@@ -1,0 +1,293 @@
+# Physics-task object loading and car callbacks
+
+Target: `GameBin/race.bin`, SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`.
+Observed with Ghidra 12.1.4 through REA; addresses below are image virtual
+addresses.
+
+## Array population
+
+`0x420480` allocates `DAT_00507D0C` with `0x800` bytes, sets the object count
+`DAT_005081E8` to zero, and repeatedly calls `0x4224D0` with the next four-byte
+slot address. The count increments after each successful read and construction.
+`0x4224D0` reads an object record, calls factory `0x422580`, invokes its virtual
+`+0x2C` method, conditionally calls `0x426F20`, and stores its pointer in the
+supplied slot. `0x426F20` assigns an object-local index at offset `+0x34` and
+advances a global index by the object's virtual `+0x18` result; it is not the
+main entity-registry insertion routine.
+
+Before populating that object array, `0x420480` obtains the track-state record
+from `0x45C2C0` and passes it to `0x426000`. That helper switches on the DWORD
+at input offset `+0x18` (decompiler expression `param_1[6]`): selector 0
+allocates `0x7DC` bytes and calls `0x43C870`; selectors 1 and 3 allocate
+`0x68` bytes, initialize with `0x43BD10`, then install vtables `0x4C7810` and
+`0x4C7880` respectively; selector 5 allocates `0x48` bytes and calls
+`0x43C360`. Other selectors call panic reporter `0x411000`. The helper
+unconditionally invokes virtual `+0x14` at its shared exit, including after
+allocation failure and after a returning panic reporter, where the selected
+object pointer is null. After the record array is loaded, `0x420480` invokes
+virtual `+0x0C` on the selected service object. This service object is separate
+from entries created by the later `0x422580` record factory.
+
+The selector-1 and selector-3 vtables share the observed status methods documented in
+`frontend_dispatch.md`: `+8` stores the mode byte as 3, `+0x0C` checks whether
+fields `+0x44`, `+0x48`, and `+0x4C` are nonzero, and `+0x14` clears fields
+`+0x54`, `+0x5C`, `+0x60`, and `+0x64` before storing mode 1. The gameplay
+meaning of these type numbers and the status byte is still unknown.
+
+The factory recognizes the following object FourCC values and constructors:
+
+| FourCC tag | Value in the x86 binary | Constructor | Allocation |
+| --- | ---: | ---: | ---: |
+| `BALL` | `0x42414C4C` | `0x43ABC0` | `0x480` |
+| `ACAR` | `0x41434152` | `0x4285D0` | `0x1080` |
+| `GCAR` | `0x47434152` | `0x4278F0` | `0xF00` |
+| `CHKP` | `0x43484B50` | `0x43A620` | `0x84` |
+| `OBST` | `0x4F425354` | `0x436860` | `0x4B0` |
+| `NCAR` | `0x4E434152` | `0x438E40` | `0xF38` |
+| `PCAR` | `0x50434152` | `0x4381E0` | `0xEF0` |
+| `STAT` | `0x53544154` | `0x437C60` | `0x6C` |
+| `WOBL` | `0x574F424C` | `0x436ED0` | `0x4B4` |
+
+These four-character labels are the readable ASCII interpretation of the
+numeric tags in the factory comparisons; they are not established class names.
+`NCAR` calls base car constructor
+`0x42FF90` before installing vtable `0x4C8238`. `PCAR` uses the constructor at
+`0x4381E0` and installs vtable `0x4C8188`.
+
+`physics_task_object_factory_descriptor` and
+`plan_physics_task_object_factory` in the source project encode this exact
+dispatch table. Allocation success, constructor return, and whether the shared
+panic reporter returns remain explicit observations. The factory evidence is
+`0x422580` (`ev_16e9359e1fff260aa38cf33c56d1c882043ea11712c8fa31761a929ff9f41f37`).
+
+## Fixed-step update dispatch
+
+`0x421050`, reached per physics step from `0x4207C0`, iterates
+`DAT_00507D0C`. For a non-null object it checks virtual `+0x2C`; if active, it
+calls virtual `+8`. It later calls virtual `+0x0C` for every non-null object.
+The earlier array initialization and factory calls show that car objects
+constructed from `NCAR` or `PCAR` records are in the same array traversed by
+this per-step dispatch.
+
+The vtable bytes at `0x4C8238` give `NCAR` virtual `+8` target `0x439200`; the
+bytes at `0x4C8188` give `PCAR` virtual `+8` target `0x4384D0`. Their
+disassembly conditionally calls `0x431150` (NCAR: `0x4392BF` and `0x439336`;
+PCAR: `0x43872F`). That method updates four wheels and then calls rigid-body
+integration `0x43ECE0`. These edges link the fixed-step task to car body updates
+for the corresponding active/state branches.
+
+The main entity registry is populated separately. World parser `0x45CAE0`
+creates a scene object for each car record through `0x463920` or `0x466840`,
+then appends it through `0x45C320`/`0x45C2E0`; that scene object's vtable
+`+8` target is `0x463EB0`, not the physics car's vtable target. Its observed
+direct call graph does not reach `0x431150`. These are distinct per-car
+instances created from the same record, as traced below. Indirect scene-update
+effects remain unresolved. Virtual `+0x2C` and class-specific conditions can
+suppress the fixed-step car callback.
+
+## Shared source record and car identity
+
+World initialization at `0x45B6B0` calls the world-record loader `0x45C630`
+before it sorts the scene objects and starts the physics-task callback through
+`0x425540`. The `obj_car` parser at `0x45CAE0` builds a `0x1E4`-byte record,
+sets its tag from the car variant, and stores the incrementing car-record index
+at record offset `+0x194`.
+
+The scene constructor `0x463920` calls `0x463510` with that same record.
+`0x463510` calls `0x425720`, which writes `record[0..record_size)` into the
+buffer allocated at `0x425420` (`DAT_00508754`) through its cursor
+`DAT_0050879C`, then advances the buffer cursor. The derived scene constructor
+`0x466840` calls `0x463920` as well. After this world-load pass, the physics
+callback's initialization state calls `0x420480(DAT_00508754)`. That routine
+deserializes the written records through `0x4224D0` and constructs their
+physics objects through `0x422580`.
+
+This establishes that the physics task consumes the same serialized car
+records produced while creating the scene objects. The ordinal at record
+offset `+0x194` is therefore shared: scene constructor `0x463920` copies it to
+scene-object offset `+0x1C8`, and physics constructor `0x42FF90` copies it to
+physics-object offset `+0x510`. The two systems create distinct objects from
+the same record, so their per-car identity correspondence is established. The
+scene object's direct `+8` path still does not show a direct call to
+`0x431150`; class-specific physics callbacks perform the known wheel/body
+integration.
+
+`plan_physics_track_service` projects selector dispatch, allocation size,
+constructor/vtable choices, panic behavior, and the final unconditional
+virtual `+0x14` call. For selectors 1 and 3, the initializer is a void helper
+and the pointer is installed directly after it, so no constructor return value
+is inferred. Allocation/constructor outcomes remain observations. Evidence:
+`0x426000`, `ev_2b5d1097e10c597fa911959cea8832d4fc90daf1d5a108167731b95dc8c346ae`.
+
+The array loop is projected by `plan_physics_task_array_population`. It records
+the fixed `0x800`-byte allocation, the unconditional first reader call, count
+increments after successful reads, and termination on the first false
+low-byte result. A bounded sequence containing only successful observations
+is reported as exhausted rather than assumed to be the real end of the input.
+The binary makes no allocation-null check before passing the global array to
+the reader, and it makes no explicit 512-pointer capacity check; both paths
+are surfaced. This loop projection does not model the preceding global reset
+stores or the later resource lookup/service callback. Evidence:
+`0x420480`, `ev_c7a8122ef79fb8e7d7e9e166e4bee5d0461c382879d95c4f0a01ddde1748d040`.
+
+The `0x426EB0` helper called between array closure and the `MIL` lookup is
+projected by `plan_physics_task_table_init`. It allocates a fixed `0x200000`
+bytes, computes unsigned `stride = previous_stride + 11`, divides that fixed
+size by the stride, and clamps the quotient using the signed comparison
+against the observed maximum-entry global. It stores the chosen count and
+stride, then allocates `count * 4` bytes and fills `count & 0x3FFFFFFF` DWORDs
+with `0xFFFFFFFF`. The following byte-fill loop is present in the decompiler
+output but starts its counter at zero, so it performs no iterations. A zero
+stride faults at division; a failed sentinel allocation faults if the fill
+count is nonzero. The primary allocation result is stored without an immediate
+check. Evidence: `0x426EB0`,
+`ev_8ad67858bad8d450cc1f946396d635333ab6ff9fb0bab2e840908a23c7fd763f`.
+
+After that helper, `0x420480` calls `0x4C59B0(0x004D494C,
+DAT_00508784 + 0x7DC)`. The wrapper allocates `0x40` bytes and, on success,
+calls `0x4C54B0` with the type and payload size. A returned object exposes its
+registry index at offset zero; the wrapper stores the object in
+`DAT_0056AFB8[index]` and returns `index + 1`. Allocation failure calls the
+panic reporter and returns zero if it returns. Constructor synchronization
+failure also calls the reporter; when it returns, `0x4C54B0` returns the
+object despite not establishing a usable index, so index/registration effects
+remain observations in `plan_legacy_resource_registration`.
+
+Once this lookup returns, `0x420480` unconditionally calls virtual `+0x0C` on
+the track service object and then sets `DAT_00508199` to 1 and
+`DAT_00508198` to 0. The observed `+0x0C` targets by selector are `0x43CB20`
+(0), `0x43BEE0` (1 and 3), and `0x43C3C0` (5), read from the selected vtables.
+Selector 0's callback at `0x43CB20` loops 16 times, zeroing DWORDs at object
+offsets `0x78C + 4*i` and writing `i + 1` at offsets `0x74 * (i + 1)`, then
+returns 1. The selector-1/3 callback is the observed three-field predicate at
+`0x43BEE0`; selector 5's callback at `0x43C3C0` returns 1 immediately.
+Registration
+evidence: `0x4C59B0`,
+`ev_e930a70e159405d16b4cd7c9a7a3b1de2fa678ee7a4e1adcb188594195d84263`, and
+`0x4C54B0`, `ev_9df77eb507cefea6dc26ef5ad85565a10ece271069287790c58fb47988f77a23`.
+Vtable evidence: `ev_da7a9eecb92a8e16ecdcb18f826acf7c967db879b937a9da55ddd357534fa107`,
+`ev_df5368c57a4556a9236aa457936eb2bc99814ecbab560077cd4c7f5e25535296`,
+`ev_4a3b3471c71109794a217ce08c7d76dcc872daec61a4b5cebf0b58bca7848b56`, and
+`ev_501298c41629653b4e6893f86e75d49d6c87fd00fefc02ca7280dc6adf931518`.
+Selector-5 callback evidence: `ev_12218e96b303370f87ea8aa9eae066440e7b821b27b6701a855daf135f2f718f`.
+
+`plan_physics_track_post_load` evaluates the recovered virtual callbacks:
+selector 0 returns true after producing its 32 ordered object writes; selectors
+1 and 3 return true exactly when all three observed fields at `+0x44`, `+0x48`,
+and `+0x4C` are nonzero; selector 5 returns true unconditionally. It reports
+the binary's unguarded virtual call on a null receiver as a fault path.
+Selector-0 instruction evidence includes the loop body at `0x43CB2B`,
+`ev_3bf36b339017898001211451ad0ec8f331bd41892f644820d8631605cfe89ba0`,
+the 16-count branch `ev_c515eaa655c2808f8e60358069f50e83c28c71067553d6d9de0d687aa1144f3b`,
+and return `ev_9945f2492c4aa9d15123120706d9d8b2c1a674a7fbcfa6a81d639e10c8752acb`.
+
+`physics_task_initialization_global_stores` returns the 61 literal DWORD
+stores in `0x420480` source order. This includes the 16-DWORD zero range at
+`0x507D70`, three 3x4 identity matrices, the three-word zero range at
+`0x508640`, scalar reset values, and the final `0x508199 = 1` / `0x508198 = 0`
+flags. Allocator and resource-helper return values are dynamic and are
+intentionally not synthesized as literal stores. Evidence:
+`0x420480`, `ev_c7a8122ef79fb8e7d7e9e166e4bee5d0461c382879d95c4f0a01ddde1748d040`.
+
+## Alternate-time command handler registry
+
+`plan_physics_command_handler_registry` projects the fixed eight-entry command
+table used by `0x426A10`. The track initializer at `0x434B60` registers command
+IDs 5 and 7 to code-fragment targets `0x430FB0` and `0x431110`; `0x4360D0`
+registers IDs 1 and 3 to `0x436190` and `0x436170`. The first constructed
+object of the `0x4285D0` class registers ID 4 to `0x4280D0`; its final
+destructor unregisters that target. Registration overwrites the selected slot
+after a no-op helper call. Unregistration scans IDs 0 through 7 and clears the
+first exact pointer match; failure calls the panic reporter. This model reports
+out-of-range registration attempts without reproducing the binary's unsafe
+global write. Handler targets are Ghidra code fragments without FunctionManager
+entries, so their full parser semantics remain partially open despite the
+fixed lengths and effects recovered below. Evidence: `0x427470`,
+`ev_f88622415ae97c159571f7ac6910b18ee12f140e1c995a7cd05e1989de3a4a7a`;
+`0x4274A0`, `ev_0f228205c6358b981b2e03eb65dbcd340d41bdf1cee40cc52500c390ab44e945`;
+`0x434B60`, `ev_63ff2becf352a2b81ae06544d220ebcb9045eca84dedc5fa64eb89bf7fb7ac48`;
+`0x4360D0`, `ev_4c48bb7817e4d2f6e653dedd1aa07dcbf82079f99d461e7ee9b8d3dbd5675fa5`;
+`0x4285D0`, `ev_576efd2d3278724c54a566ca1ed90b015dac9a8b004fdebc71de16b8ac988112`;
+`0x4289B0`, `ev_4b8fff18e11f37b984b900aa1ad1a058de057c0e4955647e0a31c6782d76016e`.
+
+Raw instruction probes now establish fixed payload lengths for every observed
+handler: ID 1 returns 20 bytes (`0x4361CF`, `ev_94208488aa10bec84d30ee55105c6e862b5010108143312e3d1f9ee29050f53d`),
+ID 3 returns 28 (`0x436181`, `ev_05f73c96c04cc7eebc279075b4be9fc8e8fad50f8a26c3070b1837b8619e34f5`),
+ID 4 returns 44 (`0x4280EC`, `ev_f05c354c77a4fef46c2d2b92695eea26b880e6133c2ba9b4d188ef5451fb2076`),
+ID 5 returns 14 on either branch (`0x4310E9`, `ev_3e9d59326d3f57feb7d4b00447d9c153ed9c4ae3c05be1eb7f4a2f5dea488ef2`,
+and `0x4310F8`, `ev_72a580a15e81e3aa03672710fa376dc1be2753b71d88d0899557ac2323d13309`),
+and ID 7 returns 2 (`0x431127`, `ev_8e7691e554ee6eed9078c8b6dfd06708fe3113886d8f7d9df7ff7714e7ba4627`).
+`plan_physics_alternate_time_path` now uses these lengths when the handler
+observation does not supply one; unknown registered IDs still require an
+observed length. Other recovered effects include ID 3's 28-byte append through
+`0x420A30`, ID 7's signed-byte task lookup and reset callback, ID 5's indexed
+task lookup and either reset or virtual `+0x3C` path, and ID 1's eight-entry
+record ring/update callback. Those object and queue mutations remain separate
+runtime observations. Helper evidence includes `0x420930`,
+`ev_33c4dd341cf4668cfab882395344a1216dc9a03679d4cae15b7d16397591e57d`,
+`0x420A30`, `ev_8e78c887ec99b926a8d90ea87f3bc5ce7e5a3645d4aed7f63e5e9662d6c838fb`,
+`0x433920`, `ev_a9ab24f7615066d8087ef3cbe99ebca5584692be6009f0aeebb7859806ff3450`,
+and `0x435FE0`, `ev_04253f3643c884dbc389a7b25838c9b860f180b996d81c377f063b4e569269d0`.
+
+The command-5 non-reset branch also has a recovered packed-float conversion.
+Payload bytes 0, 1, and 2 become the first callback vector using
+`byte * 10 / 128 - 5`. Unsigned little-endian words at byte offsets 3, 5, and
+7 become the second vector using `word * 30000 / 32768 - 15000`. The function
+stores both three-float vectors in stack locals and passes their pointers to
+the selected object's virtual `+0x3C`; source field names/units are unknown.
+The x87 intermediates are exact for these integer inputs and binary constants
+before their binary32 stores. Evidence: byte extraction/scaling at
+`0x430FD2`/`0x430FD8`/`0x430FDE`/`0x430FE3`/`0x430FF0`/`0x430FF5`/
+`0x430FFD`/`0x431004`/`0x43100E`/`0x431014`/`0x431018`,
+`0x431053`/`0x431057`/`0x43105B`; word extraction/scaling at
+`0x43105F`/`0x431065`/`0x43106B`/`0x431075`/`0x43107D`/`0x431089`/
+`0x43108D`/`0x431093`/`0x43109D`/`0x4310A9`/`0x4310AB`/`0x4310B7`/
+`0x4310C0`/`0x4310CA`/`0x4310D0` and stores
+`0x4310D6`/`0x4310DA`/`0x4310DE`. Constant bytes at `0x4C7D4C` include
+15000.0, `0x4C7D50` is 5.0, `0x4C7DAC` is 2.0, and `0x4C7DB4` is
+1/32768; constant bytes `ev_4ebc09219a12a72ddda1ed043d218530375ad7294b2f00f18f348adf758b8b9a`,
+scale instructions `ev_fbe92dd581bed6cf7cffd3a59b1ea730c05655a0df744e547da77f08136dc510`,
+`ev_dcbd6922c0ee82493dca193996db8b55ae54135c50c67e126f319840573b2215`,
+`ev_7a964e141626e837aacbb94352c5c156bfa6d4b34f64cc41d023f1963fc56771`,
+`ev_f5909875d06a69abda028d8254803df126ed4dcc727dd9b586527beed92ee63d`,
+`ev_0f06fe8f8d2281cb4bfa44e9ae4431088b68a88e1331b829b47752fb9c6f799b`,
+`ev_4cff5cdbc3444b49bded397833c11a1c2bc8d102d4758e91269875223806a5de`,
+`ev_4ba92a92986232183afb82c2b49881cd91251150110428f13fc1be387f0325f4`,
+and output stores `ev_914b8a05f821131cc766ed6936489a4261cb2770ed46e2e98b0e312abb2dab88`,
+`ev_bcfcc9f88e7c411e8680b34e083b9519b58391a4b78926559e560d4eddd98af2`,
+`ev_f2d301772b26e5c6c7b3413ada8086f59eafada91e6cfa9c99d08297b6ab2490`,
+and `ev_90da2c23b6239a79afa68bd5d15fa5f9c56ae504a51615bbdd71060542562597`.
+Pointer construction/push order (`word` vector as stack argument 0, `byte`
+vector as argument 1) is confirmed at `0x4310BC`/`0x4310C2`/`0x4310C6`/
+`0x4310C7`: `ev_bb945392cd34a41e17c7698a59bb4bfcf0726c394b0eaf28ef4f25f2da83fa2b`,
+`ev_daf399f245be14df9146d73ee162ef8fa27beb2243d386801db58a5fae47d9eb`,
+`ev_0c4151fd0dd1cf2dc322b40b8a8516551ba1922570c118c853cb69407151bfd9`,
+and `ev_27d135dea58c6cf970bf47c5e625b76a777054c4fd4b0c3ee308e5e88b8d07b4`.
+
+`plan_physics_time_command_payload` now turns those fixed-size payloads into
+bounded command effects. ID 3 models the strict `queue_size + 29 < 0x400`
+append gate and its leading record-type byte 0. ID 4 reads a DWORD and records
+the panic call unless it is 0 or 1. IDs 5 and 7 sign-extend their task index
+bytes (offset 13 and 0 respectively), resolve through the supplied task table,
+and report the unguarded null/out-of-range callback path; ID 5 distinguishes
+context 2's reset from its virtual `+0x3C` callback. ID 1 exposes its current
+eight-slot ring index and, when the slot's nested target is present, the three
+payload DWORDs and scalar bits passed to `0x435FE0`. These are portable effect
+projections: they do not mutate game object memory or the event buffer.
+
+## Record-read projection
+
+`plan_physics_task_record_load` models one iteration of `0x4224D0`. A negative
+record length ends the array without reading payload bytes. For a nonnegative
+length, the source projection requires a complete captured header and declared
+payload; an incomplete span is reported as `incomplete_payload` and records
+that the binary's unchecked copy would exceed the available span. On complete
+input it delegates FourCC allocation/construction to the factory model. It then
+records the binary's unconditional virtual `+0x2C` call—even if allocation or
+a constructor returned null—without executing an unsafe dereference. A true
+virtual result triggers `0x426F20`; a non-null object is then stored and the
+reader reports success. An unknown FourCC returns from the factory only if the
+panic reporter returns; otherwise the reader never reaches the virtual call.
+Evidence: `0x4224D0`, `ev_3daf18319a2e5bb333165deb4e9ee8040b81efdb7404bcbb769d852d8969eb61`.
+

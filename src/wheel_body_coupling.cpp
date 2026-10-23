@@ -1,0 +1,1111 @@
+#include "viper/wheel_body_coupling.hpp"
+
+#include "viper/legacy_fdiv.hpp"
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <numeric>
+
+namespace viper {
+
+bool accumulate_wheel_tire_body_force(
+    NcarForceMomentAccumulator& body_accumulator,
+    const WheelTireBasisUpdateResult& wheel_response,
+    const PhysicsVector3& application_point_0xc8,
+    const PhysicsVector3& body_center_0x5c) noexcept
+{
+    const auto& force = wheel_response.corrected_vector_0x100_0x108;
+    const std::array<float, 3> vector{force.x, force.y, force.z};
+    const std::array<float, 3> point{
+        application_point_0xc8.x,
+        application_point_0xc8.y,
+        application_point_0xc8.z};
+    const std::array<float, 3> center{
+        body_center_0x5c.x,
+        body_center_0x5c.y,
+        body_center_0x5c.z};
+    return accumulate_ncar_force_moment(body_accumulator, vector, point, center);
+}
+
+WheelSecondaryBodyForceResult accumulate_wheel_secondary_body_force(
+    NcarForceMomentAccumulator& body_accumulator,
+    const WheelSecondaryBodyForceInput& input) noexcept
+{
+    WheelSecondaryBodyForceResult result{};
+    const auto scale_component = [&input](const float value) {
+        auto scaled = static_cast<long double>(value) * input.factor_0x74;
+        scaled *= input.factor_0x48;
+        scaled *= input.factor_0x78;
+        return static_cast<float>(-scaled);
+    };
+    result.force_vector = {
+        scale_component(input.source_vector_0x10_0x18.x),
+        scale_component(input.source_vector_0x10_0x18.y),
+        scale_component(input.source_vector_0x10_0x18.z)};
+    result.application_point = {
+        static_cast<float>(static_cast<long double>(input.wheel_point_0xc8.x) *
+                               input.wheel_point_weight +
+                           static_cast<long double>(input.body_center_0x5c.x) *
+                               input.body_center_weight),
+        static_cast<float>(static_cast<long double>(input.wheel_point_0xc8.y) *
+                               input.wheel_point_weight +
+                           static_cast<long double>(input.body_center_0x5c.y) *
+                               input.body_center_weight),
+        static_cast<float>(static_cast<long double>(input.wheel_point_0xc8.z) *
+                               input.wheel_point_weight +
+                           static_cast<long double>(input.body_center_0x5c.z) *
+                               input.body_center_weight)};
+    const std::array<float, 3> vector{
+        result.force_vector.x, result.force_vector.y, result.force_vector.z};
+    const std::array<float, 3> point{
+        result.application_point.x,
+        result.application_point.y,
+        result.application_point.z};
+    const std::array<float, 3> center{
+        input.body_center_0x5c.x,
+        input.body_center_0x5c.y,
+        input.body_center_0x5c.z};
+    result.accumulated =
+        accumulate_ncar_force_moment(body_accumulator, vector, point, center);
+    return result;
+}
+
+WheelBodyForceSequenceResult accumulate_wheel_body_force_sequence(
+    NcarForceMomentAccumulator& body_accumulator,
+    const WheelTireBasisUpdateResult& wheel_response,
+    const PhysicsVector3& application_point_0xc8,
+    const PhysicsVector3& body_center_0x5c,
+    const WheelSecondaryBodyForceInput& secondary_force) noexcept
+{
+    WheelBodyForceSequenceResult result{};
+    result.tire_vector_accumulated = accumulate_wheel_tire_body_force(
+        body_accumulator, wheel_response, application_point_0xc8, body_center_0x5c);
+    auto secondary = secondary_force;
+    secondary.wheel_point_0xc8 = application_point_0xc8;
+    secondary.body_center_0x5c = body_center_0x5c;
+    result.secondary_force = accumulate_wheel_secondary_body_force(
+        body_accumulator, secondary);
+    return result;
+}
+
+WheelConditionalTireForceResult apply_wheel_conditional_tire_force(
+    NcarForceMomentAccumulator& accumulator,
+    const std::int32_t car_mode_0x4f4,
+    const WheelConditionalTireForceInput& input) noexcept
+{
+    WheelConditionalTireForceResult result{};
+    if (!input.feature_gate_0x168 || car_mode_0x4f4 != 0) {
+        return result;
+    }
+    result.gate_reached = true;
+
+    auto traction = std::max(input.tire_scalar_0x10 - 0.5F, 0.0F) * 0.5F;
+    traction = std::min(traction, 1.0F);
+    result.traction_weight = std::min(
+        traction, input.low_traction_flag_0x19c ? 0.1F : 1.0F);
+
+    const auto& tire = input.corrected_tire_vector_0x100;
+    const auto& forward = input.forward_axis_0x38;
+    const auto forward_projection =
+        (forward.x * tire.x + forward.y * tire.y) + forward.z * tire.z;
+    const auto projected = forward_projection * result.traction_weight;
+    result.force_vector = {
+        projected * forward.x * input.response_scale,
+        projected * forward.y * input.response_scale,
+        projected * forward.z * input.response_scale};
+
+    const auto& velocity = input.body_velocity_0x234;
+    result.velocity_squared =
+        (velocity.x * velocity.x + velocity.z * velocity.z) +
+        velocity.y * velocity.y;
+    if (result.velocity_squared > 0.1F) {
+        const auto inverse_speed = 1.0F / std::sqrt(result.velocity_squared);
+        const auto forward_force_projection =
+            (forward.x * result.force_vector.x +
+             forward.y * result.force_vector.y) +
+            forward.z * result.force_vector.z;
+        const auto damping = -std::fabs(forward_force_projection) * 2.5F;
+        result.force_vector.x += velocity.x * inverse_speed * damping;
+        result.force_vector.y += velocity.y * inverse_speed * damping;
+        result.force_vector.z += velocity.z * inverse_speed * damping;
+    }
+
+    const std::array<float, 3> force{
+        result.force_vector.x, result.force_vector.y, result.force_vector.z};
+    const std::array<float, 3> center{
+        input.body_center_0x5c.x, input.body_center_0x5c.y,
+        input.body_center_0x5c.z};
+    result.accumulated = accumulate_ncar_force_moment(
+        accumulator, force, center, center);
+    return result;
+}
+
+NcarPostBodyResult advance_ncar_post_body_tail(
+    NcarPostBodyState& state,
+    const NcarPostBodyInput& input) noexcept
+{
+    NcarPostBodyResult result{};
+    auto transformed_vector = input.transformed_vector_0x382;
+    if (input.derive_vector_0x382) {
+        for (std::size_t row = 0; row < transformed_vector.size(); ++row) {
+            const auto value =
+                static_cast<long double>(input.orientation_matrix_0x38[row]) *
+                    input.source_vector_0xd88[0] +
+                static_cast<long double>(input.orientation_matrix_0x38[row + 3U]) *
+                    input.source_vector_0xd88[1] +
+                static_cast<long double>(input.orientation_matrix_0x38[row + 6U]) *
+                    input.source_vector_0xd88[2];
+            transformed_vector[row] = static_cast<float>(value);
+        }
+    }
+    state.cleared_vector_0x37f = {};
+    for (std::size_t axis = 0; axis < state.vector_0x382.size(); ++axis) {
+        state.vector_0x382[axis] = static_cast<float>(
+            static_cast<long double>(transformed_vector[axis]) -
+            static_cast<long double>(input.body_axis_0x14[axis]) *
+                input.half_offset_scale_0x385 * 0.5L);
+    }
+
+    const std::array<long double, 3> normalized_axis{
+        -static_cast<long double>(input.body_axis_0x14[0]),
+        0.0L,
+        static_cast<long double>(input.body_axis_0x14[2])};
+    const auto axis_length_squared = normalized_axis[0] * normalized_axis[0] +
+        normalized_axis[1] * normalized_axis[1] +
+        normalized_axis[2] * normalized_axis[2];
+    if (axis_length_squared > 0.001L) {
+        const auto inverse_length = 1.0L / std::sqrt(axis_length_squared);
+        const std::array<long double, 3> axis{
+            normalized_axis[0] * inverse_length,
+            normalized_axis[1] * inverse_length,
+            normalized_axis[2] * inverse_length};
+        const auto scale = 0.0101936795L;
+        const std::array<long double, 3> increments{
+            (static_cast<long double>(input.angular_velocity_0xa2[0]) * axis[2] +
+             static_cast<long double>(input.angular_velocity_0xa2[2]) * axis[0]) * scale,
+            (static_cast<long double>(input.angular_velocity_0xa2[2]) * axis[2] -
+             static_cast<long double>(input.angular_velocity_0xa2[0]) * axis[0]) * scale,
+            (static_cast<long double>(input.angular_velocity_0xa2[0]) * input.reference_axis_0x44[0] +
+             static_cast<long double>(input.angular_velocity_0xa2[1]) * input.reference_axis_0x44[1] +
+             static_cast<long double>(input.angular_velocity_0xa2[2]) * input.reference_axis_0x44[2]) * scale};
+        for (std::size_t axis_index = 0; axis_index < increments.size(); ++axis_index) {
+            state.angular_accumulator_0x3a9[axis_index] = static_cast<float>(
+                static_cast<long double>(state.angular_accumulator_0x3a9[axis_index]) * 0.9L +
+                increments[axis_index]);
+        }
+        result.angular_accumulators_updated = true;
+    }
+
+    const auto contact_count = std::accumulate(
+        input.wheel_contact_bytes.begin(), input.wheel_contact_bytes.end(), 0U);
+    if (contact_count == 4U &&
+        ncar_integrator_wear_gate_0x433a00(input.wear_value_bits) == 0U) {
+        const auto x = static_cast<long double>(input.linear_velocity_0x234[0]);
+        const auto y = static_cast<long double>(input.linear_velocity_0x234[1]);
+        const auto z = static_cast<long double>(input.linear_velocity_0x234[2]);
+        auto speed = std::sqrt(x * x + y * y + z * z);
+        if (speed <= state.maximum_speed_0x38c) {
+            speed = state.maximum_speed_0x38c;
+        }
+        state.maximum_speed_0x38c = static_cast<float>(speed);
+        result.maximum_speed_store_reached = true;
+    }
+
+    if (!input.global_update_gate_0x425870 && state.timeout_pending_0x48c != 0U &&
+        static_cast<long double>(input.current_time_0x425790) >
+            static_cast<long double>(state.timeout_start_0x488) + 2.0L) {
+        result.timeout_callback_0x433920_reached = true;
+        state.timeout_auxiliary_0x48d = 0U;
+        state.timeout_values_0x48e.fill(0U);
+        state.timeout_pending_0x48c = 0U;
+        result.wheel_damage_flags_cleared = true;
+        result.backend_virtual_0x478_reached = true;
+        const auto resource_reset = reset_ncar_resource_groups(
+            input.timeout_resource_groups, state.resource_flag_0x15);
+        result.resource_groups_visited = resource_reset.groups_visited;
+        result.resource_records_copied = resource_reset.records_copied;
+        result.resource_records_unprocessed =
+            resource_reset.records_unprocessed;
+        result.resource_group_inputs_complete = resource_reset.inputs_complete;
+    }
+    result.integrator_callback_0x508a04_slot_0x38_reached = true;
+    result.integrator_callback_vehicle_ordinal_0x510 =
+        input.vehicle_ordinal_0x510;
+    return result;
+}
+
+std::uint8_t ncar_integrator_wear_gate_0x433a00(
+    const std::array<std::uint32_t, 4>& wear_value_bits) noexcept
+{
+    std::uint8_t result = 0U;
+    for (std::size_t index = 0; index < wear_value_bits.size(); ++index) {
+        if (std::bit_cast<std::int32_t>(wear_value_bits[index]) > 0x3fb9999a) {
+            result = static_cast<std::uint8_t>(result | (1U << index));
+        }
+    }
+    return result;
+}
+
+NcarIntegratorWheelPairDifferentialResult
+apply_ncar_integrator_wheel_pair_differentials(
+    const NcarIntegratorWheelPairDifferentialInput& input) noexcept
+{
+    const auto first = static_cast<float>(
+        (static_cast<long double>(input.first_value_0x63c) -
+         input.first_reference_0x7e0) * input.first_scale_0xdd4);
+    const auto second = static_cast<float>(
+        (static_cast<long double>(input.second_value_0x984) -
+         input.second_reference_0xb28) * input.second_scale_0xdd8);
+    const auto first_applied = input.contact_bytes[0] != 0U ||
+        input.contact_bytes[1] != 0U ? first : 0.0F;
+    const auto second_applied = input.contact_bytes[2] != 0U ||
+        input.contact_bytes[3] != 0U ? second : 0.0F;
+    return {
+        -first_applied,
+        first_applied,
+        -second_applied,
+        second_applied};
+}
+
+NcarIntegratorCommonForceResult apply_ncar_integrator_common_force(
+    NcarForceMomentAccumulator& accumulator,
+    const NcarIntegratorCommonForceInput& input) noexcept
+{
+    NcarIntegratorCommonForceResult result{};
+    result.contact_byte_sum = std::accumulate(
+        input.contact_bytes.begin(), input.contact_bytes.end(), 0U);
+    result.high_contact_branch = result.contact_byte_sum >= 2U;
+
+    const auto dot = [](const PhysicsVector3& left, const PhysicsVector3& right) {
+        return (left.x * right.x + left.y * right.y) + left.z * right.z;
+    };
+    if (!result.high_contact_branch) {
+        const auto x_projection = dot(input.reference_axis_0x44,
+                                      input.velocity_delta_0x234_0xdfc);
+        const auto y_projection = dot(input.body_axis_0x50,
+                                      input.velocity_delta_0x234_0xdfc);
+        const auto z_projection = dot(input.force_axis_0x38,
+                                      input.velocity_delta_0x234_0xdfc);
+        const auto x_resistance = x_projection * input.resistance_scale_0x150;
+        const auto y_resistance = y_projection * input.resistance_scale_0x14e;
+        const auto z_resistance = z_projection * input.resistance_scale_0x14f;
+        const auto magnitude = std::sqrt(
+            (x_resistance * x_resistance + y_resistance * y_resistance) +
+            z_resistance * z_resistance);
+        result.local_force = {
+            -input.velocity_delta_0x234_0xdfc.x * magnitude,
+            -input.velocity_delta_0x234_0xdfc.y * magnitude,
+            -input.velocity_delta_0x234_0xdfc.z * magnitude};
+        result.force_vector = result.local_force;
+    } else {
+        const auto quadratic_resistance = [](const float component, const float scale) {
+            return -std::fabs(component) * component * scale;
+        };
+        result.local_force = {
+            quadratic_resistance(input.transformed_velocity_delta_0xdf0.x,
+                                 input.ground_scale_0x53c),
+            quadratic_resistance(input.transformed_velocity_delta_0xdf0.y,
+                                 input.ground_scale_0x540),
+            quadratic_resistance(input.transformed_velocity_delta_0xdf0.z,
+                                 input.ground_scale_0x538)};
+        const auto& m = input.transform_0x38_to_0x58;
+        result.force_vector = {
+            (m[0] * result.local_force.x + m[3] * result.local_force.y) +
+                m[6] * result.local_force.z,
+            (m[1] * result.local_force.x + m[4] * result.local_force.y) +
+                m[7] * result.local_force.z,
+            (m[2] * result.local_force.x + m[5] * result.local_force.y) +
+                m[8] * result.local_force.z};
+    }
+
+    const std::array<float, 3> force{
+        result.force_vector.x, result.force_vector.y, result.force_vector.z};
+    const std::array<float, 3> point{
+        input.application_point.x, input.application_point.y,
+        input.application_point.z};
+    const std::array<float, 3> center{
+        input.body_center.x, input.body_center.y, input.body_center.z};
+    result.accumulated = accumulate_ncar_force_moment(
+        accumulator, force, point, center);
+    return result;
+}
+
+NcarIntegratorVelocityForceResult apply_ncar_integrator_velocity_forces(
+    NcarForceMomentAccumulator& accumulator,
+    const NcarIntegratorVelocityForceInput& input) noexcept
+{
+    NcarIntegratorVelocityForceResult result{};
+    const auto dot = [](const PhysicsVector3& left, const PhysicsVector3& right) {
+        return (left.x * right.x + left.y * right.y) + left.z * right.z;
+    };
+    const auto& velocity = input.velocity_vector;
+    result.speed = std::sqrt(dot(velocity, velocity));
+    result.projection = dot(input.projection_axis_0x50, velocity);
+    const auto projection_squared = result.projection * result.projection;
+    constexpr float energy_scale = -0.101936795F;
+
+    for (std::size_t index = 0; index < result.force_vectors.size(); ++index) {
+        const auto quadratic = projection_squared * input.quadratic_scale[index];
+        const auto damping = -(input.damping_scale[index] * result.speed);
+        result.force_vectors[index] = {
+            velocity.x * damping + input.force_axis_0x44.x * quadratic,
+            velocity.y * damping + input.force_axis_0x44.y * quadratic,
+            velocity.z * damping + input.force_axis_0x44.z * quadratic};
+        const auto& force = result.force_vectors[index];
+        const std::array<float, 3> force_components{force.x, force.y, force.z};
+        const auto& point = input.application_points[index];
+        const std::array<float, 3> point_components{point.x, point.y, point.z};
+        const std::array<float, 3> center_components{
+            input.body_center.x, input.body_center.y, input.body_center.z};
+        result.accumulated[index] = accumulate_ncar_force_moment(
+            accumulator, force_components, point_components, center_components);
+        result.per_step_energy_0xeb4 +=
+            input.mass_0x200 * force.y * energy_scale;
+    }
+    return result;
+}
+
+NcarAttachedObjectForceResult apply_ncar_attached_object_force(
+    NcarForceMomentAccumulator& accumulator,
+    const NcarAttachedObjectForceInput& input) noexcept
+{
+    NcarAttachedObjectForceResult result{};
+    const auto dot = [](const PhysicsVector3& left, const PhysicsVector3& right) {
+        return (left.x * right.x + left.y * right.y) + left.z * right.z;
+    };
+    const auto& velocity = input.transformed_relative_velocity;
+    result.speed = std::sqrt(dot(velocity, velocity));
+    const auto denominator = std::max(result.speed, 1.0F);
+    const PhysicsVector3 normalized_velocity{
+        velocity.x / denominator, velocity.y / denominator,
+        velocity.z / denominator};
+    const auto& selected_basis = input.select_basis_0x44
+        ? input.object_basis_0x44
+        : input.object_basis_0x38;
+    result.normalized_projection = dot(selected_basis, normalized_velocity);
+
+    const auto projection_error = input.target_projection_0x38 -
+        result.normalized_projection;
+    result.slip_factor = std::clamp(
+        projection_error * 3.8197186F, -1.0F, 1.0F) * 1.6F;
+    if (dot(input.body_axis_0x50, velocity) < 0.0F) {
+        result.slip_factor = 0.0F;
+    }
+    result.resistance_factor = std::min(
+        projection_error * projection_error * 0.13131225F, 0.05F) + 0.006F;
+    const auto scale = input.coefficient_0x04 * input.coefficient_0x08 * 0.2F *
+        (result.speed * result.speed) * 0.645F;
+    result.force = {
+        (result.slip_factor * selected_basis.x -
+         input.body_axis_0x50.x * result.resistance_factor) * scale,
+        (result.slip_factor * selected_basis.y -
+         input.body_axis_0x50.y * result.resistance_factor) * scale,
+        (result.slip_factor * selected_basis.z -
+         input.body_axis_0x50.z * result.resistance_factor) * scale};
+
+    const std::array<float, 3> force{result.force.x, result.force.y, result.force.z};
+    const std::array<float, 3> point{
+        input.application_point_0x28.x, input.application_point_0x28.y,
+        input.application_point_0x28.z};
+    const std::array<float, 3> center{
+        input.body_center.x, input.body_center.y, input.body_center.z};
+    result.applied = accumulate_ncar_force_moment(accumulator, force, point, center);
+    return result;
+}
+
+NcarIntegratorModeForceResult apply_ncar_integrator_mode_force(
+    NcarForceMomentAccumulator& accumulator,
+    const NcarIntegratorModeForceInput& input) noexcept
+{
+    NcarIntegratorModeForceResult result{};
+    if (input.mode_0x4f4 != 0 && input.mode_0x4f4 != 1) {
+        return result;
+    }
+    result.supported_mode = true;
+
+    const auto dot = [](const PhysicsVector3& left, const PhysicsVector3& right) {
+        return (left.x * right.x + left.y * right.y) + left.z * right.z;
+    };
+    const auto squared_length = [](const PhysicsVector3& value) {
+        return (value.x * value.x + value.y * value.y) + value.z * value.z;
+    };
+    const auto angular_projection = dot(
+        input.angular_velocity_0x240, input.body_axis_0x44);
+    const auto velocity_squared = squared_length(input.linear_velocity_0x234);
+    auto speed_vector = input.linear_velocity_0x234;
+    auto mode_scale = input.mode_0x4f4 == 0 ? 1.0F : 2.0F;
+    const auto apply_wear_scale = [&input, &mode_scale]() {
+        for (std::size_t index = 0; index < input.wear_value_bits.size(); ++index) {
+            if (std::bit_cast<std::int32_t>(input.wear_value_bits[index]) >
+                0x3dcccccd) {
+                mode_scale *= index < 2U ? 0.9F : 1.3F;
+            }
+        }
+    };
+    if (input.mode_0x4f4 == 0) {
+        apply_wear_scale();
+        auto response_scale = std::fabs(angular_projection) * 2.5F;
+        if (response_scale <= 0.4F) {
+            response_scale = 0.4F;
+        }
+        if (response_scale >= 1.0F) {
+            response_scale = 1.0F;
+        }
+        if (velocity_squared < 177.77777F) {
+            const auto speed_factor = velocity_squared * 0.005625F;
+            response_scale *= speed_factor;
+            mode_scale *= speed_factor;
+        }
+        if (velocity_squared > 1.0F) {
+            const auto root = std::sqrt(velocity_squared);
+            const auto reciprocal = static_cast<float>(
+                divide_with_vc98_fdiv_compatibility(
+                    1.0L, root, input.fdiv_compatibility_enabled));
+            speed_vector = {
+                speed_vector.x * reciprocal,
+                speed_vector.y * reciprocal,
+                speed_vector.z * reciprocal};
+        }
+        auto force_magnitude = input.force_scale_0xdcc *
+            input.force_scale_0x500 * mode_scale * 0.9F;
+        response_scale *= 0.99F;
+        const auto forward_projection = dot(input.body_axis_0x50, speed_vector);
+        if (forward_projection < 0.98F) {
+            mode_scale = force_magnitude * 0.5F;
+            force_magnitude = angular_projection * 0.2F;
+        } else {
+            mode_scale = force_magnitude;
+            force_magnitude = angular_projection;
+        }
+        const auto scalar = mode_scale * 1000.0F + force_magnitude * -140.0F;
+        result.force_vector = {
+            input.force_axis_0x38.x * response_scale * scalar,
+            input.force_axis_0x38.y * response_scale * scalar,
+            input.force_axis_0x38.z * response_scale * scalar};
+    } else {
+        if (velocity_squared < 1.0F) {
+            mode_scale = velocity_squared * 2.0F;
+        }
+        apply_wear_scale();
+        const auto angular_magnitude = std::fabs(angular_projection) * 2.5F;
+        const auto tire_response = std::min(
+            1.0F, std::max(0.2F, angular_magnitude));
+        auto force_magnitude = angular_projection * -0.05F +
+            input.force_scale_0xdcc * input.force_scale_0x500 * mode_scale * 0.1F;
+        force_magnitude *= 1000.0F;
+        result.force_vector = {
+            input.force_axis_0x38.x * tire_response * force_magnitude,
+            input.force_axis_0x38.y * tire_response * force_magnitude,
+            input.force_axis_0x38.z * tire_response * force_magnitude};
+    }
+
+    const auto contact_count = std::accumulate(
+        input.contact_bytes.begin(), input.contact_bytes.end(), 0U);
+    result.contact_gate_passed = contact_count > 2U &&
+        input.leading_wheel_damage_bytes[0] == 0U &&
+        input.leading_wheel_damage_bytes[1] == 0U;
+    if (!result.contact_gate_passed) {
+        return result;
+    }
+    const auto forward_projection = dot(
+        input.body_axis_0x50, input.mode_0x4f4 == 0
+            ? speed_vector : input.linear_velocity_0x234);
+    result.forward_gate_passed = forward_projection > 0.1F;
+    if (!result.forward_gate_passed) {
+        return result;
+    }
+
+    const std::array<float, 3> force{
+        result.force_vector.x, result.force_vector.y, result.force_vector.z};
+    const std::array<float, 3> point{
+        input.application_point.x,
+        input.application_point.y,
+        input.application_point.z};
+    const std::array<float, 3> center{
+        input.body_center.x, input.body_center.y, input.body_center.z};
+    result.accumulated = accumulate_ncar_force_moment(
+        accumulator, force, point, center);
+    return result;
+}
+
+WheelCollisionImpulseApplicationResult apply_wheel_collision_impulse(
+    NcarPointImpulseAccumulator& accumulator,
+    std::uint8_t& wheel_damage_flag_0x20,
+    const WheelCollisionImpulseInput& input) noexcept
+{
+    WheelCollisionImpulseApplicationResult result{};
+    result.response = prepare_wheel_collision_impulse(input);
+    if (!result.response.applied) {
+        return result;
+    }
+
+    if (result.response.set_wheel_damage_flag) {
+        wheel_damage_flag_0x20 = 1U;
+        result.damage_flag_written = true;
+    }
+
+    const std::array<float, 3> impulse{
+        result.response.impulse.x,
+        result.response.impulse.y,
+        result.response.impulse.z};
+    const std::array<float, 3> point{
+        input.contact_point.x,
+        input.contact_point.y,
+        input.contact_point.z};
+    const std::array<float, 3> center{
+        input.body_center.x,
+        input.body_center.y,
+        input.body_center.z};
+    accumulate_ncar_point_impulse(
+        accumulator, impulse, point, center, result.response.duration);
+    result.point_impulse_accumulated = true;
+    return result;
+}
+
+FourWheelCollisionImpulseResult apply_four_wheel_collision_impulses(
+    NcarPointImpulseAccumulator& accumulator,
+    const std::array<std::uint8_t, 4>& wheel_damage_flags_0x20,
+    const std::array<WheelCollisionImpulseInput, 4>& inputs) noexcept
+{
+    FourWheelCollisionImpulseResult result{};
+    result.wheel_damage_flags = wheel_damage_flags_0x20;
+    constexpr std::size_t wheel_stride_bytes = 0x1a4U;
+    for (std::size_t wheel = 0; wheel < inputs.size(); ++wheel) {
+        result.wheel_subobject_offsets[wheel] = wheel * wheel_stride_bytes;
+        result.wheel_results[wheel] = apply_wheel_collision_impulse(
+            accumulator, result.wheel_damage_flags[wheel], inputs[wheel]);
+        ++result.wheel_calls;
+    }
+    return result;
+}
+
+FourWheelBodyStepResult advance_four_wheel_body_step(
+    const FourWheelBodyStepInput& input)
+{
+    FourWheelBodyStepResult result{};
+    result.integrator_bookkeeping_state = input.integrator_bookkeeping_state;
+    result.wheel_animation_states = input.wheel_animation_states;
+    result.vehicle_animation_channel_0x18 =
+        input.vehicle_animation_channel_0x18;
+    result.vehicle_animation_channel_0x5c =
+        input.vehicle_animation_channel_0x5c;
+    result.body_tail_state = input.body_tail_state;
+    result.post_body_state = input.post_body_state;
+    result.point_impulse_state = input.point_impulse_state;
+    result.force_moment_state = input.force_moment_state;
+    result.wheel_tire_dynamics_states = input.wheel_tire_dynamics_states;
+    result.wheel_tire_accumulator_states = input.wheel_tire_accumulator_states;
+    result.wheel_contact_states = input.wheel_contact_states;
+    result.energy_accumulator_0xe40 = input.energy_accumulator_0xe40;
+    result.embedded_records.input_complete =
+        input.embedded_record_count_0x7b == 0U;
+    result.wheel_collisions.wheel_damage_flags = input.wheel_damage_flags_0x20;
+    constexpr std::size_t wheel_stride_bytes = 0x1a4U;
+    for (std::size_t wheel = 0; wheel < input.wheel_collision_inputs.size(); ++wheel) {
+        result.wheel_collisions.wheel_subobject_offsets[wheel] =
+            wheel * wheel_stride_bytes;
+        if (input.wheel_update_prefix_enabled) {
+            auto prefix_input = input.wheel_update_prefix_inputs[wheel];
+            prefix_input.damage_flag_0x20 =
+                result.wheel_collisions.wheel_damage_flags[wheel] != 0U;
+            if (input.wheel_spin_preprojection_enabled) {
+                prefix_input.rate_0x124 =
+                    input.wheel_spin_preprojection_inputs[wheel].spin_rate_0x124;
+                prefix_input.wheel_scalar_0x5c =
+                    input.wheel_spin_preprojection_inputs[wheel].wheel_scalar_0x5c;
+            }
+            prefix_input.angle_0xac =
+                input.wheel_animation_basis_inputs[wheel].steering_angle_0xac;
+            if (input.wheel_contact_pipeline_enabled) {
+                const auto& point_transform =
+                    input.wheel_update_pipeline_inputs[wheel].point_transform;
+                prefix_input.reference_point = point_transform.referenced_point_0x10;
+                prefix_input.wheel_position_0x14 =
+                    point_transform.wheel_position_0x04_0x0c;
+            }
+            result.wheel_update_prefix_results[wheel] =
+                advance_wheel_update_prefix(prefix_input);
+            result.wheel_collisions.wheel_damage_flags[wheel] =
+                result.wheel_update_prefix_results[wheel].damage_flag_0x20 ? 1U : 0U;
+        }
+        auto collision_input = input.wheel_collision_inputs[wheel];
+        auto curve_factor_input = input.wheel_tire_curve_factor_inputs[wheel];
+        if (input.derive_wheel_tire_setup) {
+            curve_factor_input.curves = derive_tire_response_curves(
+                input.wheel_tire_definitions[wheel]);
+        }
+        result.wheel_tire_curves[wheel] = curve_factor_input.curves;
+        auto response_vector_input = input.wheel_tire_response_vector_inputs[wheel];
+        auto wheel_application_point = input.wheel_application_points_0xc8[wheel];
+        if (input.wheel_spin_preprojection_enabled) {
+            auto spin_input = input.wheel_spin_preprojection_inputs[wheel];
+            spin_input.damage_flag_0x20 =
+                result.wheel_collisions.wheel_damage_flags[wheel];
+            if (input.wheel_update_prefix_enabled) {
+                spin_input.value_0xa8 =
+                    result.wheel_update_prefix_results[wheel].value_0xa8;
+                spin_input.use_precomputed_value_0xa8 = true;
+            }
+            spin_input.state_0x170 =
+                input.wheel_tire_dynamics_states[wheel].filtered_component_0x170;
+            spin_input.state_0x174 =
+                input.wheel_tire_dynamics_states[wheel].filtered_component_0x174;
+            spin_input.response_value_0x178 =
+                input.wheel_tire_dynamics_states[wheel].suspension_response_0x178;
+            spin_input.previous_filter_0x17c =
+                input.wheel_tire_dynamics_states[wheel].spin_filter_0x17c;
+            const auto& high_speed_axis = input.mode_force_input.body_axis_0x50;
+            const auto& linear_velocity = input.kinematics.linear_velocity;
+            spin_input.high_speed_projection =
+                high_speed_axis.x * linear_velocity.x +
+                high_speed_axis.y * linear_velocity.y +
+                high_speed_axis.z * linear_velocity.z;
+            result.wheel_spin_preprojection_results[wheel] =
+                update_wheel_spin_preprojection(spin_input);
+            result.wheel_tire_dynamics_states[wheel].spin_filter_0x17c =
+                result.wheel_spin_preprojection_results[wheel].filter_0x17c;
+            result.wheel_animation_states[wheel].field_0x12c =
+                result.wheel_spin_preprojection_results[wheel].auxiliary_0x12c;
+            curve_factor_input.wheel_spin_rate_0x124 =
+                result.wheel_spin_preprojection_results[wheel].spin_rate_0x124;
+            curve_factor_input.wheel_scalar_0x5c = spin_input.wheel_scalar_0x5c;
+            curve_factor_input.derive_rolling_surface_speed = true;
+        }
+        if (curve_factor_input.derive_rolling_surface_speed) {
+            curve_factor_input.rolling_surface_speed =
+                curve_factor_input.wheel_spin_rate_0x124 *
+                curve_factor_input.wheel_scalar_0x5c;
+        }
+        if (input.derive_wheel_moment_vectors) {
+            auto moment_input = input.wheel_moment_vector_inputs[wheel];
+            moment_input.body_basis_0x38_to_0x58 =
+                input.wheel_animation_basis_inputs[wheel]
+                    .body_basis_0x38_to_0x58;
+            if (input.wheel_spin_preprojection_enabled) {
+                moment_input.spin_rate_0x124 =
+                    result.wheel_spin_preprojection_results[wheel].spin_rate_0x124;
+            }
+            result.wheel_moment_vector_results[wheel] =
+                derive_wheel_moment_vector_0x43e7f0(moment_input);
+            result.wheel_moment_vectors_applied[wheel] =
+                result.wheel_moment_vector_results[wheel].moment_vector_0x258;
+        } else {
+            result.wheel_moment_vectors_applied[wheel] =
+                input.wheel_moment_vectors_0x258[wheel];
+        }
+        const auto& moment = result.wheel_moment_vectors_applied[wheel];
+        accumulate_ncar_moment_vector(
+            result.force_moment_state, {moment.x, moment.y, moment.z});
+        if (input.wheel_contact_pipeline_enabled) {
+            collision_input.contact_normal = {0.0F, 1.0F, 0.0F};
+            collision_input.contact_depth = 0.0F;
+            curve_factor_input.contact_normal_components = {0.0F, 1.0F, 0.0F};
+            response_vector_input.contact_normal = {0.0F, 1.0F, 0.0F};
+            auto wheel_update_input = input.wheel_update_pipeline_inputs[wheel];
+            wheel_update_input.feature_state.state_0xec =
+                result.wheel_tire_accumulator_states[wheel].state_0xec;
+            wheel_update_input.feature_state.state_0xf0 =
+                result.wheel_tire_accumulator_states[wheel].state_0xf0;
+            wheel_update_input.feature_state.response_gate_0x11c =
+                result.wheel_tire_dynamics_states[wheel].response_gate_0x11c;
+            result.wheel_contact_pipeline_results[wheel] = advance_wheel_update_pipeline(
+                result.wheel_contact_states[wheel],
+                wheel_update_input);
+            wheel_application_point = transform_wheel_point_0xc8(
+                wheel_update_input.point_transform);
+            const auto& update = result.wheel_contact_pipeline_results[wheel];
+            result.wheel_tire_accumulator_states[wheel].state_0xec =
+                update.feature_state.state_0xec;
+            result.wheel_tire_accumulator_states[wheel].state_0xf0 =
+                update.feature_state.state_0xf0;
+            result.wheel_tire_dynamics_states[wheel].response_gate_0x11c =
+                update.feature_state.response_gate_0x11c;
+            curve_factor_input.reference_speed_scale_0x1c =
+                update.feature_profile.response_scale;
+            curve_factor_input.use_reference_speed_scale_0x1c = true;
+            if (update.contact.reached_query) {
+                if (wheel_update_input.contact.query_succeeded) {
+                    collision_input.contact_normal =
+                        wheel_update_input.contact.query_contact_normal;
+                    curve_factor_input.contact_normal_components = {
+                        collision_input.contact_normal.x,
+                        collision_input.contact_normal.y,
+                        collision_input.contact_normal.z};
+                    response_vector_input.contact_normal =
+                        collision_input.contact_normal;
+                }
+                if (update.contact.contact_gate_passed) {
+                    collision_input.contact_depth = update.contact.clamped_contact_depth;
+                } else {
+                    collision_input.contact_depth = 0.0F;
+                }
+            }
+            const auto& suspension_force = update.suspension.finalized.applied_force;
+            curve_factor_input.suspension_response_components = {
+                suspension_force.x, suspension_force.y, suspension_force.z};
+
+            const auto point_velocity = derive_body_point_velocity_0x43e9b0({
+                input.kinematics.position,
+                result.wheel_contact_states[wheel].contact_point_0x130,
+                input.kinematics.linear_velocity,
+                input.kinematics.angular_velocity});
+            result.wheel_point_velocities_0x43e9b0[wheel] = point_velocity;
+            const auto& forward = response_vector_input.forward_basis;
+            const auto& normal = response_vector_input.contact_normal;
+            const PhysicsVector3 lateral{
+                normal.y * forward.z - normal.z * forward.y,
+                normal.z * forward.x - normal.x * forward.z,
+                normal.x * forward.y - normal.y * forward.x};
+            curve_factor_input.lateral_velocity =
+                point_velocity.x * lateral.x + point_velocity.y * lateral.y +
+                point_velocity.z * lateral.z;
+            curve_factor_input.longitudinal_velocity =
+                point_velocity.x * forward.x + point_velocity.y * forward.y +
+                point_velocity.z * forward.z;
+            curve_factor_input.slip_curve_input =
+                curve_factor_input.rolling_surface_speed -
+                curve_factor_input.longitudinal_velocity;
+        }
+        // These collision arguments are read from the body and wheel records
+        // by 0x442530. Reuse the state already carried by the body step and
+        // contact pipeline rather than requiring duplicate caller snapshots.
+        collision_input.body_center = input.kinematics.position;
+        collision_input.body_velocity = input.kinematics.linear_velocity;
+        if (input.wheel_contact_pipeline_enabled) {
+            collision_input.contact_point =
+                result.wheel_contact_states[wheel].contact_point_0x130;
+        }
+        result.wheel_collisions.wheel_results[wheel] = apply_wheel_collision_impulse(
+            result.point_impulse_state,
+            result.wheel_collisions.wheel_damage_flags[wheel],
+            collision_input);
+        auto animation_basis_input = input.wheel_animation_basis_inputs[wheel];
+        if (input.wheel_update_prefix_enabled) {
+            animation_basis_input.steering_angle_0xac =
+                result.wheel_update_prefix_results[wheel].angle_0xac;
+        }
+        animation_basis_input.damage_flag_0x20 =
+            result.wheel_collisions.wheel_damage_flags[wheel] != 0U;
+        if (input.wheel_contact_pipeline_enabled) {
+            animation_basis_input.contact_depth_0xe8 =
+                result.wheel_contact_pipeline_results[wheel]
+                    .suspension.finalized.next_contact_depth_0xe8;
+        }
+        result.wheel_animation_basis_states[wheel] = advance_wheel_animation_basis(
+            animation_basis_input);
+        result.wheel_moment_local_axes_next_0xb0[wheel] = {
+            result.wheel_animation_basis_states[wheel].sine_0xb0,
+            result.wheel_animation_basis_states[wheel].zero_0xb4,
+            result.wheel_animation_basis_states[wheel].cosine_0xb8};
+        if (input.wheel_contact_pipeline_enabled) {
+            const auto& suspension_force = result.wheel_contact_pipeline_results[wheel]
+                .suspension.finalized.applied_force;
+            const std::array<float, 3> force{
+                suspension_force.x, suspension_force.y, suspension_force.z};
+            const std::array<float, 3> application_point{
+                wheel_application_point.x,
+                wheel_application_point.y,
+                wheel_application_point.z};
+            const std::array<float, 3> body_center{
+                collision_input.body_center.x,
+                collision_input.body_center.y,
+                collision_input.body_center.z};
+            result.wheel_suspension_force_accumulated[wheel] =
+                accumulate_ncar_force_moment(
+                    result.force_moment_state, force, application_point, body_center);
+        }
+        result.wheel_application_points_applied_0xc8[wheel] = wheel_application_point;
+        const auto response_derivation = derive_tire_wheel_response(
+            response_vector_input.factors, curve_factor_input);
+        auto dynamics_input = input.wheel_tire_dynamics_inputs[wheel];
+        if (input.derive_wheel_tire_setup) {
+            dynamics_input.tire_terms = derive_tire_trigonometric_terms(
+                input.wheel_tire_definitions[wheel]);
+        }
+        dynamics_input.instantaneous_component_0x2c =
+            response_derivation.dynamics_component_0x2c;
+        dynamics_input.instantaneous_component_0x30 =
+            response_derivation.dynamics_component_0x30;
+        dynamics_input.secondary_slip_component_0xe4 =
+            response_derivation.secondary_slip_component_0xe4;
+        dynamics_input.clear_filter_state = dynamics_input.clear_filter_state ||
+            !response_derivation.dynamics_division_valid;
+        if (input.wheel_contact_pipeline_enabled) {
+            result.wheel_tire_dynamics_states[wheel].suspension_response_0x178 =
+                result.wheel_contact_pipeline_results[wheel]
+                    .suspension.surface.adjusted_response;
+        }
+        result.wheel_tire_dynamics_results[wheel] = advance_wheel_tire_dynamics(
+            result.wheel_tire_dynamics_states[wheel], dynamics_input);
+        auto evolved_response_factors = response_derivation.factors;
+        evolved_response_factors.trigonometric_response =
+            result.wheel_tire_dynamics_results[wheel].trigonometric_response;
+        const auto response_components =
+            combine_tire_wheel_response(evolved_response_factors);
+        if (input.wheel_tire_accumulators_enabled) {
+            auto accumulator_input = input.wheel_tire_accumulator_inputs[wheel];
+            const auto& accumulator_state =
+                result.wheel_tire_accumulator_states[wheel];
+            accumulator_input.accumulator_0xa4 =
+                accumulator_state.accumulator_0xa4;
+            accumulator_input.accumulator_0x10c =
+                accumulator_state.accumulator_0x10c;
+            accumulator_input.state_0xec = accumulator_state.state_0xec;
+            accumulator_input.state_0xf0 = accumulator_state.state_0xf0;
+            accumulator_input.forward_response_local_0x38 =
+                response_components.forward;
+            accumulator_input.lateral_response_local_0x2c =
+                response_components.lateral;
+            if (input.wheel_contact_pipeline_enabled) {
+                accumulator_input.divisor_0x1c =
+                    result.wheel_contact_pipeline_results[wheel]
+                        .feature_profile.response_scale;
+            }
+            accumulator_input.response_gate_0x11c =
+                result.wheel_tire_dynamics_states[wheel].response_gate_0x11c;
+            if (input.wheel_contact_pipeline_enabled) {
+                accumulator_input.contact_active_0x168 =
+                    result.wheel_contact_states[wheel].contact_active_0x168 != 0U;
+            }
+            result.wheel_tire_accumulator_results[wheel] =
+                advance_wheel_tire_accumulators(accumulator_input);
+            const auto& accumulator_result =
+                result.wheel_tire_accumulator_results[wheel];
+            result.wheel_tire_accumulator_states[wheel] = {
+                accumulator_result.accumulator_0xa4,
+                accumulator_result.accumulator_0x10c,
+                accumulator_result.state_0xec,
+                accumulator_result.state_0xf0};
+        }
+        response_vector_input.factors = evolved_response_factors;
+        result.wheel_tire_response_vectors[wheel] = derive_wheel_tire_response_vector(
+            response_vector_input);
+        auto tire_basis_input = input.wheel_tire_basis_update_inputs[wheel];
+        tire_basis_input.response_vector_after_scaling =
+            result.wheel_tire_response_vectors[wheel];
+        tire_basis_input.basis_0x110_0x118 = {
+            result.wheel_animation_basis_states[wheel].basis_0x110_0x118[0],
+            result.wheel_animation_basis_states[wheel].basis_0x110_0x118[1],
+            result.wheel_animation_basis_states[wheel].basis_0x110_0x118[2]};
+        result.wheel_tire_basis_updates[wheel] = apply_wheel_tire_basis_update(
+            tire_basis_input);
+        auto secondary_force_input = input.wheel_secondary_body_forces[wheel];
+        if (input.wheel_contact_pipeline_enabled) {
+            secondary_force_input.factor_0x78 =
+                result.wheel_contact_pipeline_results[wheel]
+                    .feature_profile.secondary_response;
+        }
+        result.wheel_body_forces[wheel] = accumulate_wheel_body_force_sequence(
+            result.force_moment_state,
+            result.wheel_tire_basis_updates[wheel],
+            wheel_application_point,
+            collision_input.body_center,
+            secondary_force_input);
+        auto conditional_tire_input = input.wheel_conditional_tire_force_inputs[wheel];
+        conditional_tire_input.tire_scalar_0x10 =
+            curve_factor_input.curves.quadratic.quadratic;
+        conditional_tire_input.corrected_tire_vector_0x100 =
+            result.wheel_tire_basis_updates[wheel].corrected_vector_0x100_0x108;
+        conditional_tire_input.body_center_0x5c =
+            collision_input.body_center;
+        conditional_tire_input.body_velocity_0x234 =
+            collision_input.body_velocity;
+        conditional_tire_input.response_scale = 1.0F;
+        if (input.wheel_contact_pipeline_enabled) {
+            conditional_tire_input.feature_gate_0x168 =
+                result.wheel_contact_states[wheel].contact_active_0x168 != 0U;
+            conditional_tire_input.low_traction_flag_0x19c =
+                result.wheel_contact_states[wheel].contact_feature_0x19c != 0;
+        }
+        result.wheel_conditional_tire_forces[wheel] =
+            apply_wheel_conditional_tire_force(
+                result.force_moment_state,
+                input.mode_force_input.mode_0x4f4,
+                conditional_tire_input);
+        auto finalization_input = input.wheel_rate_finalization_inputs[wheel];
+        if (input.wheel_contact_pipeline_enabled) {
+            finalization_input.animation_flags_0x120 =
+                result.wheel_contact_pipeline_results[wheel]
+                    .feature_state.animation_flags_0x120;
+        }
+        if (input.wheel_spin_preprojection_enabled) {
+            finalization_input.rate_0x124 =
+                result.wheel_spin_preprojection_results[wheel].spin_rate_0x124;
+            finalization_input.blend_local_0x28 =
+                result.wheel_spin_preprojection_results[wheel].blend_local_0x28;
+            finalization_input.response_local_0x90 =
+                result.wheel_spin_preprojection_results[wheel].response_local_0x90;
+        }
+        const auto& tire_vector = result.wheel_tire_response_vectors[wheel];
+        const auto& wheel_forward = response_vector_input.forward_basis;
+        finalization_input.response_local_0x90 -=
+            tire_vector.x * wheel_forward.x +
+            tire_vector.y * wheel_forward.y +
+            tire_vector.z * wheel_forward.z;
+        result.wheel_rate_response_local_0x90[wheel] =
+            finalization_input.response_local_0x90;
+        finalization_input.damage_flag_0x20 =
+            result.wheel_collisions.wheel_damage_flags[wheel];
+        result.wheel_rate_finalization_results[wheel] = finalize_wheel_rate_state(
+            finalization_input);
+        ++result.wheel_collisions.wheel_calls;
+    }
+
+    result.integrator_bookkeeping = advance_ncar_integrator_bookkeeping(
+        result.integrator_bookkeeping_state,
+        input.integrator_bookkeeping_input);
+    if (result.integrator_bookkeeping.substep_helper_0x4323e0_reached) {
+        result.periodic_animation = advance_vehicle_animation_frame(
+            result.wheel_animation_states,
+            result.vehicle_animation_channel_0x18,
+            result.vehicle_animation_channel_0x5c,
+            input.animation_current_time,
+            result.integrator_bookkeeping.substep_helper_argument);
+    }
+
+    auto mode_force_input = input.mode_force_input;
+    mode_force_input.leading_wheel_damage_bytes = {
+        result.wheel_collisions.wheel_damage_flags[0],
+        result.wheel_collisions.wheel_damage_flags[1]};
+    mode_force_input.angular_velocity_0x240 = input.kinematics.angular_velocity;
+    mode_force_input.linear_velocity_0x234 = input.kinematics.linear_velocity;
+    mode_force_input.body_center = input.kinematics.position;
+    if (input.wheel_contact_pipeline_enabled) {
+        for (std::size_t wheel = 0; wheel < mode_force_input.contact_bytes.size(); ++wheel) {
+            mode_force_input.contact_bytes[wheel] =
+                result.wheel_contact_states[wheel].contact_active_0x168;
+        }
+    }
+    result.mode_force = apply_ncar_integrator_mode_force(
+        result.force_moment_state, mode_force_input);
+    auto wheel_pair_input = input.wheel_pair_differential_input;
+    wheel_pair_input.contact_bytes = mode_force_input.contact_bytes;
+    result.wheel_pair_differentials =
+        apply_ncar_integrator_wheel_pair_differentials(wheel_pair_input);
+    auto common_force_input = input.common_force_input;
+    common_force_input.contact_bytes = mode_force_input.contact_bytes;
+    common_force_input.body_center = input.kinematics.position;
+    result.common_force = apply_ncar_integrator_common_force(
+        result.force_moment_state, common_force_input);
+    auto velocity_force_input = input.velocity_force_input;
+    velocity_force_input.velocity_vector = input.kinematics.linear_velocity;
+    velocity_force_input.body_center = input.kinematics.position;
+    result.velocity_forces = apply_ncar_integrator_velocity_forces(
+        result.force_moment_state, velocity_force_input);
+    if (input.attached_object_force_gate_0xbe4) {
+        constexpr float radians_5 = 0.08726646F;
+        constexpr float radians_2 = 0.034906585F;
+        constexpr float radians_7 = 0.12217305F;
+        result.attached_object_targets_0x38 = {
+            input.attached_object_tuning_0x500 * radians_5 + radians_2,
+            radians_2 - input.attached_object_tuning_0x500 * radians_5,
+            -input.attached_object_tuning_0x508 * radians_7,
+            0.0F};
+        for (std::size_t index = 0;
+             index < result.attached_object_forces.size(); ++index) {
+            auto object_input = input.attached_object_force_inputs[index];
+            object_input.target_projection_0x38 =
+                result.attached_object_targets_0x38[index];
+            object_input.body_center = input.kinematics.position;
+            result.attached_object_forces[index] = apply_ncar_attached_object_force(
+                result.force_moment_state, object_input);
+        }
+    }
+
+    if (input.embedded_record_count_0x7b != 0U) {
+        if (input.terrain == nullptr) {
+            result.embedded_records.requested_records =
+                input.embedded_record_count_0x7b;
+            result.embedded_records.unprocessed_records =
+                input.embedded_record_count_0x7b;
+            result.embedded_records.input_complete = false;
+        } else {
+            auto record_body_input = input.embedded_record_body_input;
+            record_body_input.body_motion.linear_0x234 = {
+                input.kinematics.linear_velocity.x,
+                input.kinematics.linear_velocity.y,
+                input.kinematics.linear_velocity.z};
+            record_body_input.body_motion.angular_0x240 = {
+                input.kinematics.angular_velocity.x,
+                input.kinematics.angular_velocity.y,
+                input.kinematics.angular_velocity.z};
+            record_body_input.body_motion.center_0x5c = {
+                input.kinematics.position.x,
+                input.kinematics.position.y,
+                input.kinematics.position.z};
+            result.embedded_records = update_embedded_record_contact_batch_from_terrain(
+                input.embedded_record_states,
+                input.embedded_record_local_points_0x00,
+                input.embedded_record_count_0x7b,
+                result.energy_accumulator_0xe40,
+                result.force_moment_state,
+                record_body_input,
+                *input.terrain,
+                input.compatibility_division_enabled);
+        }
+        result.input_complete = result.embedded_records.input_complete;
+    }
+
+    BodyIntegrationForceCollectionInput force_collection_input{};
+    force_collection_input.gravity_mass_0x7c = input.gravity_mass_0x7c;
+    force_collection_input.embedded_record_accumulator_delta = {
+        result.force_moment_state.force_0x24c[0],
+        result.force_moment_state.force_0x24c[1],
+        result.force_moment_state.force_0x24c[2],
+        result.force_moment_state.moment_0x258[0],
+        result.force_moment_state.moment_0x258[1],
+        result.force_moment_state.moment_0x258[2]};
+    force_collection_input.packed_virtual_records = input.packed_virtual_records;
+    result.force_collection = prepare_body_integration_force_collection(
+        result.body_tail_state,
+        result.point_impulse_state,
+        force_collection_input);
+
+    for (std::size_t index = 0;
+         index < result.body_tail_state.running_accumulators_0x93_to_0x98.size();
+         ++index) {
+        result.body_tail_state.running_accumulators_0x93_to_0x98[index] +=
+            input.virtual_record_accumulator_delta[index];
+    }
+
+    auto kinematics_input = input.kinematics;
+    const auto& accumulated =
+        result.body_tail_state.running_accumulators_0x93_to_0x98;
+    kinematics_input.accumulated_linear_force = {
+        accumulated[0], accumulated[1], accumulated[2]};
+    kinematics_input.accumulated_angular_moment = {
+        accumulated[3], accumulated[4], accumulated[5]};
+    result.kinematics = advance_body_integration_kinematics(
+        result.body_tail_state, kinematics_input);
+    auto post_body_input = input.post_body_input;
+    post_body_input.derive_vector_0x382 = true;
+    post_body_input.orientation_matrix_0x38 =
+        result.kinematics.orientation.orientation_matrix;
+    post_body_input.body_axis_0x14 = {
+        result.kinematics.orientation.orientation_matrix[6],
+        result.kinematics.orientation.orientation_matrix[7],
+        result.kinematics.orientation.orientation_matrix[8]};
+    post_body_input.reference_axis_0x44 = {
+        result.kinematics.orientation.orientation_matrix[3],
+        result.kinematics.orientation.orientation_matrix[4],
+        result.kinematics.orientation.orientation_matrix[5]};
+    post_body_input.angular_velocity_0xa2 = {
+        result.kinematics.angular.angular_velocity.x,
+        result.kinematics.angular.angular_velocity.y,
+        result.kinematics.angular.angular_velocity.z};
+    post_body_input.linear_velocity_0x234 = {
+        result.kinematics.linear.velocity.x,
+        result.kinematics.linear.velocity.y,
+        result.kinematics.linear.velocity.z};
+    post_body_input.wheel_contact_bytes = mode_force_input.contact_bytes;
+    post_body_input.wear_value_bits = mode_force_input.wear_value_bits;
+    result.post_body = advance_ncar_post_body_tail(
+        result.post_body_state, post_body_input);
+    if (result.post_body.wheel_damage_flags_cleared) {
+        result.wheel_collisions.wheel_damage_flags.fill(0U);
+    }
+    return result;
+}
+
+} // namespace viper
