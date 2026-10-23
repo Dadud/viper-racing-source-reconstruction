@@ -521,19 +521,39 @@ existing ordinal lookup and time formatter. `scene_shared_result_row_draws` now
 projects the three text calls per selected row: ordinal `%d`, record text at
 `+5` with `%s`, and (when virtual `+0x40` is true) the formatted `%s` time. It
 uses color `0x4EB374` when `0x45C230`'s returned global DWORD at `0x4DC19C`
-equals the inner record index, otherwise `0x4EB370`; the first two calls share
-a caller-provided stack seed and subtract `0x91` / `0x6B`; the time call uses its separate stack seed plus `0x41`. The row baseline is
-`(surface_height - 0xB4)/2 - 3`, advanced by `0x14` for each selected row
-that reaches the text calls. The ordinal and inner-record loops can therefore
+equals the inner record index, otherwise `0x4EB370`. Every column derives from
+the shared surface-width-half stack slot: `0x404970` stores
+`[0x509A4C]/2` at `0x404EA0` and re-reads it at `0x404FF0`, `0x405009`, and
+`0x40505C`, so the ordinal x is `surface_width/2 - 0x91`, the record text x is
+`surface_width/2 - 0x6B`, and the time x is `surface_width/2 + 0x41`; no
+caller-supplied x seeds remain. The row baseline starts at
+`(surface_height - 0xB4)/2 + 0x11` because `0x404F71` adds `0x14` to the
+`(surface_height - 0xB4)/2 - 3` seed before the loop, and advances by `0x14`
+for each selected row that reaches the text calls. The ordinal and
+inner-record loops can therefore
 place multiple records from one ordinal pass on successive lines.
 Formatting retains the existing host CRT and x87 precision limitations; the
-the raw `0x4DC19C` global value and two stack seeds remain inputs.
+raw `0x4DC19C` global value remains the only per-row input.
+
+The same stack slot also decodes both `0x404940` heading texts, which
+previously kept implicit payloads. The results title draw at `0x404F32` uses
+format handle `0x4EB24C` at x=`surface_width/2`, y=`(surface_height-0xB4)/2-8`
+with flags `0x24`; the prompt text draw at `0x404F76` uses format handle
+`0x4EB414` at x=`surface_width/2`, y=`(surface_height-0xB4)/2+0xBF` with the
+same flags. Both use color `0x4EB374` and font `0x4EB304`. Their argument
+order `(font, color, flags, x, y, format)` is confirmed against the decoded
+`0x4048E0` right-aligned draw at `0x404D6C`
+(x=`[0x509A4C]-width-10`, y=`0x43`) and against `[0x509A2C]` acting as the
+surface height in the `0x404920` centered-resource block
+(`y = [0x509A2C]/2 - 0x82`). The heading plan now emits both draws with that
+geometry.
 
 `scene_shared_results_branch_plan` composes the direct results flag with the
 heading gate/resource work, selected row records, optional time values, and
 ordered draw arguments. The record span represents the accessor-bounded row
-set, and time bytes/count, formatter marker, and caller stack seeds stay
-explicit inputs. A false results flag returns the gate and unchanged heading
+set, and time bytes/count and formatter marker stay explicit inputs; row and
+heading geometry derives from the surface dimensions. A false results flag
+returns the gate and unchanged heading
 masks without traversing or drawing rows.
 `raster_scene_shared_results_rows` now connects those row calls to the existing
 `0x44DC70` font layout and `0x44D0C0` atlas rasterizer. It consumes the loaded

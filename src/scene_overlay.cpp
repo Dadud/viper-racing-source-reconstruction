@@ -2759,7 +2759,10 @@ SceneSharedResultsHeadingPlan scene_shared_results_heading_plan(
     }
     result.ordered_operations.push_back({
         SceneSharedResultsHeadingOperationKind::draw_results_text_0x44dc70,
-        result.draw_helper, result.results_resource_object, 0});
+        result.draw_helper, result.results_resource_object, 0,
+        observation.surface_width / 2,
+        (observation.surface_height - 0xB4) / 2 - 8, 0x24, 0x004EB24CU,
+        0x004EB374U, 0x004EB304U});
     if (result.refresh_prompt_resource) {
         result.ordered_operations.push_back({
             SceneSharedResultsHeadingOperationKind::refresh_prompt_resource_0x418cc0,
@@ -2767,7 +2770,10 @@ SceneSharedResultsHeadingPlan scene_shared_results_heading_plan(
     }
     result.ordered_operations.push_back({
         SceneSharedResultsHeadingOperationKind::draw_prompt_text_0x44dc70,
-        result.draw_helper, result.prompt_resource_object, 0});
+        result.draw_helper, result.prompt_resource_object, 0,
+        observation.surface_width / 2,
+        (observation.surface_height - 0xB4) / 2 + 0xBF, 0x24, 0x004EB414U,
+        0x004EB374U, 0x004EB304U});
     return result;
 }
 
@@ -2832,9 +2838,9 @@ std::vector<SceneSharedResultRowDraw> scene_shared_result_row_draws(
     const std::span<const SceneSharedResultsRecordObservation> records,
     const std::span<const SceneSharedResultRowDisplay> displays,
     const std::int32_t surface_height,
-    const std::int32_t row_x_seed,
-    const std::int32_t time_x_seed)
+    const std::int32_t surface_width)
 {
+    const auto half_width = surface_width / 2;
     std::vector<SceneSharedResultRowDraw> draws;
     draws.reserve(displays.size() * 3U);
     std::size_t emitted_rows = 0;
@@ -2843,21 +2849,21 @@ std::vector<SceneSharedResultRowDraw> scene_shared_result_row_draws(
         if (selection.record_index >= records.size()) {
             continue;
         }
-        const auto row_y = (surface_height - 0xB4) / 2 - 3 +
+        const auto row_y = (surface_height - 0xB4) / 2 + 0x11 +
             static_cast<std::int32_t>(emitted_rows) * 0x14;
         const auto color = selection.row_helper_result_matches_index
             ? 0x004EB374U
             : 0x004EB370U;
         draws.push_back({selection.ordinal_pass, selection.record_index,
-                         0x00405004, row_x_seed - 0x91, row_y, 0x004CFF38,
+                         0x00405004, half_width - 0x91, row_y, 0x004CFF38,
                          color, 0x004EB304, 0x21,
                          selection.displayed_ordinal, {}});
         draws.push_back({selection.ordinal_pass, selection.record_index,
-                         0x00405025, row_x_seed - 0x6B, row_y, 0x004CFF3C,
+                         0x00405025, half_width - 0x6B, row_y, 0x004CFF3C,
                          color, 0x004EB304, 0x21, 0, selection.text_at_0x05});
         if (selection.emit_time_value) {
             draws.push_back({selection.ordinal_pass, selection.record_index,
-                             0x00405069, time_x_seed + 0x41, row_y, 0x004CFF40,
+                             0x00405069, half_width + 0x41, row_y, 0x004CFF40,
                              color, 0x004EB304, 0x21, 0,
                              display.formatted_time});
         }
@@ -2883,8 +2889,7 @@ SceneSharedResultsBranchPlan scene_shared_results_branch_plan(
         observation.result_time_record_count, observation.time_marker);
     result.row_draws = scene_shared_result_row_draws(
         observation.records, result.row_displays,
-        observation.heading.surface_height, observation.row_x_seed,
-        observation.time_x_seed);
+        observation.heading.surface_height, observation.heading.surface_width);
     return result;
 }
 

@@ -1360,6 +1360,9 @@ struct SceneSharedResultsHeadingOperation {
     std::int32_t x{};
     std::int32_t y{};
     std::uint32_t flags{};
+    std::uint32_t format_source{};
+    std::uint32_t color_source{};
+    std::uint32_t font_source{};
 };
 
 struct SceneSharedResultsHeadingPlan {
@@ -1373,8 +1376,8 @@ struct SceneSharedResultsHeadingPlan {
     std::int32_t prompt_x{};
     std::int32_t prompt_y{};
     std::uint32_t prompt_layout_object{0x004EB448};
-    std::uint32_t text_width_helper{0x0044D460};
-    std::uint32_t text_height_helper{0x0044D450};
+    std::uint32_t text_height_helper{0x0044D460};
+    std::uint32_t text_width_helper{0x0044D450};
     std::uint32_t layout_helper{0x0044D0C0};
     std::uint32_t resource_register_helper{0x00418C90};
     std::uint32_t initialize_helper{0x00418CC0};
@@ -1392,7 +1395,11 @@ struct SceneSharedResultsHeadingPlan {
 };
 
 // Models the registration, centered prompt layout, resource refresh, and two
-// draw calls in the 0x404940 shared-results branch.
+// draw calls in the 0x404940 shared-results branch. The decoded text draws
+// place the results title ([4EB24C]) at (W/2, (H-0xB4)/2-8) and the ESC
+// prompt text ([4EB414]) at (W/2, (H-0xB4)/2+0xBF), both with flags 0x24,
+// color [4EB374], and font [4EB304]; all derive from the shared surface/2
+// stack slot written at 0x404EA0.
 [[nodiscard]] SceneSharedResultsHeadingPlan scene_shared_results_heading_plan(
     const SceneSharedResultsHeadingObservation& observation);
 
@@ -1449,16 +1456,18 @@ struct SceneSharedResultRowDraw {
     std::string text_argument;
 };
 
-// Projects the three per-record 0x44DC70 calls in 0x404970. Horizontal
-// positions retain the caller's stack-derived seeds; y follows the recovered
-// centered baseline and advances 0x14 for each selected row emitted.
+// Projects the three per-record 0x44DC70 calls in 0x404970. The binary derives
+// every column from surface_width/2 (stored at 0x404EA0 and re-read at
+// 0x404FF0/0x405009/0x40505C): ordinal x = W/2-0x91, record text x = W/2-0x6B,
+// and time x = W/2+0x41. Row y starts at (H-0xB4)/2+0x11 because 0x404F71
+// adds 0x14 to the row baseline before the loop, then advances 0x14 per
+// selected row.
 [[nodiscard]] std::vector<SceneSharedResultRowDraw>
 scene_shared_result_row_draws(
     std::span<const SceneSharedResultsRecordObservation> records,
     std::span<const SceneSharedResultRowDisplay> displays,
     std::int32_t surface_height,
-    std::int32_t row_x_seed,
-    std::int32_t time_x_seed);
+    std::int32_t surface_width);
 
 struct SceneSharedResultsBranchObservation {
     SceneSharedOverlayObservation overlay_globals{};
@@ -1467,8 +1476,6 @@ struct SceneSharedResultsBranchObservation {
     std::span<const std::uint8_t> result_time_records{};
     std::size_t result_time_record_count{};
     char time_marker{};
-    std::int32_t row_x_seed{};
-    std::int32_t time_x_seed{};
 };
 
 struct SceneSharedResultsBranchPlan {
