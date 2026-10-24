@@ -1831,6 +1831,13 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
             update_control_key(*state, static_cast<UINT>(wparam), false);
         }
         break;
+    case WM_KILLFOCUS:
+    case WM_CANCELMODE:
+        if (state && !state->playback_active) {
+            state->keyboard_button_states.fill(0U);
+            refresh_keyboard_controls(*state);
+        }
+        return 0;
     case WM_CLOSE:
         DestroyWindow(hwnd);
         return 0;

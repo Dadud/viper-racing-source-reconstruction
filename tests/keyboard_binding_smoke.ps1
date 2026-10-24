@@ -63,6 +63,12 @@ try {
         throw 'Could not post throttle key-down'
     }
     Start-Sleep -Milliseconds 600
+    # A lost focus must release held gameplay controls even if Windows never
+    # delivers the corresponding key-up to this window.
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0008, [IntPtr]::Zero, [IntPtr]::Zero)) {
+        throw 'Could not post focus loss'
+    }
+    Start-Sleep -Milliseconds 250
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]0x26, [IntPtr]0)) {
         throw 'Could not post throttle key-up'
     }
@@ -88,7 +94,7 @@ try {
         if ($throttle[$index] -eq '0') { $releasedAfterPress = $true; break }
     }
     if (-not $releasedAfterPress) { throw 'The live trace never recorded throttle release' }
-    Write-Output 'VK_UP reached the live DIK binding evaluator as throttle and cleared on key-up.'
+    Write-Output 'VK_UP reached the live DIK binding evaluator as throttle and cleared on focus loss.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
