@@ -701,6 +701,51 @@ struct PhysicsObstacleTaskConstructorPlan {
 plan_physics_obstacle_task_constructor(
     const PhysicsObstacleTaskConstructorObservation& observation);
 
+struct PhysicsAcarTaskConstructorObservation {
+    std::uint32_t object_address{};
+    std::uint32_t registration_count_before{};
+    std::uint32_t ai_record_address{};
+    std::uint32_t ai_profile_address{};
+    std::uint32_t profile_slot_index{};
+    std::uint32_t selected_profile_word{};
+    std::uint8_t selected_driver_flag{};
+    bool profile_name_matches{};
+    bool model_data_present{};
+    std::uint32_t model_descriptor_count{};
+    std::optional<std::uint32_t> model_descriptors_address;
+    bool model_descriptor_allocation_succeeded{};
+    std::optional<std::uint32_t> model_descriptor_buffer_address;
+    std::uint32_t runtime_entry_count{};
+    bool runtime_entry_allocation_succeeded{};
+    std::optional<std::uint32_t> runtime_entry_buffer_address;
+};
+
+struct PhysicsAcarTaskConstructorPlan {
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::uint32_t model_descriptor_allocation_bytes{};
+    std::uint32_t runtime_entry_allocation_bytes{};
+    std::uint32_t runtime_entry_initializers_called{};
+    std::uint32_t registration_count_after{};
+    std::optional<std::uint32_t> model_descriptors_address;
+    std::optional<std::uint32_t> runtime_entry_buffer_address;
+    bool base_constructor_called{true};
+    bool derived_vtable_installed{};
+    bool first_instance_panic_handler_registered{};
+    bool profile_name_mismatch_reported{};
+    bool driver_setup_helper_0x41af00_called{true};
+    bool model_data_present{};
+    bool model_descriptor_allocation_attempted{};
+    bool model_helper_0x429440_called{};
+    bool runtime_entry_allocation_attempted{};
+    bool animation_helpers_called{};
+    bool final_setup_helper_0x428790_called{};
+};
+
+// Projects ACAR's global registration, AI-profile fields, and buffer setup.
+[[nodiscard]] PhysicsAcarTaskConstructorPlan
+plan_physics_acar_task_constructor(
+    const PhysicsAcarTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};

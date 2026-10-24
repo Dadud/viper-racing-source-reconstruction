@@ -1312,6 +1312,76 @@ PhysicsObstacleTaskConstructorPlan plan_physics_obstacle_task_constructor(
     return plan;
 }
 
+PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
+    const PhysicsAcarTaskConstructorObservation& observation)
+{
+    PhysicsAcarTaskConstructorPlan plan{};
+    plan.derived_vtable_installed = true;
+    plan.first_instance_panic_handler_registered =
+        observation.registration_count_before == 0U;
+    plan.registration_count_after = observation.registration_count_before + 1U;
+    plan.profile_name_mismatch_reported = !observation.profile_name_matches;
+    plan.model_data_present = observation.model_data_present;
+    plan.object_writes.push_back({0U, 0x004c7b78U});
+    for (std::uint32_t index = 0U; index < 7U; ++index) {
+        plan.object_writes.push_back({0x1054U + index * 4U, 0U});
+    }
+    plan.object_writes.push_back({0x4f4U, 2U});
+    plan.object_writes.push_back({0xf58U, observation.ai_profile_address});
+    plan.object_writes.push_back({0xf50U, observation.selected_profile_word});
+    // This is a byte store in the binary; the generic field-write record
+    // preserves its low-byte value without claiming semantics for neighbors.
+    plan.object_writes.push_back({0xf54U,
+        static_cast<std::uint32_t>(observation.selected_driver_flag)});
+    plan.object_writes.push_back({0xfe8U,
+        observation.model_data_present
+            ? observation.model_descriptors_address.value_or(0U) : 0U});
+
+    if (observation.model_data_present) {
+        plan.model_descriptor_allocation_attempted = true;
+        plan.model_descriptor_allocation_bytes =
+            observation.model_descriptor_count * 0x18U;
+        plan.object_writes.push_back({0x1058U,
+            observation.model_descriptor_count});
+        if (!observation.model_descriptor_allocation_succeeded) {
+            plan.object_writes.push_back({0x1054U, 0U});
+        } else if (observation.model_descriptor_buffer_address.has_value()) {
+            plan.model_descriptors_address =
+                observation.model_descriptor_buffer_address;
+            plan.object_writes.push_back({0x1054U,
+                *observation.model_descriptor_buffer_address});
+        }
+        // The native constructor calls this helper even when allocation
+        // returns null; its downstream memory effects are not fabricated.
+        plan.model_helper_0x429440_called = true;
+    } else {
+        plan.object_writes.push_back({0xfe8U, 0U});
+    }
+
+    plan.object_writes.push_back({0x104cU,
+        observation.runtime_entry_count});
+    plan.runtime_entry_allocation_bytes =
+        observation.runtime_entry_count * 8U;
+    plan.runtime_entry_allocation_attempted = true;
+    if (!observation.runtime_entry_allocation_succeeded) {
+        plan.object_writes.push_back({0x1048U, 0U});
+    } else {
+        plan.runtime_entry_initializers_called =
+            observation.runtime_entry_count;
+        if (observation.runtime_entry_buffer_address.has_value()) {
+            plan.runtime_entry_buffer_address =
+                observation.runtime_entry_buffer_address;
+            plan.object_writes.push_back({0x1048U,
+                *observation.runtime_entry_buffer_address});
+        }
+    }
+
+    plan.animation_helpers_called = true;
+    plan.object_writes.push_back({0x534U, 1U});
+    plan.final_setup_helper_0x428790_called = true;
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {

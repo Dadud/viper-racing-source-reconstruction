@@ -489,3 +489,20 @@ addresses are supplied as observations. Evidence for the constructor:
 timer helper `0x436EB0`: `ev_79004fd497de281d1e0b97eabded5bc795dcc3133ce0e8baa7e5d88b98fd7df7`;
 geometry helper `0x4372C0`:
 `ev_29b5f991b46ddd11e833ac2abe53b20dcc50e00ef7e78739f4990b1c2a8fb142`.
+
+## ACAR task constructor projection
+
+`plan_physics_acar_task_constructor` projects the derived constructor at
+`0x4285D0` after its shared car base. It records the derived vtable, first-
+instance handler registration gate (`0x508DCC`), seven initial clears at
+`+0x1054..+0x106C`, AI profile pointer and selected profile word, and the
+profile-name mismatch report path. The selected driver flag is represented as
+a byte-valued write at `+0xF54`.
+
+When model data is present, the constructor allocates `descriptor_count *
+0x18`, stores the result at `+0x1054`, and calls `0x429440` even if allocation
+fails; the helper's memory effects remain opaque. It then allocates
+`runtime_entry_count * 8` bytes at `+0x1048` and calls `0x42BB60` once per
+entry when the allocation succeeds. The three animation helpers, `+0x534`
+flag, and `0x428790` setup call are included. Evidence:
+`ev_becb0bf54909e1ef5b2a86dfd6fd63e34803446f8fdf780106218d38455f3971`.
