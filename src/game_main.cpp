@@ -100,12 +100,21 @@ struct Options {
     bool audio_smoke{};
     std::optional<unsigned> smoke_frames;
     std::optional<std::filesystem::path> record_trace;
+    std::optional<std::filesystem::path> play_trace;
+};
+
+struct TraceInputFrame {
+    float delta_seconds{};
+    bool steer_left{};
+    bool steer_right{};
+    bool throttle{};
+    bool brake{};
 };
 
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
 }
 
@@ -134,6 +143,9 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--record-trace") {
             if (++i >= argc) throw std::runtime_error("--record-trace requires a path");
             options.record_trace = std::filesystem::path(argv[i]);
+        } else if (arg == L"--play-trace") {
+            if (++i >= argc) throw std::runtime_error("--play-trace requires a path");
+            options.play_trace = std::filesystem::path(argv[i]);
         } else if (arg == L"--smoke-frames") {
             if (++i >= argc) throw std::runtime_error("--smoke-frames requires a positive frame count");
             unsigned frames{};
@@ -173,6 +185,55 @@ Options parse_options(const int argc, wchar_t** argv)
         }
     }
     return options;
+}
+
+std::vector<TraceInputFrame> load_input_trace(const std::filesystem::path& path)
+{
+    std::ifstream input(path);
+    if (!input) throw std::runtime_error("could not open input trace: " + path.string());
+    std::string line;
+    if (!std::getline(input, line) ||
+        !line.starts_with("frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,"))
+        throw std::runtime_error("input trace has an unsupported header");
+    std::vector<TraceInputFrame> frames;
+    std::size_t line_number = 1U;
+    while (std::getline(input, line)) {
+        ++line_number;
+        if (line.empty()) continue;
+        std::array<std::string_view, 7> fields{};
+        std::size_t begin = 0U;
+        bool complete = true;
+        for (std::size_t field = 0; field < fields.size(); ++field) {
+            const auto end = line.find(',', begin);
+            if (end == std::string::npos) {
+                complete = false;
+                break;
+            }
+            fields[field] = std::string_view(line).substr(begin, end - begin);
+            begin = end + 1U;
+        }
+        if (!complete)
+            throw std::runtime_error("input trace row has too few columns at line " +
+                std::to_string(line_number));
+        try {
+            std::size_t consumed{};
+            const float delta = std::stof(std::string(fields[2]), &consumed);
+            if (consumed != fields[2].size() || !std::isfinite(delta) || delta < 0.0F)
+                throw std::runtime_error("invalid delta");
+            const auto read_button = [&](const std::size_t index) {
+                if (fields[index] == "0") return false;
+                if (fields[index] == "1") return true;
+                throw std::runtime_error("invalid button");
+            };
+            frames.push_back({delta, read_button(3U), read_button(4U),
+                read_button(5U), read_button(6U)});
+        } catch (const std::exception&) {
+            throw std::runtime_error("invalid input trace values at line " +
+                std::to_string(line_number));
+        }
+    }
+    if (frames.empty()) throw std::runtime_error("input trace contains no frames");
+    return frames;
 }
 
 viper::GameAssets load_assets(const std::filesystem::path& root,
@@ -914,6 +975,7 @@ struct WindowState {
     bool brake{};
     bool left{};
     bool right{};
+    bool playback_active{};
     // CONTROL order: steer_left, steer_right, throttle, braking.
     std::array<UINT, 4> control_keys{
         VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN};
@@ -1116,12 +1178,12 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
         return 0;
     case WM_KEYDOWN:
         if (wparam == VK_ESCAPE) { DestroyWindow(hwnd); return 0; }
-        if (state && (lparam & (1LL << 30)) == 0) {
+        if (state && !state->playback_active && (lparam & (1LL << 30)) == 0) {
             update_control_key(*state, static_cast<UINT>(wparam), true);
         }
         return 0;
     case WM_KEYUP:
-        if (state) {
+        if (state && !state->playback_active) {
             update_control_key(*state, static_cast<UINT>(wparam), false);
         }
         break;
@@ -1138,6 +1200,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
                const std::optional<std::filesystem::path>& record_trace,
+               const std::vector<TraceInputFrame>* playback_trace,
                const std::size_t player_car_index,
                const std::uint32_t target_laps,
                const std::string_view track_name,
@@ -1163,6 +1226,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     }
     WindowState state;
     state.terrain = &terrain;
+    state.playback_active = playback_trace != nullptr;
     state.route = extract_ideal_line_points(ideal_line);
     state.player_car_index = player_car_index;
     state.target_laps = std::max(1U, target_laps);
@@ -1209,7 +1273,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             DestroyWindow(hwnd);
             return 1;
         }
-        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,player_segment,player_fraction,player_speed,completed_laps,finished";
+        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,player_segment,player_fraction,player_speed,player_steering,completed_laps,finished";
         for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             trace << ",car" << car << "_segment,car" << car
@@ -1235,6 +1299,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     bool running = true;
     unsigned rendered_frames = 0;
     std::uint64_t trace_frame = 0;
+    std::size_t playback_frame = 0U;
     while (running) {
         if (IsIconic(hwnd)) {
             const DWORD result = MsgWaitForMultipleObjects(0, nullptr, FALSE, INFINITE, QS_ALLINPUT);
@@ -1246,10 +1311,23 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             DispatchMessageW(&msg);
         }
         if (running && !IsIconic(hwnd)) {
+            if (playback_trace != nullptr && playback_frame >= playback_trace->size()) {
+                DestroyWindow(hwnd);
+                continue;
+            }
             const ULONGLONG now = GetTickCount64();
-            const float delta_seconds = state.last_tick == 0U ? 0.0F :
-                static_cast<float>(now - state.last_tick) / 1000.0F;
-            if (state.last_tick != 0U && !state.advance(delta_seconds)) {
+            const TraceInputFrame* replay = playback_trace == nullptr
+                ? nullptr : &(*playback_trace)[playback_frame];
+            if (replay != nullptr) {
+                state.left = replay->steer_left;
+                state.right = replay->steer_right;
+                state.accelerate = replay->throttle;
+                state.brake = replay->brake;
+            }
+            const float delta_seconds = replay != nullptr ? replay->delta_seconds :
+                state.last_tick == 0U ? 0.0F :
+                    static_cast<float>(now - state.last_tick) / 1000.0F;
+            if ((replay != nullptr || state.last_tick != 0U) && !state.advance(delta_seconds)) {
                 std::cerr << "Vehicle pose update failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
@@ -1260,7 +1338,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << delta_seconds << ',' << state.left << ',' << state.right << ','
                       << state.accelerate << ',' << state.brake << ','
                       << state.motion.route_segment << ',' << state.motion.route_fraction << ','
-                      << state.motion.speed << ',' << state.motion.race.completed_laps << ','
+                      << state.motion.speed << ',' << state.motion.steering << ','
+                      << state.motion.race.completed_laps << ','
                       << state.motion.race.finished;
                 for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
                     if (car == player_car_index) continue;
@@ -1280,6 +1359,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 DestroyWindow(hwnd);
                 return 1;
             }
+            if (replay != nullptr) ++playback_frame;
             if (smoke_frames && ++rendered_frames >= *smoke_frames) {
                 DestroyWindow(hwnd);
                 return 0;
@@ -1317,6 +1397,8 @@ int wmain(int argc, wchar_t** argv)
         if (options.help) { usage(std::cout); return 0; }
         if (options.data_dir.empty())
             throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
+        std::optional<std::vector<TraceInputFrame>> playback_trace;
+        if (options.play_trace) playback_trace = load_input_trace(*options.play_trace);
         const auto config_path = options.data_dir / "options.def";
         viper::GameOptions configured_options;
         std::error_code config_error;
@@ -1395,6 +1477,7 @@ int wmain(int argc, wchar_t** argv)
         }
         return run_window(options.software, options.smoke_frames, options.audio_smoke,
             options.record_trace,
+            playback_trace ? &*playback_trace : nullptr,
             *entrants.player_record_index,
             static_cast<std::uint32_t>(std::clamp(
                 assets.options().integer("GAME", "laps").value_or(1), 1, 99)),

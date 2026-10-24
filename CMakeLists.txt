@@ -243,6 +243,12 @@ if(BUILD_TESTING)
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
             add_test(NAME game_warp_render_smoke
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3)
+            add_test(NAME game_trace_replay_regression
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
+                    -GameExe "$<TARGET_FILE:viper_game>"
+                    -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
+            set_tests_properties(game_trace_replay_regression PROPERTIES TIMEOUT 30)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)
             set(VIPER_SHIPPED_CARS viper exotic plane sedan sports)
