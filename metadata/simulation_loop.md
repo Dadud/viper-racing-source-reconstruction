@@ -815,9 +815,13 @@ ordered batch through `apply_race_loop_state0_dashboard_pixel_writes_to_locked_s
 It requires the submitted frame's `0x4052D0` callback to precede the observed
 `0x447CE0` unlock, and validates all pixel destinations before writing. The
 batch preserves order across background fill/bitmap operations, gear draws,
-paused-banner operations, the two shared text effects, and race-results heading
-and rows. A reached cheater banner, centered resource, or splash-loading branch
-still leaves the full batch unavailable because its resource pixels are not yet
+paused-banner operations, cheater-banner and centered-resource STMP draws, the
+two shared text effects, and race-results heading and rows. The `0x4EB350`
+cheater resource resolves to `race.res::start.stp`; its observed draw mode
+selects one of six frames. The centered `0x4EB46C` resource resolves to
+`race.res::award.stp` (261x200, one frame). Both use the common STMP RLE,
+palette, clipping, and pixel-write path. A reached splash-loading branch still
+leaves the full batch unavailable because its resource pixels are not yet
 projected; missing raster inputs likewise prevent partial surface mutation.
 Viewport/device calls and native surface ownership remain outside this CPU
 pixel batch. The

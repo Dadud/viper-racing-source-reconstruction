@@ -3238,20 +3238,39 @@ ScenePausedBannerResourceRasterPlan raster_scene_paused_banner_resource(
     if (draw == banner.ordered_operations.end()) {
         return result;
     }
-    result.draw_reached = true;
+    const auto raster = raster_scene_stamp_image(
+        {true, draw->helper, draw->x, draw->y, draw->raw_mode},
+        {observation.resource_pointer_nonnull, observation.image,
+         observation.renderer});
+    result.draw_reached = raster.draw_reached;
+    result.input_complete = raster.input_complete;
+    result.frame_index = raster.frame_index;
+    result.raster = raster.raster;
+    return result;
+}
+
+SceneStampImageRasterPlan raster_scene_stamp_image(
+    const SceneStampImageRasterCall& draw,
+    const SceneStampImageRasterObservation& observation)
+{
+    SceneStampImageRasterPlan result{};
+    result.draw_reached = draw.reached;
+    if (!draw.reached) {
+        return result;
+    }
     if (!observation.resource_pointer_nonnull ||
         !observation.image.pointer_table_complete ||
         !observation.image.rows_complete || observation.image.width <= 0 ||
         observation.image.height <= 0 || observation.image.frame_count <= 0 ||
-        draw->raw_mode < 0 ||
-        draw->raw_mode > std::numeric_limits<std::int16_t>::max() ||
-        static_cast<std::size_t>(draw->raw_mode) >=
+        draw.frame_index < 0 ||
+        draw.frame_index > std::numeric_limits<std::int16_t>::max() ||
+        static_cast<std::size_t>(draw.frame_index) >=
             static_cast<std::size_t>(observation.image.frame_count)) {
         result.input_complete = false;
         return result;
     }
 
-    result.frame_index = static_cast<std::size_t>(draw->raw_mode);
+    result.frame_index = static_cast<std::size_t>(draw.frame_index);
     SceneDashboardAtlasFontObservation image_font{};
     image_font.glyph_width = observation.image.width;
     image_font.glyph_height = observation.image.height;
@@ -3268,18 +3287,18 @@ ScenePausedBannerResourceRasterPlan raster_scene_paused_banner_resource(
     }
     SceneDashboardTextLayout image_layout{};
     image_layout.glyph_calls.push_back({
-        draw->helper,
-        draw->x,
-        draw->y,
+        draw.draw_helper,
+        draw.x,
+        draw.y,
         0,
-        static_cast<std::int16_t>(draw->raw_mode),
+        static_cast<std::int16_t>(draw.frame_index),
     });
     // 0x40C790 passes a null fifth argument to 0x44D0C0, selecting the
     // appropriate palette plane embedded in the resource object.
     auto native_renderer = observation.renderer;
     native_renderer.explicit_palette.clear();
-    result.raster = raster_scene_dashboard_text(
-        image_layout, image_font, native_renderer);
+    result.raster = raster_scene_dashboard_text(image_layout, image_font,
+                                               native_renderer);
     result.input_complete = result.raster.input_complete;
     return result;
 }

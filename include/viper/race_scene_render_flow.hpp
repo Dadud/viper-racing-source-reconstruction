@@ -26,6 +26,11 @@ struct RaceLoopSharedTextEffectsRasterObservation {
     SceneDashboardAtlasFontObservation atlas_font{};
 };
 
+struct RaceLoopSharedStampRasterObservation {
+    std::optional<StampImage> image;
+    SceneDashboardRasterObservation renderer{};
+};
+
 struct RaceLoopState0DashboardRasterObservation {
     SceneDashboardCoreCallbackRasterObservation callback_text{};
     SceneDashboardFontObservation layout_font{};
@@ -63,6 +68,10 @@ struct RaceLoopSharedOverlayObservation {
     std::optional<StampImage> state0_dashboard_gear_resource_image;
     SceneState5OverlayObservation state5_overlay{};
     SceneSharedOverlayFrameObservation shared_overlay{};
+    // race.res registrations: award.stp at 0x4EB46C and start.stp at
+    // 0x4EB350. Use the matching parse_shared_*_image helper when available.
+    RaceLoopSharedStampRasterObservation centered_resource_raster{};
+    RaceLoopSharedStampRasterObservation cheater_banner_raster{};
     RaceLoopSharedResultsRasterObservation shared_results_raster{};
     RaceLoopSharedTextEffectsRasterObservation shared_text_effects_raster{};
     std::optional<RaceLoopSharedPausedBannerRasterObservation>
@@ -118,6 +127,8 @@ struct RaceLoopSharedOverlayPlan {
     SceneSharedResultsRasterPlan shared_results_rows_raster{};
     bool shared_text_effects_raster_reached{};
     SceneSharedTextEffectsRasterPlan shared_text_effects_raster{};
+    std::optional<SceneStampImageRasterPlan> shared_centered_resource_raster;
+    std::optional<SceneStampImageRasterPlan> shared_cheater_banner_raster;
     SceneSharedOverlayFramePlan shared_overlay{};
     std::optional<ScenePausedBannerStyle14MeasurePlan>
         shared_paused_banner_fallback_measure;
@@ -133,6 +144,11 @@ struct RaceLoopSharedOverlayPlan {
 // resource handle DAT_004EB420 (resource key at 0x004CFBDC: "rpm.stp").
 [[nodiscard]] std::optional<StampImage>
 parse_state0_dashboard_gear_image(const ResourceBundle& race_bundle);
+
+[[nodiscard]] std::optional<StampImage> parse_shared_centered_resource_image(
+    const ResourceBundle& race_bundle);
+[[nodiscard]] std::optional<StampImage> parse_shared_cheater_banner_image(
+    const ResourceBundle& race_bundle);
 
 struct RaceLoopPausedBannerSurfaceWriteResult {
     bool frame_submitted{};

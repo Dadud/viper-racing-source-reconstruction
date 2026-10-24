@@ -1719,6 +1719,32 @@ struct ScenePausedBannerResourceRasterPlan {
     SceneDashboardRasterPlan raster;
 };
 
+struct SceneStampImageRasterCall {
+    bool reached{};
+    std::uint32_t draw_helper{0x0044D0C0};
+    std::int32_t x{};
+    std::int32_t y{};
+    std::int32_t frame_index{};
+};
+
+struct SceneStampImageRasterObservation {
+    bool resource_pointer_nonnull{true};
+    StampImage image;
+    SceneDashboardRasterObservation renderer;
+};
+
+struct SceneStampImageRasterPlan {
+    bool draw_reached{};
+    bool input_complete{true};
+    std::size_t frame_index{};
+    SceneDashboardRasterPlan raster;
+};
+
+// Projects one reached 0x44D0C0 STMP draw through the shared RLE/palette path.
+[[nodiscard]] SceneStampImageRasterPlan raster_scene_stamp_image(
+    const SceneStampImageRasterCall& draw,
+    const SceneStampImageRasterObservation& observation);
+
 struct ScenePausedBannerFramePixelWrite {
     std::int32_t x{};
     std::int32_t y{};

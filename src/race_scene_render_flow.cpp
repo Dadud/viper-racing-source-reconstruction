@@ -17,6 +17,24 @@ std::optional<StampImage> parse_state0_dashboard_gear_image(
     return parse_stamp_image(*payload, true);
 }
 
+std::optional<StampImage> parse_shared_centered_resource_image(
+    const ResourceBundle& race_bundle)
+{
+    const auto payload = race_bundle.find_payload(
+        "award.stp", resource_type_code('S', 'T', 'M', 'P'));
+    return payload.has_value() ? parse_stamp_image(*payload, true)
+                               : std::nullopt;
+}
+
+std::optional<StampImage> parse_shared_cheater_banner_image(
+    const ResourceBundle& race_bundle)
+{
+    const auto payload = race_bundle.find_payload(
+        "start.stp", resource_type_code('S', 'T', 'M', 'P'));
+    return payload.has_value() ? parse_stamp_image(*payload, true)
+                               : std::nullopt;
+}
+
 RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
     const RaceLoopSharedOverlayObservation& observation)
 {
@@ -427,6 +445,68 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             plan.shared_overlay.paused_banner.inner_render.input_complete =
                 false;
         }
+        const auto shared_stamp_renderer = [&](
+            SceneDashboardRasterObservation renderer) {
+            const auto apply_context = [&](const RenderContextViewport& context,
+                                           const std::uint8_t renderer_mode,
+                                           const std::uint32_t framebuffer_base) {
+                renderer.renderer_mode = renderer_mode;
+                renderer.clip_left = context.viewport_left_0x14;
+                renderer.clip_top = context.viewport_top_0x18;
+                renderer.clip_right = context.viewport_right_0x1c;
+                renderer.clip_bottom = context.viewport_bottom_0x20;
+                renderer.framebuffer_pitch_bytes = context.row_pitch_0x10;
+                renderer.framebuffer_base = framebuffer_base;
+            };
+            if (plan.render_context_acquisition.has_value() &&
+                plan.render_context_acquisition->disposition ==
+                    RenderContextAcquisitionDisposition::acquired) {
+                const auto& context =
+                    plan.render_context_acquisition->context;
+                const auto renderer_mode =
+                    plan.optional_dashboard_branch_enabled
+                    ? static_cast<std::uint8_t>(
+                        observation.state0_dashboard_render
+                            .renderer_mode_0x4d7a48)
+                    : shared_overlay_observation.renderer_mode_0x4d7a48;
+                apply_context(
+                    context.viewport, renderer_mode,
+                    static_cast<std::uint32_t>(context.surface_bits_0x04));
+            } else if (plan.optional_dashboard_branch_enabled) {
+                apply_context(
+                    observation.state0_dashboard_render.render_context,
+                    static_cast<std::uint8_t>(
+                        observation.state0_dashboard_render
+                            .renderer_mode_0x4d7a48),
+                    observation.state0_dashboard_render
+                        .framebuffer_base_value);
+            }
+            return renderer;
+        };
+        const auto& centered_call = plan.shared_overlay.centered_resource.draw;
+        if (centered_call.reached) {
+            const auto& input = observation.centered_resource_raster;
+            const SceneStampImageRasterCall draw{
+                true, centered_call.draw_helper, centered_call.x,
+                centered_call.y, centered_call.raw_draw_mode};
+            const SceneStampImageRasterObservation raster_observation{
+                input.image.has_value(), input.image.value_or(StampImage{}),
+                shared_stamp_renderer(input.renderer)};
+            plan.shared_centered_resource_raster = raster_scene_stamp_image(
+                draw, raster_observation);
+        }
+        const auto& cheater_call = plan.shared_overlay.cheater_banner.draw;
+        if (cheater_call.reached) {
+            const auto& input = observation.cheater_banner_raster;
+            const SceneStampImageRasterCall draw{
+                true, cheater_call.draw_helper, cheater_call.x,
+                cheater_call.y, cheater_call.raw_draw_mode};
+            const SceneStampImageRasterObservation raster_observation{
+                input.image.has_value(), input.image.value_or(StampImage{}),
+                shared_stamp_renderer(input.renderer)};
+            plan.shared_cheater_banner_raster = raster_scene_stamp_image(
+                draw, raster_observation);
+        }
         if (paused_banner_raster_observation.has_value() &&
             plan.shared_overlay.paused_banner.inner_render.draws_text_handle) {
             auto raster_observation = *paused_banner_raster_observation;
@@ -792,7 +872,22 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
         }
     }
     if (overlay.cheater_banner.draw.reached) {
-        complete = false; // No cheater-resource raster projection yet.
+        const auto& raster = plan.shared_cheater_banner_raster;
+        if (!raster.has_value() || !raster->draw_reached ||
+            !raster->input_complete || !raster->raster.input_complete) {
+            complete = false;
+        } else {
+            for (const auto& write : raster->raster.pixel_writes) {
+                if (write.offset_from_framebuffer_base < 0) {
+                    complete = false;
+                    break;
+                }
+                writes.push_back({
+                    static_cast<std::uint64_t>(
+                        write.offset_from_framebuffer_base),
+                    write.value, 0xffffffffU, write.bytes_per_pixel, false});
+            }
+        }
     }
     if (overlay.text_effects.predicate_0x4048e0.has_text_draw ||
         overlay.text_effects.predicate_0x404900.has_text_draw) {
@@ -814,7 +909,22 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
         }
     }
     if (overlay.centered_resource.draw.reached) {
-        complete = false; // No centered-resource raster projection yet.
+        const auto& raster = plan.shared_centered_resource_raster;
+        if (!raster.has_value() || !raster->draw_reached ||
+            !raster->input_complete || !raster->raster.input_complete) {
+            complete = false;
+        } else {
+            for (const auto& write : raster->raster.pixel_writes) {
+                if (write.offset_from_framebuffer_base < 0) {
+                    complete = false;
+                    break;
+                }
+                writes.push_back({
+                    static_cast<std::uint64_t>(
+                        write.offset_from_framebuffer_base),
+                    write.value, 0xffffffffU, write.bytes_per_pixel, false});
+            }
+        }
     }
     if (overlay.race_results.gates.race_results) {
         if (!plan.shared_results_raster_reached ||
