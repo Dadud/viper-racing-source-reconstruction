@@ -459,6 +459,53 @@ struct PhysicsStatTaskConstructorPlan {
 plan_physics_stat_task_constructor(
     const PhysicsStatTaskConstructorObservation& observation);
 
+struct PhysicsWoblResourceEntryObservation {
+    std::uint32_t resource_id_0x30{};
+    std::array<std::uint32_t, 12> words_0x00_to_0x2c{};
+    std::uint32_t intrusive_node_address_0x38{};
+};
+
+struct PhysicsWoblTaskConstructorObservation {
+    std::uint32_t object_address{};
+    std::uint32_t object_subobject_address_0x38{};
+    std::uint32_t record_value_0x1c{};
+    std::uint32_t record_resource_id_0x18{};
+    std::span<const PhysicsWoblResourceEntryObservation> resource_entries;
+};
+
+enum class PhysicsWoblTaskConstructorStatus : std::uint8_t {
+    resource_not_found_null_dereference,
+    intrusive_node_null_dereference,
+    linked,
+};
+
+struct PhysicsTaskPointerWrite {
+    std::uint32_t address{};
+    std::uint32_t value{};
+};
+
+struct PhysicsWoblTaskConstructorPlan {
+    PhysicsWoblTaskConstructorStatus status{
+        PhysicsWoblTaskConstructorStatus::
+            resource_not_found_null_dereference};
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::vector<PhysicsTaskPointerWrite> pointer_writes;
+    std::optional<std::size_t> matched_resource_entry_index;
+    bool base_constructor_0x43e490_called{true};
+    bool derived_vtable_installed{true};
+    bool record_value_stored_at_0x4ac{true};
+    bool resource_lookup_lock_entered{};
+    bool resource_lookup_lock_left{};
+    bool resource_entry_found{};
+    bool lookup_null_result_dereferenced{};
+    bool intrusive_node_dereferenced{};
+};
+
+// Projects the WOBL record lookup, linked-resource writes, and object copies.
+[[nodiscard]] PhysicsWoblTaskConstructorPlan
+plan_physics_wobl_task_constructor(
+    const PhysicsWoblTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};

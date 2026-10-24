@@ -99,6 +99,20 @@ common base initializer `0x4375C0`,
 child box constructor `0x42D460`,
 `ev_e8bea9ef634610ace27b2bc375673e9184ebccd218aeb9e9e60d0c9688f83277`.
 
+`plan_physics_wobl_task_constructor` models the WOBL record's shared-resource
+link. It first records the record `+0x1C` value at object `+0x4AC`, then
+performs the `0x420970` resource-ID search between the observed lock helpers.
+The first matching resource supplies 12 DWORDs copied to object `+0x47C..+0x4A8`.
+Its intrusive node receives the object's `+0x38` address at node `+8`, then the
+object address at node `+4`; the constructor clears object `+0x4B0` and mirrors
+the 12 DWORDs into object `+0x38..+0x64`. If no resource matches, the caller
+dereferences the null lookup result after the initial `+0x4AC` write. If the
+matched resource has a null intrusive node, the 12-word copy has happened but
+the link and trailing object writes do not. Evidence: `0x436ED0`,
+`ev_c32449a435e472d676ccf1523ef95a86af06499d25f251773a15954fa26b50db`, and
+resource lookup `0x420970`,
+`ev_1bb2651b902d18f7d9e14701002e84f4ff795cdcc7c2b339e4c053022f73db7b`.
+
 ## Fixed-step update dispatch
 
 `0x421050`, reached per physics step from `0x4207C0`, iterates

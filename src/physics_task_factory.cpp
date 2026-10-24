@@ -810,6 +810,65 @@ PhysicsStatTaskConstructorPlan plan_physics_stat_task_constructor(
     return plan;
 }
 
+PhysicsWoblTaskConstructorPlan plan_physics_wobl_task_constructor(
+    const PhysicsWoblTaskConstructorObservation& observation)
+{
+    PhysicsWoblTaskConstructorPlan plan{};
+    plan.object_writes.push_back({0x4acU, observation.record_value_0x1c});
+    plan.resource_lookup_lock_entered = true;
+    plan.resource_lookup_lock_left = true;
+
+    for (std::size_t index = 0U;
+         index < observation.resource_entries.size(); ++index) {
+        const auto& entry = observation.resource_entries[index];
+        if (entry.resource_id_0x30 != observation.record_resource_id_0x18) {
+            continue;
+        }
+        plan.matched_resource_entry_index = index;
+        plan.resource_entry_found = true;
+        break;
+    }
+
+    if (!plan.resource_entry_found) {
+        plan.status = PhysicsWoblTaskConstructorStatus::
+            resource_not_found_null_dereference;
+        plan.lookup_null_result_dereferenced = true;
+        return plan;
+    }
+
+    const auto& entry = observation.resource_entries[
+        *plan.matched_resource_entry_index];
+    for (std::size_t index = 0U; index < entry.words_0x00_to_0x2c.size(); ++index) {
+        const auto value = entry.words_0x00_to_0x2c[index];
+        const auto word_offset = static_cast<std::uint32_t>(
+            index * sizeof(std::uint32_t));
+        plan.object_writes.push_back({0x47cU + word_offset, value});
+    }
+
+    plan.intrusive_node_dereferenced = true;
+    if (entry.intrusive_node_address_0x38 == 0U) {
+        plan.status = PhysicsWoblTaskConstructorStatus::
+            intrusive_node_null_dereference;
+        return plan;
+    }
+
+    plan.pointer_writes.push_back({
+        entry.intrusive_node_address_0x38 + 8U,
+        observation.object_subobject_address_0x38});
+    plan.pointer_writes.push_back({
+        entry.intrusive_node_address_0x38 + 4U,
+        observation.object_address});
+    plan.object_writes.push_back({0x4b0U, 0U});
+    for (std::size_t index = 0U; index < entry.words_0x00_to_0x2c.size(); ++index) {
+        const auto value = entry.words_0x00_to_0x2c[index];
+        const auto word_offset = static_cast<std::uint32_t>(
+            index * sizeof(std::uint32_t));
+        plan.object_writes.push_back({0x38U + word_offset, value});
+    }
+    plan.status = PhysicsWoblTaskConstructorStatus::linked;
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {
