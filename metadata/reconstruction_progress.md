@@ -1,5 +1,9 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added primary callback `0x456230`: modes 0–1 use the
+  observed palette-index/table inputs and preserve destination `+0x14`; mode
+  2 writes opaque white. The planner now covers this callback's mode-specific
+  row writes, with x87 palette conversion left explicit.
 - **2026-10-24:** Extended the bounded callback model to primary renderer
   callback `0x4569C0`: modes 0–1 select an observed palette index and mask the
   selected table word; mode 2 writes opaque white. All modes share the copied

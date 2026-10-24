@@ -1083,11 +1083,13 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
     const bool color_mask = callback_address == 0x00455E00U;
     const bool depth_fade = callback_address == 0x00455F40U;
     const bool palette_fade = callback_address == 0x004569C0U;
-    if (!alpha_fill && !color_mask && !depth_fade && !palette_fade) {
+    const bool palette_lighting = callback_address == 0x00456230U;
+    const bool palette_callback = palette_fade || palette_lighting;
+    if (!alpha_fill && !color_mask && !depth_fade && !palette_callback) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
         return result;
     }
-    if ((color_mask || depth_fade || palette_fade) && observation.descriptor_mode > 2U) {
+    if ((color_mask || depth_fade || palette_callback) && observation.descriptor_mode > 2U) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_descriptor_mode;
         return result;
     }
@@ -1130,9 +1132,9 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
                 (static_cast<std::uint32_t>(observation.alpha_byte_0x50d110) << 24U) |
                 0x00FFFFFFU;
             write(0x10U, alpha_color);
-        } else if (palette_fade && observation.descriptor_mode == 2U) {
+        } else if (palette_callback && observation.descriptor_mode == 2U) {
             write(0x10U, 0xFFFFFFFFU);
-        } else if (palette_fade) {
+        } else if (palette_callback) {
             if (row_index >= observation.lighting_palette_indices.size()) {
                 result.status = SceneRenderScanlineConversionStatus::lighting_index_observation_exhausted;
                 return result;
@@ -1148,15 +1150,23 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
         } else {
             write(0x10U, source[4] | observation.color_or_mask_0x50d114);
         }
-        if ((depth_fade || palette_fade) && row_index >= observation.depth_fade_alpha_bytes.size()) {
+        if (palette_lighting) {
+            if (observation.descriptor_mode == 2U) {
+                write(0x14U, 0xFF000000U);
+            }
+            ++result.rows_processed;
+            ++result.row_counter_increments;
+            continue;
+        }
+        if ((depth_fade || palette_fade) && row_index >= observation.distance_fade_alpha_bytes.size()) {
             write(0x14U, 0U);
-            result.status = SceneRenderScanlineConversionStatus::depth_fade_result_observation_exhausted;
+            result.status = SceneRenderScanlineConversionStatus::distance_fade_alpha_observation_exhausted;
             return result;
         }
         if (depth_fade || palette_fade) {
             write(0x14U, 0U);
             write(0x14U,
-                static_cast<std::uint32_t>(observation.depth_fade_alpha_bytes[row_index]) << 24U);
+                static_cast<std::uint32_t>(observation.distance_fade_alpha_bytes[row_index]) << 24U);
             ++result.rows_processed;
             ++result.row_counter_increments;
             continue;

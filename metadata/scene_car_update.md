@@ -664,6 +664,27 @@ and row stride/counter (`ev_0d5984591da78047ccb44ce997e71f50bcf8a7f404c618d0ec8e
 `ev_323ef6a2a48884d33e80c59414813a71fa86054846f480620274109e64b7e4f2`,
 `ev_54c1397d51e32b056d00b3690a537945ba8a4f18ce889f32925825ddd3f2893b`).
 
+The callback `0x456230`, selected with secondary callback `0x455E00`, also uses
+the palette-index projection shared with `0x4569C0`. Modes 0–1 copy `+0,+4,+8,+0x18,+0x1C`, write
+the masked palette word at `+0x10`, and leave destination `+0x14` untouched.
+Mode 2 copies the same fields, writes `0xFFFFFFFF` at `+0x10` and
+`0xFF000000` at `+0x14`, then increments `DAT_0050D304`. Palette conversion
+remains an observed input because it uses the same x87 arithmetic/table-index
+path. Evidence: callback/row range (`ev_9bad490bc48c3cfc58899621ac53ae5436457a323e177b2db4eb9c5f4bbc583c`,
+`ev_be818b3df6212d0c89cea7dd5f14387340bacc40796e27aa00f0ef83a10c99`), source
+copy/formula (`ev_946433c75a2da8ad136ea1f681411988c3f0fa7d198ce8552b0f824ad06e43ac`,
+`ev_5c9ff56605c9f2f9fb7fa0e2d791073f42e6f9be37e6834a024955046f90b28a`,
+`ev_adee1c5ba173587e0d889e7fa25856553fe04db76afb399deeeda942494b59e6`,
+`ev_72f831e01659ece57781562e54d15e637ad6825aeff321f1e2a04c9fd9711f92`,
+`ev_41f7d79cd905f00b468d63c4a4cd5521fd2f867d8aaff3748ec33f061f95238d`),
+palette lookup/masked color (`ev_05c196e12f376025c8a1d6ae4a5ba65dc98bc777037c7ca2c0ecd4d254133262`,
+`ev_c9c90ab39585e6a7632416be635de3bc08b56741f653acda9488c752c173120e`,
+`ev_31860bc7d0254f4cda604625345bd97c939b0151c8b630348992f10e6ec2f1c0`,
+`ev_7ead392d5414f5e276302a4e9cf0a884dbeb1ef86b359c873190ae020bedaeda`), and
+mode-2 color/alpha/counter (`ev_33ea4dbfb23181ba21daecc72374536e8ab3da88c051f656f68c0b6e36215240`,
+`ev_573f0f2f237648640e519f1af8f095f7c592c0cd774cd1935df40ce000d40d27`,
+`ev_ea9a50c5407a36863e2d29597188145f54a34b4101cad528271d7cd9a9d97541`,
+`ev_d23d92a9a3faeb0dcd6ce9e6a61fc56b86a7370790b5c6f1614119fed35c5d93`).
 The primary callback `0x4569C0`, selected with secondary callback
 `0x455F40`, now uses the same bounded row planner. All modes copy the five
 source words at `+0,+4,+8,+0x18,+0x1C`; modes 0 and 1 derive a palette index

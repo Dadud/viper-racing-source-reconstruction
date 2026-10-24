@@ -824,7 +824,7 @@ enum class SceneRenderScanlineConversionStatus : std::uint8_t {
     negative_row_pointer,
     source_observation_exhausted,
     destination_observation_exhausted,
-    depth_fade_result_observation_exhausted,
+    distance_fade_alpha_observation_exhausted,
     lighting_index_observation_exhausted,
     lighting_palette_observation_exhausted,
 };
@@ -839,7 +839,7 @@ struct SceneRenderScanlineConversionObservation {
     std::span<const std::uint32_t> lighting_palette_indices;
     std::span<const std::uint32_t> lighting_palette_words;
     // Output byte of the x87 distance-fade branch, indexed by absolute row.
-    std::span<const std::uint8_t> depth_fade_alpha_bytes;
+    std::span<const std::uint8_t> distance_fade_alpha_bytes;
     std::span<const SceneRenderRowRecord> source_rows;
     std::span<const SceneRenderRowRecord> destination_before;
 };
