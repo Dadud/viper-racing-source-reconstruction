@@ -1017,12 +1017,21 @@ into the 3x3 matrix at `+0x38` (DWORD index `0x0E`). The following
 basis synchronization multiplies the local 3x3 matrix by the matrix at
 `+0x210`, then multiplies that result by the updated orientation matrix and
 writes it to `+0x264`. `synchronize_body_basis_matrices` models these two
-row-major products when given the local matrix as it exists at the call site.
-The preceding stack assembly is not reconstructed: the assembly copies nine
-floats to `ESP+0x38`, later passes a matrix beginning at `ESP+0x30`, and reads
-the words at `ESP+0x30` and `ESP+0x34` without earlier writes in this function.
-Those two values depend on prior stack contents and must be supplied as part
-of the observed local matrix to reproduce the products. At the function tail,
+row-major products. `build_body_integrator_local_basis_matrix` derives the
+temporary matrix from the updated orientation using the observed stack copy
+and ordered overlapping DWORD moves.
+
+The earlier interpretation that two words depended on prior stack contents
+was incorrect. `0x402DD0` reserves and releases its own 0x0C-byte local area,
+leaving its three caller arguments on the stack. At `0x43F2ED`, the caller
+forms the copy destination while those arguments are still present, then adds
+0x0C to `ESP`; together these instructions place the nine-float copy at the
+same effective address later passed to the second matrix multiply. The later
+loads at `[ESP+0x30]` and `[ESP+0x34]` therefore read copied matrix elements.
+Instruction-order simulation of the subsequent moves yields the local array
+`{m0, m3, m6, m6, m4, m7, m2, m5, m8}` from input `{m0..m8}`; it is not a
+simple transpose. The prior model accepted this matrix as an external
+observation, but it is now derived internally. At the function tail,
 six floats at `+0x24C..+0x260`
 (DWORD indices `0x93..0x98`) are zeroed and the 16-bit field at `+0x10` is
 incremented. `finish_body_integration_tail` models these writes.
@@ -1031,17 +1040,24 @@ embedded-record callback accumulator deltas, point-impulse transfer, and
 duration-gated `+0x38` callback argument decoding before kinematics. It returns
 force and moment accumulators for the caller to pass onward; virtual callback
 effects stay explicit. `advance_body_integration_kinematics` composes the
-ordered linear step, angular transform/add/cap, orientation update, basis
-synchronization, and tail clear/counter increment. The stack-dependent local
-matrix and callback effects remain caller inputs, so these compositions are
-still partial models of `0x43ECE0`.
+ordered linear step, angular transform/add/cap, orientation update, derived
+local-matrix construction, basis synchronization, and tail clear/counter
+increment. Callback effects remain caller inputs, so this is still a partial
+model of `0x43ECE0`.
 Trigonometric and normalization rounding can differ from the original x87
 path. Evidence: `ev_a39a0df0b76df8e646f3d5399b4c39e51d6d36c1d3e47868ce2cadb111123100`
 (`0x43ECE0`), `ev_30831a54df2ae382a871251911b4ba4827d7bd1a872b386959900f129c8a4d76`
 (`0x422F30`), `ev_992cd7155517f76c8cc616564326fcf41c211162a7ca6bc3c536611634a468da`
 (`0x422C10`), `ev_3ef7088764745fe92c5ab7e738c9de6f50d056c32a0e93326ba4bd0f06df575f`
 (`0x422C60`), and `ev_ec726d0b852826c649a449b840806c9423465dfe4a1340a71c268f97a5ee`
-(`0x402DD0`).
+(`0x402DD0`). The stack-delta review uses dossier `ev_eeac45221c20dabe425f430d776ba783e9648cae4d51a76551839c7db16aa05e`,
+the `0x402DD0` callee frame `ev_4e1add91036877b65abd945402943c23237a26df219cd1ad88a52fdc0a02e6f6`,
+and instruction observations `ev_e207e53b6ce534f059f6388a90478b90b698217e2fed8b8c4fa465283b33606c`,
+`ev_f1487fdd641a4e27217e5c271c961399d6e544a72641c71130f4cc84229e5c20`,
+`ev_afc8f06c7b881d0f8068fd75fad818ef510b8f8985513c0fb95da2d6ef2e20b0`,
+`ev_fd591ff032f45b611d42a016e5ab4b96edd6302f0ec26ac622769c371a8a5784`,
+and `ev_82056189f255c5af6de3192f59a3763034da03f54f6bfa8c04ab93833d8387f0`;
+the complete session bundle is `body_integration_basis_sync.evidence.json`.
 
 The constant `0.016` is applied once per invocation of this body update; the
 measured clock deltas are not passed into it. The outer loop's pacing and

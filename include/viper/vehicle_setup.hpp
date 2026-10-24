@@ -978,6 +978,7 @@ struct BodyIntegrationTailState {
 };
 
 struct BodyBasisSynchronization {
+    std::array<float, 9> local_matrix{};
     std::array<float, 9> intermediate_matrix{};
     std::array<float, 9> basis_matrix{};
 };
@@ -991,9 +992,6 @@ struct BodyIntegrationKinematicsInput {
     PhysicsVector3 accumulated_angular_moment{};
     std::array<float, 9> orientation_matrix_0x0e{};
     std::array<float, 9> angular_transform_matrix_0x99{};
-    // Includes the two stack words whose values are not initialized locally
-    // by 0x43ECE0; callers retain them as observations.
-    std::array<float, 9> local_basis_matrix{};
     std::array<float, 9> body_matrix_0x210{};
 };
 
@@ -1077,9 +1075,13 @@ make_world_car_scene_record_identity(
     const std::array<float, 9>& orientation_matrix,
     const PhysicsVector3& angular_velocity) noexcept;
 
+// Reconstructs the local nine-float matrix assembled by 0x43ECE0 after the
+// orientation update, including the instruction-observed stack reorder.
+[[nodiscard]] std::array<float, 9> build_body_integrator_local_basis_matrix(
+    const std::array<float, 9>& updated_orientation_matrix) noexcept;
+
 // Applies the two observed 0x402DD0 multiplies around the body matrices at
-// +0x210 and +0x264. local_matrix is the stack matrix after the binary's
-// reorder; its construction includes two stack words not initialized here.
+// +0x210 and +0x264. local_matrix is preserved for inspection.
 [[nodiscard]] BodyBasisSynchronization synchronize_body_basis_matrices(
     const std::array<float, 9>& local_matrix,
     const std::array<float, 9>& matrix_0x210,
@@ -1121,7 +1123,7 @@ prepare_body_integration_force_collection(
 
 // Composes the ordered linear, angular, orientation, basis-sync, and tail
 // stages of 0x43ECE0. Earlier force collection and virtual record effects stay
-// caller inputs; stack-dependent local_basis_matrix is retained verbatim.
+// caller inputs; the local basis matrix is derived from the updated orientation.
 [[nodiscard]] BodyIntegrationKinematicsResult
 advance_body_integration_kinematics(
     BodyIntegrationTailState& tail_state,

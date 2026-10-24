@@ -1755,7 +1755,28 @@ BodyBasisSynchronization synchronize_body_basis_matrices(
 
     auto intermediate = multiply(local_matrix, matrix_0x210);
     auto basis = multiply(intermediate, orientation_matrix);
-    return {intermediate, basis};
+    return {local_matrix, intermediate, basis};
+}
+
+std::array<float, 9> build_body_integrator_local_basis_matrix(
+    const std::array<float, 9>& updated_orientation_matrix) noexcept
+{
+    // 0x43F2F9 copies nine DWORDs into the temporary matrix. The following
+    // stack-relative moves reorder them before the 0x402DD0 multiply. Preserve
+    // each loaded source value before applying the overlapping stores.
+    auto local = updated_orientation_matrix;
+    const auto third = local[3];
+    const auto saved_third = local[2];
+    local[1] = third;
+    const auto sixth = local[5];
+    const auto seventh = local[6];
+    local[3] = seventh;
+    local[2] = seventh;
+    local[6] = saved_third;
+    const auto eighth = local[7];
+    local[5] = eighth;
+    local[7] = sixth;
+    return local;
 }
 
 void finish_body_integration_tail(BodyIntegrationTailState& state) noexcept
@@ -1862,8 +1883,10 @@ BodyIntegrationKinematicsResult advance_body_integration_kinematics(
         input.angular_velocity, transformed_angular);
     result.orientation = advance_body_orientation_matrix(
         input.orientation_matrix_0x0e, result.angular.angular_velocity);
+    const auto local_basis = build_body_integrator_local_basis_matrix(
+        result.orientation.orientation_matrix);
     result.basis = synchronize_body_basis_matrices(
-        input.local_basis_matrix, input.body_matrix_0x210,
+        local_basis, input.body_matrix_0x210,
         result.orientation.orientation_matrix);
     finish_body_integration_tail(tail_state);
     return result;
