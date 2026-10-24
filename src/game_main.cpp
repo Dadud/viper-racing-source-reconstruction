@@ -184,6 +184,8 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << "Loaded shared tire " << assets.default_tire().label << " from common.res\n"
               << "Loaded " << assets.car_name() << " human setup record: "
               << assets.player_car_setup().size() << " bytes (CCS v2)\n"
+              << "Loaded " << assets.track_name() << " AI default setup record: "
+              << assets.ai_vehicle_setup().size() << " bytes (CCS v2)\n"
               << "Loaded settings: " << assets.options().entries().size()
               << " sections from options.def\n"
               << "Parsed " << assets.car_name() << " level-0 FNIM: " << assets.player_model().vertices.size() << " vertices, "

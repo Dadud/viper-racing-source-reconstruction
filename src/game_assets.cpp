@@ -123,6 +123,17 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         throw std::runtime_error(assets.track_name_ +
             " track.obt world-object resource is invalid");
     assets.track_objects_ = *track_objects;
+    const auto* ai_setup_entry = track_bundle.find("aidef.ccs", car_setup_type);
+    if (ai_setup_entry == nullptr)
+        throw std::runtime_error(assets.track_name_ +
+            " AI default setup resource aidef.ccs is missing");
+    const auto ai_setup_payload = track_bundle.payload(*ai_setup_entry);
+    if (ai_setup_entry->attributes != 2U || ai_setup_payload.size() !=
+            assets.ai_vehicle_setup_.size())
+        throw std::runtime_error(assets.track_name_ +
+            " AI default setup resource has an unsupported version or size");
+    std::copy(ai_setup_payload.begin(), ai_setup_payload.end(),
+        assets.ai_vehicle_setup_.begin());
     const auto terrain = parse_track_terrain_resource(track_bundle);
     if (!terrain) {
         throw std::runtime_error(assets.track_name_ +

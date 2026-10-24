@@ -33,6 +33,7 @@ public:
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
     [[nodiscard]] const TrackObjectTextTable& track_objects() const noexcept { return track_objects_; }
+    [[nodiscard]] const std::array<std::byte, 0x8c>& ai_vehicle_setup() const noexcept { return ai_vehicle_setup_; }
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
@@ -50,6 +51,7 @@ private:
     LanguageResource language_;
     TerrainSurfaceResourcePayload terrain_;
     TrackObjectTextTable track_objects_;
+    std::array<std::byte, 0x8c> ai_vehicle_setup_{};
     IdealLineTrackData ideal_line_;
     CarFileResourcePayloads player_car_;
     ModelResource player_model_;

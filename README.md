@@ -6,7 +6,8 @@ The completion plan is tracked in [the feature ledger](metadata/completion_ledge
 and [reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
 parses the selected track's terrain and ideal line plus the selected car's
-setup and level-0 indexed mesh, and draws them in a top-down Direct3D
+human setup, the track bundle's AI default setup, and the car's level-0 indexed
+mesh, and draws them in a top-down Direct3D
 development view. It loads the selected track's `track.obt` placement table and
 anchors the preview car at its first `obj car` start position, with height
 sampled from terrain data. The preview heading still follows the ideal line.

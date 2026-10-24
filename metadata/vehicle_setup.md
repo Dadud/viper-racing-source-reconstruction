@@ -49,6 +49,20 @@ out later setup mutation or a different owning row. Evidence: `0x45C5B0`
 `0x45EE40` `ev_d5349302be5d3e8df0415e2df0b15fc7f1b0bf5fe3018f4e0ba7bef8c501b36f`,
 and `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ffa06eec1a05a08317`.
 
+The AI path has a distinct setup source: `0x41A000` loads `aidef.ccs` from
+the active track resources into its 35-word AI setup block; on failure it
+copies the numeric defaults from `0x45F2A0`. It then uses the entrant ordinal,
+selected driver record, and difficulty table to update the AI setup through
+`0x41A0C0` and several direct scalar writes. All eight shipped `.trk` bundles
+contain `aidef.ccs` as CCS0 version 2 with a 0x8C-byte payload; the runtime now
+owns this raw payload from the selected track bundle in `GameAssets`. This is
+the AI initializer's base setup and is not evidence that the resource supplies
+the separate CARF mapper's configured-row words. The runtime has not yet
+applied the AI difficulty/driver mutations or passed the setup into an
+initialized physics vehicle. Evidence: `0x41A000`
+`ev_67a3cffd701fba3131c3793b441c8ae76089194d822832bebb5902ef73ac6b54`,
+`0x41A0C0` `ev_85870aa4ba6b470ea3e074c852c0ac3a55794497857bea8dd0235a0a713f8549`.
+
 ## World car variant tags at `0x45CAE0`
 
 The world parser reads a numeric subtype from each `obj_car` record and writes
