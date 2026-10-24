@@ -1252,9 +1252,11 @@ convergence, it applies both metric cache slots (`+0x10`, then `+0x14`) and
 the `0x404313` auxiliary readout in callback
 order for every selected type. Metric values, resource measurements, strings,
 and the auxiliary glyph advance remain supplied observations.
-The generic text plan's vector follows its descriptor-table order, not native
-instruction order. Gear and other later callback operations remain modeled by
-their separate helpers or caller inputs. The
+The standalone generic text plan retains descriptor-table order. The composed
+callback sorts its combined reached calls by native call-site address, yielding
+the observed instruction order across the common rows, selected-type rows,
+Best/Last metrics, and auxiliary readout. Gear and other later callback
+operations remain modeled by their separate helpers or caller inputs. The
 callback dispatch is state-0 slot `+0x00`; evidence:
 `ev_9aa46bc6450ec1572ea865ac9148625242d6d5ef645c945de5d2100e78982c22`.
 
@@ -1278,7 +1280,11 @@ and can be projected from the factory-selected object's raw field. The
 core callback uses each result when its bounded object-byte view contains the
 required field and retains the legacy direct value otherwise. Unsupported
 factory selectors remain unresolved. Bits 3 and 4 from this branch feed the
-text plan; later Best/Last gates remain caller inputs to the generic text plan.
+generic text plan. After branch convergence, the callback independently
+projects the Best/Last cache comparisons, initialization and resource-refresh
+gates, signed raw threshold checks, and type-selected draw calls through
+`update_scene_dashboard_metric`; the resulting calls are merged into native
+call-site order.
 Evidence: factory `0x426000` `ev_77ed3eea58c07cc6b7d7aa3d98a7b500091dc65c2e2da8b99ab5211b77c19024`;
 constructors `0x43C870`/`0x43C360` `ev_50f46e3ccb041e82784d31eca60f241a4283f9e9ff8ab5d530e831f408f43168`/
 `ev_8770c120f8fe3fa22ac1f52b8af7230d59e30ec67358f7647e4c60708c446e9d`; vtable bytes

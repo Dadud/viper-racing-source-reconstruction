@@ -2133,6 +2133,15 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         append_calls(metric);
     }
     append_calls(result.auxiliary_readout);
+    // The component plans are naturally grouped by subsystem, while this
+    // aggregate represents one native callback traversal. All recovered
+    // draws have call-site addresses in instruction order within 0x4035E0.
+    std::stable_sort(result.ordered_text_calls.begin(),
+        result.ordered_text_calls.end(),
+        [](const SceneDashboardTextCall& left,
+           const SceneDashboardTextCall& right) {
+            return left.call_site < right.call_site;
+        });
     return result;
 }
 

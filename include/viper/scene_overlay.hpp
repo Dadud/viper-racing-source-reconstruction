@@ -1009,7 +1009,8 @@ struct SceneDashboardCoreCallbackPlan {
     SceneDashboardAuxiliaryReadoutResult auxiliary_readout{};
     bool auxiliary_readout_reached{};
     std::uint8_t reached_text_call_site_mask{};
-    // Reached text descriptors in the modeled callback's branch/order flow.
+    // Reached text calls ordered by their native call-site address after the
+    // callback's component plans have been composed.
     std::vector<SceneDashboardTextCall> ordered_text_calls;
 };
 
