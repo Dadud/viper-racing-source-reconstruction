@@ -122,6 +122,47 @@ int main()
                 std::fabs(callback_setup->value_0xd90 + 1.27F) < 1.0e-5F &&
                 std::fabs(callback_setup->angle_0xdcc - 0.174F) < 1.0e-5F,
             "mapped CARF width/ratio/value must reach the exact constructor callback fields");
+
+        std::vector<std::byte> anchor_record(0x12cU);
+        write_u32_le(anchor_record, 0x58U, std::bit_cast<std::uint32_t>(200.0F));
+        write_u32_le(anchor_record, 0x5cU, std::bit_cast<std::uint32_t>(25.0F));
+        write_u32_le(anchor_record, 0x128U, std::bit_cast<std::uint32_t>(10.0F));
+        std::array<viper::ModelVertex, 5> anchor_vertices{};
+        const std::array<std::array<float, 3>, 4> expected_candidates{{
+            {-0.4F, -0.254F, 3.81F},
+            {0.4F, -0.254F, 3.81F},
+            {-0.4F, -0.254F, -1.27F},
+            {0.4F, -0.254F, -1.27F}}};
+        for (std::size_t vertex = 0; vertex < expected_candidates.size(); ++vertex) {
+            std::copy(expected_candidates[vertex].begin(),
+                expected_candidates[vertex].end(),
+                anchor_vertices[vertex].fields.begin());
+        }
+        std::copy(expected_candidates[0].begin(), expected_candidates[0].end(),
+            anchor_vertices[4].fields.begin());
+        const auto anchors = viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
+            anchor_record, anchor_vertices);
+        require(anchors.has_value(),
+            "complete mapped runtime fields must permit mesh-derived wheel anchors");
+        for (std::size_t wheel = 0; wheel < expected_candidates.size(); ++wheel) {
+            require(anchors->candidate_positions[wheel] == expected_candidates[wheel] &&
+                    anchors->vertex_indices[wheel] == wheel &&
+                    anchors->nearest_distances[wheel] == 0.0F,
+                "wheel anchor formulas and nearest FNIM vertices must match constructor order");
+        }
+        require(anchors->vertex_indices[0] == 0U,
+            "strict nearest-distance comparison must keep the first tied model vertex");
+        const auto empty_mesh_anchors = viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
+            anchor_record, std::span<const viper::ModelVertex>{});
+        require(empty_mesh_anchors.has_value() &&
+                std::all_of(empty_mesh_anchors->vertex_indices.begin(),
+                    empty_mesh_anchors->vertex_indices.end(),
+                    [](const auto& index) { return !index.has_value(); }),
+            "empty FNIM vertices must leave all wheel anchor selections unset");
+        require(!viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
+                    std::span<const std::byte>(anchor_record).first(0x12bU),
+                    anchor_vertices),
+            "runtime records missing bytes of +0x128 must be rejected");
         require(!viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
                     std::span<const std::byte>(runtime_record).first(0x12fU)),
             "runtime records missing bytes of +0x12C must be rejected");

@@ -129,6 +129,7 @@ target_compile_features(viper_wheel_body_coupling PUBLIC cxx_std_20)
 target_link_libraries(viper_wheel_body_coupling PUBLIC
     viper_vehicle_model
     viper_ncar_model
+    viper_model_resource
 )
 
 add_library(viper_legacy_allocator src/legacy_allocator.cpp)

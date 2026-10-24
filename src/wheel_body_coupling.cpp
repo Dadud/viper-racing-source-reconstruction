@@ -263,7 +263,7 @@ NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
         result.candidate_positions[wheel] = {x[wheel], y, z};
         float nearest_distance = 100000.0F;
         for (std::size_t vertex = 0; vertex < input.model_vertices.size(); ++vertex) {
-            const auto& point = input.model_vertices[vertex];
+            const auto& point = input.model_vertices[vertex].fields;
             const float dx = x[wheel] - point[0];
             const float dy = y - point[1];
             const float dz = z - point[2];
@@ -276,6 +276,30 @@ NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
         result.nearest_distances[wheel] = nearest_distance;
     }
     return result;
+}
+
+std::optional<NcarWheelVertexAnchorResult>
+select_ncar_wheel_vertex_anchors_from_runtime_record(
+    const std::span<const std::byte> runtime_record,
+    const std::span<const ModelVertex> model_vertices) noexcept
+{
+    constexpr std::size_t width_offset = 0x58U;
+    constexpr std::size_t ratio_offset = 0x5cU;
+    constexpr std::size_t body_offset = 0x128U;
+    constexpr std::size_t required_size = body_offset + sizeof(std::uint32_t);
+    if (runtime_record.size() < required_size) return std::nullopt;
+    const auto read_float = [&runtime_record](const std::size_t offset) {
+        std::uint32_t bits{};
+        for (std::size_t byte = 0; byte < sizeof(bits); ++byte) {
+            bits |= static_cast<std::uint32_t>(
+                std::to_integer<std::uint8_t>(runtime_record[offset + byte]))
+                << (byte * 8U);
+        }
+        return std::bit_cast<float>(bits);
+    };
+    return select_ncar_wheel_vertex_anchors({
+        read_float(width_offset), read_float(ratio_offset),
+        read_float(body_offset), model_vertices});
 }
 
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(

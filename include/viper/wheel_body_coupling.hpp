@@ -5,6 +5,7 @@
 #include <optional>
 #include <span>
 
+#include "viper/model_resource.hpp"
 #include "viper/ncar_state.hpp"
 #include "viper/vehicle_setup.hpp"
 
@@ -539,7 +540,7 @@ struct NcarWheelVertexAnchorInput {
     float source_width_0x58{};
     float source_ratio_0x5c{};
     float source_offset_0x128{};
-    std::span<const std::array<float, 3>> model_vertices;
+    std::span<const ModelVertex> model_vertices;
 };
 
 struct NcarWheelVertexAnchorResult {
@@ -552,6 +553,13 @@ struct NcarWheelVertexAnchorResult {
 // scan in NCAR constructor 0x433C00. Empty vertex spans leave indices unset.
 [[nodiscard]] NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
     const NcarWheelVertexAnchorInput& input) noexcept;
+
+// Reads mapped fields +0x58/+0x5C/+0x128 and selects anchors directly from
+// parsed FNIM rows. Returns no result if the bounded runtime record is short.
+[[nodiscard]] std::optional<NcarWheelVertexAnchorResult>
+select_ncar_wheel_vertex_anchors_from_runtime_record(
+    std::span<const std::byte> runtime_record,
+    std::span<const ModelVertex> model_vertices) noexcept;
 
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};

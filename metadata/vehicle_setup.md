@@ -237,6 +237,9 @@ passed in wheel order to `0x441C10`, whose subobjects advance by `0x1A4` bytes.
 the three mapped runtime fields and parsed model-space XYZ positions. It leaves
 an index unset for an empty mesh. This is setup geometry only: it does not
 establish a body pose, suspension travel, contact state, or a live physics step.
+`select_ncar_wheel_vertex_anchors_from_runtime_record` reads the three
+little-endian mapped fields from a bounded record and consumes parsed FNIM rows
+directly; it rejects records shorter than the last required DWORD.
 Evidence: `0x433C00` pseudocode and body range
 `0x00433C00..0x00434A51`, dossier
 `ev_f2bb786a74070a51b02f0626e35bf0593a3b38ab0f124dd60bb1a06abe4d65dd`.
