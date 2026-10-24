@@ -1831,4 +1831,20 @@ SceneWheelAuxiliaryDispatchResult dispatch_scene_wheel_auxiliary(
     return result;
 }
 
+SceneCarWheelFramePlan plan_scene_car_wheel_frame(
+    const SceneCarWheelFrameInput& input,
+    const std::array<SceneWheelAuxiliaryState, scene_car_wheel_count>& initial_state) noexcept
+{
+    SceneCarWheelFramePlan result{};
+    result.resulting_auxiliary_state = initial_state;
+    for (std::size_t wheel = 0; wheel < scene_car_wheel_count; ++wheel) {
+        auto transform = input.transforms[wheel];
+        transform.wheel_index = wheel;
+        result.transforms[wheel] = transform_scene_car_wheel(transform);
+        result.auxiliary[wheel] = dispatch_scene_wheel_auxiliary(
+            result.resulting_auxiliary_state[wheel], input.auxiliary[wheel]);
+    }
+    return result;
+}
+
 } // namespace viper

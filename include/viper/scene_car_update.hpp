@@ -1010,4 +1010,22 @@ struct SceneWheelAuxiliaryDispatchResult {
     SceneWheelAuxiliaryState& state,
     const SceneWheelAuxiliaryDispatchInput& input) noexcept;
 
+inline constexpr std::size_t scene_car_wheel_count = 4;
+struct SceneCarWheelFrameInput {
+    std::array<SceneCarWheelTransformInput, scene_car_wheel_count> transforms{};
+    std::array<SceneWheelAuxiliaryDispatchInput, scene_car_wheel_count> auxiliary{};
+};
+
+struct SceneCarWheelFramePlan {
+    std::array<SceneCarWheelTransformOutput, scene_car_wheel_count> transforms{};
+    std::array<SceneWheelAuxiliaryDispatchResult, scene_car_wheel_count> auxiliary{};
+    std::array<SceneWheelAuxiliaryState, scene_car_wheel_count> resulting_auxiliary_state{};
+};
+
+// Composes the four ordered iterations in 0x465800. Each wheel transform is
+// emitted before that wheel's gated auxiliary update/release path.
+[[nodiscard]] SceneCarWheelFramePlan plan_scene_car_wheel_frame(
+    const SceneCarWheelFrameInput& input,
+    const std::array<SceneWheelAuxiliaryState, scene_car_wheel_count>& initial_state) noexcept;
+
 } // namespace viper

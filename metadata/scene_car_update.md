@@ -504,6 +504,20 @@ observations. Evidence: `0x4485D0`
 `0x4522C0` (`ev_c6c2785f5b203480d375f127aa69ef5d84e8ebf88971bdee0963621a08069451`),
 and `0x458800` (`ev_3d45267f1ff70581eb74195da73598239192f2df640d12d185c9698c90d9720a`).
 
+### Four-wheel callback composition
+
+`plan_scene_car_wheel_frame` composes the four loop iterations from `0x465800`
+in source order. For each index 0 through 3 it selects the corresponding
+front/rear vertical offset through `transform_scene_car_wheel`, produces the
+wheel transform, then evaluates that wheel's outer gates and updates or retires
+its auxiliary resource state through `dispatch_scene_wheel_auxiliary`. The
+caller supplies per-wheel records and the four prior auxiliary states; the plan
+returns all four transforms, dispatch outcomes, and resulting states. This
+captures sequencing and state carry without claiming the unknown semantics of
+the input flags or the native helper side effects. Evidence is the complete
+`0x465800` body (`ev_9bc59c0c0669289e8d06530e19a0d8bd4088c0dab36f2066e9d10870d81aacc6`)
+and its auxiliary helper analyses retained elsewhere in this document.
+
 ## Portable model
 
 `include/viper/scene_car_update.hpp` and `src/scene_car_update.cpp` encode the
@@ -514,7 +528,9 @@ for the `0x462600` auxiliary path and the `0x4622F0`/`0x462380`/`0x4623B0`
 manager initialization, reset, and cleanup, plus the `0x4623F0` manager frame
 projection and constructor-driven pool sizing. It models the `0x462590`
 circular allocator when a slot pool is supplied; otherwise allocation success
-remains an explicit observation.
+remains an explicit observation. `plan_scene_car_wheel_frame` now combines the
+four transform and auxiliary-dispatch iterations in the observed order while
+carrying each wheel's resulting resource state forward.
 Its normalized divisions use the shared approximate compatibility
 routine when requested. Other x87 rounding remains approximate. The event
 loop and special branch are visible in assembly `0x00465868..0x00465A1D`;
