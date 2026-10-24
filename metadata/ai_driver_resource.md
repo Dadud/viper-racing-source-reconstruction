@@ -12,6 +12,15 @@ Easy, Intermediate (the medium profile), Hard, and Career1 through Career5.
 `parse_ai_driver_resource` validates the version, current payload size, and
 that each group count is at most sixteen. It preserves all sixteen raw slots
 per group because the record fields have not been semantically recovered.
+`find_ai_driver_record` selects an active slot within a supplied profile group.
+`select_ai_driver_track_tuning` mirrors `0x41A000`'s row address calculation:
+`0x90 + (track_index + mode * 8) * 0x18`, for the eight `tracks.tab` rows and
+two observed modes. It reads binary32 values at row offsets `+0`, `+4`, and
+`+0xC`, plus record values at `+0x20` and `+0x6C`. The initializer writes the
+product of row `+0` and record `+0x20` to setup word 1, passes row `+4` to
+`0x41A0C0`, and scales setup words `0x12` and `0x13` by row `+0xC` times record
+`+0x6C`. Field meanings remain unlabeled. Evidence: `0x41A000`
+`ev_67a3cffd701fba3131c3793b441c8ae76089194d822832bebb5902ef73ac6b54`.
 `GameAssets` now requires and owns this parsed resource alongside its shared,
 car, and track bundles. The parser currently does not accept the legacy
 `0x660C`-byte version-2 payload that the native loader also recognizes and

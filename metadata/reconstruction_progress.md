@@ -10,6 +10,12 @@
   original-asset validation and track/car WARP smoke cases. These checks cover
   asset loading and renderer startup, not race-play behavior.
 
+- **2026-10-24 AI tuning rows:** Added active AIDR group/driver selection and
+  bounded extraction of the native per-track tuning row (`track + mode * 8`),
+  including the exact binary32 fields consumed by `0x41A000`. Parser regression
+  and original asset validation pass. The follow-on CARF-based `0x41A0C0` setup
+  calculation and simulation use remain separate work.
+
 - **2026-10-24 AI driver resource:** Added a bounds-checked parser for the
   shipped `drivers.res` `aidriver.adr` AIDR v2 payload. It reads the eight
   difficulty group counts and retains the sixteen raw `0x220`-byte slots per

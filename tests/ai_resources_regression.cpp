@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <bit>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -24,6 +25,12 @@ void write_u32_le(std::vector<std::byte>& bytes, const std::size_t offset,
         bytes[offset + i] = static_cast<std::byte>((value >> (i * 8U)) & 0xffU);
 }
 
+void write_f32_le(std::vector<std::byte>& bytes, const std::size_t offset,
+                  const float value)
+{
+    write_u32_le(bytes, offset, std::bit_cast<std::uint32_t>(value));
+}
+
 void require(const bool condition, const char* message)
 {
     if (!condition) throw std::runtime_error(message);
@@ -37,6 +44,14 @@ void test_ai_driver_resource()
     write_u32_le(payload, 7U * ai_driver_group_bytes + 0x2200U, 1U);
     const auto retained_record = 7U * ai_driver_group_bytes;
     payload[retained_record + 17U] = std::byte{0x5a};
+    const auto selected_record = 2U * ai_driver_record_bytes;
+    write_f32_le(payload, selected_record + 0x20U, 2.0F);
+    write_f32_le(payload, selected_record + 0x6cU, 3.0F);
+    constexpr std::size_t selected_row = ai_driver_track_profile_offset +
+        (3U + ai_driver_track_count) * ai_driver_track_profile_bytes;
+    write_f32_le(payload, selected_record + selected_row, 4.0F);
+    write_f32_le(payload, selected_record + selected_row + 4U, 5.0F);
+    write_f32_le(payload, selected_record + selected_row + 0x0cU, 6.0F);
 
     const auto parsed = parse_ai_driver_resource(2U, payload);
     require(parsed.has_value(), "valid AIDR v2 resource rejected");
@@ -44,6 +59,20 @@ void test_ai_driver_resource()
             "AIDR group count mismatch");
     require(parsed->records[7][0][17] == std::byte{0x5a},
             "AIDR raw record bytes were not preserved");
+    const auto* driver = find_ai_driver_record(*parsed, AIDriverGroup::easy, 2U);
+    require(driver != nullptr, "active AIDR driver lookup failed");
+    const auto tuning = select_ai_driver_track_tuning(*driver, 3U, 1U);
+    require(tuning.has_value() && tuning->record_scale_0x20 == 2.0F &&
+            tuning->record_scale_0x6c == 3.0F &&
+            tuning->track_value_0x90 == 4.0F &&
+            tuning->track_value_0x94 == 5.0F &&
+            tuning->track_value_0x9c == 6.0F,
+            "native AIDR track-row indexing mismatch");
+    require(find_ai_driver_record(*parsed, AIDriverGroup::easy, 3U) == nullptr,
+            "inactive AIDR driver slot accepted");
+    require(!select_ai_driver_track_tuning(*driver, 8U, 0U) &&
+            !select_ai_driver_track_tuning(*driver, 0U, 2U),
+            "out-of-range AIDR tuning row accepted");
     require(!parse_ai_driver_resource(1U, payload),
             "unsupported AIDR version accepted");
     require(!parse_ai_driver_resource(2U,
