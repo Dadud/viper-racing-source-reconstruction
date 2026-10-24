@@ -471,7 +471,15 @@ Evidence: vtable/submit path and raw callback instructions in
 `ev_863e3d62425fc238f2f7d05582aadddfb0a640870bf31a34c16400574dbc1d0b`,
 `ev_b66f1af6bc9ebabb616d42d22c6e9cc544095105e212c61780e913c9b146754f`,
 `ev_0d1cac05b94aa5dc4c850cd384bb6e6cb97abe2a8a92e0f36bab0295f5a90e28`,
-and `ev_a66356af194e82eb5f16751b35cd3e4030ff0e736b2f0b30de2f2e8efeb0f482`.
+`ev_a66356af194e82eb5f16751b35cd3e4030ff0e736b2f0b30de2f2e8efeb0f482`,
+`ev_e4f38a37529c74fb1934ce169ee89e3c9c8c18cf28d87e00f91d02081272917e`
+(`0x44D710`), and `ev_530a782028b247007aab203e8ab52d18b606f9b47ea2ac4fffd1c8904092d1ba`
+(`0x44D6A0`). The callout plan also applies the text helper's exact layout:
+start x is the supplied pixel x minus four times the NUL-terminated string
+length, y is pixel y minus four, and each built-in glyph advances eight pixels.
+The `0x44D6A0` helper replaces control bytes below space with `#` before
+dispatching glyphs to `0x44D780`; pixel rasterization is covered by the shared
+built-in-font projection.
 
 `plan_scene_renderer_dispatch` projects the enclosing generic render frame at
 `0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active

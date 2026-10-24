@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Expanded the scene-car callout plan through the
+  actual built-in-font text wrapper: primary and secondary x origins now apply
+  the `0x44D710` centering rule from NUL-terminated string lengths, y origins
+  move up four pixels, and operations retain the underlying `0x44D6A0` draw
+  helper. The helper's eight-pixel glyph advance/control-byte behavior and
+  evidence are documented in `metadata/scene_car_update.md`. Release
+  `viper_race_scene_flow` build and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Added the scene-car virtual `+0x18` callout
   plan for `0x4648A0`: selected-car suppression, the strict distance/status-word
   gate (including x87 unordered behavior), projection return gate, context
