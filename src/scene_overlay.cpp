@@ -2197,7 +2197,9 @@ project_scene_dashboard_selected_record(
     result.value_0x14_bits = read_dword(0x14U);
     result.value_0x18_bits = read_dword(0x18U);
     result.value_0x1c_bits = read_dword(0x1CU);
+    result.value_0x20_bits = read_dword(0x20U);
     result.value_0x24_bits = read_dword(0x24U);
+    result.value_0x28_bits = read_dword(0x28U);
     result.value_0x4c_bits = read_dword(0x4CU);
     return result;
 }
@@ -2349,6 +2351,14 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
             supplemental_observation.record_value_0x24_bits = record_bits(
                 record->value_0x24_bits,
                 supplemental_observation.record_value_0x24_bits);
+            if (record->value_0x20_bits.has_value()) {
+                supplemental_observation.record_index_0x20 =
+                    std::bit_cast<std::int32_t>(*record->value_0x20_bits);
+            }
+            if (record->value_0x28_bits.has_value()) {
+                supplemental_observation.record_index_0x28 =
+                    std::bit_cast<std::int32_t>(*record->value_0x28_bits);
+            }
         }
         supplemental_observation.displayed_position =
             result.position.displayed_position;

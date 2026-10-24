@@ -696,7 +696,9 @@ struct SceneDashboardSelectedRecordProjection {
     std::optional<std::uint32_t> value_0x14_bits;
     std::optional<std::uint32_t> value_0x18_bits;
     std::optional<std::uint32_t> value_0x1c_bits;
+    std::optional<std::uint32_t> value_0x20_bits;
     std::optional<std::uint32_t> value_0x24_bits;
+    std::optional<std::uint32_t> value_0x28_bits;
     std::optional<std::uint32_t> value_0x4c_bits;
 };
 

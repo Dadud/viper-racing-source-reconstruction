@@ -1248,7 +1248,7 @@ a second time against a separately advanced state snapshot.
 The callback may also receive a bounded byte view beginning at its ESI pointer.
 At entry ESI is the selected record pointer plus `0x138`; the projection reads
 the observed DWORD fields at ESI offsets `+0x00`, `+0x08`, `+0x0C`, `+0x10`,
-`+0x14`, `+0x18`, `+0x1C`, `+0x24`, and `+0x4C`. Those values feed the Lap
+`+0x14`, `+0x18`, `+0x1C`, `+0x20`, `+0x24`, `+0x28`, and `+0x4C`. Those values feed the Lap
 count, Position value, LapTime/TestTrack inputs, the two Best/Last metrics,
 supplemental rows, and auxiliary readout respectively. Each field is decoded
 little-endian only when all four bytes are present; short views retain the
@@ -1596,8 +1596,10 @@ mode-dependent byte at `+0x04`, its first string at `+0x05`, its second string
 at `+0x12`, and a raw pointer/value at `+0x134`; it also marks the index
 initialized and raises `DAT_004DC718` to at least `index+1`. The getter returns
 the entry base for an index and the dashboard reads its `+0x05` string. The
-supplemental-row model now accepts this table plus the record's `+0x20` and
-`+0x28` indices. The portable setter rejects indices outside `[0,16)` because
+supplemental-row model obtains the record's `+0x20` and `+0x28` indices
+from the bounded selected-record projection and uses them with this table;
+explicit indices remain fallbacks when those bytes are unavailable. The
+portable setter rejects indices outside `[0,16)` because
 the binary's setter itself has no bounds guard. The constructor at `0x463920`
 feeds the setter its `param_1[0x65]` index, raw mode `*param_2`, and strings at
 `param_2+1` and `param_2+0x11`. Its caller `0x45CAE0` passes a 200-byte car

@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Extended the selected-record projection with
+  DWORDs at ESI `+0x20` and `+0x28` and connected them to the supplemental
+  string-table indices. When those bytes and the table are available, the
+  `+0x24`/`+0x1C` rows now resolve their record suffixes without caller-supplied
+  indices. Release build and `git diff --check` pass; no tests were run.
+  See `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Added raw generation-word inputs for Best and
   Last resource refresh. The metric projection now compares cached DWORDs at
   `0x4EB348`/`0x4EB338` with current generation `0x4D3868`, preserving the
