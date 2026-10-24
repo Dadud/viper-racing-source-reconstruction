@@ -21,7 +21,9 @@
 #include <cstring>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iomanip>
 #include <limits>
 #include <map>
 #include <optional>
@@ -97,12 +99,13 @@ struct Options {
     bool software{};
     bool audio_smoke{};
     std::optional<unsigned> smoke_frames;
+    std::optional<std::filesystem::path> record_trace;
 };
 
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--software] [--help]\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
 }
 
@@ -128,6 +131,9 @@ Options parse_options(const int argc, wchar_t** argv)
             options.software = true;
         } else if (arg == L"--smoke-audio") {
             options.audio_smoke = true;
+        } else if (arg == L"--record-trace") {
+            if (++i >= argc) throw std::runtime_error("--record-trace requires a path");
+            options.record_trace = std::filesystem::path(argv[i]);
         } else if (arg == L"--smoke-frames") {
             if (++i >= argc) throw std::runtime_error("--smoke-frames requires a positive frame count");
             unsigned frames{};
@@ -1131,6 +1137,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
+               const std::optional<std::filesystem::path>& record_trace,
                const std::size_t player_car_index,
                const std::uint32_t target_laps,
                const std::string_view track_name,
@@ -1194,6 +1201,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         DestroyWindow(hwnd);
         return 1;
     }
+    std::ofstream trace;
+    if (record_trace) {
+        trace.open(*record_trace, std::ios::out | std::ios::trunc);
+        if (!trace) {
+            std::cerr << "Could not create race trace: " << record_trace->string() << '\n';
+            DestroyWindow(hwnd);
+            return 1;
+        }
+        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,player_segment,player_fraction,player_speed,completed_laps,finished";
+        for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
+            if (car == player_car_index) continue;
+            trace << ",car" << car << "_segment,car" << car
+                  << "_fraction,car" << car << "_speed";
+        }
+        trace << '\n' << std::setprecision(9);
+        if (!trace) {
+            std::cerr << "Could not write race trace header.\n";
+            DestroyWindow(hwnd);
+            return 1;
+        }
+    }
     if ((!smoke_frames || smoke_audio) &&
         !state.audio.initialize(hwnd, car_bundle, car_name)) {
         std::cerr << "DirectSound initialization or engine sample loading failed; "
@@ -1206,6 +1234,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     MSG msg{};
     bool running = true;
     unsigned rendered_frames = 0;
+    std::uint64_t trace_frame = 0;
     while (running) {
         if (IsIconic(hwnd)) {
             const DWORD result = MsgWaitForMultipleObjects(0, nullptr, FALSE, INFINITE, QS_ALLINPUT);
@@ -1218,13 +1247,34 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         }
         if (running && !IsIconic(hwnd)) {
             const ULONGLONG now = GetTickCount64();
-            if (state.last_tick != 0U &&
-                !state.advance(static_cast<float>(now - state.last_tick) / 1000.0f)) {
+            const float delta_seconds = state.last_tick == 0U ? 0.0F :
+                static_cast<float>(now - state.last_tick) / 1000.0F;
+            if (state.last_tick != 0U && !state.advance(delta_seconds)) {
                 std::cerr << "Vehicle pose update failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
             }
             state.last_tick = now;
+            if (record_trace) {
+                trace << trace_frame++ << ',' << state.motion.race.elapsed_seconds << ','
+                      << delta_seconds << ',' << state.left << ',' << state.right << ','
+                      << state.accelerate << ',' << state.brake << ','
+                      << state.motion.route_segment << ',' << state.motion.route_fraction << ','
+                      << state.motion.speed << ',' << state.motion.race.completed_laps << ','
+                      << state.motion.race.finished;
+                for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
+                    if (car == player_car_index) continue;
+                    const auto& ai = state.opponent_motions[car];
+                    trace << ',' << ai.route_segment << ',' << ai.route_fraction << ',' << ai.speed;
+                }
+                trace << '\n';
+                if (!trace) {
+                    std::cerr << "Could not write race trace.\n";
+                    DestroyWindow(hwnd);
+                    return 1;
+                }
+                if ((trace_frame % 120U) == 0U) trace.flush();
+            }
             if (!state.graphics.render()) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
@@ -1344,6 +1394,7 @@ int wmain(int argc, wchar_t** argv)
                       << " numerically complete with the current FDIV model)\n";
         }
         return run_window(options.software, options.smoke_frames, options.audio_smoke,
+            options.record_trace,
             *entrants.player_record_index,
             static_cast<std::uint32_t>(std::clamp(
                 assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
