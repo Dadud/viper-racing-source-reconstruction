@@ -23,6 +23,31 @@ simulation frequency follows from this countdown.
 
 ## Render context and submission
 
+### Texture-pressure de-rez
+
+After the device BeginFrame wrapper, `0x453F70` checks the out-of-texture
+flag at `0x4DB0C8`. When set, it logs `out of texture space, de-rezing!` and
+scans 250 rows beginning at `0x50A0F8`, with a `0x28`-byte stride. For every
+row whose `+0x00` byte is set, it calls `0x4540A0(index)`. That helper clears
+the row's `+0x1C` flag and releases/zeros its `+0x24` pointer through
+`0x459C30` only when the flag is set. The caller then releases the row's
+`+0x20` texture pointer through `0x459BC0` when nonzero. After the first pass,
+`0x4597D0(1)` increments `0x4DBCCC`; a second pass reloads each still-eligible
+row with `0x459830(name_at_+0x08, &pointer_at_+0x20)`. The global pressure
+flag is cleared after the reload pass. `plan_scene_texture_cache_deresource`
+projects both passes and their table writes from a bounded 250-row byte span.
+Reference-release effects and reload success/new pointers remain observations;
+missing table bytes or reload outcomes leave the plan incomplete. The race-loop
+composer accepts this bounded observation and evaluates it only when the active
+frame call list reaches `0x448440`.
+
+Evidence: `ev_447b528b50509f37522715ad650290a9da58ae7b4d9b0cd5bf0580dc00fc23b7`
+(`0x453F70`), `ev_6dd7ba6eba5e3e21db6dd3c425280f22eac3e9f2e77b636259fb2beee6a5d2f8`
+(`0x4540A0`), `ev_857c6f0b183a01c5ae80313664d56ddbda86842307f967cbd0dcf8275c270a0e`
+(`0x459BC0`), `ev_23f4bb12b0bb8775de26c2196ddc304c8b9139ff8c3713a2c744f7dff002cdc3`
+(`0x4597D0`), and `ev_74f87d48e82231bbcdba6577f80a8894b31559641af12cdd24d05922d027a1b9`
+(`0x459830`).
+
 On the successful render branch, `0x447C90` obtains the render context through
 `0x44E210` and installs it as the current context with `0x449900`. The context
 acquisition clears its output fields, pumps messages through `0x412C80`, checks

@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added a bounded source-shaped model for the
+  renderer's texture-pressure recovery at `0x453F70`. It traverses the 250
+  `0x28`-byte rows, projects the cached-surface clears and texture-reference
+  releases, increments the de-rez generation, then applies explicit texture
+  reload outcomes in a second pass. Evidence is in
+  `metadata/simulation_loop.md`; the race-loop composer now evaluates it at the
+  reached `0x448440` setup. Release build and `git diff --check` pass; no tests
+  were run.
+
 - **2026-10-24 continuation:** Connected the common shared-overlay composer to
   optional resource-manager state. Its current-generation DWORD now feeds both
   the paused-banner and Splash:Loading refresh comparisons, and its init mask

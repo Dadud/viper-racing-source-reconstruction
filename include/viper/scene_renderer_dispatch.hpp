@@ -16,6 +16,58 @@ struct SceneRendererObjectObservation {
     bool virtual_0x0c_result{};
 };
 
+inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
+inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;
+
+struct SceneTextureCacheReloadOutcome {
+    bool succeeded{};
+    std::optional<std::uint32_t> replacement_texture_pointer;
+};
+
+enum class SceneTextureCacheDeresourceOperationKind : std::uint8_t {
+    log_texture_pressure,
+    release_cached_surface_slot_0x4540a0,
+    release_cached_surface_reference_0x459c30,
+    release_texture_reference_0x459bc0,
+    increment_deresource_generation_0x4597d0,
+    reload_texture_by_name_0x459830,
+    clear_texture_pressure_flag,
+};
+
+struct SceneTextureCacheDeresourceOperation {
+    SceneTextureCacheDeresourceOperationKind kind{};
+    std::uint32_t helper{};
+    std::size_t entry_index{};
+    std::uint32_t name_pointer{};
+    // Object pointer for release; pointer-to-slot for the reload helper.
+    std::uint32_t texture_pointer_or_slot_address{};
+};
+
+struct SceneTextureCacheDeresourceObservation {
+    bool out_of_texture_space_0x4db0c8{};
+    std::span<const std::uint8_t> table_bytes_0x50a0f8;
+    std::uint32_t deresource_generation_0x4dbccc{};
+    // One outcome per reached 0x459830 call, in table order.
+    std::span<const SceneTextureCacheReloadOutcome> reload_outcomes;
+};
+
+struct SceneTextureCacheDeresourcePlan {
+    bool reached{};
+    bool input_complete{true};
+    bool next_out_of_texture_space_0x4db0c8{};
+    std::uint32_t next_deresource_generation_0x4dbccc{};
+    std::vector<std::uint8_t> next_table_bytes_0x50a0f8;
+    std::vector<SceneTextureCacheDeresourceOperation> ordered_operations;
+    std::size_t reload_calls{};
+    std::size_t reloads_succeeded{};
+};
+
+// Projects the 0x453F70 texture-pressure recovery across its 250 rows. The
+// resource-manager releases and texture reload results remain observations.
+[[nodiscard]] SceneTextureCacheDeresourcePlan
+plan_scene_texture_cache_deresource(
+    const SceneTextureCacheDeresourceObservation& observation);
+
 enum class SceneRendererDispatchActionKind : std::uint8_t {
     profiling_begin,
     graphics_state_begin,

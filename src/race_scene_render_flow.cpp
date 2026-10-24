@@ -200,6 +200,18 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
     plan.state_transition_and_frame = plan_race_overlay_toggle_following_frame(
         observation.current_callback_state, frame_observation);
 
+    const auto& frame_calls =
+        plan.state_transition_and_frame.following_frame.calls;
+    const auto texture_pressure_setup = std::find_if(
+        frame_calls.begin(), frame_calls.end(), [](const auto& call) {
+            return call.address == 0x00448440U;
+        });
+    if (texture_pressure_setup != frame_calls.end() &&
+        observation.texture_cache_deresource.has_value()) {
+        plan.texture_cache_deresource = plan_scene_texture_cache_deresource(
+            *observation.texture_cache_deresource);
+    }
+
     for (const auto& call : plan.state_transition_and_frame.following_frame.calls) {
         if (!call.state_indexed_callback) {
             continue;

@@ -66,6 +66,140 @@ std::uint32_t float_bits(const float value) noexcept
 
 } // namespace
 
+SceneTextureCacheDeresourcePlan plan_scene_texture_cache_deresource(
+    const SceneTextureCacheDeresourceObservation& observation)
+{
+    SceneTextureCacheDeresourcePlan result{};
+    result.next_out_of_texture_space_0x4db0c8 =
+        observation.out_of_texture_space_0x4db0c8;
+    result.next_deresource_generation_0x4dbccc =
+        observation.deresource_generation_0x4dbccc;
+    constexpr auto required_table_bytes =
+        scene_texture_cache_entry_count * scene_texture_cache_entry_size;
+    if (!observation.out_of_texture_space_0x4db0c8) {
+        return result;
+    }
+
+    result.reached = true;
+    if (observation.table_bytes_0x50a0f8.size() < required_table_bytes) {
+        result.input_complete = false;
+        return result;
+    }
+    result.next_table_bytes_0x50a0f8.assign(
+        observation.table_bytes_0x50a0f8.begin(),
+        observation.table_bytes_0x50a0f8.begin() + required_table_bytes);
+    result.ordered_operations.push_back({
+        SceneTextureCacheDeresourceOperationKind::log_texture_pressure,
+        0x00410EA0U,
+    });
+
+    const auto read_dword = [&result](const std::size_t offset) {
+        const auto& bytes = result.next_table_bytes_0x50a0f8;
+        return static_cast<std::uint32_t>(bytes[offset]) |
+            (static_cast<std::uint32_t>(bytes[offset + 1U]) << 8U) |
+            (static_cast<std::uint32_t>(bytes[offset + 2U]) << 16U) |
+            (static_cast<std::uint32_t>(bytes[offset + 3U]) << 24U);
+    };
+    const auto write_dword = [&result](const std::size_t offset,
+                                       const std::uint32_t value) {
+        auto& bytes = result.next_table_bytes_0x50a0f8;
+        for (std::size_t byte = 0; byte < 4U; ++byte) {
+            bytes[offset + byte] = static_cast<std::uint8_t>(
+                value >> (static_cast<std::uint32_t>(byte) * 8U));
+        }
+    };
+
+    for (std::size_t index = 0; index < scene_texture_cache_entry_count;
+         ++index) {
+        const auto row = index * scene_texture_cache_entry_size;
+        if (result.next_table_bytes_0x50a0f8[row] == 0U) {
+            continue;
+        }
+        result.ordered_operations.push_back({
+            SceneTextureCacheDeresourceOperationKind::release_cached_surface_slot_0x4540a0,
+            0x004540A0U,
+            index,
+            0U,
+            read_dword(row + 0x24U),
+        });
+        if (result.next_table_bytes_0x50a0f8[row + 0x1cU] != 0U) {
+            result.ordered_operations.push_back({
+                SceneTextureCacheDeresourceOperationKind::release_cached_surface_reference_0x459c30,
+                0x00459C30U,
+                index,
+                0U,
+                read_dword(row + 0x24U),
+            });
+            result.next_table_bytes_0x50a0f8[row + 0x1cU] = 0U;
+            write_dword(row + 0x24U, 0U);
+        }
+        const auto texture_pointer = read_dword(row + 0x20U);
+        if (texture_pointer != 0U) {
+            result.ordered_operations.push_back({
+                SceneTextureCacheDeresourceOperationKind::release_texture_reference_0x459bc0,
+                0x00459BC0U,
+                index,
+                0U,
+                texture_pointer,
+            });
+        }
+    }
+
+    result.ordered_operations.push_back({
+        SceneTextureCacheDeresourceOperationKind::increment_deresource_generation_0x4597d0,
+        0x004597D0U,
+    });
+    ++result.next_deresource_generation_0x4dbccc;
+
+    std::size_t reload_outcome_index = 0U;
+    for (std::size_t index = 0; index < scene_texture_cache_entry_count;
+         ++index) {
+        const auto row = index * scene_texture_cache_entry_size;
+        if (result.next_table_bytes_0x50a0f8[row] == 0U) {
+            continue;
+        }
+        const auto texture_pointer = read_dword(row + 0x20U);
+        if (texture_pointer == 0U) {
+            continue;
+        }
+        const auto name_pointer = static_cast<std::uint32_t>(
+            0x0050A100U + index * scene_texture_cache_entry_size);
+        result.ordered_operations.push_back({
+            SceneTextureCacheDeresourceOperationKind::reload_texture_by_name_0x459830,
+            0x00459830U,
+            index,
+            name_pointer,
+            0x0050A118U + static_cast<std::uint32_t>(
+                index * scene_texture_cache_entry_size),
+        });
+        ++result.reload_calls;
+        if (reload_outcome_index >= observation.reload_outcomes.size()) {
+            result.input_complete = false;
+            ++reload_outcome_index;
+            continue;
+        }
+        const auto& outcome = observation.reload_outcomes[reload_outcome_index++];
+        if (!outcome.succeeded) {
+            continue;
+        }
+        if (!outcome.replacement_texture_pointer.has_value()) {
+            result.input_complete = false;
+            continue;
+        }
+        write_dword(row + 0x20U, *outcome.replacement_texture_pointer);
+        ++result.reloads_succeeded;
+    }
+    if (reload_outcome_index != observation.reload_outcomes.size()) {
+        result.input_complete = false;
+    }
+    result.ordered_operations.push_back({
+        SceneTextureCacheDeresourceOperationKind::clear_texture_pressure_flag,
+        0U,
+    });
+    result.next_out_of_texture_space_0x4db0c8 = false;
+    return result;
+}
+
 SceneRendererDispatchPlan plan_scene_renderer_dispatch(
     const SceneRendererDispatchInput& input)
 {
