@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24, FNIM bounds into NCAR reset proxy:** Extended the existing
+  reset-sphere bounds observation to accept precomputed `ModelVertexBounds`,
+  allowing parsed FNIM geometry to reach the native twelve-sphere constructor
+  and group-radius planner without rescanning. Added `ncar_geometry_regression`
+  to verify the twelve generated centers, radii, and group bound while keeping
+  runtime-record `+0x128` explicit. The regression passes; the adapter is not
+  connected to runtime collision handling, and `+0x128` source discovery is
+  still required.
+
 - **2026-10-24, CARF-to-wheel callback bridge:** Added a bounded adapter from
   mapped runtime-record fields `+0x58/+0x5C/+0x12C` to the three constructor
   scalars initialized by `0x433C00`. Extended the CARF setup regression to

@@ -204,8 +204,13 @@ writes six minimum/maximum outputs. `measure_model_vertex_bounds` reproduces
 that scan and its initial `+/-10000` sentinels for an empty vertex array. The
 FNIM regression checks both a synthetic triangle and the empty case. This
 provides asset-backed extents when called with a parsed model's vertices; it
-does not reconstruct the native model-object wrapper or all twelve subsequent
-collision-volume calls. Evidence: `0x4509B0`
+now feeds the existing NCAR reset-sphere geometry observation through its
+precomputed-bounds field, so the native twelve-sphere proxy can consume parsed
+FNIM bounds without rescanning vertices. The geometry regression checks all
+twelve generated centers/radii and the aggregate group radius using an
+explicit synthetic value for runtime-record `+0x128`. That field remains
+unmapped by the CARF adapter and must be supplied by the caller; this work does
+not connect the proxy to live collision handling. Evidence: `0x4509B0`
 `ev_f3e69307c431f783075d86dbeed730ee32736a6159e31f8b9633cd65593d0208`.
 
 ### TIRE field consumption at `0x435BF0`

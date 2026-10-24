@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "viper/registered_object_table.hpp"
+#include "viper/model_resource.hpp"
 #include "viper/timed_event_queue.hpp"
 
 namespace viper {
@@ -73,6 +74,9 @@ struct NcarResetSphereBoundsObservation {
     float car_record_0x58{};
     float car_record_0x5c{};
     float car_record_0x128{};
+    // Preferred when extents were already measured from a parsed FNIM model.
+    // The three vehicle-record fields remain explicit runtime inputs.
+    std::optional<ModelVertexBounds> precomputed_model_bounds;
 };
 
 struct NcarResetSphereBoundsPlan {

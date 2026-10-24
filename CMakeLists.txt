@@ -295,6 +295,12 @@ if(BUILD_TESTING)
         viper_scene_model viper_resource_bundle viper_wheel_body_coupling)
     add_test(NAME car_runtime_setup_regression
         COMMAND viper_car_runtime_setup_regression)
+    add_executable(viper_ncar_geometry_regression
+        tests/ncar_geometry_regression.cpp)
+    target_link_libraries(viper_ncar_geometry_regression PRIVATE
+        viper_ncar_model viper_model_resource)
+    add_test(NAME ncar_geometry_regression
+        COMMAND viper_ncar_geometry_regression)
     add_executable(viper_human_car_setup_regression
         tests/human_car_setup_regression.cpp)
     target_link_libraries(viper_human_car_setup_regression PRIVATE

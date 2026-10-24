@@ -1664,6 +1664,12 @@ NcarResetSphereBoundsPlan derive_ncar_reset_sphere_geometry(
     }
     if (!*observation.extents_pointer_present) {
         result.unusual_model_reported = true;
+    } else if (observation.precomputed_model_bounds.has_value()) {
+        const auto& bounds = *observation.precomputed_model_bounds;
+        result.raw_bounds = {bounds.minimum[0], bounds.maximum[0],
+            bounds.minimum[1], bounds.maximum[1],
+            bounds.minimum[2], bounds.maximum[2]};
+        result.inputs_complete = true;
     } else {
         result.raw_bounds = {10000.0F, -10000.0F, 10000.0F, -10000.0F,
             10000.0F, -10000.0F};
