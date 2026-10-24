@@ -61,6 +61,10 @@ GameAssets GameAssets::load(const std::filesystem::path& root)
         throw std::runtime_error("Bemidji track.ild could not be normalized");
     }
     assets.ideal_line_ = *normalized_ideal_line;
+    assets.player_car_ = parse_car_file_resources(assets.bundle("viper.car"), "viper", true);
+    if (!assets.player_car_.car_file) {
+        throw std::runtime_error("Viper CARF version 6 resource is missing or invalid");
+    }
     return assets;
 }
 

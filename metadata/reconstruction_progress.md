@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 runtime Viper configuration:** `GameAssets` now parses and
+  retains Viper's version-6 `viper.cf` CARF payload (138 DWORDs) through the
+  existing resource-aware car parser. Asset validation reports the parsed car
+  configuration alongside Bemidji's terrain and ideal line. This does not yet
+  create a live vehicle or apply upgrades. Release build, all three CTest checks,
+  installed-data validation, and the D3D11 WARP ideal-line render smoke pass.
+
 - **2026-10-24 runtime ideal-line view:** `GameAssets` parses and normalizes
   Bemidji's 91-row `track.ild`; `viper_game` now presents its X/Z route as a
   fitted D3D11 line strip in a clearly labeled development view. Rendering uses

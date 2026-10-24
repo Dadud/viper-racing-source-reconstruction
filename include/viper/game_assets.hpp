@@ -21,6 +21,7 @@ public:
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
+    [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
 
 private:
     std::filesystem::path root_;
@@ -28,6 +29,7 @@ private:
     LanguageResource language_;
     TerrainSurfaceResourcePayload terrain_;
     IdealLineTrackData ideal_line_;
+    CarFileResourcePayloads player_car_;
 };
 
 } // namespace viper

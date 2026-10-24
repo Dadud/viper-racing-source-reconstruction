@@ -151,6 +151,8 @@ viper::GameAssets load_assets(const std::filesystem::path& root)
               << assets.terrain().partition_nodes.size() << " partition nodes\n"
               << "Parsed Bemidji ideal line: " << assets.ideal_line().records.size()
               << " records\n"
+              << "Parsed Viper CARF: version " << assets.player_car().car_file->resource_version
+              << ", " << assets.player_car().car_file->raw_words.size() << " configuration words\n"
               << "Required assets validated in " << assets.root().string() << '\n';
     return assets;
 }
