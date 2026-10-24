@@ -1,4 +1,5 @@
 #include "viper/race_progression.hpp"
+#include "viper/race_loop_callbacks.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -18,6 +19,17 @@ void require(const bool condition, const char* message)
 int main()
 {
     try {
+        viper::RaceInputBindingObservation keyboard_input{};
+        const viper::RaceInputBinding up_key_binding{1U, 0x26U};
+        keyboard_input.device_button_states[0x26U] = 1U;
+        require(viper::evaluate_race_input_binding(up_key_binding, keyboard_input) == 1.0F &&
+                viper::race_input_binding_is_active(up_key_binding, keyboard_input),
+            "digital runtime key snapshots must pass through the recovered binding evaluator");
+        keyboard_input.device_button_states[0x26U] = 0U;
+        require(!viper::race_input_binding_is_active(up_key_binding, keyboard_input) &&
+                !viper::race_input_binding_is_active({}, keyboard_input),
+            "released and unbound controls must remain inactive");
+
         viper::RaceProgressionState state{};
         viper::initialize_race_progression(state, 1U);
         viper::advance_race_clock(state, 0.5F);

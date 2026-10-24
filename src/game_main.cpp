@@ -10,6 +10,7 @@
 #include "viper/game_assets.hpp"
 #include "viper/scene_font_8x8.hpp"
 #include "viper/race_participants.hpp"
+#include "viper/race_loop_callbacks.hpp"
 #include "viper/race_progression.hpp"
 #include "viper/sound_resource.hpp"
 #include "viper/wheel_body_coupling.hpp"
@@ -1363,9 +1364,11 @@ struct WindowState {
     bool right{};
     bool playback_active{};
     bool return_to_frontend{};
-    // CONTROL order: steer_left, steer_right, throttle, braking.
-    std::array<UINT, 4> control_keys{
-        VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN};
+    // The native binding evaluator consumes a post-poll device snapshot. The
+    // Win32 adapter records key events into its digital-button observation.
+    std::array<std::uint8_t, 256> keyboard_button_states{};
+    std::array<viper::RaceInputBinding, 4> control_bindings{{
+        {1U, VK_LEFT}, {1U, VK_RIGHT}, {1U, VK_UP}, {1U, VK_DOWN}}};
     HWND window{};
     std::wstring title_base;
     std::uint32_t target_laps{1U};
@@ -1673,21 +1676,32 @@ void load_keyboard_bindings(WindowState& state,
         const auto configured = options.get("CONTROL", action_names[index]);
         if (configured) {
             const auto key = parse_keyboard_binding(*configured);
-            state.control_keys[index] = key.value_or(
-                (std::numeric_limits<UINT>::max)());
+            state.control_bindings[index] = key
+                ? viper::RaceInputBinding{1U, *key}
+                : viper::RaceInputBinding{};
         }
     }
 }
 
+void refresh_keyboard_controls(WindowState& state)
+{
+    viper::RaceInputBindingObservation observation{};
+    observation.device_button_states = state.keyboard_button_states;
+    state.left = viper::race_input_binding_is_active(
+        state.control_bindings[0], observation);
+    state.right = viper::race_input_binding_is_active(
+        state.control_bindings[1], observation);
+    state.accelerate = viper::race_input_binding_is_active(
+        state.control_bindings[2], observation);
+    state.brake = viper::race_input_binding_is_active(
+        state.control_bindings[3], observation);
+}
+
 void update_control_key(WindowState& state, const UINT key, const bool pressed)
 {
-    const auto matches = [&](const std::size_t index) {
-        return state.control_keys[index] == key;
-    };
-    if (matches(0U)) state.left = pressed;
-    if (matches(1U)) state.right = pressed;
-    if (matches(2U)) state.accelerate = pressed;
-    if (matches(3U)) state.brake = pressed;
+    if (key >= state.keyboard_button_states.size()) return;
+    state.keyboard_button_states[key] = static_cast<std::uint8_t>(pressed);
+    refresh_keyboard_controls(state);
 }
 
 LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)

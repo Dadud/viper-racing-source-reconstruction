@@ -34,6 +34,15 @@ CLI replay still closes when the trace ends. This verifies repeated
 setup/race/result resource lifecycles for the route prototype, not physical
 simulation or original-game parity.
 
+The four driving bindings now pass through the reconstructed type-1 binding
+evaluator. The Win32 adapter records key-down/key-up events in a 256-entry
+digital snapshot indexed by the parsed Win32 virtual-key value, and samples the
+configured `CONTROL.steer_left`, `steer_right`, `throttle`, and `braking`
+records through the model's native `> 0.2` active predicate. Empty options
+remain unbound. This connects runtime keyboard state to the recovered binding
+logic; it does not implement DirectInput polling, controller support, native
+keyboard selector translation, control rebinding UI, or physical simulation.
+
 ## Acceptance still open
 
 - Run a complete Viper/Bemidji race from the setup window, inspect standings,
