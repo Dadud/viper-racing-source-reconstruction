@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Removed the precomputed PCAR-match boolean from
+  scene-car wheel-pool sizing. The planner now compares the current car ordinal
+  directly with the selected-PCAR ordinal read from `0x4DC19C`, matching the
+  constructor's raw equality gate. Release `viper_race_scene_flow` build and
+  `git diff --check` pass; no tests were run. Evidence:
+  `metadata/scene_car_update.md` and the selector getter at `0x45C230`.
+
 - **2026-10-24 continuation:** Connected the shared-results row gate to the
   existing factory-selected `DAT_00508A04` virtual-method projection. With a
   bounded global-object byte view, each eligible result-record index now

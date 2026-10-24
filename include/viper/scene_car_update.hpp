@@ -671,10 +671,12 @@ struct SceneWheelResourceAllocatorState {
 
 // Reproduces the slot-count choice in scene-car construction (0x463920).
 // A zero feature mode disables manager creation. Otherwise one or four wheel
-// groups are selected by mode, with 16 slots each or 40 for the selected PCAR.
+// groups are selected by mode, with 16 slots each or 40 when the current car
+// ordinal equals the PCAR ordinal returned by 0x45C230/0x4DC19C.
 [[nodiscard]] std::uint32_t scene_wheel_resource_pool_slot_count(
     std::uint32_t feature_mode_0x45bac0,
-    bool selected_pcar_ordinal_0x45c230_matches_car) noexcept;
+    std::int32_t selected_pcar_ordinal_0x4dc19c,
+    std::int32_t current_car_ordinal) noexcept;
 
 // Projects the slot-array result and resource handle returned to the manager
 // constructor at 0x4622F0. Slot positions and +0x34 remain untouched.

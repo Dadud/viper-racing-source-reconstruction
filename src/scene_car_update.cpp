@@ -978,7 +978,8 @@ void initialize_scene_wheel_resource_allocator(
 
 std::uint32_t scene_wheel_resource_pool_slot_count(
     const std::uint32_t feature_mode_0x45bac0,
-    const bool selected_pcar_ordinal_0x45c230_matches_car) noexcept
+    const std::int32_t selected_pcar_ordinal_0x4dc19c,
+    const std::int32_t current_car_ordinal) noexcept
 {
     if (feature_mode_0x45bac0 == 0U) {
         return 0U;
@@ -987,7 +988,7 @@ std::uint32_t scene_wheel_resource_pool_slot_count(
     const std::uint32_t active_wheel_groups =
         feature_mode_0x45bac0 < 2U ? 1U : 4U;
     const std::uint32_t slots_per_group =
-        selected_pcar_ordinal_0x45c230_matches_car ? 40U : 16U;
+        selected_pcar_ordinal_0x4dc19c == current_car_ordinal ? 40U : 16U;
     return active_wheel_groups * slots_per_group;
 }
 

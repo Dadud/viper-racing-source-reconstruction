@@ -360,8 +360,10 @@ otherwise, allocating 16 slots per group or 40 per group when selector
 `0x45CAE0` writes that selector from the current car ordinal; it starts at
 `-1` during configuration initialization. The mode comes from the `skids`
 setting parsed by `0x45B6B0`; it is behind feature gate `0x509B74`.
-`scene_wheel_resource_pool_slot_count` projects that exact count. The mode and
-selector accessors resolve to globals `0x53A4B0` and `0x4DC19C`, respectively.
+`scene_wheel_resource_pool_slot_count` now accepts the raw current-car ordinal
+and selector value and performs the native equality comparison itself before
+projecting that exact count. The mode and selector accessors resolve to globals
+`0x53A4B0` and `0x4DC19C`, respectively.
 Evidence: constructor `ev_761442b24e1e0ad9e1e15d7b5e33174a7144d92be40f035876d1cbada57a6f09`,
 mode accessor `ev_bda172315a0c06d53b8059ef56da4bb6134f01b40c22f20a79cbba25f312d9f1`,
 configuration loader `ev_84ee40aeb94d384d45130b03a0af4fd328d278a495bbc31bb03b8a3e3b884502`,
