@@ -557,6 +557,41 @@ struct PhysicsGcarTaskConstructorPlan {
 plan_physics_gcar_task_constructor(
     const PhysicsGcarTaskConstructorObservation& observation);
 
+struct PhysicsCheckpointTaskConstructorObservation {
+    std::array<float, 3> first_vertex{};
+    std::array<float, 3> second_vertex{};
+    float yaw_degrees{};
+    bool fdiv_compatibility_enabled{};
+    bool constructor_backend_nonnull{};
+};
+
+enum class PhysicsCheckpointTaskConstructorStatus : std::uint8_t {
+    constructed,
+    null_backend_virtual_call_fault,
+};
+
+struct PhysicsCheckpointTaskConstructorPlan {
+    PhysicsCheckpointTaskConstructorStatus status{
+        PhysicsCheckpointTaskConstructorStatus::constructed};
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::array<float, 9> rotated_basis{};
+    std::array<float, 3> center{};
+    std::array<std::optional<std::array<float, 3>>, 2>
+        transformed_vertices{};
+    std::uint32_t vtable_address{0x004c82a0U};
+    bool base_constructor_called{true};
+    bool cross_product_helper_0x434bf0_called{};
+    bool backend_virtual_0x34_called{};
+    bool backend_null_receiver_fault{};
+    bool fdiv_compatibility_path_used{};
+    bool x87_extended_precision_approximated{true};
+};
+
+// Projects CHKP endpoint, basis, center, rotation, and backend-call effects.
+[[nodiscard]] PhysicsCheckpointTaskConstructorPlan
+plan_physics_checkpoint_task_constructor(
+    const PhysicsCheckpointTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};

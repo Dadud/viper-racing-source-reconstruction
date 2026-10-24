@@ -137,6 +137,26 @@ tail helper `0x427A40`,
 copy helper `0x427BF0`,
 `ev_3952797030559a14e1424ff087668b8901ca5e3a635f95d2c69d3497e61e520f`.
 
+`plan_physics_checkpoint_task_constructor` projects the `CHKP` record's two
+3D endpoints at `+0x08..+0x1C`, their delta, and the derived basis at object
+`+0x38..+0x58`. The constructor normalizes the segment, a cross-product vector
+from `0x434BF0`, and its perpendicular, then rotates that 3x3 basis about Y
+using the record's degree value at `+0x24`. It stores the endpoint midpoint at
+`+0x5C..+0x64`; the transformed endpoint vectors are also returned as local
+intermediate observations. It finally makes the unguarded global backend
+virtual `+0x34` call; a null receiver is reported after the preceding writes.
+Host trigonometry, x87 rounding, and Pentium-FDIV behavior are approximations.
+Evidence: `0x43A620`,
+`ev_28f1d49ae0dce63fb5c471cd65da48e9a4cd1a72b586c3932cbffb431e7d1bf2`;
+cross product `0x434BF0`,
+`ev_e8ed20d85f950e46855973603f0e96e9f313df3c2c611318b39daa5958f7d632`;
+matrix rotation and product `0x402D10`,
+`ev_180ccb60ee7d72a02b914e750a3ca48640f177ef8fecba92ab9545b87d3c3023`,
+`0x402DD0`,
+`ev_405f1cc8b926abf27c24c930e07896bb34b49ce6a13cc1135c6cf7f01299b64a`;
+and endpoint transform `0x42FBF0`,
+`ev_d5fb1607dd5445a7120632c22341841fcaad0ab5c8cfde4dba0d94e68a6e7bc0`.
+
 ## Fixed-step update dispatch
 
 `0x421050`, reached per physics step from `0x4207C0`, iterates

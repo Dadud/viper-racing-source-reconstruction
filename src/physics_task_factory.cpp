@@ -961,6 +961,128 @@ PhysicsGcarTaskConstructorPlan plan_physics_gcar_task_constructor(
     return plan;
 }
 
+PhysicsCheckpointTaskConstructorPlan
+plan_physics_checkpoint_task_constructor(
+    const PhysicsCheckpointTaskConstructorObservation& observation)
+{
+    PhysicsCheckpointTaskConstructorPlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+    const auto write_float = [&plan](const std::uint32_t offset,
+                                     const float value) {
+        plan.object_writes.push_back({offset, std::bit_cast<std::uint32_t>(value)});
+    };
+
+    for (std::size_t axis = 0U; axis < 3U; ++axis) {
+        write_float(0x6cU + static_cast<std::uint32_t>(axis * 4U),
+                    observation.first_vertex[axis]);
+        write_float(0x78U + static_cast<std::uint32_t>(axis * 4U),
+                    observation.second_vertex[axis]);
+    }
+
+    std::array<float, 3> delta{};
+    for (std::size_t axis = 0U; axis < delta.size(); ++axis) {
+        delta[axis] = observation.second_vertex[axis]
+            - observation.first_vertex[axis];
+        write_float(0x38U + static_cast<std::uint32_t>(axis * 4U),
+                    delta[axis]);
+    }
+    const auto raw_delta = delta;
+
+    std::array<float, 3> cross{
+        -delta[0] * delta[1],
+        delta[0] * delta[0] + delta[2] * delta[2],
+        -delta[2] * delta[1]};
+    std::array<float, 3> perpendicular{-delta[2], 0.0F, delta[0]};
+    plan.cross_product_helper_0x434bf0_called = true;
+
+    const auto normalize = [&observation](std::array<float, 3>& vector) {
+        const auto x = static_cast<long double>(vector[0]);
+        const auto y = static_cast<long double>(vector[1]);
+        const auto z = static_cast<long double>(vector[2]);
+        const auto length = std::sqrt(x * x + y * y + z * z);
+        const auto inverse = divide_with_vc98_fdiv_compatibility(
+            1.0L, length, observation.fdiv_compatibility_enabled);
+        for (auto& component : vector) {
+            component = static_cast<float>(
+                static_cast<long double>(component) * inverse);
+        }
+    };
+    normalize(delta);
+    normalize(cross);
+    normalize(perpendicular);
+
+    std::array<float, 9> basis{
+        delta[0], delta[1], delta[2],
+        cross[0], cross[1], cross[2],
+        perpendicular[0], perpendicular[1], perpendicular[2]};
+
+    constexpr float degrees_to_radians = 0.017453292F;
+    const float angle_radians = observation.yaw_degrees * degrees_to_radians;
+    const auto angle = static_cast<long double>(angle_radians);
+    const float cosine = static_cast<float>(std::cos(angle));
+    const float sine = static_cast<float>(std::sin(angle));
+    const std::array<float, 9> yaw_matrix{
+        cosine, 0.0F, -sine,
+        0.0F, 1.0F, 0.0F,
+        sine, 0.0F, cosine};
+
+    // The following zero-angle X/Z rotations multiply by identity matrices.
+    for (std::size_t row = 0U; row < 3U; ++row) {
+        for (std::size_t column = 0U; column < 3U; ++column) {
+            const auto value =
+                static_cast<long double>(yaw_matrix[row * 3U])
+                    * static_cast<long double>(basis[column])
+                + static_cast<long double>(yaw_matrix[row * 3U + 1U])
+                    * static_cast<long double>(basis[3U + column])
+                + static_cast<long double>(yaw_matrix[row * 3U + 2U])
+                    * static_cast<long double>(basis[6U + column]);
+            plan.rotated_basis[row * 3U + column] =
+                static_cast<float>(value);
+        }
+    }
+    for (std::size_t index = 0U; index < plan.rotated_basis.size(); ++index) {
+        write_float(0x38U + static_cast<std::uint32_t>(index * 4U),
+                    plan.rotated_basis[index]);
+    }
+
+    for (std::size_t axis = 0U; axis < plan.center.size(); ++axis) {
+        const auto half_delta = raw_delta[axis] * 0.5F;
+        plan.center[axis] = observation.first_vertex[axis] + half_delta;
+        write_float(0x5cU + static_cast<std::uint32_t>(axis * 4U),
+                    plan.center[axis]);
+    }
+
+    for (std::size_t vertex = 0U; vertex < 2U; ++vertex) {
+        const auto& point = vertex == 0U
+            ? observation.first_vertex : observation.second_vertex;
+        std::array<float, 3> relative{};
+        for (std::size_t axis = 0U; axis < relative.size(); ++axis) {
+            relative[axis] = point[axis] - plan.center[axis];
+        }
+        std::array<float, 3> transformed{};
+        for (std::size_t row = 0U; row < 3U; ++row) {
+            const auto value =
+                static_cast<long double>(plan.rotated_basis[row * 3U])
+                    * relative[0]
+                + static_cast<long double>(
+                      plan.rotated_basis[row * 3U + 1U]) * relative[1]
+                + static_cast<long double>(
+                      plan.rotated_basis[row * 3U + 2U]) * relative[2];
+            transformed[row] = static_cast<float>(value);
+        }
+        plan.transformed_vertices[vertex] = transformed;
+    }
+
+    plan.backend_virtual_0x34_called = true;
+    if (!observation.constructor_backend_nonnull) {
+        plan.status = PhysicsCheckpointTaskConstructorStatus::
+            null_backend_virtual_call_fault;
+        plan.backend_null_receiver_fault = true;
+    }
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {
