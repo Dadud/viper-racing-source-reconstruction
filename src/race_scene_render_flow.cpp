@@ -173,6 +173,18 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
         plan.shared_overlay = scene_shared_overlay_frame_plan(
             shared_overlay_observation);
+        if (plan.shared_overlay.race_results.gates.race_results) {
+            plan.shared_results_raster_reached = true;
+            const auto& results = plan.shared_overlay.race_results;
+            const auto& raster = observation.shared_results_raster;
+            plan.shared_results_heading_raster =
+                raster_scene_shared_results_heading_text(
+                    results.heading, raster.heading, raster.layout_font,
+                    raster.atlas_font);
+            plan.shared_results_rows_raster = raster_scene_shared_results_rows(
+                results.row_draws, raster.row_renderers, raster.layout_font,
+                raster.atlas_font);
+        }
     }
     return plan;
 }

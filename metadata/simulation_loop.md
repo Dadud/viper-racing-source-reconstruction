@@ -581,7 +581,12 @@ empty string to the layout stage.
 Incomplete palette or glyph data remains reported rather than guessed.
 `apply_scene_shared_results_raster` refuses incomplete plans, then delegates
 to the existing all-ranges-validated text-write applier so the row batch is
-applied atomically to a supplied framebuffer.
+applied atomically to a supplied framebuffer. The integrated race-loop shared
+overlay now composes both heading and row raster plans only when the raw
+race-results gate passes, preserving heading text before result rows. The
+localized strings, font tables, atlas data, and per-call palette/clip/surface
+observations remain explicit inputs; resource draws and DirectDraw submission
+stay outside the text rasterizer.
 
 After results, `0x404970` calls the `0x404950` thunk to read the direct
 `0x401DF0` splash-loading flag. When set, it registers `Splash:Loading`

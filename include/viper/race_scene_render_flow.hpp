@@ -12,6 +12,13 @@
 
 namespace viper {
 
+struct RaceLoopSharedResultsRasterObservation {
+    SceneSharedResultsHeadingTextRasterObservation heading{};
+    std::vector<SceneDashboardRasterObservation> row_renderers;
+    SceneDashboardFontObservation layout_font{};
+    SceneDashboardAtlasFontObservation atlas_font{};
+};
+
 struct RaceLoopSharedOverlayObservation {
     std::int32_t current_callback_state{};
     RaceLoopActiveFrameObservation following_frame{};
@@ -28,6 +35,7 @@ struct RaceLoopSharedOverlayObservation {
     SceneDashboardCallbackGeometryObservation dashboard_callback_geometry{};
     SceneDashboardGearDisplayObservation dashboard_gear_display{};
     SceneSharedOverlayFrameObservation shared_overlay{};
+    RaceLoopSharedResultsRasterObservation shared_results_raster{};
 };
 
 struct RaceLoopSharedOverlayPlan {
@@ -60,6 +68,9 @@ struct RaceLoopSharedOverlayPlan {
         std::vector<SceneDashboardBitmapPixelWrite> pixel_writes;
     };
     std::vector<State0BitmapProjection> state0_dashboard_bitmap_projections;
+    bool shared_results_raster_reached{};
+    SceneSharedResultsHeadingTextRasterPlan shared_results_heading_raster{};
+    SceneSharedResultsRasterPlan shared_results_rows_raster{};
     SceneSharedOverlayFramePlan shared_overlay{};
 };
 
