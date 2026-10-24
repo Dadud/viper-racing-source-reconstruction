@@ -405,7 +405,9 @@ conditionally ensures resource access (`0x454030`), checks surface
 availability (`0x4540E0`), or disables texture state through `0x458BC0` for
 handle -1. Every state-changing path ends in the shared render-state sync at
 `0x457AF0`; a same-handle clean cache returns without synchronization. The
-portable plan records those helper calls and their supplied observations,
+composed plan takes the requested handle directly from manager field `+0x10`,
+as passed by `0x4623F0` to `0x448E30`, then records those helper calls and their
+remaining supplied observations,
 leaving the wide synchronization routine as an explicit external action.
 When observations are absent, the plan marks the affected texture-enable
 result unknown instead of inventing one. Evidence: `0x448E30`

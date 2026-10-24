@@ -1573,13 +1573,18 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
         0U, 0U, 0U, 0x3F800000U,
     };
     if (texture_binding.has_value()) {
+        auto effective_texture_binding = *texture_binding;
+        // 0x4623F0 passes this manager's +0x10 handle directly to 0x448E30;
+        // keep the nested state plan consistent with that reached call.
+        effective_texture_binding.requested_handle =
+            allocator.texture_handle_0x10;
         auto effective_render_state_sync = render_state_sync;
         if (state_mask.has_value() && effective_render_state_sync.has_value()) {
             effective_render_state_sync->desired_state = state_record;
             effective_render_state_sync->cached_state = cached_render_state;
         }
         result.texture_binding = plan_scene_wheel_texture_binding(
-            *texture_binding, effective_render_state_sync);
+            effective_texture_binding, effective_render_state_sync);
     }
 
     constexpr std::array<std::array<std::uint32_t, 2>, 4> uv_bits{{

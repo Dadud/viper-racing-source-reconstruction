@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** The composed wheel-manager frame now sources the
+  nested texture-binding request from manager field `+0x10`, matching its
+  observed `0x448E30` call and preventing a conflicting duplicate handle input.
+  The untouched vertex word at `+0x0C` remains an explicit observation because
+  the stack-backed draw setup does not initialize it. Release
+  `viper_race_scene_flow` build and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Removed the precomputed PCAR-match boolean from
   scene-car wheel-pool sizing. The planner now compares the current car ordinal
   directly with the selected-PCAR ordinal read from `0x4DC19C`, matching the
