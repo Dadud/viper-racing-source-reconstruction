@@ -247,6 +247,9 @@ if(BUILD_TESTING)
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
             add_test(NAME game_warp_render_smoke
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3)
+            add_test(NAME game_grid_mode_placement_smoke
+                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
+                    --track bemidji --car viper --software --smoke-frames 3 -grid)
             add_test(NAME game_trace_replay_regression
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
@@ -277,6 +280,7 @@ if(BUILD_TESTING)
                     game_car_${car}_warp_smoke PROPERTIES TIMEOUT 30)
             endforeach()
             set_tests_properties(game_original_asset_validation game_warp_render_smoke
+                game_grid_mode_placement_smoke
                 PROPERTIES TIMEOUT 30)
         endif()
     endif()

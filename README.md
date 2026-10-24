@@ -29,12 +29,15 @@ ctest --test-dir build -C Release --output-on-failure
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --validate-assets
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --track dundas --car sports
+# Force native track-basis grid placement instead of spline placement:
+./build/Release/viper_game.exe --data-dir ../game_install/GameData -grid
 # Bounded graphics initialization/presentation check using software rendering:
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --software --smoke-frames 3
 ```
 
 `--track NAME` and `--car NAME` select a `.trk` and `.car` bundle by filename
-stem. The current development view can load and validate the eight shipped
+stem. The original `-grid`/`/grid` switch selects the default track-basis car
+placement path; normal startup attempts native ILD spline placement. The current development view can load and validate the eight shipped
 track bundles and five shipped car bundles; this is asset selection and loading,
 not yet the game's frontend roster or a playable race. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each

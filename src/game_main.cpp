@@ -101,6 +101,7 @@ struct Options {
     bool validate_assets{};
     bool help{};
     bool software{};
+    bool grid_mode{};
     bool audio_smoke{};
     std::optional<unsigned> smoke_frames;
     std::optional<std::filesystem::path> record_trace;
@@ -118,7 +119,7 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
 }
 
@@ -142,6 +143,12 @@ Options parse_options(const int argc, wchar_t** argv)
             options.validate_assets = true;
         } else if (arg == L"--software") {
             options.software = true;
+        } else if (arg.size() >= 5U &&
+                   (arg.front() == L'-' || arg.front() == L'/') &&
+                   arg.substr(1U, 4U) == L"grid") {
+            // race.bin's command-line parser sets DAT_004dc1b0 for these
+            // switches; 0x45CAE0 then forces the default track-basis pose.
+            options.grid_mode = true;
         } else if (arg == L"--smoke-audio") {
             options.audio_smoke = true;
         } else if (arg == L"--record-trace") {
@@ -370,7 +377,9 @@ public:
                 const viper::ModelResource& player_model,
                 const viper::ModelResource& ai_model,
                 const std::size_t player_car_index,
-                const viper::TrackObjectTextTable& track_objects)
+                const viper::TrackObjectTextTable& track_objects,
+                const std::string_view player_car_name,
+                const bool force_default_placement)
     {
         try {
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
@@ -380,15 +389,69 @@ public:
             player_car_index_ = player_car_index;
             const auto spawns = car_spawns(track_objects);
             if (spawns.empty()) throw std::runtime_error("track.obt has no usable obj car start position");
+            const auto spline_nodes = viper::make_track_spline_index_nodes(ideal_line);
+            const float placement_base_key = spline_nodes.empty() ? 0.0F :
+                spline_nodes.back().segment_key + spline_nodes.back().segment_duration;
+            viper::TrackBasisTransform track_basis{};
+            track_basis.basis = {1.0F, 0.0F, 0.0F,
+                0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F};
             car_poses_.reserve(spawns.size());
-            for (const auto& spawn : spawns) {
-                const float yaw = route_yaw(spawn[0], spawn[1]);
+            std::size_t spline_placements = 0U;
+            std::size_t default_placements = 0U;
+            for (std::size_t index = 0; index < spawns.size(); ++index) {
+                const auto& spawn = spawns[index];
+                const bool is_player = index == player_car_index;
+                const auto make_placement = [&](const float terrain_height) {
+                    viper::CarTrackLineObservation observation{};
+                    observation.configured_car_index = index;
+                    observation.configured_car_count = spawns.size();
+                    observation.raw_subtype = is_player
+                        ? static_cast<std::uint32_t>(viper::TrackCarSubtype::pcar)
+                        : static_cast<std::uint32_t>(viper::TrackCarSubtype::ncar);
+                    observation.model_name = std::string(is_player
+                        ? player_car_name : std::string_view("viper"));
+                    observation.x = spawn[0];
+                    observation.z = spawn[1];
+                    observation.force_default_placement_0x4dc1b0 =
+                        force_default_placement;
+                    observation.track_basis = track_basis;
+                    observation.terrain_height = terrain_height;
+                    if (!force_default_placement && !spline_nodes.empty()) {
+                        observation.spline_placement =
+                            viper::CarSplineTrackPlacementObservation{
+                                true, 0U, spline_nodes, placement_base_key,
+                                static_cast<std::int32_t>(index), terrain_height};
+                    }
+                    return viper::plan_car_track_line(observation);
+                };
+                const auto preliminary = make_placement(0.0F);
+                if (preliminary.disposition !=
+                        viper::CarTrackLineDisposition::construction_ready)
+                    throw std::runtime_error("track.obt car placement plan is incomplete");
+                const auto& provisional_transform = preliminary.transform;
                 const auto surface = viper::sample_terrain_resource(
-                    terrain, {spawn[0], 1000.0f, spawn[1]}, true);
+                    terrain, {provisional_transform[9], 1000.0f,
+                        provisional_transform[11]}, true);
                 if (!surface.query_succeeded)
                     throw std::runtime_error("track.obt car start position has no terrain surface");
-                car_poses_.push_back({spawn[0], surface.sampled_position[1], spawn[1], yaw});
+                const auto placement = make_placement(surface.sampled_position[1]);
+                if (placement.disposition !=
+                        viper::CarTrackLineDisposition::construction_ready)
+                    throw std::runtime_error("track.obt car placement plan is incomplete");
+                const auto& transform = placement.transform;
+                const float yaw = std::atan2(transform[6], transform[0]);
+                car_poses_.push_back({transform[9], transform[10], transform[11], yaw});
+                if (placement.placement_route ==
+                        viper::CarTrackPlacementRoute::precomputed_transform)
+                    ++spline_placements;
+                else
+                    ++default_placements;
             }
+            std::cout << "Initialized " << car_poses_.size()
+                      << " grid poses from native placement plans: "
+                      << spline_placements << " spline, " << default_placements
+                      << " track-basis/default"
+                      << (force_default_placement ? " (-grid forced)" : "") << ".\n";
         } catch (const std::exception& e) {
             OutputDebugStringA(e.what());
             return false;
@@ -762,26 +825,6 @@ private:
             float x{}, z{};
             if (sscanf_s(directive.object_line.data(), "obj car %f, %f", &x, &z) == 2 &&
                 std::isfinite(x) && std::isfinite(z)) result.push_back({x, z});
-        }
-        return result;
-    }
-
-    float route_yaw(const float x, const float z) const
-    {
-        float nearest = std::numeric_limits<float>::infinity();
-        float result = 0.0f;
-        for (std::size_t index = 0; index < ideal_line_points_.size(); ++index) {
-            const auto& a = ideal_line_points_[index];
-            const auto& b = ideal_line_points_[(index + 1U) % ideal_line_points_.size()];
-            const float dx = b[0] - a[0], dz = b[1] - a[1];
-            const float length_sq = dx * dx + dz * dz;
-            if (!(length_sq > 1.0e-8f)) continue;
-            const float fraction = std::clamp(((x - a[0]) * dx + (z - a[1]) * dz) /
-                length_sq, 0.0f, 1.0f);
-            const float ex = x - (a[0] + dx * fraction);
-            const float ez = z - (a[1] + dz * fraction);
-            const float distance = ex * ex + ez * ez;
-            if (distance < nearest) { nearest = distance; result = std::atan2(dx, dz); }
         }
         return result;
     }
@@ -1249,12 +1292,11 @@ struct WindowState {
             }
         }
         if (!std::isfinite(nearest)) return false;
-        const auto& a = route[motion.route_segment];
-        const auto& b = route[(motion.route_segment + 1U) % route.size()];
-        const float yaw = std::atan2(b[0] - a[0], b[1] - a[1]);
         const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
-        if (!surface.query_succeeded || !graphics.set_car_pose(player_car_index,
-                x, surface.sampled_position[1], z, yaw)) return false;
+        // D3DWindow has already initialized the full track.obt placement
+        // transform. Route projection only seeds progression state; replacing
+        // that transform here would discard the native spline heading/height.
+        if (!surface.query_succeeded) return false;
         viper::initialize_race_progression(motion.race, motion.route_segment);
         refresh_title(true);
         return true;
@@ -1499,6 +1541,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::CarFileResourcePayloads& player_car_resources,
                const std::array<std::byte, 0x8c>& player_car_setup,
                const std::array<viper::TireDefinition, 4>& wheel_tires,
+               const bool force_default_placement,
                const viper::GameOptions& options)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -1552,7 +1595,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
     state.window = hwnd;
     if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model,
-            ai_model, player_car_index, track_objects)) {
+            ai_model, player_car_index, track_objects, car_name,
+            force_default_placement)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
         DestroyWindow(hwnd);
@@ -1798,7 +1842,7 @@ int wmain(int argc, wchar_t** argv)
             assets.ideal_line(), assets.player_model(), assets.ai_model(), assets.track_objects(),
             assets.bundle(std::string(assets.car_name()) + ".car"),
             assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
-            assets.options());
+            options.grid_mode, assets.options());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;

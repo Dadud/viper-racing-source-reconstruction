@@ -11,8 +11,9 @@ its 91-row ideal line, parses the Viper version-6 CARF payload (138 DWORDs),
 loads the selected track's validated 0x8C-byte `aidef.ccs` AI base setup, and
 draws each selected track's recovered terrain and ideal line with selected
 vehicle meshes in a top-down D3D11 view. The D3D camera follows the human grid
-car at a 1.6x overview zoom. Car positions and heights come from parsed
-placements and terrain queries, while headings remain ideal-line approximations.
+car at a 1.6x overview zoom. Initial car transforms now come from the
+reconstructed track-line placement planner and terrain queries; subsequent
+route-kinematic motion still approximates orientation from the ideal line.
 The WARP smoke renders three
 frames and exits cleanly. The runtime remains a route-kinematic prototype,
 not yet a complete playable game.
@@ -196,6 +197,20 @@ gap; do not infer runtime support from static analysis or file presence.
   function; the regression advances a synthetic closed course until two laps
   finish. Release build and all 39 CTest cases passed. This proves the shared
   route state machine, not the Windows input/window path or a game-asset lap.
+
+- **2026-10-24, runtime track-line placement:** The Win32 startup now composes
+  `plan_car_track_line` for every visible grid row, using spline nodes decoded
+  from normalized `track.ild`, the inferred endpoint key, the selected player
+  row, and terrain queries at the planned X/Z. Initial visible car transforms
+  preserve the planner's yaw and height. Direct Ghidra evidence shows the
+  native `-grid`/`/grid` switch sets the force-default global; this switch now
+  selects the modeled track-basis placement and has its own WARP smoke test.
+  External Viper/Bemidji smoke logged 8 spline placements normally and 8
+  forced-default placements with `-grid`; all 44 configured Release CTest
+  cases pass. This integration still assumes an identity track basis, zero
+  GCAR count, and `obj car` row order matching entrant order; the model's host
+  floating-point path approximates original x87 rounding. There is no original
+  visual comparison yet, and live route movement remains provisional.
 
 ## Ownership and CI boundary
 

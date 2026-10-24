@@ -336,6 +336,32 @@ BALL effect as explicit side-effect flags. CARF payload parsing and the
 observed `0x45E4B0` field stores are modeled; subtype side-effect
 implementations remain outside the plan.
 
+### Runtime switch evidence and current use
+
+In shipped `race.bin` (x86, SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`), global
+`0x4DC1B0` is zero-initialized. Its command-line parser at `0x401280` sets it
+when a token beginning with `-` or `/` has the four-byte prefix `grid`; the
+car-line constructor at `0x45CAE0` reads it to force the track-basis/default
+placement. Without that switch, the constructor attempts the spline helper and
+uses default placement only when the helper fails. This is static shipped-code
+evidence; it does not prove which branch a specific original-game session
+takes at runtime.
+
+The reconstruction's Win32 runtime now builds each visible `obj car` pose
+through `plan_car_track_line`, using the player slot as PCAR and the remaining
+visible slots as NCAR. It builds the spline nodes from normalized `track.ild`,
+uses the final node key plus duration as the geometry endpoint key, evaluates
+the default head at node zero, and queries terrain at the preliminary planned
+X/Z before recomputing the final transform. `-grid` and `/grid` select the
+default-placement route; the initial scene pose retains the resulting planned
+heading and height instead of replacing them with the older nearest-ideal-line
+heading. This live adapter currently assumes an identity track basis, zero
+GCAR counter, and `obj car` row order matching the runtime entrant order. It
+does not yet derive reversed-track basis, validate row-to-participant subtype
+mapping against an original capture, apply transforms to fully constructed
+CARF records, or compare measured transforms with a controlled original run.
+
 ## Checkpoint line and record
 
 `0x45D950` scans the form `obj checkpoint %s %f,%f %f,%f`; a conversion count
