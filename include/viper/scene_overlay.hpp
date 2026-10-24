@@ -647,6 +647,26 @@ struct SceneDashboardPositionObservation {
     bool decrement_entity_count_0x40e6d0{};
 };
 
+// The state-0 callback's ESI points at the selected record's +0x138 block.
+// Each optional DWORD below is independently populated when its bytes exist.
+struct SceneDashboardSelectedRecordProjection {
+    std::optional<std::uint32_t> value_0x00_bits;
+    std::optional<std::uint32_t> value_0x08_bits;
+    std::optional<std::uint32_t> value_0x0c_bits;
+    std::optional<std::uint32_t> value_0x10_bits;
+    std::optional<std::uint32_t> value_0x14_bits;
+    std::optional<std::uint32_t> value_0x18_bits;
+    std::optional<std::uint32_t> value_0x1c_bits;
+    std::optional<std::uint32_t> value_0x24_bits;
+    std::optional<std::uint32_t> value_0x4c_bits;
+};
+
+// Reads observed selected-record fields relative to ESI at 0x4035E0. Short
+// spans leave only out-of-range fields unresolved.
+[[nodiscard]] SceneDashboardSelectedRecordProjection
+project_scene_dashboard_selected_record(
+    std::span<const std::uint8_t> esi_record_bytes) noexcept;
+
 struct SceneDashboardPositionResult {
     bool redraw_all{};
     std::int32_t displayed_position{};
@@ -974,6 +994,9 @@ struct SceneDashboardCoreCallbackObservation {
     SceneDashboardState state{};
     SceneDashboardPositionObservation position{};
     std::int32_t selected_object_type_0x18{};
+    // Optional bounded view beginning at the selected record's ESI pointer
+    // (the record's +0x138 block in the callback).
+    std::span<const std::uint8_t> selected_record_esi_bytes;
     // Fallback values used when global_object_dispatch cannot resolve a
     // method result from its supported factory selector and bounded bytes.
     bool global_method_0x40_result{};
@@ -992,6 +1015,8 @@ struct SceneDashboardCoreCallbackObservation {
 
 struct SceneDashboardCoreCallbackPlan {
     SceneDashboardState next_state{};
+    std::optional<SceneDashboardSelectedRecordProjection>
+        selected_record_projection;
     std::optional<SceneDashboardGlobalObjectProjection>
         global_object_projection;
     SceneDashboardPositionResult position{};

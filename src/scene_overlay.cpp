@@ -2009,11 +2009,58 @@ scene_dashboard_global_object_projection(
     return result;
 }
 
+SceneDashboardSelectedRecordProjection
+project_scene_dashboard_selected_record(
+    const std::span<const std::uint8_t> esi_record_bytes) noexcept
+{
+    SceneDashboardSelectedRecordProjection result{};
+    const auto read_dword = [&](const std::size_t offset)
+        -> std::optional<std::uint32_t> {
+        if (offset > esi_record_bytes.size() ||
+            esi_record_bytes.size() - offset < sizeof(std::uint32_t)) {
+            return std::nullopt;
+        }
+        const auto* const bytes = esi_record_bytes.data() + offset;
+        return static_cast<std::uint32_t>(bytes[0]) |
+            (static_cast<std::uint32_t>(bytes[1]) << 8U) |
+            (static_cast<std::uint32_t>(bytes[2]) << 16U) |
+            (static_cast<std::uint32_t>(bytes[3]) << 24U);
+    };
+    result.value_0x00_bits = read_dword(0x00U);
+    result.value_0x08_bits = read_dword(0x08U);
+    result.value_0x0c_bits = read_dword(0x0CU);
+    result.value_0x10_bits = read_dword(0x10U);
+    result.value_0x14_bits = read_dword(0x14U);
+    result.value_0x18_bits = read_dword(0x18U);
+    result.value_0x1c_bits = read_dword(0x1CU);
+    result.value_0x24_bits = read_dword(0x24U);
+    result.value_0x4c_bits = read_dword(0x4CU);
+    return result;
+}
+
 SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     const SceneDashboardCoreCallbackObservation& observation)
 {
     SceneDashboardCoreCallbackPlan result{};
     result.next_state = observation.state;
+    if (!observation.selected_record_esi_bytes.empty()) {
+        result.selected_record_projection =
+            project_scene_dashboard_selected_record(
+                observation.selected_record_esi_bytes);
+    }
+    const auto* const record = result.selected_record_projection
+        ? &*result.selected_record_projection
+        : nullptr;
+    const auto record_i32 = [](const std::optional<std::uint32_t>& bits,
+                               const std::int32_t fallback) {
+        return bits.has_value()
+            ? std::bit_cast<std::int32_t>(*bits)
+            : fallback;
+    };
+    const auto record_bits = [](const std::optional<std::uint32_t>& bits,
+                                const std::uint32_t fallback) {
+        return bits.value_or(fallback);
+    };
     auto global_method_0x40_result = observation.global_method_0x40_result;
     auto global_method_0x20_result = observation.global_method_0x20_result;
     if (observation.global_object_dispatch.has_value()) {
@@ -2028,13 +2075,21 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
             global_method_0x20_result = projection.method_0x20_result;
         }
     }
+    auto position_observation = observation.position;
+    const auto record_value_0x138 = record_i32(
+        record != nullptr ? record->value_0x00_bits : std::nullopt,
+        observation.record_value_0x138);
+    if (record != nullptr && record->value_0x08_bits.has_value()) {
+        position_observation.record_value_0x140 =
+            std::bit_cast<std::int32_t>(*record->value_0x08_bits);
+    }
     result.position = update_scene_dashboard_position(
-        result.next_state, observation.position);
+        result.next_state, position_observation);
 
     const SceneDashboardLapObservation lap_observation{
         observation.selected_object_type_0x18,
         global_method_0x40_result,
-        observation.record_value_0x138,
+        record_value_0x138,
         global_method_0x20_result,
     };
     result.lap = update_scene_dashboard_lap(
@@ -2050,6 +2105,14 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     if (observation.selected_object_type_0x18 == 0 &&
         !global_method_0x40_result) {
         auto lap_time_observation = observation.lap_time;
+        if (record != nullptr) {
+            lap_time_observation.record_value_0x0c_bits = record_bits(
+                record->value_0x0c_bits,
+                lap_time_observation.record_value_0x0c_bits);
+            lap_time_observation.record_value_0x14_bits = record_bits(
+                record->value_0x14_bits,
+                lap_time_observation.record_value_0x14_bits);
+        }
         lap_time_observation.redraw_all = result.position.redraw_all;
         lap_time_observation.redraw_from_prior_state_change =
             observation.state.dashboard_kind_cache_0x4cf9ec != 1;
@@ -2061,7 +2124,11 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         auto test_track_observation = observation.test_track;
         test_track_observation.redraw_all = result.position.redraw_all;
         test_track_observation.displayed_position =
-            observation.record_value_0x138;
+            record_value_0x138;
+        if (record != nullptr && record->value_0x0c_bits.has_value()) {
+            test_track_observation.record_value_0x0c_bits =
+                *record->value_0x0c_bits;
+        }
         test_track_observation.selected_record_type_0x18 =
             observation.selected_object_type_0x18;
         result.test_track_branch_reached = true;
@@ -2083,6 +2150,14 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         !global_method_0x40_result &&
         result.position.displayed_count > 1) {
         auto supplemental_observation = observation.supplemental_time;
+        if (record != nullptr) {
+            supplemental_observation.record_value_0x1c_bits = record_bits(
+                record->value_0x1c_bits,
+                supplemental_observation.record_value_0x1c_bits);
+            supplemental_observation.record_value_0x24_bits = record_bits(
+                record->value_0x24_bits,
+                supplemental_observation.record_value_0x24_bits);
+        }
         supplemental_observation.displayed_position =
             result.position.displayed_position;
         supplemental_observation.displayed_count =
@@ -2099,11 +2174,25 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
             : SceneDashboardMetricSlot::value_0x14;
         metric_observation.selected_object_type_0x18 =
             observation.selected_object_type_0x18;
+        if (record != nullptr) {
+            const auto metric_bits = i == 0
+                ? record->value_0x10_bits
+                : record->value_0x14_bits;
+            metric_observation.value_bits = record_bits(
+                metric_bits, metric_observation.value_bits);
+            metric_observation.type_3_record_value_0x18_bits = record_bits(
+                record->value_0x18_bits,
+                metric_observation.type_3_record_value_0x18_bits);
+        }
         result.metrics[i] = update_scene_dashboard_metric(
             result.next_state, metric_observation, result.position.redraw_all);
     }
 
     auto auxiliary_observation = observation.auxiliary_readout;
+    if (record != nullptr && record->value_0x4c_bits.has_value()) {
+        auxiliary_observation.record_value_0x4c_bits =
+            *record->value_0x4c_bits;
+    }
     auxiliary_observation.redraw_all = result.position.redraw_all;
     result.auxiliary_readout_reached = true;
     result.auxiliary_readout = scene_dashboard_auxiliary_readout_plan(

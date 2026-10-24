@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added a bounded projection of the selected
+  dashboard record's observed DWORD fields relative to the `0x4035E0` ESI
+  pointer (`record +0x138`). The core callback now derives Position, Lap,
+  LapTime/TestTrack, supplemental, Best/Last, and auxiliary-readout values from
+  those bytes when present, preserving explicit inputs independently for any
+  truncated field. The raw offsets remain unnamed. Evidence and offsets are
+  recorded in `metadata/simulation_loop.md`. The full Release target rebuilds
+  successfully; no tests were run.
+
 - **2026-10-24 continuation:** Added a bounded projection for the dashboard's
   global object's virtual `+0x40`/`+0x20` methods. It derives selector-0's
   per-ordinal table byte and selector-specific count/denominator fields, and

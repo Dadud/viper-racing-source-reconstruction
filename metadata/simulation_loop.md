@@ -1209,6 +1209,17 @@ final-time state updates using the observed selected type and virtual `+0x40`
 result. Only the type-0/global-`+0x40`-false route continues into the modeled
 LapTime block at `0x40399A`; the composer supplies its redraw-all result and
 derives its prior-state-change input from the incoming dashboard-kind cache.
+The callback may also receive a bounded byte view beginning at its ESI pointer.
+At entry ESI is the selected record pointer plus `0x138`; the projection reads
+the observed DWORD fields at ESI offsets `+0x00`, `+0x08`, `+0x0C`, `+0x10`,
+`+0x14`, `+0x18`, `+0x1C`, `+0x24`, and `+0x4C`. Those values feed the Lap
+count, Position value, LapTime/TestTrack inputs, the two Best/Last metrics,
+supplemental rows, and auxiliary readout respectively. Each field is decoded
+little-endian only when all four bytes are present; short views retain the
+corresponding explicit observation as fallback. The offsets are raw record
+coordinates, not semantic gameplay names. This projection is grounded in the
+`0x4035E0` byte range evidence
+`ev_5f60fd107734e816e45359b06c10c71e1300a8c15309a630ac4de08ed745912e`.
 The LapTime result carries its own ordered calls and state changes. The core
 plan returns the updated state snapshot and combines the core reached text
 site bits; the race-frame flow resolves those bits through

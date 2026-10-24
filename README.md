@@ -177,7 +177,9 @@ files were present.
   and full-surface fill projections are modeled from the binary's tables and
   renderer sequence. The dashboard core can derive the global object's
   virtual `+0x40` and `+0x20` results from its factory selector and bounded raw
-  object bytes. The gear display model covers resource/mode gates, draw
+  object bytes. It can also derive the observed dashboard record fields from
+  a bounded view beginning at the callback's ESI pointer. The gear display
+  model covers resource/mode gates, draw
   calls, pointer vertices, fill spans, outline pixels, pixel-format projections,
   geometry parameters, and the `+0x34` clamp. A separate helper projects the
   value of one source pixel through the recovered bitmap format conversions,
