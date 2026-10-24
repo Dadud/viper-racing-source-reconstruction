@@ -2101,6 +2101,19 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     };
     result.final_time = update_scene_dashboard_final_time(
         result.next_state, final_time_observation, result.position.redraw_all);
+    if (result.final_time.final_time_branch &&
+        !observation.result_time_records.empty()) {
+        result.final_time_seconds = scene_dashboard_time_for_ordinal(
+            observation.result_time_records,
+            observation.result_time_record_count,
+            static_cast<std::uint8_t>(observation.position.selected_ordinal));
+        auto time_marker = observation.final_time_marker;
+        if (observation.locale_state != nullptr) {
+            time_marker = observation.locale_state->decimal_marker;
+        }
+        result.final_time_text = format_scene_dashboard_time(
+            *result.final_time_seconds, time_marker, true);
+    }
 
     if (observation.selected_object_type_0x18 == 0 &&
         !global_method_0x40_result) {
@@ -2297,6 +2310,9 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         attach_text(0x00403972, format_pair(
             result.lap.displayed_lap,
             std::bit_cast<std::int32_t>(result.lap.displayed_lap_count)));
+    }
+    if (result.final_time_text.has_value()) {
+        attach_text(0x00403848, *result.final_time_text);
     }
     const auto attach_if_nonempty = [&](const std::uint32_t call_site,
                                         const std::string& text) {

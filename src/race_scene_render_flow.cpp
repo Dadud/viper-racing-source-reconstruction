@@ -245,6 +245,17 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
 
     if (plan.dashboard_core_callback_reached) {
         auto dashboard_observation = observation.dashboard_core_callback;
+        if (dashboard_observation.result_time_records.empty()) {
+            dashboard_observation.result_time_records =
+                observation.shared_overlay.race_results.result_time_records;
+            dashboard_observation.result_time_record_count =
+                observation.shared_overlay.race_results.result_time_record_count;
+            if (dashboard_observation.final_time_marker == '.' &&
+                observation.shared_overlay.race_results.time_marker != '\0') {
+                dashboard_observation.final_time_marker =
+                    observation.shared_overlay.race_results.time_marker;
+            }
+        }
         if (dashboard_observation.language_resource == nullptr) {
             dashboard_observation.language_resource =
                 observation.language_resource;

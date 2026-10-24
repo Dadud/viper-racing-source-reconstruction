@@ -200,8 +200,8 @@ files were present.
   the TestTrack kind/resource setup and cached position row, the adjacent
   final-race-time branch, and dirty-rectangle bits. Other dashboard
   text gates and bitmap/device rendering effects remain incomplete and are documented in
-  `metadata/simulation_loop.md`; the final-time result lookup and formatter are
-  modeled separately, along with the raw type-0 supplemental rows and cached
+  `metadata/simulation_loop.md`; the final-time result lookup and formatter now
+  feed the composed callback, along with the raw type-0 supplemental rows and cached
   `+0x10`/`+0x14` metric projections, type-selected text formats, and Best/Last
   resource registration and refresh gates; the following scaled integer
   auxiliary readout and its full-redraw string calls are also modeled. The

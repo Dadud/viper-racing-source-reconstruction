@@ -1430,6 +1430,13 @@ the formatted `%s` value call at `0x403848` runs on every visit to this branch.
 checking flag byte `+0x40` bit `0x20`; it stops on the first matching row with
 that bit clear. If all matching rows have bit `0x20` set, the last matching
 row's float is returned; no ordinal match returns `-1.0`.
+When those rows are present on `SceneDashboardCoreCallbackObservation`, the
+composed callback uses its selected ordinal, applies this lookup and the
+hundredths `0x425A40` format, and carries the result as the resolved text
+argument for call `0x403848`. The race-loop composer inherits the same row span,
+count, and available marker from its shared race-results observation when the
+dashboard-specific inputs omit them. Without row bytes, the final-time text
+remains a caller-formatted fallback.
 `format_scene_dashboard_time` models the true second-argument
 branch of `0x425A40`, including integer-minute/second conversion, hundredths
 from the fractional second, the marker byte supplied from `0x4F04F4`, and the

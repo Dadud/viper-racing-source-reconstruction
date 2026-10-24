@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected final-race-time row lookup and
+  hundredths formatting to the composed dashboard callback. It now derives the
+  `0x403848` string from supplied `DAT_0050869C` rows and the selected ordinal;
+  the race-loop composer forwards the same shared-results rows when available.
+  Missing row bytes preserve the caller fallback. See
+  `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Extended callback-owned text arguments across
   LapTime, TestTrack, supplemental rows, Best/Last metrics, and the auxiliary
   numeric readout. The core also binds the observed locale table into these

@@ -996,6 +996,10 @@ struct SceneDashboardLocaleState;
 struct SceneDashboardCoreCallbackObservation {
     SceneDashboardState state{};
     SceneDashboardPositionObservation position{};
+    // Optional DAT_0050869C rows used by the final-time callback branch.
+    std::span<const std::uint8_t> result_time_records;
+    std::size_t result_time_record_count{};
+    char final_time_marker{'.'};
     std::int32_t selected_object_type_0x18{};
     // Optional bounded view beginning at the selected record's ESI pointer
     // (the record's +0x138 block in the callback).
@@ -1025,6 +1029,8 @@ struct SceneDashboardCoreCallbackPlan {
     SceneDashboardPositionResult position{};
     SceneDashboardLapResult lap{};
     SceneDashboardFinalTimeResult final_time{};
+    std::optional<float> final_time_seconds;
+    std::optional<std::string> final_time_text;
     SceneDashboardLapTimeResult lap_time{};
     SceneDashboardTestTrackResult test_track{};
     std::optional<SceneDashboardTestTrackLocalizationPlan>
