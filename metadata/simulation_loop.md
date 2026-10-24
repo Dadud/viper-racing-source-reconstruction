@@ -837,6 +837,9 @@ The state-0 `0x405100` background fill and bitmap writes can be applied as one
 ordered batch through `apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface`.
 It requires the submitted frame's `0x4052D0` callback to precede the observed
 `0x447CE0` unlock, and validates all pixel destinations before writing. The
+bitmap pixel projection now carries the active viewport through the operation
+stream: each `0x4498A0` call clips the next bitmap draw's destination, and
+`0x4498E0` restores the full-surface viewport for subsequent operations. The
 batch preserves order across background fill/bitmap operations, gear draws,
 paused-banner operations, cheater-banner and centered-resource STMP draws, the
 two shared text effects, race-results heading and rows, and the Splash:Loading

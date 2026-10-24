@@ -330,11 +330,26 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             plan.state0_dashboard_fill_projection =
                 scene_dashboard_full_surface_fill_projection(
                     render_observation);
+            auto active_destination_context =
+                render_observation.render_context;
             for (std::size_t index = 0;
                  index < plan.state0_dashboard_render_operations.size();
                  ++index) {
                 const auto& operation =
                     plan.state0_dashboard_render_operations[index];
+                if (operation.kind ==
+                    SceneDashboardRenderOperationKind::viewport_0x4498a0) {
+                    set_render_context_viewport(
+                        active_destination_context, operation.left,
+                        operation.top, operation.right, operation.bottom);
+                    continue;
+                }
+                if (operation.kind ==
+                    SceneDashboardRenderOperationKind::restore_viewport_0x4498e0) {
+                    reset_render_context_viewport(
+                        active_destination_context);
+                    continue;
+                }
                 if (operation.kind ==
                     SceneDashboardRenderOperationKind::full_surface_fill_0x44a1b0) {
                     if (plan.state0_dashboard_fill_projection.has_value()) {
@@ -366,7 +381,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     static_cast<std::uint8_t>(
                         operation.renderer_mode_0x4d7a48);
                 blit_observation.destination_context =
-                    render_observation.render_context;
+                    active_destination_context;
                 blit_observation.destination_base_address =
                     render_observation.framebuffer_base_value;
                 RaceLoopSharedOverlayPlan::State0BitmapProjection projection{};
