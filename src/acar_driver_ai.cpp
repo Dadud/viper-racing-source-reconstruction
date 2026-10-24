@@ -766,6 +766,63 @@ AcarBehaviorGeometryPlan plan_acar_behavior_geometry_seed(
     return plan;
 }
 
+AcarSteeringHistoryTailPlan plan_acar_steering_history_tail(
+    const float steering_target,
+    const AcarSteeringHistoryTailObservation& observation) noexcept
+{
+    AcarSteeringHistoryTailPlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+
+    const auto profile_step = static_cast<long double>(
+        observation.profile_step_0xf58_plus_0x28) * 31.25L;
+    plan.maximum_delta = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(
+            2.0L, profile_step,
+            observation.fdiv_compatibility_enabled));
+    const auto delta = static_cast<float>(
+        static_cast<long double>(steering_target) -
+        observation.steering_value_0xf4c);
+    auto limited_delta = delta;
+    if (delta < -plan.maximum_delta) {
+        limited_delta = -plan.maximum_delta;
+    } else if (plan.maximum_delta < delta) {
+        limited_delta = plan.maximum_delta;
+    }
+    plan.limited_delta = limited_delta;
+
+    auto steering_value = static_cast<float>(
+        (1.0L - static_cast<long double>(observation.speed_0x1020) * 0.9L) *
+            limited_delta +
+        observation.steering_value_0xf4c);
+    auto response_ramp = observation.response_ramp_0xf48;
+    if (std::bit_cast<std::int32_t>(response_ramp) < 0x3f333333 &&
+        ((observation.previous_control_bits_0x500 ^
+          std::bit_cast<std::uint32_t>(steering_value)) &
+         0x80000000U) != 0U) {
+        response_ramp = static_cast<float>(
+            static_cast<long double>(response_ramp) + 0.12L);
+        plan.response_ramp_increased = true;
+    }
+    steering_value = static_cast<float>(
+        (1.0L - static_cast<long double>(response_ramp)) * steering_value);
+    if (1.0F < std::fabs(steering_value)) {
+        steering_value = std::bit_cast<std::int32_t>(steering_value) < 1
+            ? -1.0F : 1.0F;
+        plan.steering_clamped = true;
+    }
+
+    plan.steering_value_0xf4c = steering_value;
+    plan.response_ramp_0xf48 = response_ramp;
+    plan.control_value_0x500 = steering_value;
+    const auto wheel_control = static_cast<float>(
+        static_cast<long double>(steering_value) *
+        observation.steering_scale_0xdcc);
+    plan.wheel_control_0x630 = wheel_control;
+    plan.wheel_control_0x7d4 = wheel_control;
+    return plan;
+}
+
 AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     const AcarDriverAiState& driver_state,
     const AcarBehaviorControlChainObservation& observation)
@@ -826,6 +883,14 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     if (!(plan.local_output_1 >= observation.clamp_value_0x1018)) {
         plan.local_output_1 = observation.clamp_value_0x1018;
     }
+    auto steering_history_observation = observation.steering_history;
+    steering_history_observation.speed_0x1020 = observation.speed_0x1020;
+    steering_history_observation.steering_scale_0xdcc =
+        observation.geometry.steering_scale_0xdcc;
+    steering_history_observation.fdiv_compatibility_enabled =
+        observation.geometry.fdiv_compatibility_enabled;
+    plan.steering_history_plan = plan_acar_steering_history_tail(
+        plan.local_output_0, steering_history_observation);
     plan.tail_argument_0x428cd0 = plan.local_output_0;
     plan.tail_argument_0x428e20 = plan.local_output_1;
     plan.tail_argument_0x4331d0 = plan.final_argument_0x2c;

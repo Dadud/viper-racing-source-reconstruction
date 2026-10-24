@@ -697,4 +697,11 @@ selecting `0.6`. Evidence: full callback bytes `0x42B7B0..0x42BB24`
 unit tolerance `0x4C7A90` `ev_07bb0849fc9a975f3b1ec585fe462b418cd0358aac9fc91e535665a288bf36e7`,
 and default-vector constant `0x4C7B60`
 `ev_8f72f892b514d0f5da81e218e0aa790a8a7879ff36567835e3177f61bba0eefe`.
-The six tail helpers' state effects remain open.
+The first tail call, `plan_acar_steering_history_tail` (`0x428CD0`), now
+projects the profile-scaled delta limit, speed-dependent history update,
+sign-change response ramp, final `[-1,1]` clamp, and paired `+0x630/+0x7D4`
+control writes. Its profile step, incoming history/ramp/control values,
+speed, and scale are explicit observations. Evidence:
+`0x428CD0` `ev_79e703e41d739bc81a42eec4fb785446b74af8830a2245fdd8cdd4824aba92be`.
+Effects of the later brake/throttle setters and the nested `0x43FDD0` work
+called from `0x433230` remain open.

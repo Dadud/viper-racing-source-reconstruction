@@ -306,11 +306,40 @@ struct AcarBehaviorGeometryPlan {
 [[nodiscard]] AcarBehaviorGeometryPlan plan_acar_behavior_geometry_seed(
     const AcarBehaviorGeometryObservation& observation) noexcept;
 
+struct AcarSteeringHistoryTailObservation {
+    float profile_step_0xf58_plus_0x28{};
+    float steering_value_0xf4c{};
+    float response_ramp_0xf48{};
+    std::uint32_t previous_control_bits_0x500{};
+    float speed_0x1020{};
+    float steering_scale_0xdcc{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct AcarSteeringHistoryTailPlan {
+    float maximum_delta{};
+    float limited_delta{};
+    float steering_value_0xf4c{};
+    float response_ramp_0xf48{};
+    float control_value_0x500{};
+    float wheel_control_0x630{};
+    float wheel_control_0x7d4{};
+    bool response_ramp_increased{};
+    bool steering_clamped{};
+    bool fdiv_compatibility_path_used{};
+};
+
+// Projects callback tail helper 0x428CD0's rate-limited steering history.
+[[nodiscard]] AcarSteeringHistoryTailPlan plan_acar_steering_history_tail(
+    float steering_target,
+    const AcarSteeringHistoryTailObservation& observation) noexcept;
+
 struct AcarBehaviorControlChainObservation {
     AcarBehaviorGeometryObservation geometry{};
     AcarRouteSteeringObservation route_steering{};
     AcarControlResponseObservation control_response{};
     AcarForwardCandidateSteeringObservation forward_steering{};
+    AcarSteeringHistoryTailObservation steering_history{};
     float clamp_value_0x1018{};
     float speed_0x1020{};
 };
@@ -320,6 +349,7 @@ struct AcarBehaviorControlChainPlan {
     std::optional<AcarControlResponsePlan> control_response_plan;
     std::optional<AcarForwardCandidateSteeringPlan> forward_steering_plan;
     AcarBehaviorGeometryPlan geometry_plan{};
+    std::optional<AcarSteeringHistoryTailPlan> steering_history_plan;
     std::vector<AcarBehaviorControlTailCall> tail_call_order;
     float local_output_0{};
     float local_output_1{};
