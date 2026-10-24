@@ -1184,6 +1184,17 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
         AcarBehaviorControlTailCall::helper_0x4331d0,
         AcarBehaviorControlTailCall::helper_0x4331c0,
     };
+    plan.helper_0x43fdd0_called = true;
+    plan.state_0xde0_after_callback =
+        plan.throttle_tail_plan->throttle_output_0xde0;
+    plan.state_0xde4_after_callback =
+        plan.brake_tail_plan->brake_output_0xde4;
+    plan.state_0xde8_after_callback = plan.tail_argument_0x4331d0;
+    plan.state_0xdec_after_callback = plan.tail_argument_0x4331c0;
+    plan.state_0xd64_after_callback =
+        observation.post_0x43fdd0_state_0xcbc;
+    plan.input_incomplete = plan.input_incomplete ||
+        !observation.post_0x43fdd0_state_0xcbc.has_value();
     plan.tail_reached = true;
     return plan;
 }

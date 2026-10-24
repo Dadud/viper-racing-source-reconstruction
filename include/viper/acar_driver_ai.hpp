@@ -424,6 +424,7 @@ struct AcarBehaviorControlChainObservation {
     std::optional<float> route_value_0xf0c;
     std::optional<float> route_scalar_0xfbc;
     std::optional<float> existing_throttle_limit_0x103c;
+    std::optional<std::uint32_t> post_0x43fdd0_state_0xcbc;
     float clamp_value_0x1018{};
     float speed_0x1020{};
 };
@@ -446,9 +447,15 @@ struct AcarBehaviorControlChainPlan {
     float tail_argument_0x428e20{};
     float tail_argument_0x4331d0{};
     float tail_argument_0x4331c0{1.0F};
+    std::optional<float> state_0xde0_after_callback;
+    std::optional<float> state_0xde4_after_callback;
+    std::optional<float> state_0xde8_after_callback;
+    std::optional<float> state_0xdec_after_callback;
+    std::optional<std::uint32_t> state_0xd64_after_callback;
     bool helper_0x42a6d0_called{};
     bool helper_0x42b570_called{};
     bool helper_0x42b450_called{};
+    bool helper_0x43fdd0_called{};
     bool input_incomplete{};
     bool tail_reached{};
 };

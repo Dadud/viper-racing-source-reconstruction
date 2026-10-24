@@ -704,8 +704,8 @@ sign-change response ramp, final `[-1,1]` clamp, and paired `+0x630/+0x7D4`
 control writes. Its profile step, incoming history/ramp/control values,
 speed, and scale are explicit observations. Evidence:
 `0x428CD0` `ev_79e703e41d739bc81a42eec4fb785446b74af8830a2245fdd8cdd4824aba92be`.
-The nested `0x43FDD0` work and subsequent `+0xD64` state copy from
-`0x433230` remain open.
+The nested `0x43FDD0` effects remain open; the callback's subsequent `+0xD64`
+copy is modeled from an explicit post-helper `+0xCBC` observation.
 
 `plan_acar_alternate_route_throttle_limit` also reconstructs the callback's
 independent `+0xF30` write to `+0x103C`: it preserves the existing value when
@@ -736,3 +736,11 @@ observations rather than assuming wheel state. Evidence: `0x428E20`
 `ev_28e0c53cd235953d972d75a96d6f6d0a93b92440f2c140816e8cf1a690b9f6bc` and
 setter `0x4331B0`
 `ev_1a4a9aa0de75046dcf27829d381e8b598229fc3405d356d9b5e94638c4cf9036`.
+
+The final callback state projection records the `0x433230` nested call and
+its post-call `+0xCBC` to `+0xD64` copy, then exposes the direct `0x4331D0`
+(`+0xDE8`) and `0x4331C0` (`+0xDEC`) setter writes. The unresolved interior
+effects of `0x43FDD0` remain observations. Evidence: `0x433230`
+`ev_51f1c30c2b566839dc0bbb6d5daf4fb4fb1979a1310daa219a62d820c128e613`,
+`0x4331D0` `ev_919aa381a2fd748691c9e227f220bb203f904dc92207ba40bd8a8f1a95f28c67`,
+and `0x4331C0` `ev_e1a941070e681ef12c720233800a257ac80a5e38bfc00d10325b4d9361fb308d`.
