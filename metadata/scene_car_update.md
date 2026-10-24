@@ -90,12 +90,19 @@ payload `+0x18` against the `+0x04` key in all 32 slots at `0x540B70..0x540BEC`.
 Any match suppresses generation but does not stop the scan. With no match, the
 global cursor increments and wraps with `& 31`; the selected slot then enters
 `0x468AF0`. Null pool entries and an absent selected object are reported as
-faults, while an incomplete 32-entry observation is kept distinct. The
-particle generator's detailed geometry remains a separate reconstruction
-slice. Evidence: `0x4692A0` byte range
-(`ev_c924832e2207c9f88dace42f6fb0d9e4d8cad232dfb40f54a137d7d09f5e78d9`) and
-generator `0x468AF0`
-(`ev_fdf72c8842997f85c97fed158fae93ba441b5016c07baf6bd8ccb813475b0a18`).
+faults, while an incomplete 32-entry observation is kept distinct.
+`plan_scene_car_effect_particle_generator` now covers `0x468AF0`'s
+effect-key/origin writes, speed clamp, horizontal-motion gate, fifteen control
+points and sentinel words, fifteen cloud particles with three random draws
+each, and its lifetime/mode fields. The sample inputs are the integers
+returned by the `0x468E80` random-range helper; missing observations preserve
+the already projected control points and any completed particle writes.
+FDIV correction uses the shared approximation and x87 rounding remains
+approximate. Evidence: `0x4692A0` bytes
+(`ev_c924832e2207c9f88dace42f6fb0d9e4d8cad232dfb40f54a137d7d09f5e78d9`),
+generator `0x468AF0` (`ev_fdf72c8842997f85c97fed158fae93ba441b5016c07baf6bd8ccb813475b0a18`),
+random-range helper `0x468E80` (`ev_fe4d25653a3f36764032e8f7d0a541610c8fa4c31b7b1f12e17a60771b1500ca`),
+and constants at `0x4C954C..0x4C9598` (`ev_52957d613ceed6a1be2bae4856668b7b9a4ae80dfcf7b634f96b9a413b694cad`).
 
 The wrapper measures the distance from object position `+0x28..+0x30` to the
 camera globals `0x509B58..0x509B60` using `0x448C10`; the following scale

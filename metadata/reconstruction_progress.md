@@ -25,7 +25,11 @@
 - **2026-10-24:** Projected tag 0's effect deduplication and pool selection in
   `plan_scene_car_effect_tag_zero_handler`: full 32-slot key scan, duplicate
   suppression, wrapped cursor update, generator dispatch, and bounded reports
-  for incomplete/null slots. The particle generator's geometry remains open.
+  for incomplete/null slots. Added a bounded model of `0x468AF0` that includes
+  velocity clamping, control points, random cloud particles, and lifetime
+  fields, with missing random observations and x87 precision clearly reported.
+  Evidence and implementation notes are recorded in
+  `scene_car_dispatch_correction.evidence.json` and `scene_car_update.md`.
 
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table

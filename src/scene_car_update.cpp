@@ -275,6 +275,105 @@ SceneCarEffectTagZeroPlan plan_scene_car_effect_tag_zero_handler(
     return result;
 }
 
+SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
+    const SceneCarEffectParticleGeneratorInput& input) noexcept
+{
+    SceneCarEffectParticleGeneratorPlan result{};
+    result.stored_effect_key = input.effect_key;
+    result.stored_origin = input.origin;
+
+    float x = input.velocity[0];
+    float y = input.velocity[1];
+    float z = input.velocity[2];
+    const float speed = std::sqrt(x * x + y * y + z * z);
+    if (5.0F < speed) {
+        const float scale = static_cast<float>(divide_with_vc98_fdiv_compatibility(
+            5.0L, static_cast<long double>(speed), input.fdiv_compatibility_enabled));
+        x *= scale;
+        y *= scale;
+        z *= scale;
+    }
+
+    x *= 0.4F;
+    z *= 0.4F;
+    if (y < -4.905F) y = -4.905F;
+    result.scaled_velocity = {x, y, z};
+
+    const float horizontal_squared = x * x + z * z;
+    if (horizontal_squared < 0.1F) {
+        result.status = SceneCarEffectGeneratorStatus::inactive_horizontal_motion;
+        return result;
+    }
+
+    const float horizontal_length = std::sqrt(horizontal_squared);
+    const float lateral_z = static_cast<float>(divide_with_vc98_fdiv_compatibility(
+        static_cast<long double>(z), static_cast<long double>(horizontal_length),
+        input.fdiv_compatibility_enabled));
+    const float lateral_x = static_cast<float>(divide_with_vc98_fdiv_compatibility(
+        static_cast<long double>(-x), static_cast<long double>(horizontal_length),
+        input.fdiv_compatibility_enabled));
+
+    for (std::size_t group = 0; group < 3; ++group) {
+        const float spread = static_cast<float>(group) * 0.33333334F * 3.0F - 1.5F;
+        for (std::size_t column = 0; column < 5; ++column) {
+            const auto index = column * 3U + group;
+            result.control_points[index] = {
+                input.origin[0] + lateral_z * spread,
+                input.origin[1],
+                input.origin[2] + spread * lateral_x};
+            result.control_point_flags[index] = 0xffffffffU;
+        }
+    }
+    result.control_points_written = true;
+
+    constexpr std::array<float, 3> minimum_noise{-5.0F, -10.0F, -5.0F};
+    constexpr std::array<float, 3> noise_range{10.0F, 20.0F, 10.0F};
+    const float particle_velocity_x = x * 1.4F;
+    const float particle_velocity_y = y * -1.2F;
+    const float particle_velocity_z = z * 1.4F;
+    for (std::size_t group = 0; group < 3; ++group) {
+        for (std::size_t row = 0; row < 5; ++row) {
+            if (result.random_samples_consumed + 3U > input.random_percent_samples.size()) {
+                result.status = SceneCarEffectGeneratorStatus::random_observation_exhausted;
+                return result;
+            }
+
+            std::array<float, 3> noise{};
+            for (std::size_t axis = 0; axis < noise.size(); ++axis) {
+                const auto sample = input.random_percent_samples[result.random_samples_consumed++];
+                const long double scaled_sample = static_cast<long double>(sample) * 0.01L;
+                noise[axis] = static_cast<float>(
+                    static_cast<long double>(noise_range[axis]) * scaled_sample
+                    + static_cast<long double>(minimum_noise[axis]));
+            }
+
+            const float attenuation = 1.0F - static_cast<float>(row) * 0.2F;
+            const float position_scale = attenuation + 0.05F;
+            const float fan = (static_cast<float>(group) * 0.33333334F * 2.0F - 1.0F)
+                * (attenuation * 0.5F + 0.5F);
+            const auto particle_index = row * 3U + group;
+            auto& particle = result.cloud_particles[particle_index];
+            particle[0] = particle_velocity_x * position_scale + noise[0]
+                + fan * lateral_z * 10.0F;
+            particle[1] = (1.0F - (1.0F - position_scale) * (1.0F - position_scale))
+                * particle_velocity_y;
+            particle[2] = particle_velocity_z * position_scale + noise[2]
+                + fan * lateral_x * 10.0F;
+            ++result.cloud_particles_written_count;
+        }
+    }
+
+    result.status = SceneCarEffectGeneratorStatus::generated;
+    result.duration_0x370 = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(
+            static_cast<long double>(particle_velocity_y), 9.81L,
+            input.fdiv_compatibility_enabled) * 2.0L);
+    result.time_0x36c = input.now_0x45bb70;
+    result.mode_word_0x378 = 0x3f333333U;
+    result.lifetime_fields_written = true;
+    return result;
+}
+
 SceneCarDispatchIndices select_scene_car_dispatch_indices(
     const SceneCarDispatchIndicesInput& input) noexcept
 {

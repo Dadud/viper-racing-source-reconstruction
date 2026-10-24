@@ -216,6 +216,47 @@ struct SceneCarEffectTagZeroPlan {
 [[nodiscard]] SceneCarEffectTagZeroPlan plan_scene_car_effect_tag_zero_handler(
     const SceneCarEffectTagZeroInput& input) noexcept;
 
+enum class SceneCarEffectGeneratorStatus : std::uint8_t {
+    inactive_horizontal_motion,
+    generated,
+    random_observation_exhausted,
+};
+
+struct SceneCarEffectParticleGeneratorInput {
+    std::array<float, 3> velocity{}; // handler payload +0x00
+    std::array<float, 3> origin{}; // handler payload +0x0C
+    std::uint32_t effect_key{};
+    // FUN_00468E80 draws three values per generated cloud particle, x/y/z.
+    std::span<const std::int32_t> random_percent_samples{};
+    float now_0x45bb70{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct SceneCarEffectParticleGeneratorPlan {
+    SceneCarEffectGeneratorStatus status{SceneCarEffectGeneratorStatus::inactive_horizontal_motion};
+    std::uint32_t stored_effect_key{};
+    std::array<float, 3> stored_origin{};
+    std::array<float, 3> scaled_velocity{};
+    std::array<std::array<float, 3>, 15> control_points{};
+    std::array<std::uint32_t, 15> control_point_flags{};
+    std::array<std::array<float, 3>, 15> cloud_particles{};
+    std::size_t random_samples_consumed{};
+    std::size_t cloud_particles_written_count{};
+    float duration_0x370{};
+    float time_0x36c{};
+    std::uint32_t mode_word_0x378{};
+    bool control_points_written{};
+    bool lifetime_fields_written{};
+    bool x87_rounding_approximated{true};
+};
+
+// Projects 0x468AF0's 15 control points, 15 randomized cloud positions,
+// horizontal-motion gate, and lifetime fields. RNG draws and current time
+// remain explicit observations; x87 intermediate rounding is approximate.
+[[nodiscard]] SceneCarEffectParticleGeneratorPlan
+plan_scene_car_effect_particle_generator(
+    const SceneCarEffectParticleGeneratorInput& input) noexcept;
+
 struct SceneCarDistanceThreshold {
     float distance{};
     std::array<std::uint32_t, 2> opaque{};
