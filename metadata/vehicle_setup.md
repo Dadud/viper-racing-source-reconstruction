@@ -1437,3 +1437,17 @@ aliasing path is unnecessary for this caller because its stack input and wheel
 output do not overlap. Evidence:
 `0x442530` assembly `0x00442A00..0x00442A40` and `0x00442C3F..0x00442C66`,
 plus `0x437BA0` assembly `0x00437BA0..0x00437C5D`.
+
+The Windows race loop now supplies live, bounded observations to the per-wheel
+contact state model. It reconstructs the candidate local anchor by adding the
+selected FNIM vertex back to the constructor's stored relative point, then
+projects local X/Z through the yaw-only pose used by the current renderer.
+Local Y is added to the terrain-following route height. The resulting point is
+queried against the loaded track terrain, with world-up as the contact axis and
+the ordinary quick-race reset-feature hook disabled. This matches the current
+runtime's available pose representation; it does not synthesize the missing
+native pitch/roll body matrix. Each race trace appends query success, contact
+gate, active byte, feature, and projected depth for all four wheels after the
+existing entrant columns. The observations do not yet feed suspension forces,
+collision handling, or vehicle motion. Regression coverage checks the trace
+format and live query results on Viper/Bemidji.

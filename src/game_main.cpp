@@ -1433,6 +1433,12 @@ struct WindowState {
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
     std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
+    // Per-wheel observations use the current renderer's route pose and the
+    // constructor's wheel-anchor points. They are exposed in race traces while
+    // route motion remains the current pose authority.
+    std::array<viper::WheelContactState, 4> player_wheel_contact_states{};
+    std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
+    std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
     bool player_constructor_inputs_ready{};
     bool accelerate{};
     bool brake{};
@@ -1577,6 +1583,63 @@ struct WindowState {
         return true;
     }
 
+    void update_player_wheel_contacts(const float x, const float y, const float z,
+                                      const float yaw)
+    {
+        if (terrain == nullptr || !player_constructor_inputs_ready ||
+            !player_wheel_core_initialization.has_value()) return;
+        const float cosine = std::cos(yaw);
+        const float sine = std::sin(yaw);
+        for (std::size_t wheel = 0; wheel < player_wheel_contact_states.size(); ++wheel) {
+            const auto& core = player_wheel_core_initialization->wheels[wheel];
+            if (!core.has_value()) continue;
+
+            // The selected vertex is subtracted by native 0x441C10 when it
+            // stores +0x04..+0x0C, then added back by 0x437BA0. This is the
+            // equivalent local point before the current renderer's yaw-only
+            // pose transform.
+            const float local_x = core->position_relative_to_selected_vertex[0] +
+                core->selected_model_vertex[0];
+            const float local_y = core->position_relative_to_selected_vertex[1] +
+                core->selected_model_vertex[1];
+            const float local_z = core->position_relative_to_selected_vertex[2] +
+                core->selected_model_vertex[2];
+            const viper::PhysicsVector3 wheel_world_point{
+                x + local_x * cosine + local_z * sine,
+                y + local_y,
+                z - local_x * sine + local_z * cosine};
+
+            // The live renderer has yaw but no roll/pitch, so its modeled body
+            // query axis remains world-up. The native cheat reset hook is off
+            // for the ordinary quick-race path.
+            viper::WheelContactObservation observation{};
+            observation.body_query_enabled = true;
+            observation.reset_feature_hook_active = false;
+            observation.contact_projection_origin = wheel_world_point;
+            observation.contact_direction = {0.0F, 1.0F, 0.0F};
+            observation.wheel_depth_limit_0x44 = core->value_0x44;
+            const auto query = viper::sample_terrain_surface(
+                viper::make_terrain_surface_query_input(
+                    *terrain,
+                    {wheel_world_point.x, wheel_world_point.y, wheel_world_point.z},
+                    true));
+            player_wheel_terrain_queries_succeeded[wheel] = query.query_succeeded;
+            observation.query_succeeded = query.query_succeeded;
+            if (query.query_succeeded) {
+                observation.query_contact_point = {
+                    query.sampled_position[0], query.sampled_position[1],
+                    query.sampled_position[2]};
+                observation.query_contact_normal = {
+                    query.plane_normal[0], query.plane_normal[1],
+                    query.plane_normal[2]};
+                observation.query_feature_output_0x19c =
+                    static_cast<std::int32_t>(query.surface_value_0x34);
+            }
+            player_wheel_contact_results[wheel] = viper::update_wheel_contact(
+                player_wheel_contact_states[wheel], observation);
+        }
+    }
+
     bool initialize_opponents()
     {
         if (route.size() < 2U || terrain == nullptr) return false;
@@ -1629,6 +1692,9 @@ struct WindowState {
         } else if (route_result.finished) {
             motion = candidate_motion;
         }
+        if (route_result.valid)
+            update_player_wheel_contacts(route_result.x, surface->sampled_position[1],
+                route_result.z, route_result.yaw);
         if (route_result.lap_completed) refresh_title(true);
         if (update_graphics) {
             for (std::size_t car = 0; car < graphics.car_count(); ++car) {
@@ -1954,6 +2020,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_fraction,car" << car << "_speed,car" << car
                   << "_completed_laps,car" << car << "_finished";
         }
+        for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
+            trace << ",wheel" << wheel << "_query_ok,wheel" << wheel
+                  << "_contact_gate,wheel" << wheel << "_active,wheel" << wheel
+                  << "_feature,wheel" << wheel << "_depth";
+        }
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2031,6 +2102,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     const auto& ai = state.opponent_motions[car];
                     trace << ',' << ai.route_segment << ',' << ai.route_fraction << ',' << ai.speed
                           << ',' << ai.race.completed_laps << ',' << ai.race.finished;
+                }
+                for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
+                    trace << ',' << state.player_wheel_terrain_queries_succeeded[wheel]
+                          << ',' << state.player_wheel_contact_results[wheel].contact_gate_passed
+                          << ',' << static_cast<unsigned>(
+                                state.player_wheel_contact_states[wheel].contact_active_0x168)
+                          << ',' << state.player_wheel_contact_states[wheel].contact_feature_0x19c
+                          << ',' << state.player_wheel_contact_results[wheel].projected_depth;
                 }
                 trace << '\n';
                 if (!trace) {
