@@ -1,6 +1,6 @@
 # Project tracking
 
-Updated: 2026-10-24 (ACAR and OBST physics-task constructors)
+Updated: 2026-10-24 (ACAR constructor state and descriptor effects)
 
 ## Report two percentages
 
@@ -353,3 +353,5 @@ After a meaningful change:
 
 
 - **2026-10-24 continuation:** Added evidence-driven OBST selector/geometry constructor modeling, ACAR profile/model-descriptor and runtime initialization projections, including linked-list and allocation fault paths. Release build and git diff --check pass; no tests were run. Physics maturity remains 2.75 because full simulation, other ACAR helper math, and runtime comparison are still open. Evidence is in metadata/physics_task_objects.md. Pushed commits: 3eee516, 6127e9a, 4fd99f2, 77f2eb9, ddb2dfc, 489608f, bfedaee.
+
+- **2026-10-24 continuation:** Replaced ACAR constructor setter placeholders with the exact `+0x4F8` threshold gate and eight strided writes across the `+0x6B0`/`+0x6B8` slot families; recorded the supporting helper bodies. Physics maturity remains 2.75 because trajectory-helper math and original-runtime behavior are open. Release build and `git diff --check` pass; no tests were run. Evidence: `ev_7f2a7638cef433bcdbf414083f784135b5b01cd65d2b69716ca37eb6939c7e6e`.
