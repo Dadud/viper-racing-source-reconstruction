@@ -1008,13 +1008,15 @@ parameters are phase `-0.27925268` and rate `0.00066322513` from `0x405510`
 (`ev_3f3261dd623758f3ab6ca1b038a14bcb6995ca3bdf4cd68d464c3e7051f84eae`).
 In that same nonzero/non-12 mode branch, `0x404970` reads the selected
 object's `+0x48` selector, indexes the runtime table at `0x4CFAB4`, and calls
-`0x44DC70` with text source `0x4CFEB8`, coordinates `(12, height-40)`, raw
-arguments 30 and 12, and the values loaded from `0x4EB28C` and `0x4EB314`.
-The mode-0 branch makes the same call with the same selector. The plan exposes
-this as a call projection only when the bounded selected-object pointer chain
-resolves; the table entry remains optional input, and the helper's font and
-raster effects are not yet reconstructed. The raster composer consequently
-reports the frame as incomplete when this call is reached.
+`0x44DC70` with text source `0x4CFEBC`, raw arguments `12` and `50`, vertical
+argument `height-73`, and the values loaded from `0x4EB28C` and `0x4EB314`.
+Mode 0 calls the same helper using text source `0x4CFEB8`, raw arguments `12`
+and `30`, and vertical argument `height-40`. The plan preserves these raw
+arguments without assigning a coordinate meaning to them. It exposes each
+call only when the bounded selected-object pointer chain resolves; the table
+entry remains optional input, and the helper's font and raster effects are
+not yet reconstructed. The raster composer consequently reports the frame as
+incomplete when this call is reached.
 The portable plan now also projects the filled triangle vertices and its two
 colored tip-to-base edges: center `(80, height-80)`, tip offset
 `(-sin(angle)*50, cos(angle)*50)`, and base corners offset by

@@ -1297,10 +1297,9 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                         0x004CFEB8U,
                         observation.gear_label_font_context_value_0x4eb28c,
                         observation.gear_label_font_resource_value_0x4eb314,
-                        0x0c,
                         observation.surface_height - 0x28,
-                        0x1eU,
-                        0x0cU};
+                        0x0cU,
+                        0x1eU};
             }
         }
     }
@@ -1312,10 +1311,10 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
         const auto& call = *result.selected_gear_label_call;
         result.operations.push_back({
             SceneDashboardGearOperationKind::draw_selected_gear_label,
-            call.x,
-            call.y,
-            static_cast<std::int32_t>(call.raw_width_argument),
-            static_cast<std::int32_t>(call.raw_height_argument),
+            static_cast<std::int32_t>(call.first_draw_argument),
+            call.vertical_argument,
+            static_cast<std::int32_t>(call.second_draw_argument),
+            0,
             call.selected_resource_address.value_or(0U),
             call.text_source});
     };
@@ -1341,6 +1340,12 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
             0,
             observation.gear_resource_value_0x4eb420,
             0});
+        if (result.selected_gear_label_call.has_value()) {
+            auto& call = *result.selected_gear_label_call;
+            call.text_source = 0x004CFEBCU;
+            call.vertical_argument = observation.surface_height - 0x49;
+            call.second_draw_argument = 0x50U;
+        }
         append_gear_label_call();
         auto value = observation.selected_record_value_0x34;
         if (selected_object_resolved) {

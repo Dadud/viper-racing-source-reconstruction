@@ -595,13 +595,12 @@ struct SceneDashboardGearDisplayResult {
     struct GearLabelCall {
         std::uint32_t selector{};
         std::optional<std::uint32_t> selected_resource_address;
-        std::uint32_t text_source{0x004CFEB8U};
+        std::uint32_t text_source{};
         std::uint32_t font_context_value{};
         std::uint32_t font_resource_value{};
-        std::int32_t x{0x0c};
-        std::int32_t y{};
-        std::uint32_t raw_width_argument{0x1eU};
-        std::uint32_t raw_height_argument{0x0cU};
+        std::int32_t vertical_argument{};
+        std::uint32_t first_draw_argument{0x0cU};
+        std::uint32_t second_draw_argument{};
     };
     std::optional<GearLabelCall> selected_gear_label_call;
     std::optional<SceneDashboardGearGeometry> rotating_gear_geometry;
