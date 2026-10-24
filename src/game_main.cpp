@@ -1437,6 +1437,7 @@ struct WindowState {
     // constructor's wheel-anchor points. They are exposed in race traces while
     // route motion remains the current pose authority.
     std::array<viper::WheelContactState, 4> player_wheel_contact_states{};
+    std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
     bool player_constructor_inputs_ready{};
@@ -1587,6 +1588,7 @@ struct WindowState {
                                       const float yaw)
     {
         player_wheel_terrain_queries_succeeded.fill(false);
+        player_wheel_contact_observations = {};
         player_wheel_contact_results = {};
         if (terrain == nullptr || !player_constructor_inputs_ready ||
             !player_wheel_core_initialization.has_value()) {
@@ -1644,6 +1646,7 @@ struct WindowState {
                 observation.query_feature_output_0x19c =
                     static_cast<std::int32_t>(query.surface_value_0x34);
             }
+            player_wheel_contact_observations[wheel] = observation;
             player_wheel_contact_results[wheel] = viper::update_wheel_contact(
                 player_wheel_contact_states[wheel], observation);
         }
@@ -2034,6 +2037,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_contact_gate,wheel" << wheel << "_active,wheel" << wheel
                   << "_feature,wheel" << wheel << "_depth";
         }
+        for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
+            trace << ",wheel" << wheel << "_surface_x,wheel" << wheel
+                  << "_surface_y,wheel" << wheel << "_surface_z,wheel" << wheel
+                  << "_normal_x,wheel" << wheel << "_normal_y,wheel" << wheel
+                  << "_normal_z";
+        }
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2119,6 +2128,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 state.player_wheel_contact_states[wheel].contact_active_0x168)
                           << ',' << state.player_wheel_contact_states[wheel].contact_feature_0x19c
                           << ',' << state.player_wheel_contact_results[wheel].projected_depth;
+                }
+                for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
+                    const auto& observation = state.player_wheel_contact_observations[wheel];
+                    trace << ',' << observation.query_contact_point.x
+                          << ',' << observation.query_contact_point.y
+                          << ',' << observation.query_contact_point.z
+                          << ',' << observation.query_contact_normal.x
+                          << ',' << observation.query_contact_normal.y
+                          << ',' << observation.query_contact_normal.z;
                 }
                 trace << '\n';
                 if (!trace) {

@@ -1446,8 +1446,10 @@ Local Y is added to the terrain-following route height. The resulting point is
 queried against the loaded track terrain, with world-up as the contact axis and
 the ordinary quick-race reset-feature hook disabled. This matches the current
 runtime's available pose representation; it does not synthesize the missing
-native pitch/roll body matrix. Each race trace appends query success, contact
-gate, active byte, feature, and projected depth for all four wheels after the
-existing entrant columns. The observations do not yet feed suspension forces,
-collision handling, or vehicle motion. Regression coverage checks the trace
-format and live query results on Viper/Bemidji.
+native pitch/roll body matrix. `WindowState` retains each wheel's observation
+and contact-state result, and each race trace appends query success, contact
+gate, active byte, feature, projected depth, sampled surface point, and terrain
+normal for all four wheels after the existing entrant columns. The observations
+do not yet feed suspension forces, collision handling, or vehicle motion.
+Regression coverage checks finite terrain samples and non-degenerate normals
+for all four wheels on Viper/Bemidji.

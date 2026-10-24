@@ -83,14 +83,33 @@ try {
     $finishElapsed = 0.0
     $wheelQueryStart = 13 + 5 * 7
     $wheelQueriesObserved = [bool[]]::new(4)
+    $wheelSurfaceStart = $wheelQueryStart + 5 * 4
+    $wheelSurfaceSamplesObserved = [bool[]]::new(4)
     for ($index = 1; $index -lt $raceOutputLines.Count; ++$index) {
         $fields = $raceOutputLines[$index].Split(',')
-        if ($fields.Count -lt ($wheelQueryStart + 5 * 4)) {
+        if ($fields.Count -lt ($wheelSurfaceStart + 6 * 4)) {
             throw 'Race trace is missing per-wheel contact diagnostics'
         }
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
             if ($fields[$wheelQueryStart + 5 * $wheel] -eq '1') {
                 $wheelQueriesObserved[$wheel] = $true
+                $sampleStart = $wheelSurfaceStart + 6 * $wheel
+                $sample = [single[]]::new(6)
+                for ($component = 0; $component -lt 6; ++$component) {
+                    $sample[$component] = [single]::Parse(
+                        $fields[$sampleStart + $component], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($sample[$component]) -or
+                        [single]::IsInfinity($sample[$component])) {
+                        throw "Wheel $wheel emitted a non-finite terrain contact sample"
+                    }
+                }
+                $normalLength = [Math]::Sqrt(
+                    $sample[3] * $sample[3] + $sample[4] * $sample[4] +
+                    $sample[5] * $sample[5])
+                if ($normalLength -le 0.1) {
+                    throw "Wheel $wheel emitted a degenerate terrain normal"
+                }
+                $wheelSurfaceSamplesObserved[$wheel] = $true
             }
         }
         if ($fields[12] -eq '1' -and $finishFrame -lt 0) {
@@ -106,8 +125,8 @@ try {
     if ($finishFrame -lt 0) { throw 'Player did not finish a complete Viper/Bemidji lap' }
     if ($finishElapsed -le 0) { throw 'Player finish time is not positive' }
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
-        if (-not $wheelQueriesObserved[$wheel]) {
-            throw "Wheel $wheel never produced a successful live terrain query"
+        if (-not $wheelQueriesObserved[$wheel] -or -not $wheelSurfaceSamplesObserved[$wheel]) {
+            throw "Wheel $wheel never produced a valid live terrain contact sample"
         }
     }
     $lastRaceFields = $raceOutputLines[-1].Split(',')
