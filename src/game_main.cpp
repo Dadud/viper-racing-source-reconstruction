@@ -368,6 +368,8 @@ public:
         return update_car_buffer();
     }
 
+    std::array<float, 2> car_position() const { return {car_anchor_x_, car_anchor_z_}; }
+
 private:
     void extract_terrain_points(const viper::TerrainSurfaceResourcePayload& terrain)
     {
@@ -642,6 +644,82 @@ private:
 
 struct WindowState {
     D3DWindow graphics;
+    const viper::TerrainSurfaceResourcePayload* terrain{};
+    std::vector<std::array<float, 2>> route;
+    std::size_t route_segment{};
+    float route_fraction{};
+    float steering{};
+    float speed{};
+    bool accelerate{};
+    bool brake{};
+    bool left{};
+    bool right{};
+    ULONGLONG last_tick{};
+
+    bool place_on_route(const float x, const float z)
+    {
+        if (route.size() < 2U || terrain == nullptr) return false;
+        float nearest = std::numeric_limits<float>::infinity();
+        for (std::size_t index = 0; index < route.size(); ++index) {
+            const auto& a = route[index];
+            const auto& b = route[(index + 1U) % route.size()];
+            const float dx = b[0] - a[0], dz = b[1] - a[1];
+            const float length_sq = dx * dx + dz * dz;
+            if (!(length_sq > 1.0e-8f)) continue;
+            const float fraction = std::clamp(((x-a[0])*dx + (z-a[1])*dz) / length_sq, 0.0f, 1.0f);
+            const float px = a[0] + dx * fraction, pz = a[1] + dz * fraction;
+            const float ex = x - px, ez = z - pz;
+            const float distance = ex * ex + ez * ez;
+            if (distance < nearest) { nearest = distance; route_segment = index; route_fraction = fraction; }
+        }
+        if (!std::isfinite(nearest)) return false;
+        const auto& a = route[route_segment];
+        const auto& b = route[(route_segment + 1U) % route.size()];
+        const float yaw = std::atan2(b[0] - a[0], b[1] - a[1]);
+        const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
+        return surface.query_succeeded && graphics.set_car_pose(
+            x, surface.sampled_position[1], z, yaw);
+    }
+
+    bool advance(float delta_seconds)
+    {
+        if (route.size() < 2U || terrain == nullptr) return false;
+        delta_seconds = std::clamp(delta_seconds, 0.0f, 0.05f);
+        const float input = static_cast<float>(right) - static_cast<float>(left);
+        steering += (input - steering) * std::min(1.0f, delta_seconds * 5.0f);
+        const float drive = static_cast<float>(accelerate) - static_cast<float>(brake);
+        speed = std::clamp((speed + drive * 14.0f * delta_seconds) *
+            std::pow(0.992f, delta_seconds * 60.0f), -8.0f, 38.0f);
+        float distance = speed * delta_seconds;
+        for (unsigned guard = 0; std::abs(distance) > 1.0e-5f && guard < 128U; ++guard) {
+            const auto& a = route[route_segment];
+            const auto& b = route[(route_segment + 1U) % route.size()];
+            const float dx = b[0] - a[0], dz = b[1] - a[1];
+            const float length = std::sqrt(dx * dx + dz * dz);
+            if (!(length > 1.0e-5f)) { route_segment = (route_segment + 1U) % route.size(); route_fraction = 0.0f; continue; }
+            const float remaining = (distance > 0.0f ? 1.0f - route_fraction : route_fraction) * length;
+            if (std::abs(distance) < remaining) { route_fraction += distance / length; distance = 0.0f; }
+            else {
+                const bool forward = distance > 0.0f;
+                distance += distance > 0.0f ? -remaining : remaining;
+                route_segment = (route_segment + (forward ? 1U : route.size() - 1U)) % route.size();
+                route_fraction = forward ? 0.0f : 1.0f;
+            }
+        }
+        const auto& a = route[route_segment];
+        const auto& b = route[(route_segment + 1U) % route.size()];
+        const float dx = b[0] - a[0], dz = b[1] - a[1];
+        const float tangent = std::atan2(dx, dz);
+        const float route_x = a[0] + dx * route_fraction;
+        const float route_z = a[1] + dz * route_fraction;
+        const float lateral = steering * speed * std::abs(speed) * 0.0008f;
+        const float x = route_x + std::cos(tangent) * lateral;
+        const float z = route_z - std::sin(tangent) * lateral;
+        const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
+        if (!surface.query_succeeded) { speed = 0.0f; return true; }
+        return graphics.set_car_pose(
+            x, surface.sampled_position[1], z, tangent + steering * 0.35f);
+    }
 };
 
 LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -660,6 +738,20 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
         return 0;
     case WM_KEYDOWN:
         if (wparam == VK_ESCAPE) { DestroyWindow(hwnd); return 0; }
+        if (state && (lparam & (1LL << 30)) == 0) {
+            if (wparam == VK_UP || wparam == 'W') state->accelerate = true;
+            if (wparam == VK_DOWN || wparam == 'S') state->brake = true;
+            if (wparam == VK_LEFT || wparam == 'A') state->left = true;
+            if (wparam == VK_RIGHT || wparam == 'D') state->right = true;
+        }
+        return 0;
+    case WM_KEYUP:
+        if (state) {
+            if (wparam == VK_UP || wparam == 'W') state->accelerate = false;
+            if (wparam == VK_DOWN || wparam == 'S') state->brake = false;
+            if (wparam == VK_LEFT || wparam == 'A') state->left = false;
+            if (wparam == VK_RIGHT || wparam == 'D') state->right = false;
+        }
         break;
     case WM_CLOSE:
         DestroyWindow(hwnd);
@@ -691,8 +783,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
+    state.terrain = &terrain;
+    state.route = extract_ideal_line_points(ideal_line);
     const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
-        " & " + std::string(car_name) + " Mesh View";
+        " & " + std::string(car_name) + " Driving Prototype (WASD / Arrows)";
     const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
     if (title_length <= 0) return 1;
     std::wstring title(static_cast<std::size_t>(title_length), L'\0');
@@ -707,6 +801,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             track_objects)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
+        DestroyWindow(hwnd);
+        return 1;
+    }
+    const auto spawn = state.graphics.car_position();
+    if (!state.place_on_route(spawn[0], spawn[1])) {
+        std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
         DestroyWindow(hwnd);
         return 1;
     }
@@ -725,6 +825,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             DispatchMessageW(&msg);
         }
         if (running && !IsIconic(hwnd)) {
+            const ULONGLONG now = GetTickCount64();
+            if (state.last_tick != 0U &&
+                !state.advance(static_cast<float>(now - state.last_tick) / 1000.0f)) {
+                std::cerr << "Vehicle pose update failed.\n";
+                DestroyWindow(hwnd);
+                return 1;
+            }
+            state.last_tick = now;
             if (!state.graphics.render()) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
