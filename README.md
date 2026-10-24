@@ -538,9 +538,12 @@ the game's full simulation, rendering, input, audio, persistence, replays, and
 networking remain unimplemented. The active `0x4020E0` path now preserves
 callback, render-context, viewport, and submission order, and the scene-car
 update projects its ordered four-wheel transform/resource pass. The next
-milestone is integrating recovered scene objects and draw calls into a complete
+milestone is determining which registered scene-object classes pass the
+`0x45BEB0` virtual gates and integrating the reached callbacks into a complete
 race renderer; native DirectDraw execution, many class-specific effects, and
-original-game comparison remain open.
+original-game comparison remain open. The registered wheel-resource manager's
+`0x4623F0` callback is not reached through this generic frame path because its
+`+0x0C` gate reads the nonzero value set by frame setup.
 Build with CMake 3.20+ and a C++20 compiler. The full Release target has been
 compiled successfully with Visual Studio 18 Build Tools (MSVC 19.51) and CMake;
 this confirms the reconstruction utilities build, not game runtime behavior.
