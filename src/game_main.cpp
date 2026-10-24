@@ -1124,6 +1124,42 @@ struct WindowState {
         refresh_title();
         return true;
     }
+
+    void draw_hud() const
+    {
+        if (window == nullptr) return;
+        HDC dc = GetDC(window);
+        if (dc == nullptr) return;
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, RGB(245, 248, 250));
+        RECT panel{18, 18, 318, 126};
+        HBRUSH panel_brush = CreateSolidBrush(RGB(14, 24, 32));
+        if (panel_brush != nullptr) {
+            FillRect(dc, &panel, panel_brush);
+            DeleteObject(panel_brush);
+        }
+        const auto minutes = static_cast<unsigned>(motion.race.elapsed_seconds / 60.0F);
+        const auto seconds = static_cast<unsigned>(motion.race.elapsed_seconds) % 60U;
+        const auto hundredths = static_cast<unsigned>(
+            std::fmod(std::max(0.0F, motion.race.elapsed_seconds), 1.0F) * 100.0F);
+        std::wstring status = L"LAP " +
+            std::to_wstring(std::min(target_laps,
+                motion.race.completed_laps + (motion.race.finished ? 0U : 1U)));
+        status += L" / " + std::to_wstring(target_laps);
+        status += L"\nTIME " + std::to_wstring(minutes) + L":" +
+            (seconds < 10U ? L"0" : L"") + std::to_wstring(seconds) + L"." +
+            (hundredths < 10U ? L"0" : L"") + std::to_wstring(hundredths);
+        status += L"\nSPEED " + std::to_wstring(static_cast<int>(
+            std::lround(std::abs(motion.speed) * 3.6F))) + L" km/h";
+        DrawTextW(dc, status.c_str(), -1, &panel, DT_LEFT | DT_TOP | DT_NOPREFIX);
+        if (motion.race.finished) {
+            RECT result{18, 138, 318, 178};
+            SetTextColor(dc, RGB(255, 214, 80));
+            DrawTextW(dc, L"RACE FINISHED", -1, &result,
+                DT_LEFT | DT_TOP | DT_NOPREFIX);
+        }
+        ReleaseDC(window, dc);
+    }
 };
 
 std::optional<UINT> parse_keyboard_binding(const std::string_view binding)
@@ -1380,6 +1416,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 DestroyWindow(hwnd);
                 return 1;
             }
+            if (render_frame) state.draw_hud();
             if (replay != nullptr) ++playback_frame;
             if (render_frame && smoke_frames && ++rendered_frames >= *smoke_frames) {
                 DestroyWindow(hwnd);
