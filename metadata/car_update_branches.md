@@ -28,6 +28,27 @@ Evidence: `ev_fb7a9b21717cfb6308ed0b4ff5c8e3f5b185399be225d0fbbfbde36ee68b1217`
 projection. The retained analysis bundle is
 [`ncar_integrator_prefix.evidence.json`](ncar_integrator_prefix.evidence.json).
 
+The next helper call `0x433570` is now modeled by
+`advance_ncar_integrator_timer`. It computes `now = timer_ticks * 0.016`,
+then continues only when the x87 comparison finds `now - +0xE44 < 6.2` (an
+unordered comparison also follows the native less-flag path). The stored
+single-precision delta takes the quadratic ramp when its signed raw DWORD is
+below `0x40C00000`; otherwise `+0x50C` is set to 1.0. The quadratic branch
+uses the exact binary constants and x87-style extended intermediates. While
+inside the time window it also resolves the `+0x510` ordinal through the
+runtime table at `0x4D45B0`; a non-null record whose `+0x04/+0x08` squared
+distance is less than `25.806398` advances `+0xE44` by `0.016`. The runtime
+table/record is supplied explicitly, with unresolved lookup data marking the
+composed step incomplete. No semantic names are assigned to the table fields.
+
+Evidence: `ev_b33d1d148f26718f4435cef4a33eef66d10e0d9c58e27c577477ccb2cce4b1f8`
+(`0x433570` pseudocode), `ev_158aba98f08b44d3788819fdf2c99714a496b272bb50286b61cbc3dee5d00fa2`
+(`0x433570` instruction sequence), `ev_4394f76cfa93de76984db3bbd98bb3696a7ab8b4159da55951abcbc5f7aabaef`
+(`0x425790` timer scale), `ev_1816f75b415168f0d79f1c0012ccfbdc04a46e96fa08745bccef31f02c6f9061`
+and `ev_946ec3efe850470f7eea21d3d08dc427a46c9a686b71d929dbd583ebeab36ae6`
+(`0x433570` constants). The retained records are in
+[`ncar_integrator_timer.evidence.json`](ncar_integrator_timer.evidence.json).
+
 ## PCAR callback at `0x4384D0`
 
 The prologue combines object fields `+0x234`, `+0x238`, and `+0x23C` with

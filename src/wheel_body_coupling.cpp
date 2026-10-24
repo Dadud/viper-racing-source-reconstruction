@@ -51,6 +51,66 @@ NcarIntegratorPrefixResult apply_ncar_integrator_prefix(
     return result;
 }
 
+NcarIntegratorTimerResult advance_ncar_integrator_timer(
+    NcarIntegratorTimerState& state,
+    const NcarIntegratorTimerInput& input) noexcept
+{
+    NcarIntegratorTimerResult result{};
+    constexpr auto timer_tick_seconds = std::bit_cast<float>(0x3C83126FU);
+    constexpr auto six_point_two = std::bit_cast<float>(0x40C66666U);
+    constexpr auto six_seconds_bits = std::uint32_t{0x40C00000U};
+    constexpr auto ramp_square_scale = std::bit_cast<float>(0x3CE38E39U);
+    constexpr auto ramp_floor = std::bit_cast<float>(0x3E19999AU);
+    constexpr auto ramp_scale = std::bit_cast<float>(0x3F5E9BD3U);
+    constexpr auto record_radius_squared = std::bit_cast<float>(0x41CE7381U);
+
+    result.vehicle_ordinal_0x510 = input.vehicle_ordinal_0x510;
+    const auto now = static_cast<long double>(input.timer_ticks_0x508774) *
+        static_cast<long double>(timer_tick_seconds);
+    const auto elapsed_extended = now -
+        static_cast<long double>(state.record_time_0xe44);
+    if (elapsed_extended >= static_cast<long double>(six_point_two)) {
+        return result;
+    }
+
+    result.time_window_reached = true;
+    const auto elapsed = static_cast<float>(elapsed_extended);
+    result.elapsed_time = elapsed;
+    if (std::bit_cast<std::int32_t>(elapsed) <
+        static_cast<std::int32_t>(six_seconds_bits)) {
+        result.quadratic_ramp_branch = true;
+        const auto wide_elapsed = static_cast<long double>(elapsed);
+        const auto ramp = (wide_elapsed * wide_elapsed * ramp_square_scale +
+                           ramp_floor) * ramp_scale;
+        state.ramp_0x50c = static_cast<float>(ramp);
+    } else {
+        state.ramp_0x50c = 1.0F;
+    }
+
+    result.ordinal_record_lookup_reached = true;
+    if (!input.record_lookup_resolved) {
+        result.input_complete = false;
+        return result;
+    }
+    if (!input.record_nonnull) {
+        return result;
+    }
+    const auto record_distance_squared =
+        static_cast<long double>(input.record_x_0x04) * input.record_x_0x04 +
+        static_cast<long double>(input.record_y_0x08) * input.record_y_0x08;
+    if (record_distance_squared >=
+            static_cast<long double>(record_radius_squared) &&
+        !std::isnan(record_distance_squared)) {
+        return result;
+    }
+
+    result.record_radius_gate_passed = true;
+    state.record_time_0xe44 = static_cast<float>(
+        static_cast<long double>(state.record_time_0xe44) + timer_tick_seconds);
+    result.record_time_advanced = true;
+    return result;
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,
@@ -646,6 +706,11 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         result.force_moment_state,
         input.integrator_prefix_input,
         input.mode_force_input.contact_bytes);
+    result.integrator_timer_state = input.integrator_timer_state;
+    result.integrator_timer = advance_ncar_integrator_timer(
+        result.integrator_timer_state,
+        input.integrator_timer_input);
+    result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;
     result.wheel_collisions.wheel_damage_flags = input.wheel_damage_flags_0x20;
@@ -1092,7 +1157,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                 *input.terrain,
                 input.compatibility_division_enabled);
         }
-        result.input_complete = result.embedded_records.input_complete;
+        result.input_complete = result.input_complete &&
+            result.embedded_records.input_complete;
     }
 
     BodyIntegrationForceCollectionInput force_collection_input{};

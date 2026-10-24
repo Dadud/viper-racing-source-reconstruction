@@ -274,6 +274,7 @@ files were present.
   decoding before kinematics; `advance_four_wheel_body_step` connects the
   four-wheel collision accumulator, observed mode-0/mode-1 force branch and
   the initial `+0x4FC` X/Z velocity reset and `+0xE3D` vertical-force prefix,
+  plus the `0x433570` time-window ramp and caller-supplied ordinal-record gate,
   contact-gated wheel-pair differences, the following contact-count split and
   low-contact resistance/high-contact quadratic force projection, and the two
   post-resistance velocity/projection forces with their per-step energy sum;

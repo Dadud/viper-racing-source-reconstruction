@@ -309,6 +309,39 @@ struct NcarIntegratorPrefixResult {
     const NcarIntegratorPrefixInput& input,
     const std::array<std::uint8_t, 4>& contact_bytes) noexcept;
 
+struct NcarIntegratorTimerState {
+    float ramp_0x50c{};
+    float record_time_0xe44{};
+};
+
+struct NcarIntegratorTimerInput {
+    // Raw global counter consumed by 0x425790, scaled by the binary's 0.016f.
+    std::uint32_t timer_ticks_0x508774{};
+    std::uint32_t vehicle_ordinal_0x510{};
+    // Distinguish a known null record from an unavailable table lookup.
+    bool record_lookup_resolved{};
+    bool record_nonnull{};
+    float record_x_0x04{};
+    float record_y_0x08{};
+};
+
+struct NcarIntegratorTimerResult {
+    std::uint32_t vehicle_ordinal_0x510{};
+    bool time_window_reached{};
+    float elapsed_time{};
+    bool quadratic_ramp_branch{};
+    bool ordinal_record_lookup_reached{};
+    bool record_radius_gate_passed{};
+    bool record_time_advanced{};
+    bool input_complete{true};
+};
+
+// Reconstructs 0x433570's 6.2-second gate, 6.0-second bit cutoff, ramp
+// formula, and nearby-record timestamp update. Table lookup data stays input.
+[[nodiscard]] NcarIntegratorTimerResult advance_ncar_integrator_timer(
+    NcarIntegratorTimerState& state,
+    const NcarIntegratorTimerInput& input) noexcept;
+
 struct FourWheelBodyStepInput {
     std::array<std::uint8_t, 4> wheel_damage_flags_0x20{};
     bool wheel_update_prefix_enabled{};
@@ -346,6 +379,8 @@ struct FourWheelBodyStepInput {
     NcarIntegratorBookkeepingState integrator_bookkeeping_state{};
     NcarIntegratorBookkeepingInput integrator_bookkeeping_input{};
     NcarIntegratorPrefixInput integrator_prefix_input{};
+    NcarIntegratorTimerState integrator_timer_state{};
+    NcarIntegratorTimerInput integrator_timer_input{};
     NcarIntegratorModeForceInput mode_force_input{};
     NcarIntegratorWheelPairDifferentialInput wheel_pair_differential_input{};
     NcarIntegratorCommonForceInput common_force_input{};
@@ -409,6 +444,8 @@ struct FourWheelBodyStepResult {
     std::array<WheelRateFinalizationResult, 4> wheel_rate_finalization_results{};
     NcarIntegratorBookkeepingResult integrator_bookkeeping{};
     NcarIntegratorPrefixResult integrator_prefix{};
+    NcarIntegratorTimerResult integrator_timer{};
+    NcarIntegratorTimerState integrator_timer_state{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};
