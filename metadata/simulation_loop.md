@@ -1213,14 +1213,17 @@ prior-state-change gate from the incoming dashboard-kind cache, and continues
 the same state snapshot through its TestTrack cache/resource updates. Its
 displayed-position input remains separate: the TestTrack branch reads record
 `+0x00`, while the common Position row reads `+0x140`. The TestTrack plan's
-emitted calls remain in branch order; resource text, generation matches,
-distance scale, and suffix remain supplied observations.
+emitted calls remain in branch order; resource text and generation matches
+remain supplied observations.
 When `SceneDashboardCoreCallbackObservation::language_resource` is supplied,
 the callback resolves the `TRY`, `TIME`, and `DIST` labels from the exact
 `Dashboard:TestTrack:Try`, `Dashboard:TestTrack:Time`, and
 `Dashboard:TestTrack:DistanceAbbreviated` keys before applying the TestTrack
-plan. Generation matches and the distance unit suffix remain separate runtime
-observations. The key addresses are confirmed at `0x4CFCF0`, `0x4CFD08`, and
+plan. When `SceneDashboardCoreCallbackObservation::locale_state` is also
+supplied, it binds the distance scale, decimal marker, and null suffix from the
+selected table produced by `initialize_scene_dashboard_locale`; otherwise
+those values remain supplied observations. Generation matches remain separate
+runtime inputs. The key addresses are confirmed at `0x4CFCF0`, `0x4CFD08`, and
 `0x4CFD24` by string evidence
 `ev_bb72e4563d1e233a8c2f3b6161be56993c7dfde3b1f23787ed864efbfbcc396b`,
 `ev_5aa526aff8909e8c9188bc7870749404053fb90646b5b56c9c285ef804035b9a`, and
@@ -1299,14 +1302,16 @@ other types select `0x4CFD58`. Type 5 instead uses the Distance label at
 by the float at `global[0x4F04F4] + 0x0C`, formats `%1.0f`, replaces its
 decimal marker through `0x4188F0`, and joins it with `global[0x4F04F4] + 0x08`
 using `%s %s` before drawing at `0x403F76`. The resource text, generation-match
-outcomes remain observation inputs. `bind_scene_dashboard_locale` supplies the
-marker and scale and resolves the preset's null `+0x08` suffix to `"(null)"`;
+outcomes remain observation inputs. When a locale state is passed into the
+composed callback, `bind_scene_dashboard_locale` supplies the marker and scale
+and resolves the preset's null `+0x08` suffix to `"(null)"`;
 host CRT and x87 numeric-formatting edges are not guaranteed bit-identical.
 `scene_dashboard_core_callback_plan` now dispatches this branch when the
 selected object's observed `+0x18` field is nonzero, threading the same updated
 dashboard state into it and sourcing its cached position from callback record
 `+0x138`. The inner type-5 distance choice remains separate from this nonzero
-branch gate; labels, resource generations, scale, and suffix remain inputs.
+branch gate; labels and resource generations remain inputs, while scale,
+marker, and suffix can be sourced from the locale state.
 The composer also reaches the type-0 supplemental time rows only when the
 selected-type/global-result gates pass and the displayed record count exceeds
 one, then runs the `+0x10` and `+0x14` metric caches in order for either branch.

@@ -459,7 +459,8 @@ files were present.
   LANGRES0 language tables as bounded key/value offset pairs. The
   `--inspect-language PATH [KEY]` command lists labels or resolves one key;
   the state-0 TestTrack callback can use a parsed table to resolve its three
-  localized labels.
+  localized labels. Its composed callback can also bind distance formatting
+  from the optional locale state produced by the `0x418500` model.
 - `include/viper/legacy_allocator.hpp` and `src/legacy_allocator.cpp` model
   the optional VxD allocation marker and fill behavior; portable execution can
   use the normal host heap instead of opening `\\.\vexed.vxd`.

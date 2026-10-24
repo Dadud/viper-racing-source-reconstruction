@@ -944,6 +944,8 @@ scene_dashboard_supplemental_time_plan(
     SceneDashboardState& state,
     const SceneDashboardTestTrackObservation& observation);
 
+struct SceneDashboardLocaleState;
+
 struct SceneDashboardCoreCallbackObservation {
     SceneDashboardState state{};
     SceneDashboardPositionObservation position{};
@@ -954,6 +956,7 @@ struct SceneDashboardCoreCallbackObservation {
     SceneDashboardLapTimeObservation lap_time{};
     SceneDashboardTestTrackObservation test_track{};
     const LanguageResource* language_resource{};
+    const SceneDashboardLocaleState* locale_state{};
     SceneDashboardSupplementalTimeObservation supplemental_time{};
     std::array<SceneDashboardMetricObservation, 2> metrics{};
     SceneDashboardAuxiliaryReadoutObservation auxiliary_readout{};
@@ -968,6 +971,7 @@ struct SceneDashboardCoreCallbackPlan {
     SceneDashboardTestTrackResult test_track{};
     std::optional<SceneDashboardTestTrackLocalizationPlan>
         test_track_localization;
+    bool test_track_locale_bound{};
     bool test_track_branch_reached{};
     SceneDashboardSupplementalTimeResult supplemental_time{};
     bool supplemental_time_branch_reached{};

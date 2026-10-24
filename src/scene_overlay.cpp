@@ -1993,6 +1993,11 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         test_track_observation.selected_record_type_0x18 =
             observation.selected_object_type_0x18;
         result.test_track_branch_reached = true;
+        if (observation.locale_state != nullptr) {
+            bind_scene_dashboard_locale(
+                test_track_observation, *observation.locale_state);
+            result.test_track_locale_bound = true;
+        }
         if (observation.language_resource != nullptr) {
             result.test_track_localization =
                 apply_scene_dashboard_test_track_localization(
