@@ -1086,6 +1086,50 @@ apply_race_loop_paused_banner_to_locked_surface(
     return result;
 }
 
+RaceLoopSceneCarCalloutSurfaceWriteResult
+apply_race_loop_scene_car_callout_pixel_writes_to_locked_surface(
+    const RaceLoopSharedOverlayPlan& frame_plan,
+    const SceneCarCalloutRasterPlan& callout,
+    const bool callout_callback_reached,
+    const std::span<std::uint8_t> locked_surface)
+{
+    RaceLoopSceneCarCalloutSurfaceWriteResult result{};
+    const auto& frame = frame_plan.state_transition_and_frame.following_frame;
+    result.frame_submitted = frame.frame_submitted;
+    result.write_plan_available = callout.input_complete;
+    if (!result.frame_submitted || !callout_callback_reached ||
+        !frame.surface_unlock.has_value() ||
+        !frame.surface_unlock->reached ||
+        frame.surface_unlock->ordered_helpers !=
+            std::array<std::uint32_t, 3>{
+                0x00415090U, 0x00459030U, 0x004150A0U}) {
+        return result;
+    }
+
+    const auto submit = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x0045C090U;
+        });
+    const auto unlock = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x00447CE0U;
+        });
+    if (submit == frame.calls.end() || unlock == frame.calls.end() ||
+        !(submit < unlock)) {
+        return result;
+    }
+
+    result.callout_inside_submit_before_unlock = true;
+    if (!result.write_plan_available) {
+        return result;
+    }
+    const auto applied = apply_scene_text_pixel_writes(
+        callout.ordered_pixel_writes, locked_surface);
+    result.applied = applied.applied;
+    result.pixel_writes_applied = applied.pixels_written;
+    return result;
+}
+
 RaceLoopState0DashboardSurfaceWriteResult
 apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
     const RaceLoopSharedOverlayPlan& plan,

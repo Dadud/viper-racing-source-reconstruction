@@ -235,6 +235,23 @@ apply_race_loop_paused_banner_to_locked_surface(
     const RaceLoopSharedOverlayPlan& plan,
     std::span<std::uint8_t> locked_surface);
 
+struct RaceLoopSceneCarCalloutSurfaceWriteResult {
+    bool frame_submitted{};
+    bool callout_inside_submit_before_unlock{};
+    bool write_plan_available{};
+    bool applied{};
+    std::size_t pixel_writes_applied{};
+};
+
+// Applies one scene-car callout's ordered thought-image/text writes only when
+// its +0x18 callback was reached inside the submitted 0x45C090 pass.
+[[nodiscard]] RaceLoopSceneCarCalloutSurfaceWriteResult
+apply_race_loop_scene_car_callout_pixel_writes_to_locked_surface(
+    const RaceLoopSharedOverlayPlan& frame_plan,
+    const SceneCarCalloutRasterPlan& callout,
+    bool callout_callback_reached,
+    std::span<std::uint8_t> locked_surface);
+
 struct RaceLoopState0DashboardSurfaceWriteResult {
     bool frame_submitted{};
     bool dashboard_callback_before_surface_unlock{};

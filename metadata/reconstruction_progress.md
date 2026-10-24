@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added a frame-lifecycle application path for
+  the scene-car callout's ordered text and `thought.stp` writes. It requires
+  the callback to be observed inside the submitted `0x45C090` pass before
+  `0x447CE0` unlock and applies writes transactionally to the caller-owned
+  locked surface. Surface acquisition/lifetime remain external. Release
+  `viper_race_scene_flow` build and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Connected scene-car callout text operations to
   the existing built-in-font and STMP rasterizers. Constructor `0x463920`
   identifies the `+0x7B4` image as `thought.stp`; a bundle resolver now decodes

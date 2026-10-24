@@ -499,6 +499,14 @@ destructor `ev_f73b4d9052d98fd990e4a7d4ae0ee6ba739ff38cbe0403521b83290f560d9da0`
 STMP loader `ev_25f5d3dba9d9afd575d728381bfefcd986686965da53e256242d359ad0a4e67c`,
 and `--inspect-image race.res thought.stp`.
 
+`apply_race_loop_scene_car_callout_pixel_writes_to_locked_surface` connects
+the raster output to the frame lifecycle. It requires a submitted frame, an
+observed callout callback inside the `0x45C090` object pass, and the observed
+`0x447CE0` surface-unlock helper sequence. It delegates to the shared
+transactional text-pixel writer, which validates every destination before
+mutating the caller-owned locked-surface span. Surface acquisition and lifetime
+remain owned by the caller.
+
 `plan_scene_renderer_dispatch` projects the enclosing generic render frame at
 `0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active
 draw gate is `renderer_mode > 0` with renderer state in `{0,1,2}`. When active,
