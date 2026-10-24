@@ -708,6 +708,7 @@ struct PhysicsAcarModelNodeObservation {
 };
 
 struct PhysicsAcarModelDescriptorProjection {
+    std::optional<std::uint32_t> descriptor_address;
     std::vector<PhysicsTaskObjectFieldWrite> writes;
     float mapped_scalar{};
     std::uint32_t source_node_address{};
@@ -725,7 +726,7 @@ struct PhysicsAcarTaskConstructorObservation {
     bool profile_name_matches{};
     bool model_data_present{};
     std::uint32_t model_descriptor_count{};
-    std::optional<std::uint32_t> model_descriptors_address;
+    std::optional<std::uint32_t> model_data_object_address;
     bool model_descriptor_allocation_succeeded{};
     std::optional<std::uint32_t> model_descriptor_buffer_address;
     bool helper_0x41b020_nonzero{};
@@ -733,7 +734,6 @@ struct PhysicsAcarTaskConstructorObservation {
     bool blend_source_result_available{};
     std::span<const std::array<std::uint32_t, 2>> blend_source_pairs;
     std::span<const PhysicsAcarModelNodeObservation> model_nodes;
-    bool model_node_capture_complete{};
     std::uint32_t runtime_entry_count{};
     bool runtime_entry_allocation_succeeded{};
     std::optional<std::uint32_t> runtime_entry_buffer_address;
@@ -746,7 +746,7 @@ struct PhysicsAcarTaskConstructorPlan {
     std::uint32_t runtime_entry_allocation_bytes{};
     std::uint32_t runtime_entry_initializers_called{};
     std::uint32_t registration_count_after{};
-    std::optional<std::uint32_t> model_descriptors_address;
+    std::optional<std::uint32_t> model_descriptor_buffer_address;
     std::optional<std::uint32_t> runtime_entry_buffer_address;
     bool base_constructor_called{true};
     bool derived_vtable_installed{};
@@ -757,6 +757,7 @@ struct PhysicsAcarTaskConstructorPlan {
     bool model_descriptor_allocation_attempted{};
     bool model_helper_0x429440_called{};
     bool model_helper_null_buffer_fault{};
+    bool model_lookup_null_pointer_fault{};
     bool model_helper_null_node_fault{};
     bool model_helper_input_capture_incomplete{};
     bool runtime_entry_allocation_attempted{};

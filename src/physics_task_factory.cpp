@@ -1333,9 +1333,20 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
     // preserves its low-byte value without claiming semantics for neighbors.
     plan.object_writes.push_back({0xf54U,
         static_cast<std::uint32_t>(observation.selected_driver_flag)});
-    plan.object_writes.push_back({0xfe8U,
-        observation.model_data_present
-            ? observation.model_descriptors_address.value_or(0U) : 0U});
+    if (observation.model_data_object_address.has_value()) {
+        plan.object_writes.push_back({0xfe8U,
+            *observation.model_data_object_address});
+        if (*observation.model_data_object_address == 0U) {
+            plan.model_lookup_null_pointer_fault = true;
+            return plan;
+        }
+    } else if (observation.model_data_present) {
+        plan.model_helper_input_capture_incomplete = true;
+    }
+
+    if (!observation.model_data_present) {
+        plan.object_writes.push_back({0xfe8U, 0U});
+    }
 
     if (observation.model_data_present) {
         plan.model_descriptor_allocation_attempted = true;
@@ -1346,17 +1357,18 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
         if (!observation.model_descriptor_allocation_succeeded) {
             plan.object_writes.push_back({0x1054U, 0U});
         } else if (observation.model_descriptor_buffer_address.has_value()) {
-            plan.model_descriptors_address =
+            plan.model_descriptor_buffer_address =
                 observation.model_descriptor_buffer_address;
             plan.object_writes.push_back({0x1054U,
                 *observation.model_descriptor_buffer_address});
         }
         // The native constructor calls this helper even when allocation
-        // returns null; its downstream memory effects are not fabricated.
+        // returns null; a nonempty descriptor loop then faults on that buffer.
         plan.model_helper_0x429440_called = true;
-        if (!observation.model_descriptor_allocation_succeeded) {
+        if (!observation.model_descriptor_allocation_succeeded
+            && observation.model_descriptor_count > 0U) {
             plan.model_helper_null_buffer_fault = true;
-        } else {
+        } else if (observation.model_descriptor_allocation_succeeded) {
             const bool blend_lookup_attempted =
                 !observation.helper_0x41b020_nonzero
                 && !observation.helper_0x426e50_nonzero;
@@ -1365,7 +1377,12 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
             for (std::uint32_t index = 0U;
                  index < observation.model_descriptor_count; ++index) {
                 PhysicsAcarModelDescriptorProjection descriptor{};
-                const auto base = 0x1054U + index * 0x18U;
+                constexpr std::uint32_t base = 0U;
+                if (observation.model_descriptor_buffer_address.has_value()) {
+                    descriptor.descriptor_address =
+                        *observation.model_descriptor_buffer_address
+                        + index * 0x18U;
+                }
                 descriptor.writes.push_back({base, 0U});
                 descriptor.writes.push_back({base + 2U, 0U});
                 if (blend_data_available
@@ -1382,20 +1399,26 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
                     plan.model_helper_input_capture_incomplete = true;
                 }
                 descriptor.writes.push_back({base + 0x0cU, 0U});
+                if (index > 0U
+                    && index - 1U < observation.model_nodes.size()
+                    && observation.model_nodes[index - 1U].next_address == 0U) {
+                    plan.model_helper_null_node_fault = true;
+                    plan.model_descriptors.push_back(std::move(descriptor));
+                    break;
+                }
                 if (index >= observation.model_nodes.size()) {
                     plan.model_helper_input_capture_incomplete = true;
-                    plan.model_helper_null_node_fault =
-                        observation.model_node_capture_complete;
                     plan.model_descriptors.push_back(std::move(descriptor));
                     break;
                 }
                 const auto& node = observation.model_nodes[index];
-                if (index > 0U
-                    && observation.model_nodes[index - 1U].next_address
-                        != node.address) {
+                if (node.address == 0U
+                    || (index > 0U
+                        && observation.model_nodes[index - 1U].next_address
+                            != node.address)) {
                     plan.model_helper_input_capture_incomplete = true;
-                    plan.model_helper_null_node_fault =
-                        observation.model_nodes[index - 1U].next_address == 0U;
+                    plan.model_helper_null_node_fault = node.address == 0U
+                        || observation.model_nodes[index - 1U].next_address == 0U;
                     plan.model_descriptors.push_back(std::move(descriptor));
                     break;
                 }
@@ -1416,17 +1439,16 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
                     std::bit_cast<std::uint32_t>(descriptor.mapped_scalar)});
                 descriptor.writes.push_back({base + 0x14U, node.address});
                 plan.model_descriptors.push_back(std::move(descriptor));
-                if (index + 1U < observation.model_descriptor_count
-                    && node.next_address == 0U) {
-                    plan.model_helper_null_node_fault = true;
-                    break;
-                }
             }
             if (blend_data_available
                 && observation.blend_source_pairs.size()
                     < observation.model_descriptor_count) {
                 plan.model_helper_input_capture_incomplete = true;
             }
+        }
+        if (plan.model_helper_null_buffer_fault
+            || plan.model_helper_null_node_fault) {
+            return plan;
         }
     } else {
         plan.object_writes.push_back({0xfe8U, 0U});

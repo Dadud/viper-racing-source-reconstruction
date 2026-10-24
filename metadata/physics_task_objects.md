@@ -501,7 +501,8 @@ a byte-valued write at `+0xF54`.
 
 When model data is present, the constructor allocates `descriptor_count *
 0x18`, stores the result at `+0x1054`, and calls `0x429440` even if allocation
-fails; the helper's memory effects remain opaque. It then allocates
+fails; a positive descriptor count then exposes the null-buffer fault. The
+helper's per-descriptor writes are modeled below. It then allocates
 `runtime_entry_count * 8` bytes at `+0x1048` and calls `0x42BB60` once per
 entry when the allocation succeeds. The three animation helpers, `+0x534`
 flag, and `0x428790` setup call are included. Evidence:
