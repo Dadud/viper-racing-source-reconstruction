@@ -1569,6 +1569,40 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
     write(0xf4cU, 0U);
     write(0xef0U, 0U);
     write(0xf34U, 0U);
+    write(0xfe4U, observation.current_value_0xf0c);
+
+    plan.model_sync_helper_0x41d170_called = true;
+    if (!observation.model_object_pointer_nonnull) {
+        plan.model_sync_null_receiver_fault = true;
+        return plan;
+    }
+    plan.model_object_address = observation.model_object_address;
+    if (observation.model_object_has_records) {
+        plan.model_object_writes.push_back({0x18U,
+            observation.object_position_xz[0]});
+        plan.model_object_writes.push_back({0x1cU,
+            observation.object_position_xz[1]});
+        plan.model_object_writes.push_back({0x20U,
+            observation.object_vector_0x234_0x23c[0]});
+        plan.model_object_writes.push_back({0x24U,
+            observation.object_vector_0x234_0x23c[1]});
+        if (observation.model_object_reset_flag_0x28) {
+            plan.model_reset_helper_call_count += 1U;
+            plan.model_object_writes.push_back({0x04U, 0U});
+            plan.model_object_writes.push_back({0x28U, 0U});
+            plan.model_object_reset_flag_cleared = true;
+        } else {
+            plan.model_curve_update_0x41d4f0_called = true;
+        }
+    }
+
+    // 0x428790 invokes 0x41d1d0 again after 0x429690 returns, regardless of
+    // whether 0x41d170 selected its reset or curve-update branch.
+    plan.model_reset_helper_call_count += 1U;
+    plan.model_object_helper_0x41d1d0_called = true;
+    plan.model_object_writes.push_back({0x04U, 0U});
+    plan.model_curve_seek_0x41d3a0_call_count =
+        plan.model_reset_helper_call_count;
 
     if (observation.runtime_entry_count > 0U
         && !observation.runtime_entry_buffer_available) {
@@ -1585,7 +1619,11 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
         // captured base address is unavailable.
         plan.cleared_runtime_entries = observation.runtime_entry_count;
     }
-    plan.final_helper_0x428590_called = !plan.runtime_entry_clear_fault;
+    if (!plan.runtime_entry_clear_fault) {
+        write(0xec8U, 0x0042b7b0U);
+        write(0xeccU, 0x0042ad80U);
+        plan.final_helper_0x428590_called = true;
+    }
     return plan;
 }
 

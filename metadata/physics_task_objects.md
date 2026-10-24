@@ -526,8 +526,17 @@ and the selection gates: `ev_921603fb8c35029f239b604139468c416af59e42234608c9cf7
 shared-state pointer calculation, timer observation, fixed state constants,
 and the descriptor-derived threshold (`+0x1044`) and normalized value
 (`+0x1030`) when their source fields are captured. The raw-bit gate deciding
-whether the derived threshold replaces profile `+0x98` is preserved. It also
-records `0x429690`, the model-object helper, and `0x428590` call order, and
-clears one DWORD per eight-byte runtime entry. Missing descriptor inputs stay
-unknown; a null runtime-entry buffer with a positive count is reported as the
-native clear-loop fault. Evidence: `ev_e59da5bb7d388e42e9580e51de21b72b204617a3d813fa9aadea6a314ba39804`.
+whether the derived threshold replaces profile `+0x98` is preserved. The
+`0x429690` path copies `+0xF0C` to `+0xFE4` and calls the `0x41D170` model
+sync. That helper copies four task vectors when the model has records, then
+selects reset (`0x41D1D0`) or curve update (`0x41D4F0`) from model flag `+0x28`.
+The caller performs a second unconditional `0x41D1D0`, modeled as clearing
+model `+4` and calling the still-opaque `0x41D3A0` with limit `10000`. A null
+model receiver is reported as a fault before that second call. The initializer
+clears one DWORD per eight-byte runtime entry; a null buffer with a positive
+count is a fault. On the surviving route, `0x428590` installs callbacks
+`0x42B7B0` and `0x42AD80` at offsets `+0xEC8` and `+0xECC`. Evidence:
+`ev_e59da5bb7d388e42e9580e51de21b72b204617a3d813fa9aadea6a314ba39804`,
+`ev_a84dec33e9d04da3fa72f6439d3c2e599ec3eeab3e6027410a8d32adb0d2ac42`,
+`ev_f4bfcbadc58c411dafa520fe96978c340227d8b44f58d8472908504b58b48201`, and
+`ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.

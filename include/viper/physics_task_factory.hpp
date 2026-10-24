@@ -777,6 +777,13 @@ struct PhysicsAcarRuntimeInitializationObservation {
     float selected_config_value_0x04{};
     std::uint32_t profile_value_0x98{};
     std::uint32_t profile_value_0xa4{};
+    std::uint32_t current_value_0xf0c{};
+    std::array<std::uint32_t, 2> object_position_xz{};
+    std::array<std::uint32_t, 2> object_vector_0x234_0x23c{};
+    bool model_object_pointer_nonnull{};
+    std::optional<std::uint32_t> model_object_address;
+    bool model_object_has_records{};
+    bool model_object_reset_flag_0x28{};
     std::optional<std::uint32_t> timer_value_0xfb8;
     std::optional<float> linked_object_value_0x18;
     std::optional<float> last_model_node_value_0x18;
@@ -791,6 +798,8 @@ struct PhysicsAcarRuntimeInitializationObservation {
 struct PhysicsAcarRuntimeInitializationPlan {
     std::vector<PhysicsTaskObjectFieldWrite> object_writes;
     std::vector<PhysicsTaskPointerWrite> runtime_entry_writes;
+    std::vector<PhysicsTaskObjectFieldWrite> model_object_writes;
+    std::optional<std::uint32_t> model_object_address;
     std::optional<float> derived_threshold_0x1044;
     std::optional<float> normalized_value_0x1030;
     std::uint32_t cleared_runtime_entries{};
@@ -798,7 +807,14 @@ struct PhysicsAcarRuntimeInitializationPlan {
     bool derived_value_inputs_missing{};
     bool fdiv_compatibility_path_used{};
     bool derived_calculation_0x429690_called{true};
-    bool model_object_helper_0x41d1d0_called{true};
+    bool model_sync_helper_0x41d170_called{};
+    bool model_sync_null_receiver_fault{};
+    bool model_curve_update_0x41d4f0_called{};
+    bool model_object_helper_0x41d1d0_called{};
+    std::uint32_t model_reset_helper_call_count{};
+    std::uint32_t model_curve_seek_0x41d3a0_call_count{};
+    float model_curve_seek_limit{10000.0F};
+    bool model_object_reset_flag_cleared{};
     bool runtime_entry_clear_fault{};
     bool final_helper_0x428590_called{};
 };
