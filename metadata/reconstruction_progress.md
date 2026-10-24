@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 ADNT note parsing:** Added native-style filename key construction
+  for `.trk<key>.dnt` and `*notes\\<key>.dnt`, including the recovered car-name
+  normalization, plus a bounded ADNT v7 parser that preserves node bytes and
+  checks lookup fields and payload sizing. The native ILIN checksums, redundant
+  header check, legacy resource-set lookup, and runtime integration remain open.
+
 - **2026-10-24 AI driver resource:** Added a bounds-checked parser for the
   shipped `drivers.res` `aidriver.adr` AIDR v2 payload. It reads the eight
   difficulty group counts and retains the sixteen raw `0x220`-byte slots per

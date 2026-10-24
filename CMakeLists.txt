@@ -184,7 +184,8 @@ target_link_libraries(viper_reconstruction PRIVATE
 target_compile_features(viper_reconstruction PRIVATE cxx_std_20)
 
 if(WIN32)
-    add_executable(viper_game src/game_main.cpp src/game_assets.cpp src/ai_driver_resource.cpp)
+    add_executable(viper_game src/game_main.cpp src/game_assets.cpp
+        src/ai_driver_resource.cpp src/ai_notes_resource.cpp)
     target_compile_features(viper_game PRIVATE cxx_std_20)
     target_compile_definitions(viper_game PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
     if(MSVC)

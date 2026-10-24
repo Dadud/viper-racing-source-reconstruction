@@ -49,8 +49,10 @@ files were present.
 
 The Windows runtime now validates the current `drivers.res` AIDR v2 layout
 and preserves its eight groups of raw driver records; see
-[`metadata/ai_driver_resource.md`](metadata/ai_driver_resource.md). Legacy AIDR
-conversion and ADNT note selection are still under reconstruction.
+[`metadata/ai_driver_resource.md`](metadata/ai_driver_resource.md). The ADNT
+filename builder and bounded header parser are in
+[`metadata/ai_notes_resource.md`](metadata/ai_notes_resource.md); legacy AIDR
+conversion and full note checksum/resource-set integration remain open.
 
 ## Current reconstruction
 

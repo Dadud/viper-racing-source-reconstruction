@@ -26,6 +26,8 @@ Evidence from `race.bin` (SHA-256
 
 The extracted `drivers.res` inventory reports `aidriver.adr`, type `0x41494472`,
 attributes/version 2, and 69,664 (`0x11020`) payload bytes. The native initializer
-also uses these records with runtime-generated ADNT note resources to select
-AI parameters; track lookup comes from `common.res`'s `tracks.tab`. Those note
-selection and parameter application paths remain separate reconstruction work.
+uses a distinct per-entrant group key modulo 7 for ADNT lookup; it is not the
+same index as the eight AIDR profile groups. The key also contains the selected
+difficulty and track index. See `metadata/ai_notes_resource.md` for the current
+ADNT header parser and filename construction. Runtime discovery/loading of those
+optional note sidecars and their checksum validation are still incomplete.
