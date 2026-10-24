@@ -48,6 +48,24 @@ Evidence: `ev_447b528b50509f37522715ad650290a9da58ae7b4d9b0cd5bf0580dc00fc23b7`
 (`0x4597D0`), and `ev_74f87d48e82231bbcdba6577f80a8894b31559641af12cdd24d05922d027a1b9`
 (`0x459830`).
 
+The paired `0x448440`/`0x448450` wrappers are projected as a device frame
+batch. BeginFrame dispatches through device vtable offset `+0x28`; its HRESULT
+is stored at `0x509FC4` and logged on failure. The end wrapper calls
+SetRenderState `(1,0)`, stores `0xFFFFFFFF` at `0x4DA17C`, calls
+SetRenderState `(0x1B,0)`, clears byte `0x509B3E`, then dispatches EndFrame at
+vtable offset `+0x2C`. Every HRESULT replaces `0x509FC4`; nonzero results are
+logged through `0x452770`. `plan_scene_device_frame_batch` preserves this order
+and is connected by the race-loop composer when both wrappers are reached.
+HRESULTs remain observations.
+
+Evidence: `ev_54c964f82dd752b84a4b4f98553b21e889bdd8b817904462870823ea14567e14`
+(`0x448440`), `ev_fe4aee2684fc5e81c01de1bed3b45cce6e0e04511dee88fa929b505b1cda83c7`
+(`0x448450`), `ev_6809863cb15663935c2dafc099f62498d03334d6de758f898efca12b5d8ce606`
+(`0x458B60` BeginFrame), `ev_e96987d0098dc5a331b3b0fad5aefd6ea790def1211c750b602e99b83ee32973`
+(`0x458BC0` SetRenderState), and
+`ev_ea198db8879a14dcfe049460efd62bf1a1c0aa80477da212b5091242191c2850`
+(`0x458B90` EndFrame).
+
 On the successful render branch, `0x447C90` obtains the render context through
 `0x44E210` and installs it as the current context with `0x449900`. The context
 acquisition clears its output fields, pumps messages through `0x412C80`, checks

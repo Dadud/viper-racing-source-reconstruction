@@ -68,6 +68,52 @@ struct SceneTextureCacheDeresourcePlan {
 plan_scene_texture_cache_deresource(
     const SceneTextureCacheDeresourceObservation& observation);
 
+enum class SceneDeviceFrameBatchOperationKind : std::uint8_t {
+    begin_frame_virtual_call,
+    log_begin_frame_failure,
+    texture_pressure_check_0x453f70,
+    texture_pressure_recovery,
+    no_op_helper_0x454000,
+    set_render_state,
+    log_render_state_failure,
+    store_cached_render_state,
+    end_frame_virtual_call,
+    log_end_frame_failure,
+};
+
+struct SceneDeviceFrameBatchObservation {
+    std::optional<std::int32_t> begin_frame_hresult;
+    // SetRenderState(1, 0), then SetRenderState(0x1B, 0).
+    std::array<std::optional<std::int32_t>, 2> render_state_hresults{};
+    std::optional<std::int32_t> end_frame_hresult;
+};
+
+struct SceneDeviceFrameBatchOperation {
+    SceneDeviceFrameBatchOperationKind kind{};
+    std::uint32_t helper{};
+    std::uint32_t device_vtable_offset{};
+    std::uint32_t state_index{};
+    std::uint32_t state_value{};
+    std::uint32_t global_store_address{};
+    std::uint32_t global_store_value{};
+    std::optional<std::int32_t> hresult;
+};
+
+struct SceneDeviceFrameBatchPlan {
+    bool reached{};
+    bool input_complete{true};
+    std::optional<std::int32_t> final_hresult_0x509fc4;
+    std::uint32_t next_cached_render_state_0x4da17c{};
+    std::uint8_t next_render_state_flag_0x509b3e{};
+    std::vector<SceneDeviceFrameBatchOperation> ordered_operations;
+};
+
+// Projects the paired 0x448440/0x448450 device frame bracket. Device results
+// remain observations; texture-pressure recovery is composed between begin/end.
+[[nodiscard]] SceneDeviceFrameBatchPlan plan_scene_device_frame_batch(
+    const SceneDeviceFrameBatchObservation& observation,
+    bool texture_pressure_recovery_reached);
+
 enum class SceneRendererDispatchActionKind : std::uint8_t {
     profiling_begin,
     graphics_state_begin,

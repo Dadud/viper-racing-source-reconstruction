@@ -200,6 +200,92 @@ SceneTextureCacheDeresourcePlan plan_scene_texture_cache_deresource(
     return result;
 }
 
+SceneDeviceFrameBatchPlan plan_scene_device_frame_batch(
+    const SceneDeviceFrameBatchObservation& observation,
+    const bool texture_pressure_recovery_reached)
+{
+    SceneDeviceFrameBatchPlan result{};
+    result.reached = true;
+    result.input_complete = observation.begin_frame_hresult.has_value() &&
+        observation.render_state_hresults[0].has_value() &&
+        observation.render_state_hresults[1].has_value() &&
+        observation.end_frame_hresult.has_value();
+    result.ordered_operations.push_back({
+        SceneDeviceFrameBatchOperationKind::begin_frame_virtual_call,
+        0x00458B60U, 0x28U, 0U, 0U, 0U, 0U,
+        observation.begin_frame_hresult,
+    });
+    result.final_hresult_0x509fc4 = observation.begin_frame_hresult;
+    if (observation.begin_frame_hresult.has_value() &&
+        *observation.begin_frame_hresult != 0) {
+        result.ordered_operations.push_back({
+            SceneDeviceFrameBatchOperationKind::log_begin_frame_failure,
+            0x00452770U, 0U, 0U, 0U, 0U, 0U,
+            observation.begin_frame_hresult,
+        });
+    }
+    result.ordered_operations.push_back({
+        SceneDeviceFrameBatchOperationKind::texture_pressure_check_0x453f70,
+        0x00453F70U,
+    });
+    if (texture_pressure_recovery_reached) {
+        result.ordered_operations.push_back({
+            SceneDeviceFrameBatchOperationKind::texture_pressure_recovery,
+            0x00453F70U,
+        });
+    }
+
+    result.ordered_operations.push_back({
+        SceneDeviceFrameBatchOperationKind::no_op_helper_0x454000,
+        0x00454000U,
+    });
+    constexpr std::array<std::uint32_t, 2> state_indices{1U, 0x1BU};
+    for (std::size_t index = 0; index < state_indices.size(); ++index) {
+        const auto hresult = observation.render_state_hresults[index];
+        result.ordered_operations.push_back({
+            SceneDeviceFrameBatchOperationKind::set_render_state,
+            0x00458BC0U, 0x5CU, state_indices[index], 0U, 0U, 0U,
+            hresult,
+        });
+        result.final_hresult_0x509fc4 = hresult;
+        if (hresult.has_value() && *hresult != 0) {
+            result.ordered_operations.push_back({
+                SceneDeviceFrameBatchOperationKind::log_render_state_failure,
+                0x00452770U, 0U, state_indices[index], 0U, 0U, 0U,
+                hresult,
+            });
+        }
+        if (index == 0U) {
+            result.next_cached_render_state_0x4da17c = 0xFFFFFFFFU;
+            result.ordered_operations.push_back({
+                SceneDeviceFrameBatchOperationKind::store_cached_render_state,
+                0U, 0U, 0U, 0U, 0x004DA17CU, 0xFFFFFFFFU,
+            });
+        } else {
+            result.next_render_state_flag_0x509b3e = 0U;
+            result.ordered_operations.push_back({
+                SceneDeviceFrameBatchOperationKind::store_cached_render_state,
+                0U, 0U, 0U, 0U, 0x00509B3EU, 0U,
+            });
+        }
+    }
+    result.ordered_operations.push_back({
+        SceneDeviceFrameBatchOperationKind::end_frame_virtual_call,
+        0x00458B90U, 0x2CU, 0U, 0U, 0U, 0U,
+        observation.end_frame_hresult,
+    });
+    result.final_hresult_0x509fc4 = observation.end_frame_hresult;
+    if (observation.end_frame_hresult.has_value() &&
+        *observation.end_frame_hresult != 0) {
+        result.ordered_operations.push_back({
+            SceneDeviceFrameBatchOperationKind::log_end_frame_failure,
+            0x00452770U, 0U, 0U, 0U, 0U, 0U,
+            observation.end_frame_hresult,
+        });
+    }
+    return result;
+}
+
 SceneRendererDispatchPlan plan_scene_renderer_dispatch(
     const SceneRendererDispatchInput& input)
 {

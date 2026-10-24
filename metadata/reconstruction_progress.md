@@ -6,8 +6,9 @@
   releases, increments the de-rez generation, then applies explicit texture
   reload outcomes in a second pass. Evidence is in
   `metadata/simulation_loop.md`; the race-loop composer now evaluates it at the
-  reached `0x448440` setup. Release build and `git diff --check` pass; no tests
-  were run.
+  reached `0x448440` setup. The same integration now models the paired
+  BeginFrame/EndFrame device calls, state resets, and HRESULT log gates.
+  Release build and `git diff --check` pass; no tests were run.
 
 - **2026-10-24 continuation:** Connected the common shared-overlay composer to
   optional resource-manager state. Its current-generation DWORD now feeds both

@@ -71,6 +71,7 @@ struct RaceLoopSharedOverlayObservation {
     // Raw renderer texture table and helper outcomes for the 0x448440 setup.
     std::optional<SceneTextureCacheDeresourceObservation>
         texture_cache_deresource;
+    std::optional<SceneDeviceFrameBatchObservation> device_frame_batch;
     // When supplied, acquisition runs only if the following frame reaches
     // 0x447C90; its result then controls submission and post-submit callbacks.
     std::optional<RenderContextAcquisitionObservation> render_context_acquisition;
@@ -110,6 +111,7 @@ struct RaceLoopSharedOverlayPlan {
     RaceOverlayToggleFramePlan state_transition_and_frame{};
     std::optional<SceneTextureCacheDeresourcePlan>
         texture_cache_deresource;
+    std::optional<SceneDeviceFrameBatchPlan> device_frame_batch;
     std::optional<RenderContextAcquisitionPlan> render_context_acquisition;
     bool shared_callback_reached{};
     std::uint32_t shared_callback_wrapper{};

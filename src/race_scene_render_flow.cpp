@@ -211,6 +211,18 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         plan.texture_cache_deresource = plan_scene_texture_cache_deresource(
             *observation.texture_cache_deresource);
     }
+    const auto texture_pressure_teardown = std::find_if(
+        frame_calls.begin(), frame_calls.end(), [](const auto& call) {
+            return call.address == 0x00448450U;
+        });
+    if (texture_pressure_setup != frame_calls.end() &&
+        texture_pressure_teardown != frame_calls.end() &&
+        observation.device_frame_batch.has_value()) {
+        plan.device_frame_batch = plan_scene_device_frame_batch(
+            *observation.device_frame_batch,
+            plan.texture_cache_deresource.has_value() &&
+                plan.texture_cache_deresource->reached);
+    }
 
     for (const auto& call : plan.state_transition_and_frame.following_frame.calls) {
         if (!call.state_indexed_callback) {
