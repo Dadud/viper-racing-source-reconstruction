@@ -548,6 +548,14 @@ surface height in the `0x404920` centered-resource block
 (`y = [0x509A2C]/2 - 0x82`). The heading plan now emits both draws with that
 geometry.
 
+`raster_scene_shared_results_heading_text` takes the two `0x44DC70` text
+operations from that heading plan in call order and projects their glyph and
+pixel writes through the loaded-font, RLE-atlas, clipping, and palette pipeline
+used for result rows. It validates the title/prompt format handles and requires
+one renderer observation for each draw. The localized title/prompt strings and
+renderer observations remain inputs; resource lookup and surface acquisition
+are outside this helper.
+
 `scene_shared_results_branch_plan` composes the direct results flag with the
 heading gate/resource work, selected row records, optional time values, and
 ordered draw arguments. The record span represents the accessor-bounded row

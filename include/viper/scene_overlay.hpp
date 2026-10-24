@@ -1667,6 +1667,27 @@ raster_scene_shared_results_rows(
     const SceneDashboardFontObservation& layout_font,
     const SceneDashboardAtlasFontObservation& atlas_font);
 
+struct SceneSharedResultsHeadingTextRasterObservation {
+    std::string_view results_title_text;
+    std::string_view prompt_text;
+    std::array<SceneDashboardRasterObservation, 2> per_call_renderers{};
+};
+
+struct SceneSharedResultsHeadingTextRasterPlan {
+    bool input_complete{true};
+    std::size_t heading_text_calls_rasterized{};
+    std::vector<SceneTextPixelWrite> ordered_pixel_writes;
+};
+
+// Rasterizes the two 0x44DC70 heading operations from the results plan. The
+// localized strings and renderer/font observations remain supplied inputs.
+[[nodiscard]] SceneSharedResultsHeadingTextRasterPlan
+raster_scene_shared_results_heading_text(
+    const SceneSharedResultsHeadingPlan& heading,
+    const SceneSharedResultsHeadingTextRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font);
+
 [[nodiscard]] SceneTextPixelApplyResult
 apply_scene_shared_results_raster(
     const SceneSharedResultsRasterPlan& plan,

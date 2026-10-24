@@ -2893,6 +2893,72 @@ SceneSharedResultsBranchPlan scene_shared_results_branch_plan(
     return result;
 }
 
+SceneSharedResultsHeadingTextRasterPlan
+raster_scene_shared_results_heading_text(
+    const SceneSharedResultsHeadingPlan& heading,
+    const SceneSharedResultsHeadingTextRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font)
+{
+    SceneSharedResultsHeadingTextRasterPlan result{};
+    if (!heading.reached) {
+        return result;
+    }
+
+    std::size_t renderer_index = 0;
+    for (const auto& operation : heading.ordered_operations) {
+        std::uint32_t call_site = 0;
+        std::string_view text;
+        switch (operation.kind) {
+        case SceneSharedResultsHeadingOperationKind::draw_results_text_0x44dc70:
+            call_site = 0x00404F32U;
+            if (operation.format_source != 0x004EB24CU) {
+                result.input_complete = false;
+            }
+            text = observation.results_title_text;
+            break;
+        case SceneSharedResultsHeadingOperationKind::draw_prompt_text_0x44dc70:
+            call_site = 0x00404F76U;
+            if (operation.format_source != 0x004EB414U) {
+                result.input_complete = false;
+            }
+            text = observation.prompt_text;
+            break;
+        default:
+            continue;
+        }
+
+        if (renderer_index >= observation.per_call_renderers.size()) {
+            result.input_complete = false;
+            break;
+        }
+
+        const SceneDashboardTextCall call{
+            call_site,
+            operation.x,
+            operation.y,
+            operation.format_source,
+            operation.color_source,
+            operation.font_source,
+            operation.flags,
+        };
+        const auto layout = layout_scene_dashboard_text(call, text, layout_font);
+        const auto raster = raster_scene_dashboard_text(
+            layout, atlas_font, observation.per_call_renderers[renderer_index]);
+        ++renderer_index;
+        ++result.heading_text_calls_rasterized;
+        result.input_complete = result.input_complete && raster.input_complete;
+        result.ordered_pixel_writes.insert(
+            result.ordered_pixel_writes.end(), raster.pixel_writes.begin(),
+            raster.pixel_writes.end());
+    }
+
+    if (renderer_index != observation.per_call_renderers.size()) {
+        result.input_complete = false;
+    }
+    return result;
+}
+
 SceneSharedOverlayFramePlan scene_shared_overlay_frame_plan(
     const SceneSharedOverlayFrameObservation& observation)
 {
