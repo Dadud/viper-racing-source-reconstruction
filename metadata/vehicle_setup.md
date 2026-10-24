@@ -352,6 +352,24 @@ playback. Evidence against shipped `GameBin/race.bin` SHA-256
 (`0x46BE60`), and `ev_ac73f4a64c8db118ba3572f6d79b8454bd109e04b0fc11041ec614055ec5e385`
 (`0x46E6A0`).
 
+The `ESFX` payload begins with a DWORD band count followed by seven-float
+records. `parse_engine_sound_setup` bounds the count to the engine manager's
+seven slots, checks every used float is finite, and retains bytes after the
+records without assigning them meaning. All five car bundles contain one
+setup; Viper has three bands and 140 trailing bytes, while the other four have
+two bands and 168 trailing bytes. Native `0x46C410` copies the seven
+record values into manager state in this order: fields 3, 4, 5, 6, 1, 2, 0.
+The update routine `0x46C7A0` obtains two values from the vehicle object and
+passes the first through `0x46CA10`; that function uses per-band record data
+for sound gain and playback frequency. The runtime has not connected its own
+vehicle RPM/throttle state to these native inputs, so DirectSound band
+selection remains provisional. Evidence IDs:
+`ev_f5ee7b4ebd6c8e0d68ffdb0224d85bf883046a27e5b16642e7fb67ac89e34236`
+(`0x46C410`), `ev_f86b4719b9039a7866207664763dbe8a6fbda6300526ef0b1ab25dc20f5de927`
+(`0x46C7A0`), `ev_92cd5da97ed44864efc27dc372f8558d6815fc2f90583ddc019bf39e83564583`
+(`0x46C930`), and `ev_f9144a31f0be970da7eb404b2cafaf57105061875543db365173f22a99503b36`
+(`0x46CA10`).
+
 The selected player car's `SFX0` (`0x53465830`) entries contain a 20-byte
 header: sample byte count, PCM format tag, channel count, sample rate, average
 byte rate, block alignment, and bits per sample. `parse_pcm_sfx0_resource`

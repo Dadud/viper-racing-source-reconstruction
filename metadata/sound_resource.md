@@ -36,7 +36,15 @@ reads all shipped car bundles using external assets.
 The Win32 runtime loads the selected car's idle and numbered samples into
 DirectSound PCM buffers and loops them. It uses provisional speed/throttle
 selection and pitch scaling; it does not yet consume the native `ESFX` band
-parameters. `--smoke-audio --smoke-frames 30` initializes the DirectSound
-device and exercises buffer creation/play calls. The smoke run does not capture
-speaker output or compare timing and pitch against the original. The separate
-top-level `trk2.sfx` file's `MGI!` payload remains unparsed.
+parameters. `parse_engine_sound_setup` reads the native count and seven-float
+record per band, retaining remaining bytes as opaque tail data. Native
+`0x46C410` reads exactly this prefix; Viper has three records and 140 remaining
+bytes, while each of the other four cars has two records and 168 remaining
+bytes. The runtime has not yet consumed these records.
+`0x46C7A0` reads two values through vehicle virtual offsets `+0x48` and `+0x44`,
+then applies per-band data through `0x46CA10`; the field mapping and native
+vehicle value units still need to be tied to the reconstruction's physics.
+`--smoke-audio --smoke-frames 30` initializes the DirectSound device and
+exercises buffer creation/play calls. The smoke run does not capture speaker
+output or compare timing and pitch against the original. The separate top-level
+`trk2.sfx` file's `MGI!` payload remains unparsed.

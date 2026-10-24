@@ -54,7 +54,9 @@ add_library(viper_resource_bundle src/resource_bundle.cpp)
 target_include_directories(viper_resource_bundle PUBLIC include)
 target_compile_features(viper_resource_bundle PUBLIC cxx_std_20)
 
-add_library(viper_sound_resource src/sound_resource.cpp)
+add_library(viper_sound_resource
+    src/sound_resource.cpp
+    src/engine_sound_setup.cpp)
 target_include_directories(viper_sound_resource PUBLIC include)
 target_compile_features(viper_sound_resource PUBLIC cxx_std_20)
 
