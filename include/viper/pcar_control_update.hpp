@@ -35,6 +35,8 @@ struct PcarScalarFields {
 struct PcarCallbackTailFields {
     std::uint8_t value_0xc3c{};
     std::uint8_t gate_0xc3d{};
+    // Embedded +0xBFC curve object's byte +0x41, read by 0x4402D0.
+    std::uint8_t curve_gate_0x41{};
     float value_0xc7c{};
     std::uint32_t mode_0x4fc{};
     float value_0xde0{};

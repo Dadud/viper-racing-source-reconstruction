@@ -64,7 +64,7 @@ PcarCallbackTailResult advance_pcar_callback_tail(
     if (fields.gate_0xc3d != 0U &&
         std::bit_cast<std::int32_t>(fields.value_0xc7c) < helper_threshold_bits) {
         result.called_curve_helper_0x4402d0 = true;
-        if (fields.gate_0xc3d != 0U) {
+        if (fields.curve_gate_0x41 != 0U) {
             fields.value_0xc3c = 1U;
             result.set_byte_0xc3c = true;
         }

@@ -136,6 +136,29 @@ NcarIntegratorEarlyBoundsResult plan_ncar_integrator_early_bounds(
     return result;
 }
 
+NcarIntegratorCurveGateResult advance_ncar_integrator_curve_gate(
+    NcarIntegratorCurveGateState& state,
+    const NcarIntegratorCurveGateInput& input) noexcept
+{
+    NcarIntegratorCurveGateResult result{};
+    constexpr std::int32_t helper_threshold_bits = 0x3C23D70A;
+    if (input.parent_gate_0xc3d != 0U &&
+        std::bit_cast<std::int32_t>(input.parent_value_bits_0xc7c) <
+            helper_threshold_bits) {
+        result.curve_helper_0x4402d0_reached = true;
+        if (input.curve_gate_0x41 != 0U) {
+            state.parent_flag_0xc3c = 1U;
+            result.curve_byte_0x40_written = true;
+            result.parent_flag_0xc3c_written = true;
+        }
+    }
+    if (state.parent_flag_0xc3c != 0U) {
+        state.value_0xde0 = 1.0F;
+        result.setter_0x4331a0_reached = true;
+    }
+    return result;
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,
@@ -738,6 +761,10 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     result.integrator_early_bounds = plan_ncar_integrator_early_bounds(
         kinematics_at_step_start.position,
         input.post_body_input.vehicle_ordinal_0x510);
+    result.integrator_curve_gate_state = input.integrator_curve_gate_state;
+    result.integrator_curve_gate = advance_ncar_integrator_curve_gate(
+        result.integrator_curve_gate_state,
+        input.integrator_curve_gate_input);
     result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;

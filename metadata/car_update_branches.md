@@ -63,6 +63,21 @@ Evidence: `ev_76372b1d20911ae6c6596f9fc9987110b1639312dde8af814ff1145e92ab0d56`
 (`0x432130` pseudocode and instructions), linked to caller `0x431150` in
 [`ncar_integrator_timer.evidence.json`](ncar_integrator_timer.evidence.json).
 
+The following `0x431150` branch calls `0x4402D0` on the embedded object at
+`+0xBFC` when parent byte `+0xC3D` is set and the signed raw DWORD at `+0xC7C`
+is below `0x3C23D70A`. The helper writes child byte `+0x40` only if child byte
+`+0x41` is nonzero; this aliases parent byte `+0xC3C`. If the resulting parent
+byte `+0xC3C` is nonzero, the caller invokes setter `0x4331A0(1.0)` for
+`+0xDE0`. `advance_ncar_integrator_curve_gate` models this sequence in the
+four-wheel step. `advance_pcar_callback_tail` now also requires the observed
+child `+0x41` byte before projecting the parent flag write.
+
+Evidence: `ev_96c88cabb88c7c78ae26cb2ae250b2939ebe2a35e35c952ee28e62aee3be1e0a`
+(`0x4402D0`) and `ev_c4b47e34375fbf4bd3cb556c06f630cca74cfbc46dce80a77aed30a155152827`
+(`0x4331A0`); the caller branch is in `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`.
+The helper and setter records are in
+[`ncar_integrator_curve_gate.evidence.json`](ncar_integrator_curve_gate.evidence.json).
+
 ## PCAR callback at `0x4384D0`
 
 The prologue combines object fields `+0x234`, `+0x238`, and `+0x23C` with
@@ -105,7 +120,8 @@ When byte `+0xC3D` is set and the signed dword at `+0xC7C` is below
 `0x3E4CCCCD`, 0.2). If byte `+0xBE4` is nonzero, it passes the `0x43BA10`
 result to `0x434B20`, which stores it at `+0x508`. The portable
 `advance_pcar_callback_tail` applies those offset writes and reports which
-helper branches ran.
+helper branches ran. Its inputs now include the embedded curve object's raw
+`+0x41` byte so the `+0xC3C` store only occurs on the helper's observed gate.
 
 Evidence: `0x4402D0` `ev_96c88cabb88c7c78ae26cb2ae250b2939ebe2a35e35c952ee28e62aee3be1e0a`,
 `0x434B20` `ev_22e4b24214928c99dced78db39dbbb2176546ab0ebc869e98bf2ffaa8b44d948`,
