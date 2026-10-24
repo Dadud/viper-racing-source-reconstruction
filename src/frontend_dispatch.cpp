@@ -641,6 +641,27 @@ MultiplayerStatusSupervisorPlan plan_multiplayer_status_supervisor(
         !observation.synchronizing_text_already_initialized;
     result.waiting_text_initialization_called =
         !observation.waiting_text_already_initialized;
+    if (result.synchronizing_text_initialization_called) {
+        result.status_text_registrations.push_back(
+            result.status_text_registration_definitions[0]);
+    }
+    if (observation.synchronizing_text_already_initialized ||
+        result.synchronizing_text_initialization_called) {
+        result.status_text_initialized_low_mask_after |= 0x01U;
+    }
+    if (result.waiting_text_initialization_called) {
+        result.status_text_registrations.push_back(
+            result.status_text_registration_definitions[1]);
+    }
+    if (observation.waiting_text_already_initialized ||
+        result.waiting_text_initialization_called) {
+        result.status_text_initialized_low_mask_after |= 0x02U;
+    }
+    result.synchronizing_text_cache_refresh_called =
+        observation.synchronizing_text_resource_stale;
+    if (!observation.synchronizing_text_resource_stale.has_value()) {
+        result.input_complete = false;
+    }
     result.snapshots.reserve(observation.snapshots.size());
     auto phase = SnapshotPhase::outer_state_dispatch;
 
@@ -814,6 +835,13 @@ MultiplayerStatusSupervisorPlan plan_multiplayer_status_supervisor(
 
         if (phase != SnapshotPhase::status_0x11_wait) {
             snapshot.waiting_text_path_reached = true;
+            if (!result.waiting_text_cache_refresh_called.has_value()) {
+                result.waiting_text_cache_refresh_called =
+                    observation.waiting_text_resource_stale;
+                if (!observation.waiting_text_resource_stale.has_value()) {
+                    result.input_complete = false;
+                }
+            }
         }
         if (phase != SnapshotPhase::status_0x11_wait &&
             observed.status_value == 0x11) {

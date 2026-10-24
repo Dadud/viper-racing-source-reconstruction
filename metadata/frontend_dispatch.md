@@ -1142,9 +1142,22 @@ label lookup through `0x4A1680`, passes the `status >= 15` test and label to
 offset `0x1C8 + argument * 0xD9`. The portable
 `plan_multiplayer_status_callback` reports the label ID and no-op call, models
 the gate field and callback argument separately, then reads this byte from a
-bounded raw object span. The label ID captures the stable 22-entry mapping;
-resource refresh and one-time registration behavior remain outside this
-callback projection. The supervisor's state 15 is
+bounded raw object span. The label ID captures the stable 22-entry mapping.
+The supervisor projection now also records its two one-time text registrations:
+`Synchronizing` and `Waiting`, guarded by bits 0 and 1 of `DAT_00564320`, with
+their resource objects, localization keys, and atexit callbacks. Generation
+mismatches for both cache objects are optional observations routed through
+`0x418CC0`, at the initial synchronization draw and later waiting-text path.
+
+Before entering its status loop, `0x49C2E0` queries `0x49C8A0`, which holds the
+object's `+0x38` lock while comparing the current thread ID with the saved ID
+at `+0x34`. A mismatch calls `0x49C7A0`: it signals the event at `+0x30`, polls
+that event against a timer deadline advanced by raw value `3000`, uses delay
+argument `0x19` between polls, and invokes `0x412C80` in the wait loop. If the
+event is still unsignaled at the deadline, it calls panic `0x411000`; otherwise
+it finishes through `0x49C920` and releases the lock. The plan keeps the
+event/timer outcome as an input and records the recovered helper addresses and
+timeout/delay constants. The supervisor's state 15 is
 `PGS_RACE_BEGIN`; its
 vtable `+0x50` target `0x4A2F10` calls `0x4A3AC0` and writes state 16
 (`PGS_SYNCHRONIZING`) when the current state is greater than 4. `0x4A3AC0`

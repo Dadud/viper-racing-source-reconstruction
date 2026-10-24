@@ -484,7 +484,16 @@ struct MultiplayerStatusSupervisorObservation {
     std::optional<bool> worker_stopped_within_cleanup_timeout;
     bool synchronizing_text_already_initialized{};
     bool waiting_text_already_initialized{};
+    std::optional<bool> synchronizing_text_resource_stale;
+    std::optional<bool> waiting_text_resource_stale;
     std::span<const MultiplayerStatusSnapshotObservation> snapshots;
+};
+
+struct MultiplayerStatusTextRegistration {
+    std::uint32_t initialized_mask_bit{};
+    std::uint32_t resource_object_address{};
+    std::uint32_t localization_key_address{};
+    std::uint32_t atexit_callback_address{};
 };
 
 struct MultiplayerStatusSnapshotPlan {
@@ -530,6 +539,12 @@ struct MultiplayerStatusSnapshotPlan {
 
 struct MultiplayerStatusSupervisorPlan {
     bool input_complete{true};
+    std::uint32_t worker_identity_gate_helper{0x0049c8a0U};
+    std::uint32_t worker_cleanup_helper{0x0049c7a0U};
+    std::uint32_t worker_cleanup_deadline_delta{3000U};
+    std::uint32_t worker_cleanup_delay_argument{0x19U};
+    std::uint32_t worker_cleanup_panic_helper{0x00411000U};
+    std::uint32_t worker_cleanup_finalizer{0x0049c920U};
     std::optional<bool> thread_identity_matches;
     std::optional<bool> thread_identity_cleanup_called;
     std::optional<bool> worker_cleanup_timed_out;
@@ -537,6 +552,20 @@ struct MultiplayerStatusSupervisorPlan {
     bool cleanup_panic_continuation_unknown{};
     bool synchronizing_text_initialization_called{};
     bool waiting_text_initialization_called{};
+    std::array<MultiplayerStatusTextRegistration, 2>
+        status_text_registration_definitions{{
+            {0x01U, 0x00564380U, 0x004e32a4U, 0x0049c500U},
+            {0x02U, 0x00564368U, 0x004e32b8U, 0x0049c4f0U},
+        }};
+    std::vector<MultiplayerStatusTextRegistration> status_text_registrations;
+    std::uint32_t status_text_registration_mask_address{0x00564320U};
+    std::uint32_t status_text_initialized_low_mask_after{};
+    std::optional<bool> synchronizing_text_cache_refresh_called;
+    std::optional<bool> waiting_text_cache_refresh_called;
+    std::uint32_t status_text_cache_refresh_helper{0x00418cc0U};
+    std::uint32_t locale_generation_address{0x004d3868U};
+    std::uint32_t synchronizing_text_generation_address{0x00564388U};
+    std::uint32_t waiting_text_generation_address{0x00564370U};
     bool initial_synchronizing_text_draw_called{true};
     bool initial_thread_priority_set_to_2{true};
     bool terminal_status_text_draw_called{};

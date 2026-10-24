@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended the multiplayer status supervisor with the two
+  `DAT_00564320` one-time text registrations, their localized keys and atexit
+  callbacks, and optional generation-cache refresh gates. Documented the
+  `0x49C8A0` thread-ID/lock check and `0x49C7A0` signal/poll/panic cleanup path,
+  including its raw 3,000-unit deadline and `0x19` delay argument. Missing
+  generation outcomes keep the supervisor projection incomplete. Existing
+  evidence is in `metadata/multiplayer_worker.evidence.json` and
+  `metadata/multiplayer_interface_followup.evidence.json`; Release build and
+  `git diff --check` passed; no tests were run.
+
 - **2026-10-24:** Extended `plan_main_menu_screen` through the full-screen
   `0x472B30` interaction path: centered coordinates, controller allocation and
   its 16-slot registry/panic gate, controller initialization/resource load,
