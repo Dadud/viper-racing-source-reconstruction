@@ -230,6 +230,12 @@ if(BUILD_TESTING)
         viper_race_progression)
     add_test(NAME race_progression_regression
         COMMAND viper_race_progression_regression)
+    add_executable(viper_physics_task_stream_regression
+        tests/physics_task_stream_regression.cpp)
+    target_link_libraries(viper_physics_task_stream_regression PRIVATE
+        viper_physics_scheduler)
+    add_test(NAME physics_task_stream_regression
+        COMMAND viper_physics_task_stream_regression)
     add_executable(viper_game_options_regression tests/game_options_regression.cpp)
     target_link_libraries(viper_game_options_regression PRIVATE viper_frontend_model)
     add_test(NAME game_options_regression COMMAND viper_game_options_regression)

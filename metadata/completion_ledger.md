@@ -222,6 +222,17 @@ gap; do not infer runtime support from static analysis or file presence.
   cross-selection loop, option persistence, and native menu parity remain
   unverified. See `metadata/runtime_frontend.md`.
 
+- **2026-10-24, physics-task serialized cursor map:** Recovered the complete
+  `0x4209E0` tag-to-advance table from the shipped binary and confirmed that
+  `0x425420` initializes its cursor to zero before `0x45C630` loads world
+  records. Added a bounded offset planner and regression for all ten table
+  entries, mixed ordered records, unknown tags, and overflow. Release build
+  and all 50 configured CTest cases pass with external data. This supplies
+  cursor semantics but not the actual scene emission sequence; live vehicle
+  motion is still route-driven and no original gameplay comparison exists.
+  The original startup capture remains a graphics initialization failure, not
+  a gameplay reference.
+
 ## Ownership and CI boundary
 
 Assign one owner per subsystem or ledger row at a time; coordinate interfaces
