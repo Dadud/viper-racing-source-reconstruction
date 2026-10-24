@@ -1512,6 +1512,25 @@ struct WindowState {
             player_task_record_frame.reset();
             return false;
         }
+        const auto decoded_task_stream = viper::read_physics_task_record_stream(
+            player_task_record_frame->bytes);
+        if (decoded_task_stream.status !=
+                viper::PhysicsTaskRecordStreamReadStatus::complete ||
+            decoded_task_stream.records.size() != 1U ||
+            decoded_task_stream.records[0].record_tag != 0x50434152U ||
+            decoded_task_stream.records[0].cursor_offset != *serialized_stream_offset ||
+            decoded_task_stream.records[0].record_size != player_runtime_car_record.size() ||
+            decoded_task_stream.records[0].record_bytes_offset >
+                player_task_record_frame->bytes.size() ||
+            player_runtime_car_record.size() > player_task_record_frame->bytes.size() -
+                decoded_task_stream.records[0].record_bytes_offset ||
+            !std::equal(player_runtime_car_record.begin(), player_runtime_car_record.end(),
+                player_task_record_frame->bytes.begin() + static_cast<std::ptrdiff_t>(
+                    decoded_task_stream.records[0].record_bytes_offset))) {
+            player_runtime_car_record.clear();
+            player_task_record_frame.reset();
+            return false;
+        }
         const auto body_observation =
             viper::make_ncar_body_constructor_observation_from_runtime_record(
                 player_runtime_car_record, serialized_stream_offset,
