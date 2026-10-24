@@ -1473,6 +1473,24 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
     }
 
     plan.animation_helpers_called = true;
+    plan.timer_threshold_10_selected =
+        static_cast<long double>(observation.timer_threshold_0xf0c)
+            - static_cast<long double>(observation.timer_baseline_0xfcc)
+            >= 10.0L;
+    plan.object_writes.push_back({0x4f8U,
+        plan.timer_threshold_10_selected ? 1U : 0U});
+
+    const auto speed_word_as_signed = std::bit_cast<std::int32_t>(
+        observation.speed_threshold_word_0xf10);
+    plan.speed_or_driver_gate_selected = speed_word_as_signed < 0x42055555
+        || observation.selected_driver_flag != 0U;
+    for (std::uint32_t index = 0U; index < 4U; ++index) {
+        plan.object_writes.push_back({0x6b0U + index * 0x1a4U,
+            plan.speed_or_driver_gate_selected ? 1U : 0U});
+    }
+    for (std::uint32_t index = 0U; index < 4U; ++index) {
+        plan.object_writes.push_back({0x6b8U + index * 0x1a4U, 2U});
+    }
     plan.object_writes.push_back({0x534U, 1U});
     plan.final_setup_helper_0x428790_called = true;
     return plan;

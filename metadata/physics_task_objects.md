@@ -504,9 +504,14 @@ When model data is present, the constructor allocates `descriptor_count *
 fails; a positive descriptor count then exposes the null-buffer fault. The
 helper's per-descriptor writes are modeled below. It then allocates
 `runtime_entry_count * 8` bytes at `+0x1048` and calls `0x42BB60` once per
-entry when the allocation succeeds. The three animation helpers, `+0x534`
-flag, and `0x428790` setup call are included. Evidence:
+entry when the allocation succeeds. The final setters compute `+0x4F8` from
+`+0xF0C - +0xFCC >= 10`, fill four `+0x6B0`-family slots from the signed
+`+0xF10` threshold or selected-driver byte, and set four `+0x6B8`-family slots
+to 2 with stride `0x1A4`. The constructor then sets `+0x534` and calls
+`0x428790`. Evidence:
 `ev_becb0bf54909e1ef5b2a86dfd6fd63e34803446f8fdf780106218d38455f3971`.
+The setter bodies and their stride helpers are directly analyzed in
+`ev_7f2a7638cef433bcdbf414083f784135b5b01cd65d2b69716ca37eb6939c7e6e`.
 
 The `0x429440` helper is now expanded through `0x429010` and `0x429510`:
 each 0x18-byte descriptor clears its first two fields, either copies a pair

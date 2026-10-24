@@ -723,6 +723,9 @@ struct PhysicsAcarTaskConstructorObservation {
     std::uint32_t profile_slot_index{};
     std::uint32_t selected_profile_word{};
     std::uint8_t selected_driver_flag{};
+    float timer_threshold_0xf0c{};
+    float timer_baseline_0xfcc{};
+    std::uint32_t speed_threshold_word_0xf10{};
     bool profile_name_matches{};
     bool model_data_present{};
     std::uint32_t model_descriptor_count{};
@@ -762,6 +765,8 @@ struct PhysicsAcarTaskConstructorPlan {
     bool model_helper_input_capture_incomplete{};
     bool runtime_entry_allocation_attempted{};
     bool animation_helpers_called{};
+    bool timer_threshold_10_selected{};
+    bool speed_or_driver_gate_selected{};
     bool final_setup_helper_0x428790_called{};
 };
 
