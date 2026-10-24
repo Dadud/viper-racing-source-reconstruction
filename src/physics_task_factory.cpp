@@ -1456,6 +1456,117 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
     return plan;
 }
 
+PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
+    const PhysicsAcarRuntimeInitializationObservation& observation)
+{
+    PhysicsAcarRuntimeInitializationPlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+    const auto write = [&plan](const std::uint32_t offset,
+                               const std::uint32_t value) {
+        plan.object_writes.push_back({offset, value});
+    };
+    const auto write_float = [&write](const std::uint32_t offset,
+                                      const float value) {
+        write(offset, std::bit_cast<std::uint32_t>(value));
+    };
+
+    write(0x107cU, 0xc2c80000U);
+    write(0xfe0U, 0U);
+    write(0x1070U, 0U);
+    const auto config_value = static_cast<float>(
+        static_cast<long double>(observation.selected_config_value_0x00)
+        + static_cast<long double>(observation.selected_config_value_0x04)
+            * static_cast<long double>(observation.car_index_0x510));
+    write_float(0x1078U, config_value);
+    const auto index_bits = static_cast<std::uint32_t>(
+        observation.car_index_0x510);
+    const auto shared_state = observation.shared_state_array_base
+        + index_bits * 0x74U + 0x78U;
+    write(0x1020U, 0U);
+    write(0x1038U, shared_state);
+    write(0x1034U, 0U);
+    write(0x1040U, 0U);
+    write(0x1024U, 0U);
+    write(0x103cU, 0x3f800000U);
+    write(0x1028U, observation.profile_value_0x98);
+    write(0x102cU, observation.profile_value_0xa4);
+
+    const bool have_last_descriptor_data =
+        observation.linked_object_value_0x18.has_value()
+        && observation.last_model_node_value_0x18.has_value()
+        && observation.last_model_node_value_0x20.has_value()
+        && observation.last_model_node_value_0x38.has_value();
+    std::uint32_t selected_profile_value = observation.profile_value_0x98;
+    if (have_last_descriptor_data) {
+        const auto denominator =
+            static_cast<long double>(*observation.linked_object_value_0x18)
+            + static_cast<long double>(
+                *observation.last_model_node_value_0x18) * 0.5L;
+        const auto ratio = divide_with_vc98_fdiv_compatibility(
+            static_cast<long double>(*observation.last_model_node_value_0x20),
+            denominator, observation.fdiv_compatibility_enabled);
+        const auto threshold = static_cast<float>(
+            ratio + static_cast<long double>(
+                *observation.last_model_node_value_0x38));
+        plan.derived_threshold_0x1044 = threshold;
+        write_float(0x1044U, threshold);
+        // The original uses a raw unsigned bit threshold to decide whether
+        // to replace profile +0x98 with the calculated limit.
+        plan.derived_value_selected = observation.profile_value_0x98
+            > 0x80000000U;
+        if (plan.derived_value_selected) {
+            selected_profile_value = std::bit_cast<std::uint32_t>(threshold);
+            write(0x1028U, selected_profile_value);
+        }
+        const auto normalized = divide_with_vc98_fdiv_compatibility(
+            static_cast<long double>(std::bit_cast<float>(selected_profile_value)),
+            static_cast<long double>(threshold),
+            observation.fdiv_compatibility_enabled);
+        plan.normalized_value_0x1030 = static_cast<float>(normalized);
+        write_float(0x1030U, *plan.normalized_value_0x1030);
+    } else {
+        plan.derived_value_inputs_missing = true;
+    }
+
+    write(0xfd4U, 0U);
+    write(0xf00U, 0U);
+    write(0xfd0U, 0xc47a0000U);
+    write(0xfc0U, 0xc47a0000U);
+    if (observation.timer_value_0xfb8.has_value()) {
+        write(0xfb8U, *observation.timer_value_0xfb8);
+    }
+    write(0xfc8U, 0xc47a0000U);
+    write(0xfbcU, 0U);
+    write(0xfc4U, 0xc47a0000U);
+    write(0xf38U, 0U);
+    write(0x1050U, 0U);
+    write(0xf48U, 0U);
+    write(0x1069U, 0U);
+    write(0xfe4U, 0xc2c80000U);
+    write(0xf4cU, 0U);
+    write(0xef0U, 0U);
+    write(0xf34U, 0U);
+
+    if (observation.runtime_entry_count > 0U
+        && !observation.runtime_entry_buffer_available) {
+        plan.runtime_entry_clear_fault = true;
+    } else if (observation.runtime_entry_buffer_address.has_value()) {
+        for (std::uint32_t index = 0U;
+             index < observation.runtime_entry_count; ++index) {
+            plan.runtime_entry_writes.push_back({
+                *observation.runtime_entry_buffer_address + index * 8U, 0U});
+        }
+        plan.cleared_runtime_entries = observation.runtime_entry_count;
+    } else if (observation.runtime_entry_buffer_available) {
+        // The initialized entries are known to be cleared even though their
+        // captured base address is unavailable.
+        plan.cleared_runtime_entries = observation.runtime_entry_count;
+    }
+    plan.final_helper_0x428590_called = !plan.runtime_entry_clear_fault;
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {

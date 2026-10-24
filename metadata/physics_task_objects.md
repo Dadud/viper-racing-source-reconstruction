@@ -515,3 +515,14 @@ observed clamp/scale helper, and stores the node pointer. Node links, blend
 pairs, and allocation outcomes remain explicit observations; truncated input
 is reported instead of being filled with invented zeros. Evidence for these
 helpers and the selection gates: `ev_921603fb8c35029f239b604139468c416af59e42234608c9cf737abd33242e2e`.
+
+`plan_physics_acar_runtime_initialization` expands the constructor's
+`0x428790` follow-up. It projects the selected configuration and profile words,
+shared-state pointer calculation, timer observation, fixed state constants,
+and the descriptor-derived threshold (`+0x1044`) and normalized value
+(`+0x1030`) when their source fields are captured. The raw-bit gate deciding
+whether the derived threshold replaces profile `+0x98` is preserved. It also
+records `0x429690`, the model-object helper, and `0x428590` call order, and
+clears one DWORD per eight-byte runtime entry. Missing descriptor inputs stay
+unknown; a null runtime-entry buffer with a positive count is reported as the
+native clear-loop fault. Evidence: `ev_e59da5bb7d388e42e9580e51de21b72b204617a3d813fa9aadea6a314ba39804`.

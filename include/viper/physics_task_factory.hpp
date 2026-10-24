@@ -769,6 +769,44 @@ struct PhysicsAcarTaskConstructorPlan {
 plan_physics_acar_task_constructor(
     const PhysicsAcarTaskConstructorObservation& observation);
 
+struct PhysicsAcarRuntimeInitializationObservation {
+    std::int32_t car_index_0x510{};
+    std::uint32_t shared_state_array_base{};
+    float selected_config_value_0x00{};
+    float selected_config_value_0x04{};
+    std::uint32_t profile_value_0x98{};
+    std::uint32_t profile_value_0xa4{};
+    std::optional<std::uint32_t> timer_value_0xfb8;
+    std::optional<float> linked_object_value_0x18;
+    std::optional<float> last_model_node_value_0x18;
+    std::optional<float> last_model_node_value_0x20;
+    std::optional<float> last_model_node_value_0x38;
+    std::uint32_t runtime_entry_count{};
+    bool runtime_entry_buffer_available{};
+    std::optional<std::uint32_t> runtime_entry_buffer_address;
+    bool fdiv_compatibility_enabled{};
+};
+
+struct PhysicsAcarRuntimeInitializationPlan {
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::vector<PhysicsTaskPointerWrite> runtime_entry_writes;
+    std::optional<float> derived_threshold_0x1044;
+    std::optional<float> normalized_value_0x1030;
+    std::uint32_t cleared_runtime_entries{};
+    bool derived_value_selected{};
+    bool derived_value_inputs_missing{};
+    bool fdiv_compatibility_path_used{};
+    bool derived_calculation_0x429690_called{true};
+    bool model_object_helper_0x41d1d0_called{true};
+    bool runtime_entry_clear_fault{};
+    bool final_helper_0x428590_called{};
+};
+
+// Projects the ACAR follow-up initializer at 0x428790 from captured inputs.
+[[nodiscard]] PhysicsAcarRuntimeInitializationPlan
+plan_physics_acar_runtime_initialization(
+    const PhysicsAcarRuntimeInitializationObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};
