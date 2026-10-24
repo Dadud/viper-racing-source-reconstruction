@@ -38,6 +38,7 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-stamp BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-image BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --inspect-text-table BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-terrain BUNDLE_PATH\n"
            << "       viper_reconstruction --inspect-language LNG_PATH [KEY]\n"
            << "       viper_reconstruction --help | --version\n\n"
@@ -408,6 +409,34 @@ int inspect_stamp_image(const std::filesystem::path& path,
         : 2;
 }
 
+int inspect_text_table(const std::filesystem::path& path,
+                       const std::string_view resource_name)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto payload = bundle.find_payload(
+        resource_name, viper::TrackObjectTextTable::bats_resource_type_code);
+    if (!payload) {
+        throw std::runtime_error("STAB text-table resource not found: " +
+                                 std::string(resource_name));
+    }
+    const auto table = viper::parse_track_object_text_table(*payload);
+    if (!table) {
+        throw std::runtime_error("STAB text-table payload is invalid: " +
+                                 std::string(resource_name));
+    }
+    std::cout << "line_count\t" << table->line_count << '\n'
+              << "line_stride\t" << table->line_stride << '\n';
+    for (std::size_t row = 0; row < table->line_count; ++row) {
+        std::cout << "row_" << row;
+        for (std::size_t column = 0; column < table->line_offsets.size(); ++column) {
+            const auto text = viper::track_object_text_line(*table, row, column);
+            std::cout << '\t' << (text ? *text : std::string_view{});
+        }
+        std::cout << '\n';
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -423,6 +452,7 @@ int main(int argc, char** argv)
         std::optional<std::string> stamp_resource_name;
         std::optional<std::string> stamp_image_resource_name;
         std::optional<std::string> font_resource_name;
+        std::optional<std::string> text_table_resource_name;
         std::optional<std::string> car_stem;
         bool inspect_track_terrain = false;
 
@@ -503,6 +533,15 @@ int main(int argc, char** argv)
                 font_resource_name = argv[++i];
                 continue;
             }
+            if (argument == "--inspect-text-table") {
+                if (i + 2 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-text-table requires a bundle path and resource name");
+                }
+                resource_bundle_path = argv[++i];
+                text_table_resource_name = argv[++i];
+                continue;
+            }
             if (argument == "--inspect-car") {
                 if (i + 2 >= argc) {
                     throw std::invalid_argument(
@@ -553,6 +592,7 @@ int main(int argc, char** argv)
                 static_cast<unsigned>(stamp_resource_name.has_value()) +
                 static_cast<unsigned>(stamp_image_resource_name.has_value()) +
                 static_cast<unsigned>(font_resource_name.has_value()) +
+                static_cast<unsigned>(text_table_resource_name.has_value()) +
                 static_cast<unsigned>(car_stem.has_value()) +
                 static_cast<unsigned>(inspect_track_terrain);
             if (inspection_count > 1U) {
@@ -574,6 +614,10 @@ int main(int argc, char** argv)
             }
             if (font_resource_name) {
                 return inspect_font(*resource_bundle_path, *font_resource_name);
+            }
+            if (text_table_resource_name) {
+                return inspect_text_table(*resource_bundle_path,
+                    *text_table_resource_name);
             }
             if (car_stem) {
                 return inspect_car(*resource_bundle_path, *car_stem);

@@ -193,18 +193,56 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
     return assets;
 }
 
-template <std::size_t N>
-std::string configured_stem(const viper::GameOptions& options,
-                            const std::string_view key,
-                            const std::array<std::string_view, N>& stems,
-                            const std::string_view fallback)
+std::string configured_track_stem(const std::filesystem::path& data_dir,
+                                  const viper::GameOptions& options)
 {
-    const auto index = options.integer("GLOBAL", key);
-    if (!index) return std::string(fallback);
-    if (*index < 0 || static_cast<std::size_t>(*index) >= stems.size())
-        throw std::runtime_error("options.def [GLOBAL] " + std::string(key) +
-            " index is outside the shipped asset range");
-    return std::string(stems[static_cast<std::size_t>(*index)]);
+    const auto common = viper::ResourceBundle::open(data_dir / "common.res");
+    constexpr auto stab_type = viper::TrackObjectTextTable::bats_resource_type_code;
+    const auto payload = common.find_payload("tracks.tab", stab_type);
+    if (!payload) throw std::runtime_error("common.res tracks.tab is missing");
+    const auto table = viper::parse_track_object_text_table(*payload);
+    if (!table) throw std::runtime_error("common.res tracks.tab is invalid");
+
+    auto index = options.integer("GLOBAL", "track_no").value_or(0);
+    // The original selector resets only past-end values. -1 selects its empty
+    // row, which cannot be represented as a track bundle by this runtime.
+    if (index < 0)
+        throw std::runtime_error("options.def track_no selects an empty track entry");
+    if (static_cast<std::size_t>(index) >= table->line_count) index = 0;
+    const auto stem = viper::track_object_text_line(
+        *table, static_cast<std::size_t>(index), 0);
+    if (!stem || stem->empty())
+        throw std::runtime_error("tracks.tab selected an empty track name");
+    if (*stem == "random")
+        throw std::runtime_error(
+            "options.def selects the random track; random track setup is not implemented");
+    return std::string(*stem);
+}
+
+std::string configured_car_stem(const std::filesystem::path& data_dir,
+                                const viper::GameOptions& options)
+{
+    const auto wildcard = (data_dir / L"*.car").wstring();
+    WIN32_FIND_DATAW file{};
+    const HANDLE search = FindFirstFileW(wildcard.c_str(), &file);
+    if (search == INVALID_HANDLE_VALUE)
+        throw std::runtime_error("no .car bundles found under " + data_dir.string());
+    struct SearchHandle {
+        HANDLE value;
+        ~SearchHandle() { if (value != INVALID_HANDLE_VALUE) FindClose(value); }
+    } close_search{search};
+
+    std::vector<std::string> stems;
+    do {
+        stems.push_back(std::filesystem::path(file.cFileName).stem().string());
+    } while (FindNextFileW(search, &file));
+    auto index = options.integer("GLOBAL", "car_no").value_or(0);
+    // The original constructor resets a selector at or above the enumerated
+    // car count to zero. The enumeration order is the native *.car order.
+    if (index < 0)
+        throw std::runtime_error("options.def car_no selects an empty car entry");
+    if (static_cast<std::size_t>(index) >= stems.size()) index = 0;
+    return stems[static_cast<std::size_t>(index)];
 }
 
 class D3DWindow {
@@ -677,11 +715,12 @@ int wmain(int argc, wchar_t** argv)
         std::error_code config_error;
         if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
             configured_options = viper::GameOptions::load(config_path);
-        // The observed options.def values are numeric, but the original game's
-        // index-to-resource tables have not yet been reconstructed. Do not
-        // treat those values as indices into an alphabetical asset list.
-        const auto track = options.track.value_or("bemidji");
-        const auto car = options.car.value_or("viper");
+        const auto track = options.track
+            ? *options.track
+            : configured_track_stem(options.data_dir, configured_options);
+        const auto car = options.car
+            ? *options.car
+            : configured_car_stem(options.data_dir, configured_options);
         auto assets = load_assets(options.data_dir, track, car,
             std::move(configured_options));
         if (options.validate_assets) return 0;

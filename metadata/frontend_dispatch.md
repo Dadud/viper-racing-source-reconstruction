@@ -108,6 +108,52 @@ interaction and controller evidence is
 `ev_1ba503e7babb22fe99218dbf3d4230add731cba3e680260a7aea0fabaa654d98`, and
 `ev_9636d6bd73bf3c05920380d82ba0c6c94dc4b92b44b93c005de8502505c6c242`.
 
+### Saved track and car selector indices
+
+The runtime now resolves the saved `[GLOBAL] track_no` through the original
+`common.res` `tracks.tab` resource instead of assuming an alphabetical list.
+Selector construction at `0x4947E0` reads `GLOBAL/track_no`, compares it with
+the `0x406590` track count, resets a past-end value to zero, then passes the
+index to `0x494B30`. Negative values are not clamped; `-1` selects the
+`emptytrk.stp` label and is rejected by the bundle-only runtime. That helper
+stores the index and resolves the track name through `0x4065A0`, which reads
+column 0 of the STAB table. The
+shipped installation's `tracks.tab` rows are `dundas`, `kenyon`, `uptown`,
+`nfield`, `hastings`, `heaven`, `limbo`, `bemidji`, `random`, and `hell`; the
+user's saved value 7 therefore resolves to Bemidji. Row 8 is the game's
+`random` selector and is currently reported unsupported by the runtime; row 9
+resolves to `hell`, which is absent from the local shipped track-file
+inventory. This row list was inspected from the separately supplied
+`GameData/common.res`; the original bundle is not checked into this repository.
+
+The car selector has different semantics. `0x4959D0` reads
+`GLOBAL/car_no`, obtains the count through the constructor-supplied callback,
+and resets an index greater than or equal to the count to zero. The callback
+leaves negative indices as empty selector states, which the runtime rejects.
+The callback at `0x406420` allocates its list, enumerates `*.car` with the native file
+enumeration helpers, strips each extension, and stores stems in that order;
+`0x4066A0` returns a row and `0x4066B0` returns the count. The runtime mirrors
+this with `FindFirstFileW`/`FindNextFileW` against the supplied data directory,
+so car indices follow that installation's enumeration order rather than a
+fixed source list. On the current installation, `car_no 0` selects
+`exotic.car`.
+
+`src/main.cpp --inspect-text-table BUNDLE RESOURCE` exposes the 16 columns of
+an STAB payload for review. `track_table_regression` covers row extraction,
+stride bounds, and invalid nonempty zero-stride tables. The `viper_game`
+runtime resolves these selector indices before loading the selected bundles;
+explicit `--track` and `--car` values still take precedence. Evidence for
+`0x4947E0`, `0x494B30`, `0x406420`, `0x4065A0`, `0x4066A0`, `0x4066B0`, and
+`0x4959D0` was captured from the shipped `race.bin` (SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`).
+Evidence IDs: `0x4947E0` `ev_9312ffc6b420dc28c9da2a6ddd7fec4dda2c110bc1f2025969354a9ef54cbce0`;
+`0x494B30` `ev_1269a0e224c7747d833aa51691e72e012a2091943cfebc27b42028a133ffab21`;
+`0x406420` `ev_8a0ef52531547af34343eb0df69fee2bfb441a0d7f6fcbe114e6810cc15af03`;
+`0x4065A0` `ev_77227951b779b22ad91eb1e6f6d465d3ecc3e08e3284c883f35570cbde4fd3a2`;
+`0x4066A0` `ev_ab247ca19dfa1dec334f9e92eea5023628432be61a30a1502c7c4474a715be13`;
+`0x4066B0` `ev_f1294afaf79d012c54a134ef1fd430d3cfdeba2741aec231748203e103fbaacf`;
+`0x4959D0` `ev_db6fcb576d845c42d841520e9ad33f2b14a66f7cf9f7b822b17bcce1923d6935`.
+
 ### Replay screen (`0x406950`)
 
 `plan_replay_screen` projects the replay handler's record-presence branches,
