@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -19,6 +20,8 @@ enum class SceneRendererDispatchActionKind : std::uint8_t {
     profiling_begin,
     graphics_state_begin,
     viewport_set,
+    device_viewport_set,
+    device_zbuffer_clear,
     view_transform_set,
     transform_cache_invalidate,
     device_transform_state_dispatch,
@@ -37,10 +40,23 @@ struct SceneRendererDispatchAction {
     std::uint32_t address{};
     std::size_t object_index{};
     std::uint32_t virtual_slot{};
-    std::array<std::int32_t, 5> integer_arguments{};
+    std::array<std::int32_t, 6> integer_arguments{};
     std::array<float, 12> transform{};
     std::array<float, 16> matrix_4x4{};
     std::string label;
+    std::int32_t result_value{};
+    std::array<std::uint32_t, 11> viewport_record{};
+};
+
+struct SceneRendererViewportProjection {
+    std::int32_t x{};
+    std::int32_t y{};
+    std::int32_t width{};
+    std::int32_t height{};
+    std::int32_t center_x{};
+    std::int32_t center_y{};
+    std::array<std::uint32_t, 11> device_record{};
+    bool adjusted_division_observation_missing{};
 };
 
 enum class SceneRendererDispatchStatus : std::uint8_t {
@@ -62,6 +78,10 @@ struct SceneRendererDispatchInput {
     std::array<std::int32_t, 8> view_transform_cache_reference_counts{};
     std::array<std::uint32_t, 8> view_transform_cache_flags{};
     std::array<std::int32_t, 2> view_transform_hresult{}; // transformed camera, restore
+    bool use_adjusted_division{}; // DAT_004E9754
+    std::array<std::optional<float>, 2> adjusted_viewport_aspect_ratios{};
+    std::array<std::int32_t, 2> viewport_hresult{}; // inset viewport, full-window restore
+    std::array<std::int32_t, 2> zbuffer_clear_hresult{};
 };
 
 struct SceneRendererDispatchPlan {
@@ -75,6 +95,11 @@ struct SceneRendererDispatchPlan {
     std::array<std::array<float, 16>, 2> installed_view_matrices{};
     std::size_t view_matrices_installed{};
     std::size_t view_transform_error_reports{};
+    std::array<SceneRendererViewportProjection, 2> viewport_projections{};
+    std::size_t viewport_calls{};
+    std::size_t zbuffer_clear_calls{};
+    std::size_t viewport_error_reports{};
+    std::size_t zbuffer_clear_error_reports{};
     std::size_t objects_processed{};
     std::size_t object_draw_callbacks{};
     std::vector<SceneRendererDispatchAction> actions;

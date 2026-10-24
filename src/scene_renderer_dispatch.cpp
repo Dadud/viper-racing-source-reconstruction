@@ -1,7 +1,9 @@
 #include "viper/scene_renderer_dispatch.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
+#include <utility>
 
 namespace viper {
 namespace {
@@ -51,6 +53,17 @@ std::array<float, 16> make_device_view_matrix(
     };
 }
 
+std::int32_t wrap_add_i32(const std::int32_t left, const std::int32_t right) noexcept
+{
+    return std::bit_cast<std::int32_t>(
+        static_cast<std::uint32_t>(left) + static_cast<std::uint32_t>(right));
+}
+
+std::uint32_t float_bits(const float value) noexcept
+{
+    return std::bit_cast<std::uint32_t>(value);
+}
+
 } // namespace
 
 SceneRendererDispatchPlan plan_scene_renderer_dispatch(
@@ -61,6 +74,90 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
     result.view_transform_cache_reference_counts_after =
         input.view_transform_cache_reference_counts;
     result.view_transform_cache_flags_after = input.view_transform_cache_flags;
+
+    const auto append_viewport = [&](const std::int32_t x, const std::int32_t y,
+                                     const std::int32_t width, const std::int32_t height,
+                                     const bool caller_flag, const std::size_t index) {
+        auto& projection = result.viewport_projections[index];
+        projection.x = x;
+        projection.y = y;
+        projection.width = width;
+        projection.height = height;
+        projection.center_x = wrap_add_i32(x, width / 2);
+        projection.center_y = wrap_add_i32(y, height / 2);
+
+        float aspect_ratio{};
+        if (input.use_adjusted_division && input.adjusted_viewport_aspect_ratios[index]) {
+            aspect_ratio = *input.adjusted_viewport_aspect_ratios[index];
+        } else {
+            aspect_ratio = static_cast<float>(static_cast<double>(height)
+                / static_cast<double>(width));
+            projection.adjusted_division_observation_missing =
+                input.use_adjusted_division
+                && !input.adjusted_viewport_aspect_ratios[index].has_value();
+        }
+        projection.device_record = {
+            0x2cU,
+            static_cast<std::uint32_t>(x),
+            static_cast<std::uint32_t>(y),
+            static_cast<std::uint32_t>(width),
+            static_cast<std::uint32_t>(height),
+            float_bits(-1.0F),
+            float_bits(aspect_ratio),
+            float_bits(2.0F),
+            float_bits(0.0F),
+            float_bits(static_cast<float>(static_cast<double>(aspect_ratio) * 2.0)),
+            float_bits(1.0F),
+        };
+
+        SceneRendererDispatchAction viewport_wrapper{};
+        viewport_wrapper.kind = SceneRendererDispatchActionKind::viewport_set;
+        viewport_wrapper.address = 0x004487A0U;
+        viewport_wrapper.integer_arguments = {
+            x, y, width, height, caller_flag ? 1 : 0};
+        result.actions.push_back(std::move(viewport_wrapper));
+
+        const auto viewport_result = input.viewport_hresult[index];
+        SceneRendererDispatchAction set_viewport{};
+        set_viewport.kind = SceneRendererDispatchActionKind::device_viewport_set;
+        set_viewport.address = 0x00458740U;
+        set_viewport.integer_arguments = {x, y, width, height, 0};
+        set_viewport.result_value = viewport_result;
+        set_viewport.viewport_record = projection.device_record;
+        result.actions.push_back(std::move(set_viewport));
+        ++result.viewport_calls;
+        if (viewport_result != 0) {
+            SceneRendererDispatchAction error{};
+            error.kind = SceneRendererDispatchActionKind::device_error_report;
+            error.address = 0x00452770U;
+            error.integer_arguments[0] = viewport_result;
+            error.label = "set_viewport";
+            result.actions.push_back(std::move(error));
+            ++result.viewport_error_reports;
+        }
+
+        const auto clear_result = input.zbuffer_clear_hresult[index];
+        const auto right = wrap_add_i32(x, width);
+        const auto bottom = wrap_add_i32(y, height);
+        SceneRendererDispatchAction clear{};
+        clear.kind = SceneRendererDispatchActionKind::device_zbuffer_clear;
+        clear.address = 0x00458800U;
+        clear.integer_arguments = {
+            1, caller_flag ? 3 : 2, x, y, right, bottom};
+        clear.result_value = clear_result;
+        result.actions.push_back(std::move(clear));
+        ++result.zbuffer_clear_calls;
+        if (clear_result != 0) {
+            SceneRendererDispatchAction error{};
+            error.kind = SceneRendererDispatchActionKind::device_error_report;
+            error.address = 0x00452770U;
+            error.integer_arguments[0] = clear_result;
+            error.label = "clearing_zbuffer";
+            result.actions.push_back(std::move(error));
+            ++result.zbuffer_clear_error_reports;
+        }
+    };
+
     result.actions.push_back({SceneRendererDispatchActionKind::profiling_begin,
         0x00415090U, 0U, 0U,
         {static_cast<std::int32_t>(input.profiling_context), 0, 0, 0, 0}, {}});
@@ -72,9 +169,8 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
             0x00448450U});
         result.actions.push_back({SceneRendererDispatchActionKind::graphics_state_begin,
             0x00448440U});
-        result.actions.push_back({SceneRendererDispatchActionKind::viewport_set,
-            0x004487A0U, 0U, 0U,
-            {static_cast<std::int32_t>(input.setup_viewport_origin), 0x40, 0x80, 0x20, 1}, {}});
+        append_viewport(static_cast<std::int32_t>(input.setup_viewport_origin),
+            0x40, 0x80, 0x20, true, 0U);
 
         const auto view_transform = make_scene_view_transform(input.camera_transform);
         result.camera_transform_after = view_transform;
@@ -151,9 +247,7 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                 0x00448940U, 0U, 0U, {}, input.camera_transform});
             append_transform_install(input.camera_transform, input.view_transform_hresult[1]);
             result.camera_transform_after = input.camera_transform;
-            result.actions.push_back({SceneRendererDispatchActionKind::viewport_restore,
-                0x004487A0U, 0U, 0U,
-                {0, 0, input.screen_width, input.screen_height, 0}, {}});
+            append_viewport(0, 0, input.screen_width, input.screen_height, false, 1U);
         }
     }
 

@@ -460,6 +460,25 @@ device setter `0x458C20`
 and error logger `0x452770`
 (`ev_ce89dcbcb43d460ff14a562e8771dd78dd13d069bc274061800da0423b1d44e8`).
 
+The viewport wrapper `0x4487A0` is also expanded through its device calls.
+It stores `(x,y,width,height)` and center coordinates, then `0x452100` builds
+the observed 0x2C-byte viewport record and invokes device vtable `+0x44` via
+`0x458740`. The record preserves the binary's exact scalar slots; the aspect
+ratio uses `height / width`, with an optional supplied adjusted-FDIV result
+when `DAT_004E9754` selects that path. Without that observation the model marks
+the ratio as approximate. A failed viewport HRESULT logs `set_viewport`, but
+does not suppress the following clear call. `0x4522C0` then reaches device
+vtable `+0x30` through `0x458800` with one rectangle `(x,y,x+width,y+height)`:
+flags 3 on the inset viewport call and flags 2 on the full-window restore. A
+failed clear HRESULT logs `clearing_zbuffer`. The renderer
+plan records both the inset operation and restore, including separate HRESULT
+observations. Evidence: `0x4485D0`
+(`ev_5d22efbec104b4cf539dd13ad87d0559015dec8c0d6d06e35d51a8fb7dd4481a`),
+`0x452100` (`ev_b0be56d103c74e299a5c35a0e67c724d582784558fbd9d0bd87a85cf39e3ef95`),
+`0x458740` (`ev_5ccbd1fe9dd998cbb0f6c2fd24e3b39b848c08f432524436a3d371c0a071e7ac`),
+`0x4522C0` (`ev_c6c2785f5b203480d375f127aa69ef5d84e8ebf88971bdee0963621a08069451`),
+and `0x458800` (`ev_3d45267f1ff70581eb74195da73598239192f2df640d12d185c9698c90d9720a`).
+
 ## Portable model
 
 `include/viper/scene_car_update.hpp` and `src/scene_car_update.cpp` encode the

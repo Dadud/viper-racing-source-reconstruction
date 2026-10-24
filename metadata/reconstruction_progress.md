@@ -6,6 +6,9 @@
   update, and per-object `+0x10`/`+0x0C`/`+0x14` virtual dispatch conditions.
   Followed `0x448940` into its 4x4 view-matrix construction, eight-slot
   transform-cache invalidation, device vtable `+0x68` call, and error logger.
+  Expanded `0x4487A0` through its `+0x44` viewport call and `+0x30` buffer
+  clearing, including the 0x2C viewport record, rect edges, raw flags, and error
+  messages. Adjusted-FDIV ratio output remains an explicit observation.
   Missing object observations and null pointers stop or bound the projection;
   other graphics API effects and virtual return bytes remain external. Evidence
   is retained in `scene_renderer_dispatch.evidence.json`.
