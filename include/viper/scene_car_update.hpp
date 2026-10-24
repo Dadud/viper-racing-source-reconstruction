@@ -809,6 +809,21 @@ struct SceneWheelResourceFrameOperation {
     bool device_return_ignored{};
     std::uint32_t texture_transform_state{};
     std::array<std::uint32_t, 16> texture_transform_matrix_words{};
+    std::optional<std::uint32_t> state_mask_before;
+    std::optional<std::uint32_t> state_mask_after;
+    std::optional<std::uint32_t> state_mask_index;
+    std::optional<bool> texture_stage_enabled_before;
+    std::optional<bool> texture_stage_enabled_after;
+    // Set when 0x457A20(&DAT_00509B30) follows a 0x100-byte toggle.
+    bool state_snapshot_refresh_called{};
+    // Value passed to 0x455A60 when the toggle changes; otherwise absent.
+    std::optional<bool> state_toggle_notification_value;
+};
+
+struct SceneWheelResourceStateMaskObservation {
+    std::uint32_t state_index_0x4da120{};
+    std::uint32_t mask_at_0x509f50_plus_stride{};
+    bool texture_stage_enabled_0x509b39{};
 };
 
 struct SceneWheelResourceFramePlan {
@@ -825,7 +840,8 @@ struct SceneWheelResourceFramePlan {
     bool frame_gate_0x45c380,
     const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations,
     const std::optional<SceneWheelTextureBindingObservation>& texture_binding = std::nullopt,
-    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync = std::nullopt);
+    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync = std::nullopt,
+    const std::optional<SceneWheelResourceStateMaskObservation>& state_mask = std::nullopt);
 
 struct SceneWheelResourceAllocation {
     bool allocated{};

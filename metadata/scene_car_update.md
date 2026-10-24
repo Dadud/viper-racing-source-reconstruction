@@ -559,3 +559,19 @@ and helper wrappers `0x457F60` (`ev_485553f29ebfa97a054cefff993c5424691dee51d2b1
 `0x458220` (`ev_1c498908c2a7db93192602dbed7f982a5a85ef3b4dd9895dbe05030ca297ac81`),
 and device wrapper `0x458BC0`
 (`ev_3f3f2bd8815c0b4e866d99d3d2664fe6e74bbada0fe5591eae3d2a6a67145519`).
+
+The wheel frame's state wrappers `0x4513A0` and `0x451610` now have an
+optional observed-state projection. Their selected mask is a 32-bit value at
+`0x509F50 + DAT_004DA120 * 8`; the frame ORs bit `8`, clears bit `0x100`,
+sets bit `0x100`, then clears bit `8`. The byte `DAT_00509B39` changes only
+when the `0x100` set/clear actually flips its value. Each such flip records the
+`0x455A60` notification and `0x457A20(&DAT_00509B30)` snapshot refresh. These
+per-step effects are omitted unless the caller supplies the selected index,
+mask, and initial enable byte. Evidence: setter `0x4513A0`
+(`ev_c778fdfe9dfec169127a6ad9f74440753041d5b3fcab2c6b450461659fad5459`),
+clearer `0x451610`
+(`ev_6b68320e67ef48b48d993a9fadaf1d58e2f40452146d5b3037fda98ce07acf8f`),
+state accessor `0x451890`
+(`ev_c14d1b186c5376e69547270091a5a6811b1c060256e82b36f0408650ee8dfc91`),
+and snapshot refresh `0x457A20`
+(`ev_c42837495c0f84efbfe27caca7ad1b880eec14ae75246e16742027b7ceb3ddc2`).

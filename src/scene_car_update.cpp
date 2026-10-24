@@ -1260,7 +1260,8 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     const bool frame_gate_0x45c380,
     const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations,
     const std::optional<SceneWheelTextureBindingObservation>& texture_binding,
-    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync)
+    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync,
+    const std::optional<SceneWheelResourceStateMaskObservation>& state_mask)
 {
     SceneWheelResourceFramePlan result{};
     if (!frame_gate_0x45c380) {
@@ -1277,8 +1278,35 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
         operation.argument = argument;
         result.operations.push_back(operation);
     };
-    append_call(SceneWheelResourceFrameOperationKind::call_0x513a0, 8U);
-    append_call(SceneWheelResourceFrameOperationKind::call_0x51610, 0x100U);
+    std::uint32_t current_state_mask = state_mask.has_value()
+        ? state_mask->mask_at_0x509f50_plus_stride : 0U;
+    bool texture_stage_enabled = state_mask.has_value()
+        ? state_mask->texture_stage_enabled_0x509b39 : false;
+    const auto append_mask_call = [&](const SceneWheelResourceFrameOperationKind kind,
+        const std::uint32_t argument) {
+        append_call(kind, argument);
+        if (!state_mask.has_value()) {
+            return;
+        }
+        auto& operation = result.operations.back();
+        operation.state_mask_index = state_mask->state_index_0x4da120;
+        operation.state_mask_before = current_state_mask;
+        operation.texture_stage_enabled_before = texture_stage_enabled;
+        current_state_mask = kind == SceneWheelResourceFrameOperationKind::call_0x513a0
+            ? current_state_mask | argument : current_state_mask & ~argument;
+        if (argument == 0x100U) {
+            const bool next_enabled = kind == SceneWheelResourceFrameOperationKind::call_0x513a0;
+            if (next_enabled != texture_stage_enabled) {
+                texture_stage_enabled = next_enabled;
+                operation.state_snapshot_refresh_called = true;
+                operation.state_toggle_notification_value = next_enabled;
+            }
+        }
+        operation.state_mask_after = current_state_mask;
+        operation.texture_stage_enabled_after = texture_stage_enabled;
+    };
+    append_mask_call(SceneWheelResourceFrameOperationKind::call_0x513a0, 8U);
+    append_mask_call(SceneWheelResourceFrameOperationKind::call_0x51610, 0x100U);
     append_call(SceneWheelResourceFrameOperationKind::bind_texture_0x448e30,
         std::bit_cast<std::uint32_t>(allocator.texture_handle_0x10));
     auto& texture_bind = result.operations.back();
@@ -1335,8 +1363,8 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     }
 
     append_call(SceneWheelResourceFrameOperationKind::end_batch_0x448ef0, 0U);
-    append_call(SceneWheelResourceFrameOperationKind::call_0x513a0, 0x100U);
-    append_call(SceneWheelResourceFrameOperationKind::call_0x51610, 8U);
+    append_mask_call(SceneWheelResourceFrameOperationKind::call_0x513a0, 0x100U);
+    append_mask_call(SceneWheelResourceFrameOperationKind::call_0x51610, 8U);
     return result;
 }
 
