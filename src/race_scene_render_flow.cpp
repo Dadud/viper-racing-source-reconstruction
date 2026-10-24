@@ -766,6 +766,86 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
             break;
         }
     }
+
+    // 0x4052D0 continues into 0x404970 after the dashboard and gear. Preserve
+    // the shared wrapper's branch order in the same mutation batch so that
+    // overlaps retain the later draw's value. Branches without a pixel
+    // projection remain explicit blockers instead of being silently skipped.
+    const auto& overlay = plan.shared_overlay;
+    const auto& paused = overlay.paused_banner.inner_render;
+    if (paused.reached) {
+        const auto& raster = plan.shared_paused_banner_frame_raster;
+        if (!raster.has_value() || !raster->reached || !raster->input_complete) {
+            complete = false;
+        } else {
+            for (const auto& write : raster->ordered_pixel_writes) {
+                if (write.offset_from_framebuffer_base < 0) {
+                    complete = false;
+                    break;
+                }
+                writes.push_back({
+                    static_cast<std::uint64_t>(
+                        write.offset_from_framebuffer_base),
+                    write.value, write.write_mask, write.bytes_per_pixel,
+                    write.preserves_existing_bits});
+            }
+        }
+    }
+    if (overlay.cheater_banner.draw.reached) {
+        complete = false; // No cheater-resource raster projection yet.
+    }
+    if (overlay.text_effects.predicate_0x4048e0.has_text_draw ||
+        overlay.text_effects.predicate_0x404900.has_text_draw) {
+        const auto& raster = plan.shared_text_effects_raster;
+        if (!plan.shared_text_effects_raster_reached ||
+            !raster.input_complete) {
+            complete = false;
+        } else {
+            for (const auto& write : raster.ordered_pixel_writes) {
+                if (write.offset_from_framebuffer_base < 0) {
+                    complete = false;
+                    break;
+                }
+                writes.push_back({
+                    static_cast<std::uint64_t>(
+                        write.offset_from_framebuffer_base),
+                    write.value, 0xffffffffU, write.bytes_per_pixel, false});
+            }
+        }
+    }
+    if (overlay.centered_resource.draw.reached) {
+        complete = false; // No centered-resource raster projection yet.
+    }
+    if (overlay.race_results.gates.race_results) {
+        if (!plan.shared_results_raster_reached ||
+            !plan.shared_results_heading_raster.input_complete ||
+            !plan.shared_results_rows_raster.input_complete) {
+            complete = false;
+        } else {
+            const auto append_text_writes = [&writes, &complete](
+                const auto& text_writes) {
+                for (const auto& write : text_writes) {
+                    if (write.offset_from_framebuffer_base < 0) {
+                        complete = false;
+                        break;
+                    }
+                    writes.push_back({
+                        static_cast<std::uint64_t>(
+                            write.offset_from_framebuffer_base),
+                        write.value, 0xffffffffU, write.bytes_per_pixel, false});
+                }
+            };
+            append_text_writes(
+                plan.shared_results_heading_raster.ordered_pixel_writes);
+            if (complete) {
+                append_text_writes(
+                    plan.shared_results_rows_raster.ordered_pixel_writes);
+            }
+        }
+    }
+    if (overlay.splash_loading.reached) {
+        complete = false; // No splash-resource raster projection yet.
+    }
     result.dashboard_write_plan_available = complete;
     if (!complete) {
         return result;

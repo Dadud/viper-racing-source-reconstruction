@@ -810,14 +810,17 @@ the composed state-0 render context is used when that branch is active. Formatte
 arguments, font tables/palettes, and each call's raster context remain explicit
 observations, and the output reports projected writes without claiming device
 submission.
-The state-0 `0x405100` background fill and bitmap writes can now be applied as
-one ordered batch through
-`apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface`. It requires
-the submitted frame's `0x4052D0` callback to precede the observed `0x447CE0`
-unlock, and validates all pixel destinations before writing. It covers only the
-background fill/bitmap operations plus the mode-0 gear rectangle fill;
-viewport/device calls, other gear/text effects, and native surface ownership
-remain separate or externally supplied. The
+The state-0 `0x405100` background fill and bitmap writes can be applied as one
+ordered batch through `apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface`.
+It requires the submitted frame's `0x4052D0` callback to precede the observed
+`0x447CE0` unlock, and validates all pixel destinations before writing. The
+batch preserves order across background fill/bitmap operations, gear draws,
+paused-banner operations, the two shared text effects, and race-results heading
+and rows. A reached cheater banner, centered resource, or splash-loading branch
+still leaves the full batch unavailable because its resource pixels are not yet
+projected; missing raster inputs likewise prevent partial surface mutation.
+Viewport/device calls and native surface ownership remain outside this CPU
+pixel batch. The
 `0x404970` pseudocode confirms that `0x405100` precedes the wrapper's later
 gear/banner/text effects (`ev_a058b9f23799a14959f9a4c014c5676ed3461968e94bbb8ac13c1c3cb3687e65`).
 The mode-0 gear rectangle's position and raw color come from the already

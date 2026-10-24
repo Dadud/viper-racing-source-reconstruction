@@ -161,8 +161,10 @@ struct RaceLoopState0DashboardSurfaceWriteResult {
     std::size_t pixel_writes_applied{};
 };
 
-// Applies modeled state-0 background writes and the mode-0 gear rectangle only
-// when the callback is inside a submitted frame and precedes surface unlock.
+// Applies the modeled state-0 background, gear, and supported shared-tail
+// writes in callback order only when the callback is inside a submitted frame
+// and precedes surface unlock. Reached shared branches without a pixel model
+// leave the complete batch unavailable.
 [[nodiscard]] RaceLoopState0DashboardSurfaceWriteResult
 apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
     const RaceLoopSharedOverlayPlan& plan,
