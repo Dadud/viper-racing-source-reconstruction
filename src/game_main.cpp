@@ -84,6 +84,7 @@ HRESULT compile_shader(const char* source, const char* entry, const char* target
 
 struct Options {
     std::filesystem::path data_dir;
+    std::optional<std::filesystem::path> setup_config_directory;
     std::optional<std::string> track;
     std::optional<std::string> car;
     bool validate_assets{};
@@ -95,7 +96,7 @@ struct Options {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--software] [--help]\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
 }
 
@@ -138,6 +139,9 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--data-dir") {
             if (++i >= argc) throw std::runtime_error("--data-dir requires a path");
             options.data_dir = argv[i];
+        } else if (arg == L"--config-dir") {
+            if (++i >= argc) throw std::runtime_error("--config-dir requires a path");
+            options.setup_config_directory = std::filesystem::path(argv[i]);
         } else if (arg == L"--track" || arg == L"--car") {
             if (++i >= argc) throw std::runtime_error(std::filesystem::path(arg).string() + " requires a name");
             const std::wstring_view value(argv[i]);
@@ -160,12 +164,14 @@ Options parse_options(const int argc, wchar_t** argv)
 viper::GameAssets load_assets(const std::filesystem::path& root,
                               const std::string_view track,
                               const std::string_view car,
-                              viper::GameOptions game_options)
+                              viper::GameOptions game_options,
+                              const std::filesystem::path& setup_config_directory)
 {
     if (root.empty()) {
         throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
     }
-    auto assets = viper::GameAssets::load(root, track, car, std::move(game_options));
+    auto assets = viper::GameAssets::load(root, track, car,
+        std::move(game_options), setup_config_directory);
     if (assets.default_tire().label.empty() ||
         !std::all_of(assets.default_tire().parameters.begin(),
             assets.default_tire().parameters.end(),
@@ -185,7 +191,9 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << ", " << assets.player_car().car_file->raw_words.size() << " configuration words\n"
               << "Loaded shared tire " << assets.default_tire().label << " from common.res\n"
               << "Loaded " << assets.car_name() << " human setup record: "
-              << assets.player_car_setup().size() << " bytes (CCS v2)\n"
+              << assets.player_car_setup().size() << " bytes ("
+              << (assets.player_setup_file_loaded() ? "player CSU" : "CCS resource")
+              << ")\n"
               << "Loaded " << assets.track_name() << " AI default setup record: "
               << assets.ai_vehicle_setup().size() << " bytes (CCS v2)\n"
               << "Loaded settings: " << assets.options().entries().size()
@@ -203,6 +211,21 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
                   << assets.ai_drivers().active_counts[index];
     std::cout << '\n';
     return assets;
+}
+
+std::filesystem::path resolve_setup_config_directory(
+    const std::filesystem::path& data_dir)
+{
+    const std::array candidates{
+        data_dir / "Config",
+        data_dir.parent_path() / "Config",
+        data_dir.parent_path() / "GameRoot" / "Config"};
+    for (const auto& candidate : candidates) {
+        std::error_code error;
+        if (std::filesystem::is_directory(candidate, error) && !error)
+            return candidate;
+    }
+    return {};
 }
 
 std::string configured_track_stem(const std::filesystem::path& data_dir,
@@ -966,8 +989,13 @@ int wmain(int argc, wchar_t** argv)
         const auto car = options.car
             ? *options.car
             : configured_car_stem(options.data_dir, configured_options);
+        const auto setup_config_directory = options.setup_config_directory
+            ? *options.setup_config_directory
+            : resolve_setup_config_directory(options.data_dir);
         auto assets = load_assets(options.data_dir, track, car,
-            std::move(configured_options));
+            std::move(configured_options), setup_config_directory);
+        if (assets.player_setup_version_warning())
+            std::cerr << "Warning: player CSU version is not 1; native loader continues with its first 0x8c bytes\n";
         report_start_grid(assets);
         if (options.validate_assets) return 0;
         const auto driver_order = viper::initialize_single_race_driver_order();

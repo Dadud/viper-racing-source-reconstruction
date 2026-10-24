@@ -2,6 +2,7 @@
 
 #include <array>
 #include <algorithm>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -52,7 +53,8 @@ bool ascii_equal_case_insensitive(const std::string_view left,
 GameAssets GameAssets::load(const std::filesystem::path& root,
                             const std::string_view track,
                             const std::string_view car,
-                            std::optional<GameOptions> options)
+                            std::optional<GameOptions> options,
+                            std::filesystem::path setup_config_directory)
 {
     if (root.empty()) throw std::runtime_error("asset directory is required");
     GameAssets assets;
@@ -127,18 +129,57 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         }
         assets.wheel_tires_[wheel_index] = *tire;
     }
-    const auto* car_setup_entry = car_bundle.find(
-        assets.car_name_ + ".ccs", car_setup_type);
-    if (car_setup_entry == nullptr)
-        throw std::runtime_error(assets.car_name_ +
-            " human car setup resource is missing");
-    const auto car_setup_payload = car_bundle.payload(*car_setup_entry);
-    if (car_setup_entry->attributes != 2U || car_setup_payload.size() !=
-            assets.player_car_setup_.size())
-        throw std::runtime_error(assets.car_name_ +
-            " human car setup resource has an unsupported version or size");
-    std::copy(car_setup_payload.begin(), car_setup_payload.end(),
-        assets.player_car_setup_.begin());
+    if (!setup_config_directory.empty()) {
+        const auto player_name = assets.options_.get("GLOBAL", "player_name");
+        if (player_name && !player_name->empty() && *player_name != "." &&
+            *player_name != ".." &&
+            std::all_of(player_name->begin(), player_name->end(), [](const char ch) {
+                return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+                    (ch >= '0' && ch <= '9') || ch == ' ' || ch == '_' ||
+                    ch == '-' || ch == '.';
+            })) {
+            const auto setup_path = setup_config_directory / "setups" /
+                (std::string(*player_name) + ".csu");
+            std::error_code setup_error;
+            const auto setup_size = std::filesystem::file_size(setup_path,
+                setup_error);
+            if (!setup_error && setup_size == HumanCarSetupFile::file_size) {
+                std::array<std::byte, HumanCarSetupFile::file_size> setup_bytes{};
+                std::ifstream setup_file(setup_path, std::ios::binary);
+                setup_file.read(reinterpret_cast<char*>(setup_bytes.data()),
+                    static_cast<std::streamsize>(setup_bytes.size()));
+                if (setup_file.gcount() ==
+                        static_cast<std::streamsize>(setup_bytes.size())) {
+                    const auto parsed_setup = parse_human_car_setup_file(setup_bytes);
+                    if (parsed_setup) {
+                        assets.player_car_setup_ = parsed_setup->active_setup;
+                        assets.player_setup_file_loaded_ = true;
+                        assets.player_setup_version_warning_ =
+                            parsed_setup->version_warning;
+                    }
+                }
+            }
+        }
+    }
+    if (!assets.player_setup_file_loaded_) {
+        const ResourceEntry* car_setup_entry = car_bundle.find(
+            assets.car_name_ + ".ccs", car_setup_type);
+        const ResourceBundle* setup_bundle = &car_bundle;
+        if (car_setup_entry == nullptr) {
+            car_setup_entry = common_bundle.find("default.ccs", car_setup_type);
+            setup_bundle = &common_bundle;
+        }
+        if (car_setup_entry == nullptr)
+            throw std::runtime_error(assets.car_name_ +
+                " human setup and common default.ccs resources are missing");
+        const auto car_setup_payload = setup_bundle->payload(*car_setup_entry);
+        if (car_setup_entry->attributes != 2U || car_setup_payload.size() !=
+                assets.player_car_setup_.size())
+            throw std::runtime_error("human setup resource " + car_setup_entry->name +
+                " has an unsupported version or size");
+        std::copy(car_setup_payload.begin(), car_setup_payload.end(),
+            assets.player_car_setup_.begin());
+    }
     const auto language_path = root / "english.lng";
     std::error_code ec;
     if (!std::filesystem::is_regular_file(language_path, ec) || ec) {

@@ -25,7 +25,8 @@ public:
         const std::filesystem::path& root,
         std::string_view track = "bemidji",
         std::string_view car = "viper",
-        std::optional<GameOptions> options = std::nullopt);
+        std::optional<GameOptions> options = std::nullopt,
+        std::filesystem::path setup_config_directory = {});
 
     [[nodiscard]] const std::filesystem::path& root() const noexcept { return root_; }
     [[nodiscard]] std::string_view track_name() const noexcept { return track_name_; }
@@ -43,6 +44,10 @@ public:
     [[nodiscard]] const std::array<TireDefinition, 4>& wheel_tires() const noexcept
     { return wheel_tires_; }
     [[nodiscard]] const std::array<std::byte, 0x8c>& player_car_setup() const noexcept { return player_car_setup_; }
+    [[nodiscard]] bool player_setup_file_loaded() const noexcept
+    { return player_setup_file_loaded_; }
+    [[nodiscard]] bool player_setup_version_warning() const noexcept
+    { return player_setup_version_warning_; }
     [[nodiscard]] const GameOptions& options() const noexcept { return options_; }
     [[nodiscard]] std::size_t model_resource_count() const noexcept { return model_resource_count_; }
 
@@ -63,6 +68,8 @@ private:
     TireDefinition default_tire_;
     std::array<TireDefinition, 4> wheel_tires_{};
     std::array<std::byte, 0x8c> player_car_setup_{};
+    bool player_setup_file_loaded_{};
+    bool player_setup_version_warning_{};
     GameOptions options_;
     std::size_t model_resource_count_{};
 };

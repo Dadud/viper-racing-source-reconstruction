@@ -7,6 +7,26 @@
 
 namespace viper {
 
+std::optional<HumanCarSetupFile> parse_human_car_setup_file(
+    const std::span<const std::byte> payload) noexcept
+{
+    if (payload.size() != HumanCarSetupFile::file_size) {
+        return std::nullopt;
+    }
+
+    HumanCarSetupFile result{};
+    std::copy_n(payload.begin(), result.active_setup.size(),
+        result.active_setup.begin());
+    constexpr std::size_t version_offset = HumanCarSetupFile::active_setup_size;
+    result.version =
+        static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(payload[version_offset])) |
+        (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(payload[version_offset + 1U])) << 8U) |
+        (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(payload[version_offset + 2U])) << 16U) |
+        (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(payload[version_offset + 3U])) << 24U);
+    result.version_warning = result.version != 1U;
+    return result;
+}
+
 std::optional<std::uint32_t> world_car_object_tag(
     const std::uint32_t record_variant) noexcept
 {

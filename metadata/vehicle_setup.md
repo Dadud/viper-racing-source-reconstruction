@@ -28,6 +28,18 @@ participant row. `0x45EFD0` calls `0x45EE40`, which constructs a per-user
 `default.ccs` resources; each is an 0x8C-byte CCS v2 payload. The validated
 external install has the bundled `.ccs` entries but no `.csu` setup files.
 
+The reconstruction implements this selection in `GameAssets::load`. It reads
+`Config/setups/<player_name>.csu` only for a bounded ASCII filename stem and
+only when the file is exactly 0xD4 bytes. The first 0x8C bytes become the
+active setup; the uint32 at +0x8C is retained and a value other than 1 raises
+the native-style warning without rejecting the file. Missing, malformed, or
+unreadable files use the selected car's `<car>.ccs`, then
+`common.res/default.ccs`. The CLI accepts `--config-dir PATH`; otherwise it
+checks `Config` beside the data directory, beside its parent, and at the
+supplied install layout's sibling `GameRoot/Config`. This implements the
+observed per-user setup source and documented bundled fallback, but does not
+implement setup editing or save `.csu` files yet.
+
 Separately, the CARF mapper at `0x45E4B0` reads 35 DWORDs (0x8C bytes) from
 its second argument. In the garage path, `0x48AC20` first calls `0x45EFD0` to
 load the active `.csu`/CCS bytes into `DAT_005620B8`, then calls `0x45EC20`

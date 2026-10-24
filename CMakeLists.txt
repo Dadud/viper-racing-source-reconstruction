@@ -270,6 +270,12 @@ if(BUILD_TESTING)
         viper_scene_model viper_resource_bundle)
     add_test(NAME car_runtime_setup_regression
         COMMAND viper_car_runtime_setup_regression)
+    add_executable(viper_human_car_setup_regression
+        tests/human_car_setup_regression.cpp)
+    target_link_libraries(viper_human_car_setup_regression PRIVATE
+        viper_vehicle_model)
+    add_test(NAME human_car_setup_regression
+        COMMAND viper_human_car_setup_regression)
 endif()
 
 if(MSVC)

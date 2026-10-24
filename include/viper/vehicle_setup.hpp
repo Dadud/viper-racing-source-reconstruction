@@ -13,6 +13,19 @@
 
 namespace viper {
 
+struct HumanCarSetupFile {
+    static constexpr std::size_t active_setup_size = 0x8cU;
+    static constexpr std::size_t file_size = 0xd4U;
+    std::array<std::byte, active_setup_size> active_setup{};
+    std::uint32_t version{};
+    bool version_warning{};
+};
+
+// Parses the exact-size per-user .csu file read by 0x45EE40. The first 0x8C
+// bytes are copied into the active setup; a non-1 version warns but succeeds.
+[[nodiscard]] std::optional<HumanCarSetupFile> parse_human_car_setup_file(
+    std::span<const std::byte> payload) noexcept;
+
 struct TireDefinition {
     std::string label;
     std::array<float, 22> parameters{};
