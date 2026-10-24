@@ -1091,6 +1091,79 @@ NcarInterpolatedRecordSelectionPlan select_ncar_interpolated_records(
     return result;
 }
 
+NcarInterpolatedDispatchPlan dispatch_ncar_interpolated_object(
+    const NcarInterpolatedDispatchObservation& observation) noexcept
+{
+    NcarInterpolatedDispatchPlan result{};
+    result.indexed_target_table_byte_offset = 0xA4U +
+        observation.object_callback_index_0x510 * 116U;
+    if (observation.indexed_target_pointer_nonnull &&
+        observation.indexed_target_value_0x2c.has_value()) {
+        result.indexed_target_stores_valid = true;
+        result.indexed_target_write_0x04 =
+            *observation.indexed_target_value_0x2c;
+        result.indexed_target_write_0x08 = 0U;
+    }
+    if (!observation.indexed_target_pointer_nonnull) {
+        result.indexed_target_null_dereference = true;
+        return result;
+    }
+
+    std::uint32_t flags = observation.object_flags_0x04;
+    if (observation.object_gate_0xed4 > 0 &&
+        observation.selection.object_limit_0xef8 != 0) {
+        flags |= 1U;
+    }
+    result.object_flags_after_gate_0x04 = flags;
+
+    if ((flags & 1U) == 0) {
+        result.registered_transform_callback_0x420930_called = true;
+        if (observation.registered_transform_0x38.has_value()) {
+            result.registered_transform_copy_valid = true;
+            result.copied_transform_0x38 =
+                *observation.registered_transform_0x38;
+        }
+    }
+
+    if (observation.global_virtual_return_nonzero.has_value()) {
+        result.virtual_callback_branch_known = true;
+        if (*observation.global_virtual_return_nonzero) {
+            flags &= ~3U;
+        }
+        if ((flags & 1U) != 0) {
+            flags |= 2U;
+            const auto frame_step = std::bit_cast<std::int32_t>(
+                observation.selection.global_time_bits_0x508774 -
+                observation.selection.object_value_bits_0xedc -
+                observation.selection.object_value_bits_0xee0);
+            result.interpolation_time_gate_passed = frame_step < 0 ||
+                static_cast<std::int64_t>(
+                    observation.object_frame_gate_0xed8) > frame_step;
+            if (result.interpolation_time_gate_passed) {
+                result.selector_0x427630_called = true;
+                result.selection = select_ncar_interpolated_records(
+                    observation.selection);
+                if (result.selection.record_window_valid) {
+                    auto update = observation.update;
+                    update.object.first_record = result.selection.first_record;
+                    update.object.second_record = result.selection.second_record;
+                    update.object.interpolation_fraction =
+                        result.selection.interpolation_fraction;
+                    update.saved_object_flags_0x04 = flags;
+                    result.interpolated_update =
+                        update_ncar_interpolated_state(update);
+                }
+            }
+        }
+        result.object_flags_after_virtual_callback_0x04 = flags;
+    }
+
+    result.incremented_object_counter_0x10 = static_cast<std::uint16_t>(
+        observation.object_counter_0x10 + 1U);
+    result.tail_virtual_callback_0x38_called = true;
+    return result;
+}
+
 NcarInterpolatedObjectPlan update_ncar_interpolated_object(
     const NcarInterpolatedObjectObservation& observation) noexcept
 {

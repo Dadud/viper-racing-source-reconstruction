@@ -373,7 +373,9 @@ files were present.
   path; `apply_ncar_callback_gate_bytes` models the callback's four normalized
   sample flags. `select_ncar_interpolated_records` models the separate 0x3C-byte
   interpolation ring (distinct from the 0x3E-byte history payload). It derives
-  its signed selector inputs from the recovered `0x427DA3` object fields.
+  its signed selector inputs from the recovered `0x427DA3` object fields;
+  `dispatch_ncar_interpolated_object` composes the outer flag, callback,
+  registered-transform, time-gate, ring-selection and tail-counter behavior.
   `advance_ncar_callback_main` composes the recovered input,
   mode-3 setter/gate, and timer branches around the unreconstructed integrator
   body; it includes the integrator's entry-reset prefix.

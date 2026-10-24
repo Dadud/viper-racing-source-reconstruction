@@ -185,3 +185,53 @@ The actual direct caller `0x427B10` is composed by
 `update_ncar_interpolated_state`: it saves/restores object `+0x04` around the
 inner update and derives `+0xED0` from the linear interpolation of the two
 records' velocity magnitudes. Evidence: `ev_4056ddfc4f12323d76158052c3dfd33d1ed4cdb27387a46500af0aae76dfb767`.
+
+### Outer interpolation-object dispatch
+
+`dispatch_ncar_interpolated_object` reconstructs the observed caller shell
+around the ring selector. It clears object `+0xEF0`, conditionally sets bit 0
+of `+0x04` when signed `+0xED4` is positive and `+0xEF8` is nonzero, and
+always resolves the callback-table slot indexed by `+0x510` at byte offset
+`0xA4 + 116*n` before calling `0x41D1C0`. That helper writes the target's
+`+0x04` from `+0x2C` and clears `+0x08`; the target pointer and source DWORD
+remain explicit observations. A known null target is reported as a
+null-dereference path and stops the projected dispatch before later callbacks.
+
+When bit 0 is clear, the wrapper asks `0x420930` for the registered transform
+indexed by `+0xEC8` and copies 12 DWORDs from the returned object's `+0x38` to
+the current object's `+0x38`. The registration table is zeroed at startup and
+populated at runtime by `0x4208F0`, so transform bytes are supplied as an
+observation instead of inferred from the shipped image. The global `+0x40`
+virtual callback result is also an explicit input: a nonzero AL clears the
+low two object flag bits. With bit 0 set after that call, the wrapper sets bit
+1 and enters `0x427630` when signed frame delta is negative or object `+0xED8`
+is greater than that delta. The existing selector then enforces its separate
+next-slot `< +0xEF8` gate. A valid bounded record window composes through
+`update_ncar_interpolated_state`; unavailable record bytes are reported
+without manufacturing an update. The tail invokes the global `+0x38` virtual
+callback with object `+0x510` and increments the 16-bit counter at `+0x10`.
+
+Instruction evidence from the shipped PE includes the field clear and flag
+gate (`ev_bf261e2fa09c26135619f99442a57bf1436bcce71879c686be51293a594f413e`,
+`ev_88ba86a5f24ea57c78af659f8cdb9d83688657dcc9169d267bd658e8c31fd5dd`,
+`ev_89236eac738efbe4f778302b7c29d3773a46357b4c58ec0219e084141f95acaf`,
+`ev_987784bb9671b02c00a1473956e98c5a88b110f7bcd9d9386138e6ffb36ec732`),
+indexed target call and transform gate/copy (`ev_9d0106572d2f4dcfab32cc11a32a832faeeb9c5da7b829dc8f1b0223712bb8c5`,
+`ev_8ca1d2ae175c856d2b37b217a20f7f089163a7046f8d07b847fdefac7d39a96c`,
+`ev_8da73efc08b115b981dbdd0dfeee9aea395da752b8d2d7034c309e2922552aa5`,
+`ev_311f2604d7e914ec2ff90e7030776fe98577351ac8ae8aa3262375f1db6a4d62`),
+global callback and frame gates (`ev_35cad57f3681f87e4055c6f556e99aa80ad97b7f8240bb270e76b8bd9c1bbe6c`,
+`ev_8f9cddb7ba8487593193d2d203028696d98d267b69869df8121e340b0fab8958`,
+`ev_f1ff60c7cc4c5afa3cef719208622008392fbcd911b2bb137d454cf0579deeeb`,
+`ev_b7dbd33b8e02f54c8672f21a4df2000ce080e070188aa0d4954d9ab09c6e4c61`,
+`ev_fedc40a9e57ebbf1e370d48dba006151761f3cb5a1a0acd05f597bb378386f07`,
+`ev_a09eb9b4979ce9834dfb9ab0d21818840748f90c9b8f42b7146aee42234cdd70`,
+`ev_bdf939369ad82bbf05e7978dde0a71ce2bc9cebe2435ed39b6a48c5329384ae1`),
+selector argument setup and call (`ev_d2387b2d40280242f4caf8f8ad4556bd64563314c4a773fc21d7210b495feb7a`,
+`ev_1eb310b3602428d4a37faaf3956c0f43d073403031a3915f8f1c38e54192acf3`,
+`ev_85c6eb02fa91005b7ce530236672d8f5f3942054e7ff23c2f2b57deaa060e373`),
+and tail callback/counter (`ev_d9b563852421b30c5ed2094de5e9a865e5651b0a9c13be1b0d1697de74aeb7aa`,
+`ev_4c3b5a45cf3a452ee1ad7f5e25044459ce9cc1b7cdcaa021b0aff880c2132d2a`,
+`ev_56d03dcd2ac7a488f7183e295c8ffd854b1dd2f99fd8d73eb87898d59907c7f8`).
+The complete instruction observations are bundled in
+`metadata/ncar_interpolation_dispatch.evidence.json`.

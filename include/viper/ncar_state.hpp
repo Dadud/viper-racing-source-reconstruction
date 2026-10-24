@@ -485,12 +485,62 @@ struct NcarInterpolatedRecordSelectionPlan {
     std::array<std::uint8_t, ncar_interpolated_record_bytes> second_record{};
 };
 
+// Runtime observations used by the outer object dispatcher around 0x427630.
+// Dynamic callback-table and transform-table contents are supplied explicitly;
+// they are populated by runtime registration and are not present in the PE.
+struct NcarInterpolatedDispatchObservation {
+    NcarInterpolatedRecordSelectionObservation selection{};
+    NcarInterpolatedUpdateObservation update{};
+    std::uint32_t object_flags_0x04{};
+    std::int32_t object_gate_0xed4{};
+    std::int32_t object_frame_gate_0xed8{};
+    std::uint32_t object_transform_index_0xec8{};
+    std::uint32_t object_callback_index_0x510{};
+    std::uint16_t object_counter_0x10{};
+    // Resolution of the indexed target pointer passed to 0x41D1C0.
+    bool indexed_target_pointer_nonnull{};
+    std::optional<std::uint32_t> indexed_target_value_0x2c;
+    // Runtime transform returned by 0x420930 for the +0xEC8 index.
+    std::optional<std::array<float, 12>> registered_transform_0x38;
+    // AL from the global +0x40 virtual callback; unknown means dispatch is
+    // ambiguous and no downstream branch is synthesized.
+    std::optional<bool> global_virtual_return_nonzero;
+};
+
+struct NcarInterpolatedDispatchPlan {
+    std::uint32_t cleared_object_field_0xef0{};
+    std::uint32_t object_flags_after_gate_0x04{};
+    std::uint32_t indexed_target_table_byte_offset{};
+    bool indexed_target_callback_0x41d1c0_called{true};
+    bool indexed_target_stores_valid{};
+    std::uint32_t indexed_target_write_0x04{};
+    std::uint32_t indexed_target_write_0x08{};
+    bool indexed_target_null_dereference{};
+    bool registered_transform_callback_0x420930_called{};
+    bool registered_transform_copy_valid{};
+    std::array<float, 12> copied_transform_0x38{};
+    std::optional<std::uint32_t> object_flags_after_virtual_callback_0x04;
+    bool virtual_callback_branch_known{};
+    bool interpolation_time_gate_passed{};
+    bool selector_0x427630_called{};
+    NcarInterpolatedRecordSelectionPlan selection{};
+    std::optional<NcarInterpolatedUpdatePlan> interpolated_update;
+    bool tail_virtual_callback_0x38_called{};
+    std::uint16_t incremented_object_counter_0x10{};
+};
+
 // Models the 0x427DA3 caller operands and indexed ring selection in 0x427630,
 // including signed frame-step arithmetic and the 0x3c-byte record stride.
 // Invalid spans are rejected before copying; native inputs are assumed valid.
 [[nodiscard]] NcarInterpolatedRecordSelectionPlan
 select_ncar_interpolated_records(
     const NcarInterpolatedRecordSelectionObservation& observation) noexcept;
+
+// Projects the observed dispatch gates and side effects surrounding
+// 0x427630. Runtime-registered transform data and unresolved pointers remain
+// explicit observations rather than fabricated static values.
+[[nodiscard]] NcarInterpolatedDispatchPlan dispatch_ncar_interpolated_object(
+    const NcarInterpolatedDispatchObservation& observation) noexcept;
 
 // Projects one five-byte wheel sample update in 0x444240. The follow-up
 // effect and basis helpers are reported as calls; their additional writes are
