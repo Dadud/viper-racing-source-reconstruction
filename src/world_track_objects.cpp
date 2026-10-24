@@ -1653,7 +1653,7 @@ std::optional<CheckpointConstructionPlan> plan_checkpoint_track_line(
         observation.end_terrain_height,
         observation.end_z,
     };
-    plan.route = observation.visual_checkpoint_mode_0x53b194
+    plan.route = observation.track_state_selector_0x53b194 != 0U
         ? CheckpointConstructionRoute::visual_scene_object
         : CheckpointConstructionRoute::serialized_object_record;
     return plan;

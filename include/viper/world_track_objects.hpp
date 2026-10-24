@@ -756,7 +756,9 @@ struct CheckpointTrackLineObservation {
     float end_z{};
     float start_terrain_height{};
     float end_terrain_height{};
-    bool visual_checkpoint_mode_0x53b194{};
+    // Raw shared track-state DWORD: 0x426000 uses it as a service selector,
+    // while 0x45D950 uses zero/nonzero to choose checkpoint construction.
+    std::uint32_t track_state_selector_0x53b194{};
 };
 
 [[nodiscard]] std::optional<CheckpointConstructionPlan>

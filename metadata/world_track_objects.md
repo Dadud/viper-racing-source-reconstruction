@@ -353,10 +353,16 @@ The nonzero state of `DAT_0053B194` selects the visual route: allocate a 0x40
 object, initialize it through `0x463590` with the CHKP record and
 `checkpt1.mod`, then append it through `0x45C320`. When the global is zero,
 `0x45D950` clears the preceding DWORD and sends the CHKP header and payload to
-`0x425720` for record serialization. The global's broader semantic meaning is
-not established. `CheckpointTrackLineObservation` keeps scan success, terrain
-query outputs, and this raw route selector explicit;
-`plan_checkpoint_track_line` builds the verified record and branch plan.
+`0x425720` for record serialization. The same DWORD is the selector read by
+the `0x426000` physics-track service factory, so
+`CheckpointTrackLineObservation` carries the raw
+`track_state_selector_0x53b194` instead of a route-only boolean. Zero/nonzero
+controls this parser's branch, while values 0/1/3/5 select service classes in
+the factory. The shipped image initializes the field to zero, but runtime
+writes remain an observation. `plan_checkpoint_track_line` builds the verified
+record and branch plan. See `physics_task_objects.md` and
+`physics_track_selector_source.evidence.json` for the accessor and initial
+value trace.
 
 ## Wobble line and record
 
