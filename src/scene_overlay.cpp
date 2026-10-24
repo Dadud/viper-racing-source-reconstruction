@@ -1951,32 +1951,104 @@ SceneDashboardRasterPlan raster_scene_dashboard_text(
     return result;
 }
 
+SceneDashboardGlobalObjectProjection
+scene_dashboard_global_object_projection(
+    const SceneDashboardGlobalObjectObservation& observation) noexcept
+{
+    SceneDashboardGlobalObjectProjection result{};
+    std::size_t method_0x20_offset{};
+    switch (observation.factory_selector) {
+    case 0U:
+        result.selector_supported = true;
+        method_0x20_offset = 0x2CU;
+        if (observation.selected_ordinal >= 0) {
+            constexpr std::size_t first_flag_offset = 0x68U;
+            constexpr std::size_t entry_stride = 0x74U;
+            const auto ordinal = static_cast<std::size_t>(
+                observation.selected_ordinal);
+            if (ordinal <= (std::numeric_limits<std::size_t>::max() -
+                            first_flag_offset) / entry_stride) {
+                const auto flag_offset = first_flag_offset +
+                    ordinal * entry_stride;
+                if (flag_offset < observation.object_bytes.size()) {
+                    result.method_0x40_resolved = true;
+                    result.method_0x40_result =
+                        observation.object_bytes[flag_offset] != 0U;
+                }
+            }
+        }
+        break;
+    case 1U:
+    case 3U:
+        result.selector_supported = true;
+        result.method_0x40_resolved = true;
+        result.method_0x40_result = false;
+        method_0x20_offset = 0x54U;
+        break;
+    case 5U:
+        result.selector_supported = true;
+        result.method_0x40_resolved = true;
+        result.method_0x40_result = false;
+        method_0x20_offset = 0x34U;
+        break;
+    default:
+        return result;
+    }
+
+    if (method_0x20_offset <= observation.object_bytes.size() &&
+        observation.object_bytes.size() - method_0x20_offset >= 4U) {
+        const auto* const bytes = observation.object_bytes.data() +
+            method_0x20_offset;
+        result.method_0x20_result =
+            static_cast<std::uint32_t>(bytes[0]) |
+            (static_cast<std::uint32_t>(bytes[1]) << 8U) |
+            (static_cast<std::uint32_t>(bytes[2]) << 16U) |
+            (static_cast<std::uint32_t>(bytes[3]) << 24U);
+        result.method_0x20_resolved = true;
+    }
+    return result;
+}
+
 SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     const SceneDashboardCoreCallbackObservation& observation)
 {
     SceneDashboardCoreCallbackPlan result{};
     result.next_state = observation.state;
+    auto global_method_0x40_result = observation.global_method_0x40_result;
+    auto global_method_0x20_result = observation.global_method_0x20_result;
+    if (observation.global_object_dispatch.has_value()) {
+        result.global_object_projection =
+            scene_dashboard_global_object_projection(
+                *observation.global_object_dispatch);
+        const auto& projection = *result.global_object_projection;
+        if (projection.method_0x40_resolved) {
+            global_method_0x40_result = projection.method_0x40_result;
+        }
+        if (projection.method_0x20_resolved) {
+            global_method_0x20_result = projection.method_0x20_result;
+        }
+    }
     result.position = update_scene_dashboard_position(
         result.next_state, observation.position);
 
     const SceneDashboardLapObservation lap_observation{
         observation.selected_object_type_0x18,
-        observation.global_method_0x40_result,
+        global_method_0x40_result,
         observation.record_value_0x138,
-        observation.global_method_0x20_result,
+        global_method_0x20_result,
     };
     result.lap = update_scene_dashboard_lap(
         result.next_state, lap_observation, result.position.redraw_all);
 
     const SceneDashboardFinalTimeObservation final_time_observation{
         observation.selected_object_type_0x18,
-        observation.global_method_0x40_result,
+        global_method_0x40_result,
     };
     result.final_time = update_scene_dashboard_final_time(
         result.next_state, final_time_observation, result.position.redraw_all);
 
     if (observation.selected_object_type_0x18 == 0 &&
-        !observation.global_method_0x40_result) {
+        !global_method_0x40_result) {
         auto lap_time_observation = observation.lap_time;
         lap_time_observation.redraw_all = result.position.redraw_all;
         lap_time_observation.redraw_from_prior_state_change =
@@ -2008,7 +2080,7 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     }
 
     if (observation.selected_object_type_0x18 == 0 &&
-        !observation.global_method_0x40_result &&
+        !global_method_0x40_result &&
         result.position.displayed_count > 1) {
         auto supplemental_observation = observation.supplemental_time;
         supplemental_observation.displayed_position =
@@ -2048,7 +2120,7 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
             plan.calls.begin(), plan.calls.end());
     };
     if (observation.selected_object_type_0x18 == 0 &&
-        !observation.global_method_0x40_result) {
+        !global_method_0x40_result) {
         append_calls(result.lap_time);
     }
     if (result.test_track_branch_reached) {

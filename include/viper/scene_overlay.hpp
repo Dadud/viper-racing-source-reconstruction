@@ -677,8 +677,9 @@ struct SceneDashboardLapResult {
     std::uint8_t reached_text_call_sites{};
 };
 
-// Models the ordinary Lap branch of 0x4035E0. The global method outcomes are
-// supplied values because their renderer-facing callees are not reconstructed.
+// Models the ordinary Lap branch of 0x4035E0. The composed callback can derive
+// its global method outcomes from SceneDashboardGlobalObjectObservation;
+// unresolved methods fall back to these explicit inputs.
 [[nodiscard]] SceneDashboardLapResult update_scene_dashboard_lap(
     SceneDashboardState& state,
     const SceneDashboardLapObservation& observation,
@@ -930,6 +931,29 @@ struct SceneDashboardAuxiliaryReadoutResult {
     std::vector<SceneDashboardTextCall> calls;
 };
 
+struct SceneDashboardGlobalObjectObservation {
+    // Raw selector copied from factory input +0x18 (param_1[6]) at 0x426000.
+    std::uint32_t factory_selector{};
+    std::int32_t selected_ordinal{};
+    // Bounded bytes beginning at the object pointer stored in DAT_00508A04.
+    std::span<const std::uint8_t> object_bytes;
+};
+
+struct SceneDashboardGlobalObjectProjection {
+    bool selector_supported{};
+    bool method_0x40_resolved{};
+    bool method_0x40_result{};
+    bool method_0x20_resolved{};
+    std::uint32_t method_0x20_result{};
+};
+
+// Projects the observed factory vtables' virtual +0x40 and +0x20 methods.
+// Selector 0's +0x40 reads a byte from its 0x74-stride entry table; selectors
+// 1/3/5 share a false-return stub. +0x20 reads the selector's raw object DWORD.
+[[nodiscard]] SceneDashboardGlobalObjectProjection
+scene_dashboard_global_object_projection(
+    const SceneDashboardGlobalObjectObservation& observation) noexcept;
+
 [[nodiscard]] SceneDashboardAuxiliaryReadoutResult
 scene_dashboard_auxiliary_readout_plan(
     const SceneDashboardAuxiliaryReadoutObservation& observation);
@@ -950,9 +974,13 @@ struct SceneDashboardCoreCallbackObservation {
     SceneDashboardState state{};
     SceneDashboardPositionObservation position{};
     std::int32_t selected_object_type_0x18{};
+    // Fallback values used when global_object_dispatch cannot resolve a
+    // method result from its supported factory selector and bounded bytes.
     bool global_method_0x40_result{};
     std::int32_t record_value_0x138{};
     std::uint32_t global_method_0x20_result{};
+    std::optional<SceneDashboardGlobalObjectObservation>
+        global_object_dispatch;
     SceneDashboardLapTimeObservation lap_time{};
     SceneDashboardTestTrackObservation test_track{};
     const LanguageResource* language_resource{};
@@ -964,6 +992,8 @@ struct SceneDashboardCoreCallbackObservation {
 
 struct SceneDashboardCoreCallbackPlan {
     SceneDashboardState next_state{};
+    std::optional<SceneDashboardGlobalObjectProjection>
+        global_object_projection;
     SceneDashboardPositionResult position{};
     SceneDashboardLapResult lap{};
     SceneDashboardFinalTimeResult final_time{};

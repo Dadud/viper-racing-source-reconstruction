@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added a bounded projection for the dashboard's
+  global object's virtual `+0x40`/`+0x20` methods. It derives selector-0's
+  per-ordinal table byte and selector-specific count/denominator fields, and
+  recognizes the false-return vtable stub for selectors 1/3/5. The composed
+  callback uses these results when their source bytes are available and falls
+  back only for unresolved values. Semantic type names and object construction
+  inputs remain open. Evidence and addresses are recorded in
+  `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Propagated the race-loop's optional language and
   locale state into its separate TestTrack projection, keeping labels and
   distance formatting consistent with the core callback. The paused and

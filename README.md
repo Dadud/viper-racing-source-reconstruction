@@ -175,7 +175,9 @@ files were present.
   drawing and most renderer/device effects remain unmodeled. State-0 dashboard
   viewport and background bitmap ordering, bitmap format dispatch and clipping,
   and full-surface fill projections are modeled from the binary's tables and
-  renderer sequence. The gear display model covers resource/mode gates, draw
+  renderer sequence. The dashboard core can derive the global object's
+  virtual `+0x40` and `+0x20` results from its factory selector and bounded raw
+  object bytes. The gear display model covers resource/mode gates, draw
   calls, pointer vertices, fill spans, outline pixels, pixel-format projections,
   geometry parameters, and the `+0x34` clamp. A separate helper projects the
   value of one source pixel through the recovered bitmap format conversions,

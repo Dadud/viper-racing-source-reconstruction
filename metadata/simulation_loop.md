@@ -1270,8 +1270,29 @@ call-site mask bit `0x10` for the `%d/%d` row. It also registers the Lap
 resource using bit `0x04` of `0x4EB484`. The Lap resource row at `0x40391C` is
 emitted on full redraw or dashboard-kind
 change. The denominator comes from the global `0x508A04` virtual `+0x20` call
-and remains an input. Bits 3 and 4 from this branch feed the text plan; later
-Best/Last gates remain caller inputs to the generic text plan.
+and can be projected from the factory-selected object's raw field. The
+`scene_dashboard_global_object_projection` maps observed factory selectors
+0/1/3/5 to their vtables: `+0x40` is the per-ordinal byte at object
+`+0x68 + ordinal*0x74` for selector 0 and the `AL=0` stub for selectors 1/3/5;
+`+0x20` returns object DWORD `+0x2C`, `+0x54`, or `+0x34` respectively. The
+core callback uses each result when its bounded object-byte view contains the
+required field and retains the legacy direct value otherwise. Unsupported
+factory selectors remain unresolved. Bits 3 and 4 from this branch feed the
+text plan; later Best/Last gates remain caller inputs to the generic text plan.
+Evidence: factory `0x426000` `ev_77ed3eea58c07cc6b7d7aa3d98a7b500091dc65c2e2da8b99ab5211b77c19024`;
+constructors `0x43C870`/`0x43C360` `ev_50f46e3ccb041e82784d31eca60f241a4283f9e9ff8ab5d530e831f408f43168`/
+`ev_8770c120f8fe3fa22ac1f52b8af7230d59e30ec67358f7647e4c60708c446e9d`; vtable bytes
+`0x4C7810`, `0x4C7880`, `0x4C84D8`, `0x4C8420`:
+`ev_f354aac4c209c06f527a03a8af37f7d02a834bcb9a9711f77659628214cc4049`,
+`ev_bfd2b6149a5b7d6749a8312b3f4d6f863c7517915a7a1f3d13033422266e52fc`,
+`ev_9d5909016a4786c467f3e12d04b10fdc16a071f784fb0dfcd09b6123e4e635fd`,
+`ev_f3e83771b2203a153b03419fe61b8c6935a067efd14a3a0c87d5d49478c7fe7e`;
+method entries `0x43DC60`, `0x426170`, `0x43DCB0`, `0x426200`, and `0x43C600`:
+`ev_5d062e905025e277e1b4f4c5a42fa350d696a93f474233bbad4d403b36150807`,
+`ev_739d8da1777b03552758b151fd0371e0b410258282add79af6c9a01b1840468c`,
+`ev_4bee6543cd186cda7fc8b7b8cbd11ab3fb6ba0075a128d8b402b15c32382587f`,
+`ev_afd2bca204107efe8a4aafdb39b7d65f47ad5058926682c333fea7341c90a5ca`,
+`ev_cad197e91d6196af700fd5d0786fddb7206c1c0bc7dd897b3032009d451aa707`.
 
 `update_scene_dashboard_lap_time` models the selected type-0 LapTime branch
 at `0x40399A`. It registers `Dashboard:LapTime` in bit `0x08` of
