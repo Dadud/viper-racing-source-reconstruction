@@ -1058,7 +1058,7 @@ struct SceneRenderScanlineConversionObservation {
     // Effective [0x50D320 + index*4] lookup for the secondary color channel.
     std::span<const std::uint32_t> secondary_lighting_indices;
     std::span<const std::uint32_t> secondary_lighting_words;
-    // DAT_0050D2DC == 2 gates the environment-mapping transform in 0x456660.
+    // DAT_0050D2DC == 2 gates the environment transform in 0x456660/0x457090.
     std::optional<bool> environment_mapping_mode_2_enabled;
     // Final binary32 words for destination +0x18/+0x1C when that transform runs.
     std::span<const std::array<std::uint32_t, 2>> transformed_tail_words;

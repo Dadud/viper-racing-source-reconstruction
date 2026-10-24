@@ -1,5 +1,18 @@
 # Reconstruction progress
 
+- **2026-10-24 runtime foundation:** Added the Windows `viper_game` shell with
+  external data-directory selection, required resource/language loading,
+  Direct3D 11 swapchain initialization, resize/close handling, and hidden
+  frame-count smoke mode (including WARP software rendering). Added a
+  regression executable for the renderer submit-target and environment-fade
+  model, a completion ledger/reference capture protocol, and Windows CI build
+  workflow. Release solution build and all three CTest checks pass. Installed
+  data validation loaded `common.res` (41), `ui.res` (96), `race.res` (57),
+  `viper.car` (30), `bemidji.trk` (40), and `english.lng` (822 strings); a
+  three-frame hidden WARP smoke run exited successfully. This is an executable
+  runtime foundation only: the game is not yet playable and has no integrated
+  race simulation/rendering loop. See `metadata/completion_ledger.md`.
+
 - **2026-10-24 continuation:** Added `plan_scene_renderer_submit_targets`
   for selector `0x455C80`, including both function-pointer slots, the four
   renderer selector globals, and incomplete results when required observations

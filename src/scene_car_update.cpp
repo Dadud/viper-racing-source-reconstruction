@@ -729,8 +729,9 @@ SceneRendererSubmitTargetSelection plan_scene_renderer_submit_targets(
         return result;
     }
     if (!*input.enabled_0x50d0a8) {
-        result.target_0x4db744 = 0x00455D90U;
-        result.target_0x4db748 = 0x00455D90U;
+        const auto selected = plan_scene_render_callback_selection(false, {});
+        result.target_0x4db744 = selected.callback_slot_0x4db744;
+        result.target_0x4db748 = selected.callback_slot_0x4db748;
         result.complete = true;
         return result;
     }
@@ -739,30 +740,18 @@ SceneRendererSubmitTargetSelection plan_scene_renderer_submit_targets(
         return result;
     }
 
-    if (*input.raster_mode_0x50d2dc != 0) {
-        if (*input.mode_0x50d119) {
-            result.target_0x4db744 = 0x00457090U;
-            result.target_0x4db748 = 0x00456220U;
-        } else {
-            result.target_0x4db744 = 0x00456660U;
-            result.target_0x4db748 = 0x00455F30U;
-        }
-    } else {
-        if (!input.mode_0x50d118.has_value()) {
-            return result;
-        }
-        if (*input.mode_0x50d119) {
-            result.target_0x4db744 = *input.mode_0x50d118
-                ? 0x00456D00U : 0x004569C0U;
-            result.target_0x4db748 = *input.mode_0x50d118
-                ? 0x00456210U : 0x00455F40U;
-        } else {
-            result.target_0x4db744 = *input.mode_0x50d118
-                ? 0x004563E0U : 0x00456230U;
-            result.target_0x4db748 = *input.mode_0x50d118
-                ? 0x00455F20U : 0x00455E00U;
-        }
+    if (*input.raster_mode_0x50d2dc == 0
+        && !input.mode_0x50d118.has_value()) {
+        return result;
     }
+    const SceneRenderCallbackSelectionObservation observation{
+        *input.mode_0x50d119,
+        *input.raster_mode_0x50d2dc != 0,
+        input.mode_0x50d118.value_or(false),
+    };
+    const auto selected = plan_scene_render_callback_selection(true, observation);
+    result.target_0x4db744 = selected.callback_slot_0x4db744;
+    result.target_0x4db748 = selected.callback_slot_0x4db748;
     result.complete = true;
     return result;
 }
@@ -1517,8 +1506,9 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
         callback_address == 0x00456D00U;
     const bool distance_faded_dual_palette = callback_address == 0x00456D00U;
     const bool environment_pre_lit = callback_address == 0x00456660U;
+    const bool environment_palette_fade = callback_address == 0x00457090U;
     const bool palette_callback = palette_fade || palette_lighting || dual_palette ||
-        environment_pre_lit;
+        environment_pre_lit || environment_palette_fade;
     if (!alpha_fill && !color_mask && !depth_fade && !palette_callback) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
         return result;
@@ -1625,6 +1615,32 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
             if (observation.descriptor_mode == 2U) {
                 write(0x14U, 0xFF000000U);
             }
+            if (!observation.environment_mapping_mode_2_enabled.has_value()) {
+                result.status = SceneRenderScanlineConversionStatus::environment_mapping_mode_observation_exhausted;
+                return result;
+            }
+            if (*observation.environment_mapping_mode_2_enabled) {
+                if (row_index >= observation.transformed_tail_words.size()) {
+                    result.status = SceneRenderScanlineConversionStatus::transformed_tail_observation_exhausted;
+                    return result;
+                }
+                const auto& tail = observation.transformed_tail_words[row_index];
+                write(0x18U, tail[0]);
+                write(0x1CU, tail[1]);
+                ++result.environment_mapping_transform_rows;
+            }
+            ++result.rows_processed;
+            ++result.row_counter_increments;
+            continue;
+        }
+        if (environment_palette_fade) {
+            write(0x14U, 0U);
+            if (row_index >= observation.distance_fade_alpha_bytes.size()) {
+                result.status = SceneRenderScanlineConversionStatus::distance_fade_alpha_observation_exhausted;
+                return result;
+            }
+            write(0x14U, static_cast<std::uint32_t>(
+                observation.distance_fade_alpha_bytes[row_index]) << 24U);
             if (!observation.environment_mapping_mode_2_enabled.has_value()) {
                 result.status = SceneRenderScanlineConversionStatus::environment_mapping_mode_observation_exhausted;
                 return result;

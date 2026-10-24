@@ -1123,6 +1123,26 @@ and alpha/counter (`ev_4799b3d0c93f5a0b6b64038d723121f99beab6c284746b903114b9da4
 `ev_2c3a186b8dad8766d6c4878141939f9e7e423dfc6ea6d0da6e526aa3fd5a825c`,
 `ev_f78447609e79fc750a255148f553f285afe37067a98b864c0cc64010f167127a`,
 `ev_6385719af1e8b8f040648a11e5e74910aae157499b8a497f7cef486e374f1fc0`).
+Callback `0x457090` combines palette lighting (modes 0/1) or white (mode 2),
+distance fade, then the `0x457460` environment helper. The bounded row model
+preserves five source-word copies, the color write, zero initialization at
+`+0x14`, and the final alpha write before any environment-tail changes. The
+helper changes `+0x18/+0x1C` only when `0x50D2DC == 2`. Missing alpha,
+environment-mode or transformed-tail observations retain preceding writes and
+stop before the row counter increment. The selector adapter now reuses the
+existing callback-selection implementation instead of duplicating its table.
+These operations are covered by `tests/renderer_regression.cpp`; computed
+palette indices, alpha values and transformed tails still require observations.
+Evidence: `disasm/engine_.text.asm`, `0x457090..0x4573E8` and
+`0x457460..0x45759B`; REA palette lookup `0x45713A`
+`ev_4a4c544cfa645c402eb570703de729bbf4d4a72f9c774ddab10de7ef017d15cb`,
+zero-alpha store `0x45714A`
+`ev_333d7ea23c646cd4e24406758b1e8830f60f7df3d1e116e5bb52d3654f416ea4`,
+helper call `0x4571D7`
+`ev_2702d0f59ce0748def0b4b1d7d1dc9cf86db29a711a95427ecb479afd53a5dff`,
+and helper gate `0x457463`
+`ev_f5d55d05ae7d34a3b31b02bc36be91495425dcd168ef71a3d43d10286a9d1611`.
+
 Four other second-slot callback targets are constant-argument panic
 forwarders: `0x455F20` passes `0x4DB74C`, `0x455F30` passes `0x4DB78C`,
 `0x456210` passes `0x4DB7C8`, and `0x456220` passes `0x4DB808` to

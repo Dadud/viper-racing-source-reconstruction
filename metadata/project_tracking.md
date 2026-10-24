@@ -1,6 +1,6 @@
 # Project tracking
 
-Updated: 2026-10-24 (ACAR curve-tracking helper reconstruction)
+Updated: 2026-10-24 (race-surface rendering and physics integration pass)
 
 ## Report two percentages
 
@@ -46,18 +46,18 @@ including recent compositions and successful builds. They are not claims of
 exhaustive coverage. The point totals make the estimate reproducible; update
 the maturity level when the evidence changes.
 
-### Reverse-engineering coverage: 58% (57.81 / 100)
+### Reverse-engineering coverage: 61% (61.25 / 100)
 
 | Workstream | Weight | Level | Points | Evidence / remaining gap |
 | --- | ---: | ---: | ---: | --- |
 | Target and asset recovery | 10 | 4 | 10.00 | Extracted game PE, installer and assets documented. Confirm target scope and provenance in `install_layout.md`. |
 | Resource and data formats | 10 | 3.25 | 8.13 | RST0/resource load paths, TIRE and track spline records, and shipped SEAS career records are decoded and connected to consumers; other payload semantics and runtime file outcomes remain open. See `resource_loading.md`, `vehicle_setup.md`, `world_track_objects.md`, `career_season_samples.md`. |
 | Startup and frontend flow | 15 | 2.75 | 10.31 | Startup handoff composes command-line/config flow, initialization, task/lock setup and cleanup; frontend/race transitions include composed callback and overlay paths. The main-menu localization registrations, cache gates, full-screen controller/registry, auxiliary control, and selection callback flow are now modeled. OS/allocation results, visible meanings, and several called systems remain unknown. See `engine_application_entry.md`, `frontend_dispatch.md`. |
-| Physics and simulation | 25 | 2.75 | 17.19 | Track placement, terrain/suspension/contact paths, tire response, PCAR/NCAR stages, physics-task record loading/population, STAT/BALL/CHKP/WOBL/GCAR constructors, partial ACAR profile/model-descriptor/runtime initialization and curve tracking, OBST shape branches, task-data cursor assignment/advance, and track service construction are modeled. Full race simulation, other constructor internals, selector/helper effects, exact arithmetic, and runtime behavior remain open. See `simulation_loop.md`, `car_update_branches.md`, `physics_task_objects.md`, `world_track_objects.md`, `vehicle_setup.md`. |
-| Scene and rendering | 15 | 2.25 | 8.44 | Dashboard/race-frame flow now connects state-0 callback text through layout and atlas rasterization in the race-loop composer; gear geometry and clipped pixel-write projections are also composed. DirectDraw submission/state and full scene rendering remain unknown or unimplemented. See `scene_car_update.md`, `simulation_loop.md`. |
+| Physics and simulation | 25 | 3 | 18.75 | Track placement, terrain/suspension/contact, tire response, PCAR/NCAR callbacks, wheel/body integration, impact mesh deformation, physics-task loading, and multiple track-object constructors are modeled and composed. Remaining constructor internals, exact arithmetic, several native helper effects, and runtime behavior remain open. See `simulation_loop.md`, `car_update_branches.md`, `physics_task_objects.md`, `world_track_objects.md`, `vehicle_setup.md`. |
+| Scene and rendering | 15 | 2.75 | 10.31 | State-0 dashboard, state-4 shared overlays, and state-5 numeric output are connected to race-loop callback/context flow; rasterized pixel writes can be applied to a locked surface span. Native DirectDraw acquisition/flip and complete scene rendering remain open. See `scene_car_update.md`, `simulation_loop.md`. |
 | Input, audio, platform services, multiplayer | 10 | 1.5 | 3.75 | Menu/race input gates, startup services, and multiplayer initialization/status/packet-queue paths have partial models; the status supervisor also models its two one-time localized labels, generation refresh gates, and thread-identity cleanup deadline. Full controls, audio, transport/lobby behavior, and runtime event/timer semantics remain open. |
 | Original-game behavioral validation | 15 | 0 | 0.00 | No systematic original-versus-model capture and comparison recorded. |
-| **Total** | **100** |  | **57.81** | Rounded to 58%. |
+| **Total** | **100** |  | **61.25** | Rounded to 61%. |
 
 ### Baseline playable reconstruction: 16% (16.25 / 100, 2026-10-22)
 
@@ -73,25 +73,25 @@ the maturity level when the evidence changes.
 | End-to-end integration and acceptance | 5 | 0 | 0.00 | No playable build or original-game comparison run recorded. |
 | **Total** | **100** |  | **16.25** | Rounded to 16%. |
 
-The 16% and 19% figures were earlier snapshots. This 28% score recognizes
+The 16%, 19%, 25%, and 28% figures were earlier snapshots. This 32% score recognizes
 additional source foundations in resource/season decoding, ranking, startup,
-wheel simulation, and physics-task loading. It does not mean the game is 28%
+wheel simulation, rendering, and physics-task loading. It does not mean the game is 32%
 playable: the end-to-end playable-game milestone remains at 0 until a game can
 launch and complete a race.
 
-### Current playable-reconstruction foundations: 28% (28.13 / 100)
+### Current playable-reconstruction foundations: 32% (32.19 / 100)
 
 | Workstream | Weight | Level | Points | Evidence / remaining gap |
 | --- | ---: | ---: | ---: | --- |
 | Buildable application and development loop | 10 | 1 | 2.50 | Full Visual Studio 18/CMake Release build succeeds and produces `build/Release/viper_reconstruction.exe`; it is a source-analysis tool, not a playable game. |
 | Asset and resource integration | 10 | 2.25 | 5.63 | Asset catalog and bundle readers now include resource loading and season inspection flows; they are still not feeding a running game. |
 | Frontend and race flow | 15 | 1.5 | 5.63 | Startup/race flow and season ranking inputs are composed; playable screens, complete race setup, and runtime results remain absent. |
-| Simulation and vehicle behavior | 25 | 1.5 | 9.38 | Composed wheel/contact paths and physics-task record/track services deepen the model; a game-loop-integrated simulation is absent. |
-| Rendering and presentation | 20 | 0.5 | 2.50 | Pixel and geometry output projections exist, but no renderer presents a playable scene. |
+| Simulation and vehicle behavior | 25 | 1.75 | 10.94 | Wheel/body integration, contact, force accumulation, and impact-object updates are more fully composed; no game-loop-integrated simulation is running. |
+| Rendering and presentation | 20 | 1 | 5.00 | Multiple race overlays are rasterized and their writes can be applied to a locked surface span; native surface lifecycle and a running renderer are absent. |
 | Input and audio | 10 | 0.25 | 0.63 | Some input events are modeled; controls are not wired into a playable game and audio is absent. |
 | Persistence, replay, networking | 5 | 1.5 | 1.88 | Career-file/progression models and decoded season records are connected to ranking; runtime race results, replay, and multiplayer remain unimplemented. |
 | End-to-end integration and acceptance | 5 | 0 | 0.00 | No playable game or original-game scenario has been run; the successful executable is an analysis tool. |
-| **Total** | **100** |  | **28.13** | Rounded to 28%; this is foundation work only. The playable-game acceptance milestone remains unmet. |
+| **Total** | **100** |  | **32.19** | Rounded to 32%; this is foundation work only. The playable-game acceptance milestone remains unmet. |
 
 ## Acceptance checks for level 4
 
@@ -302,6 +302,7 @@ After a meaningful change:
 - **2026-10-23:** Resolved the shared vtable's `+0x64` and `+0x68` calls in state 3: the former supplies a 60-second threshold, and the latter compares vehicle speed squared against raw constant `0x4431C71C`. Removed both caller-supplied gates from `update_alternate_mode_interface`; native display/result helper mutations remain outside the model. Release build succeeds; no tests were run.
 - **2026-10-23:** Traced `0x43BF00`'s display messages through `0x46BFE0`, `0x46C0D0`, and `0x46E4F0`. Active resolved targets now receive the observed flag stores and can be appended to the bounded 32-entry queue; lookup and queue state remain inputs, and overflow reports the panic route. Release build succeeds; no tests were run.
 - **2026-10-23 re-score:** The earlier whole-level scoring rule hid incremental progress. Changed to quarter-level increments and re-scored current evidence. Reverse-engineering coverage rises from 44% to 54% on composed startup, simulation, rendering, and multiplayer analysis. Playable reconstruction rises from 19% to 25% for stronger integrated model foundations; no playable game or original-runtime comparison is claimed. Recent Release builds succeed; original behavior validation remains outstanding.
+- **2026-10-24 review:** Connected state-0 dashboard, state-4 shared overlays, and state-5 numeric output to race-loop context/surface-write plans; expanded wheel/body integration and impact-object handling. Reverse-engineering coverage rises to 61% and reconstruction foundations to 32%. Latest source notes report successful builds for several slices, while later changes have build status pending/unavailable; no end-to-end playable run or original-game comparison is recorded.
 - **2026-10-23 latest review:** Added shipped SEAS decoding connected to event ranking, deeper resource loader/registration paths, and physics-task record population/track service models. Release build and whitespace checks pass. Updated reverse-engineering coverage to 56% and reconstruction foundations to 28%; end-to-end playable acceptance stays at 0 because there is still no game that can launch and complete a race. No tests or original-game comparison were run.
 - **2026-10-23:** Added the ordered `0x4031F0` dashboard resource/font initialization plan and composed it at its `0x401EA0` race-setup call site. The helper now preserves cache store order and widths. Scene/rendering maturity and both headline scores remain unchanged because renderer integration and original-game validation are still open; Release builds and `git diff --check` pass, no tests were run. Evidence: `ev_f63a1c54ee77e2b07363968872ef6738bfdb9961d2540c41da139ef5d11fa6e8`.
 - **2026-10-23:** Added the bounded STMP payload parser and `--inspect-stamp` command, then projected the font character tables built by `0x44DA00` and added `--inspect-font`. Shipped `common.res` samples `euro6.fnt` and `cross.stp` produce complete pointer tables with in-payload fixup targets; the font map preserves both metrics without assigning labels. The resource-format maturity level remains unchanged because other payload types and original runtime comparison remain open. Release build and `git diff --check` pass; no tests were run. Evidence: `ev_dc4e4553c2b95266ca3c76190a77d6371abee5ab9520656220facd6f817484b1`, `ev_4d95bea32a566762f91f581a174b2b9c3919d92416e39659afdfe44913a3bbee`, `ev_9c87753a7b96dd2eab7167774892dd8c6877748cc1df5c8cabe67c4f1dd8917f`, and `ev_257c3693e424fe89f3867434404a21c4e59f14182207e0decf39e99206b74e4d`.

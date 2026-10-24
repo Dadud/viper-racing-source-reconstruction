@@ -178,6 +178,28 @@ target_link_libraries(viper_reconstruction PRIVATE
 )
 target_compile_features(viper_reconstruction PRIVATE cxx_std_20)
 
+if(WIN32)
+    add_executable(viper_game src/game_main.cpp src/game_assets.cpp)
+    target_compile_features(viper_game PRIVATE cxx_std_20)
+    target_compile_definitions(viper_game PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    if(MSVC)
+        target_compile_options(viper_game PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    target_link_libraries(viper_game PRIVATE
+        viper_resource_bundle viper_language_resource d3d11 dxgi user32)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(viper_renderer_regression tests/renderer_regression.cpp)
+    target_link_libraries(viper_renderer_regression PRIVATE viper_scene_model)
+    add_test(NAME renderer_regression COMMAND viper_renderer_regression)
+    add_test(NAME inspection_help COMMAND viper_reconstruction --help)
+    if(WIN32)
+        add_test(NAME game_help COMMAND viper_game --help)
+    endif()
+endif()
+
 if(MSVC)
     target_compile_options(viper_asset_catalog PRIVATE /W4 /permissive-)
     target_compile_options(viper_frontend_model PRIVATE /W4 /permissive-)

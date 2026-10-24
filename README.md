@@ -1,5 +1,27 @@
 # Viper Racing source reconstruction
 
+## Runtime implementation and acceptance
+
+The completion plan is tracked in [the feature ledger](metadata/completion_ledger.md)
+and [reference capture protocol](metadata/reference_capture_protocol.md).
+`viper_game` is the new Windows runtime foundation: it loads external assets
+and creates a Direct3D 11 window. It does not yet render a track or run a race.
+`viper_reconstruction` remains the asset inspection tool.
+
+```powershell
+cmake -S . -B build -A x64 -DBUILD_TESTING=ON
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+./build/Release/viper_game.exe --data-dir ../game_install/GameData --validate-assets
+./build/Release/viper_game.exe --data-dir ../game_install/GameData
+# Bounded graphics initialization/presentation check using software rendering:
+./build/Release/viper_game.exe --data-dir ../game_install/GameData --software --smoke-frames 3
+```
+
+Public CI runs without original assets. Runtime checks use an external data
+directory, also configurable through `VIPER_DATA_DIR`. Passing these checks
+does not establish gameplay fidelity; original-game comparisons remain required.
+
 Project percentages, scoring rules, and acceptance checks are tracked in
 [`metadata/project_tracking.md`](metadata/project_tracking.md). It reports
 reverse-engineering coverage separately from playable reconstruction.
