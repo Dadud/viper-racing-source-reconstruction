@@ -3191,6 +3191,59 @@ SceneSharedResultsRasterPlan raster_scene_shared_results_rows(
     return result;
 }
 
+ScenePhysicsWheelBarLabelRasterPlan raster_scene_physics_wheel_bar_labels(
+    const std::array<ScenePhysicsWheelBarPlan, 4>& bars,
+    const ScenePhysicsWheelBarLabelRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font)
+{
+    ScenePhysicsWheelBarLabelRasterPlan result{};
+    for (std::size_t index = 0; index < bars.size(); ++index) {
+        const ScenePhysicsWheelBarOperation* label_operation = nullptr;
+        for (const auto& operation : bars[index].ordered_operations) {
+            if (operation.kind ==
+                ScenePhysicsWheelBarOperationKind::formatted_text_0x479580) {
+                if (label_operation != nullptr) {
+                    result.input_complete = false;
+                }
+                label_operation = &operation;
+            }
+        }
+        if (label_operation == nullptr ||
+            !bars[index].formatted_label_complete) {
+            result.input_complete = false;
+            continue;
+        }
+        if (label_operation->argument != 0x004D4C54U ||
+            label_operation->x2 != 0x11) {
+            result.input_complete = false;
+        }
+
+        const SceneDashboardTextCall call{
+            0x00479580U,
+            label_operation->x1,
+            label_operation->y1,
+            label_operation->argument,
+            observation.text_style.color_source,
+            observation.text_style.font_source,
+            observation.text_style.format_flags,
+        };
+        const auto layout = layout_scene_dashboard_text(
+            call, label_operation->text_argument, layout_font);
+        const auto raster = raster_scene_dashboard_text(
+            layout, atlas_font, observation.per_bar_renderers[index]);
+        ++result.labels_rasterized;
+        result.input_complete = result.input_complete && raster.input_complete;
+        result.ordered_pixel_writes.insert(
+            result.ordered_pixel_writes.end(), raster.pixel_writes.begin(),
+            raster.pixel_writes.end());
+    }
+    if (result.labels_rasterized != bars.size()) {
+        result.input_complete = false;
+    }
+    return result;
+}
+
 SceneTextPixelApplyResult apply_scene_shared_results_raster(
     const SceneSharedResultsRasterPlan& plan,
     const std::span<std::uint8_t> framebuffer)

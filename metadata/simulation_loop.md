@@ -1538,8 +1538,12 @@ eight-way midpoint-circle stepping and preserves its symmetric pixel-call
 order, including duplicate calls where the octants meet.
 `apply_scene_physics_wheel_bar_pixel_writes` validates the fill, circle, and
 indicator destinations together, then applies their writes in that exact
-order. It does not include the subsequent formatted label or any DirectDraw
-surface operation.
+order. `raster_scene_physics_wheel_bar_labels` now takes each bar's formatted
+`%1.0f` string through the shared `0x44DC70` layout and `0x44D0C0` atlas
+rasterizer, preserving pixel writes in bar order. The style object's color,
+font and flags, font tables, atlas bytes, and each bar's renderer/framebuffer
+observations remain supplied inputs; this helper does not acquire DirectDraw
+surfaces or infer those runtime resources.
 
 Evidence: `ev_8bd7df33daf7008cf7470c1009769d94a5bb726432e62f1801e8eb6ec676fbf1`
 (`0x40D570` bytes), `ev_e3c9bfbe5709843f76c437f4c75ec574f1058ea421f72bb5d2ee3a6f2c153063`

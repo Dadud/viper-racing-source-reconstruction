@@ -1652,6 +1652,27 @@ raster_scene_dashboard_builtin_font(
     const SceneDashboardAtlasFontObservation& font,
     const SceneDashboardRasterObservation& renderer);
 
+struct ScenePhysicsWheelBarLabelRasterObservation {
+    // Text color/font/flags selected by the 0x479580 style object (style 0x11).
+    SceneDashboardTextCall text_style{};
+    std::array<SceneDashboardRasterObservation, 4> per_bar_renderers{};
+};
+
+struct ScenePhysicsWheelBarLabelRasterPlan {
+    bool input_complete{true};
+    std::size_t labels_rasterized{};
+    std::vector<SceneTextPixelWrite> ordered_pixel_writes;
+};
+
+// Rasterizes the formatted `%1.0f` labels submitted by the four 0x479580
+// calls, using supplied style, font-table, atlas, and renderer observations.
+[[nodiscard]] ScenePhysicsWheelBarLabelRasterPlan
+raster_scene_physics_wheel_bar_labels(
+    const std::array<ScenePhysicsWheelBarPlan, 4>& bars,
+    const ScenePhysicsWheelBarLabelRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font);
+
 struct SceneSharedResultsRasterPlan {
     bool input_complete{true};
     std::size_t row_calls_rasterized{};
