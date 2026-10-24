@@ -3,6 +3,8 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <array>
+#include <vector>
 
 namespace {
 
@@ -38,6 +40,22 @@ int main()
         require(state.elapsed_seconds == 1.75F &&
                 !viper::observe_race_route_transition(state, 1U, true, 2U),
             "finished race state must remain stable");
+
+        const std::vector<std::array<float, 2>> square_route{
+            {0.0F, 0.0F}, {10.0F, 0.0F},
+            {10.0F, 10.0F}, {0.0F, 10.0F}};
+        viper::RouteMotionState motion{};
+        viper::initialize_race_progression(motion.race, 0U);
+        viper::RouteMotionResult motion_result{};
+        for (unsigned frame = 0U; frame < 6000U && !motion.race.finished; ++frame) {
+            motion_result = viper::advance_route_motion(motion, square_route,
+                false, false, true, false, 1.0F / 60.0F, 2U);
+            require(motion_result.valid,
+                "route integrator must produce finite poses during a closed-course run");
+        }
+        require(motion.race.finished && motion.race.completed_laps == 2U &&
+                motion_result.finished && motion.race.elapsed_seconds > 0.0F,
+            "the runtime route integrator must drive through the configured finish");
         std::cout << "race progression regression checks passed\n";
         return 0;
     } catch (const std::exception& error) {

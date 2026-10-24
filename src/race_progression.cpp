@@ -33,4 +33,77 @@ bool observe_race_route_transition(
     return true;
 }
 
+RouteMotionResult advance_route_motion(
+    RouteMotionState& state,
+    const std::span<const std::array<float, 2>> route,
+    const bool steer_left,
+    const bool steer_right,
+    const bool accelerate,
+    const bool brake,
+    float delta_seconds,
+    const std::uint32_t target_laps) noexcept
+{
+    RouteMotionResult result{};
+    if (route.size() < 2U || state.route_segment >= route.size() ||
+        state.race.finished || !std::isfinite(delta_seconds)) {
+        result.finished = state.race.finished;
+        return result;
+    }
+    delta_seconds = std::clamp(delta_seconds, 0.0F, 0.05F);
+    advance_race_clock(state.race, delta_seconds);
+    const float steering_input = static_cast<float>(steer_right) -
+        static_cast<float>(steer_left);
+    state.steering += (steering_input - state.steering) *
+        std::min(1.0F, delta_seconds * 5.0F);
+    const float drive = static_cast<float>(accelerate) - static_cast<float>(brake);
+    state.speed = std::clamp((state.speed + drive * 14.0F * delta_seconds) *
+        std::pow(0.992F, delta_seconds * 60.0F), -8.0F, 38.0F);
+    float distance = state.speed * delta_seconds;
+    for (unsigned guard = 0U; std::abs(distance) > 1.0e-5F && guard < 128U; ++guard) {
+        const auto& a = route[state.route_segment];
+        const auto& b = route[(state.route_segment + 1U) % route.size()];
+        const float dx = b[0] - a[0];
+        const float dz = b[1] - a[1];
+        const float length = std::sqrt(dx * dx + dz * dz);
+        if (!(length > 1.0e-5F)) {
+            state.route_segment = (state.route_segment + 1U) % route.size();
+            state.route_fraction = 0.0F;
+            continue;
+        }
+        const float remaining = (distance > 0.0F
+            ? 1.0F - state.route_fraction : state.route_fraction) * length;
+        if (std::abs(distance) < remaining) {
+            state.route_fraction += distance / length;
+            distance = 0.0F;
+        } else {
+            const bool forward = distance > 0.0F;
+            distance += distance > 0.0F ? -remaining : remaining;
+            state.route_segment = (state.route_segment +
+                (forward ? 1U : route.size() - 1U)) % route.size();
+            state.route_fraction = forward ? 0.0F : 1.0F;
+            result.lap_completed = observe_race_route_transition(state.race,
+                state.route_segment, forward, target_laps) || result.lap_completed;
+            if (state.race.finished) {
+                state.speed = 0.0F;
+                distance = 0.0F;
+            }
+        }
+    }
+    const auto& a = route[state.route_segment];
+    const auto& b = route[(state.route_segment + 1U) % route.size()];
+    const float dx = b[0] - a[0];
+    const float dz = b[1] - a[1];
+    const float tangent = std::atan2(dx, dz);
+    const float route_x = a[0] + dx * state.route_fraction;
+    const float route_z = a[1] + dz * state.route_fraction;
+    const float lateral = state.steering * state.speed * std::abs(state.speed) * 0.0008F;
+    result.x = route_x + std::cos(tangent) * lateral;
+    result.z = route_z - std::sin(tangent) * lateral;
+    result.yaw = tangent + state.steering * 0.35F;
+    result.valid = std::isfinite(result.x) && std::isfinite(result.z) &&
+        std::isfinite(result.yaw);
+    result.finished = state.race.finished;
+    return result;
+}
+
 } // namespace viper
