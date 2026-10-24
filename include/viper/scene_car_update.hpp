@@ -602,6 +602,89 @@ struct SceneRendererDeferredEnqueuePlan {
 [[nodiscard]] SceneRendererDeferredEnqueuePlan plan_scene_renderer_deferred_enqueue(
     const SceneRendererDeferredEnqueueInput& input) noexcept;
 
+inline constexpr std::size_t scene_renderer_deferred_queue_bucket_count = 0x77;
+
+struct SceneRendererDeferredDrawNodeObservation {
+    bool pointer_present{true};
+    std::uint32_t address{};
+    std::optional<std::uint32_t> next_address;
+    bool binding_pointer_present{true};
+    std::uint32_t binding_node_address{};
+    std::uint32_t descriptor_row_address{};
+    std::uint32_t vertex_data_address{};
+    SceneRendererBindingNode binding_fields;
+};
+
+struct SceneRendererDeferredQueueBucketObservation {
+    std::optional<std::uint32_t> head_address;
+    std::optional<bool> skip_in_first_pass; // result of 0x4540E0(handle)
+    std::span<const SceneRendererDeferredDrawNodeObservation> nodes_in_link_order;
+};
+
+enum class SceneRendererDeferredDrainIssue : std::uint8_t {
+    queue_head_unobserved,
+    first_pass_gate_unobserved,
+    first_pass_gate_observation_contradicted,
+    node_observation_exhausted,
+    null_queue_node,
+    broken_node_link,
+    null_binding_pointer,
+    pool_manager_missing,
+    pool_free_head_unobserved,
+    active_allocation_count_unobserved,
+};
+
+enum class SceneRendererDeferredDrainActionKind : std::uint8_t {
+    helper_call,
+    bind_texture_handle,
+    submit_vertices,
+    draw_descriptor_range,
+    return_pool_node,
+    clear_queue_head,
+};
+
+struct SceneRendererDeferredDrainAction {
+    SceneRendererDeferredDrainActionKind kind{};
+    std::uint32_t helper{};
+    std::size_t queue_slot{};
+    std::size_t node_index{};
+    std::uint32_t node_address{};
+    std::uint32_t binding_node_address{};
+    std::uint32_t descriptor_row_address{};
+    std::int32_t texture_handle{};
+    std::array<std::uint32_t, 4> integer_arguments{};
+    std::optional<std::uint32_t> pool_free_head_before;
+    std::optional<std::uint32_t> pool_free_head_after;
+};
+
+struct SceneRendererDeferredDrainInput {
+    std::array<SceneRendererDeferredQueueBucketObservation,
+        scene_renderer_deferred_queue_bucket_count> buckets;
+    std::uint32_t texture_data_base_0x4d9fec{};
+    bool pool_manager_present{true}; // DAT_00509ED8
+    std::optional<std::uint32_t> pool_free_head_address;
+    std::optional<std::int32_t> active_pool_allocations;
+};
+
+struct SceneRendererDeferredDrainPlan {
+    std::vector<SceneRendererDeferredDrainIssue> issues;
+    std::vector<SceneRendererDeferredDrainAction> actions;
+    std::array<std::optional<std::uint32_t>,
+        scene_renderer_deferred_queue_bucket_count> queue_heads_after;
+    std::optional<std::uint32_t> pool_free_head_after;
+    std::optional<std::int32_t> active_pool_allocations_after;
+    std::size_t nodes_drawn{};
+    std::size_t nodes_recycled{};
+    std::size_t buckets_cleared{};
+    bool deferred_activity_flag_0x509edc_cleared{true};
+    bool complete{true};
+};
+
+// Projects 0x450DA0's gate-ordered pass followed by its unconditional
+// 0x450E50 remainder pass, including draw calls, queue clears, and pool returns.
+[[nodiscard]] SceneRendererDeferredDrainPlan plan_scene_renderer_deferred_drain(
+    const SceneRendererDeferredDrainInput& input);
+
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,
     generated,

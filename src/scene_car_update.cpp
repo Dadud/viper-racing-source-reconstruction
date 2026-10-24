@@ -888,6 +888,215 @@ SceneRendererDeferredEnqueuePlan plan_scene_renderer_deferred_enqueue(
     return result;
 }
 
+SceneRendererDeferredDrainPlan plan_scene_renderer_deferred_drain(
+    const SceneRendererDeferredDrainInput& input)
+{
+    SceneRendererDeferredDrainPlan result{};
+    result.pool_free_head_after = input.pool_free_head_address;
+    result.active_pool_allocations_after = input.active_pool_allocations;
+    std::array<bool, scene_renderer_deferred_queue_bucket_count> bucket_drained{};
+    std::array<bool, scene_renderer_deferred_queue_bucket_count> bucket_failed{};
+
+    const auto add_issue = [&result](const SceneRendererDeferredDrainIssue issue) {
+        result.complete = false;
+        if (std::find(result.issues.begin(), result.issues.end(), issue)
+            == result.issues.end()) {
+            result.issues.push_back(issue);
+        }
+    };
+    const auto add_helper = [&result](const std::uint32_t helper,
+                                      const std::size_t slot,
+                                      const std::int32_t handle) {
+        SceneRendererDeferredDrainAction action{};
+        action.kind = SceneRendererDeferredDrainActionKind::helper_call;
+        action.helper = helper;
+        action.queue_slot = slot;
+        action.texture_handle = handle;
+        result.actions.push_back(action);
+    };
+
+    for (std::size_t slot = 0; slot < input.buckets.size(); ++slot) {
+        result.queue_heads_after[slot] = input.buckets[slot].head_address;
+    }
+
+    // 0x450DA0 resets the deferred flag and synchronizes renderer state.
+    add_helper(0x00457AF0U, 0U, -1);
+
+    const auto drain_bucket = [&input, &result, &add_issue, &add_helper,
+        &bucket_drained, &bucket_failed](const std::size_t slot) {
+        const auto& bucket = input.buckets[slot];
+        if (!bucket.head_address.has_value()) {
+            add_issue(SceneRendererDeferredDrainIssue::queue_head_unobserved);
+            bucket_failed[slot] = true;
+            return;
+        }
+        auto expected_node = *bucket.head_address;
+        if (expected_node == 0U) {
+            bucket_drained[slot] = true;
+            return;
+        }
+
+        const auto handle = static_cast<std::int32_t>(slot) - 1;
+        add_helper(0x004524E0U, slot, handle);
+        std::size_t node_index = 0;
+        while (expected_node != 0U) {
+            if (node_index >= bucket.nodes_in_link_order.size()) {
+                add_issue(SceneRendererDeferredDrainIssue::node_observation_exhausted);
+                bucket_failed[slot] = true;
+                return;
+            }
+            const auto& node = bucket.nodes_in_link_order[node_index];
+            if (!node.pointer_present) {
+                add_issue(SceneRendererDeferredDrainIssue::null_queue_node);
+                bucket_failed[slot] = true;
+                return;
+            }
+            if (node.address != expected_node) {
+                add_issue(SceneRendererDeferredDrainIssue::broken_node_link);
+                bucket_failed[slot] = true;
+                return;
+            }
+            if (!node.binding_pointer_present) {
+                add_issue(SceneRendererDeferredDrainIssue::null_binding_pointer);
+                bucket_failed[slot] = true;
+                return;
+            }
+
+            SceneRendererDeferredDrainAction submit{};
+            submit.kind = SceneRendererDeferredDrainActionKind::submit_vertices;
+            submit.helper = 0x00455D70U;
+            submit.queue_slot = slot;
+            submit.node_index = node_index;
+            submit.node_address = node.address;
+            submit.binding_node_address = node.binding_node_address;
+            submit.descriptor_row_address = node.descriptor_row_address;
+            submit.texture_handle = handle;
+            submit.integer_arguments = {node.descriptor_row_address,
+                node.vertex_data_address, input.texture_data_base_0x4d9fec, 0U};
+            result.actions.push_back(submit);
+
+            SceneRendererDeferredDrainAction draw{};
+            draw.kind = SceneRendererDeferredDrainActionKind::draw_descriptor_range;
+            draw.helper = 0x004525B0U;
+            draw.queue_slot = slot;
+            draw.node_index = node_index;
+            draw.node_address = node.address;
+            draw.binding_node_address = node.binding_node_address;
+            draw.descriptor_row_address = node.descriptor_row_address;
+            draw.texture_handle = handle;
+            draw.integer_arguments = {
+                static_cast<std::uint32_t>(node.binding_fields.texture_offset_0x20),
+                static_cast<std::uint32_t>(node.binding_fields.texture_component_count_0x24),
+                node.binding_fields.vertex_pointer_0x18,
+                static_cast<std::uint32_t>(node.binding_fields.vertex_component_count_0x1c)};
+            result.actions.push_back(draw);
+            ++result.nodes_drawn;
+
+            SceneRendererDeferredDrainAction recycle{};
+            recycle.kind = SceneRendererDeferredDrainActionKind::return_pool_node;
+            recycle.helper = 0x00419870U;
+            recycle.queue_slot = slot;
+            recycle.node_index = node_index;
+            recycle.node_address = node.address;
+            recycle.binding_node_address = node.binding_node_address;
+            recycle.texture_handle = handle;
+            recycle.pool_free_head_before = result.pool_free_head_after;
+            recycle.pool_free_head_after = node.address;
+            result.actions.push_back(recycle);
+            if (!input.pool_manager_present) {
+                add_issue(SceneRendererDeferredDrainIssue::pool_manager_missing);
+                bucket_failed[slot] = true;
+                return;
+            }
+
+            ++result.nodes_recycled;
+            if (!result.pool_free_head_after.has_value()) {
+                add_issue(SceneRendererDeferredDrainIssue::pool_free_head_unobserved);
+            }
+            result.pool_free_head_after = node.address;
+            if (result.active_pool_allocations_after.has_value()) {
+                auto& active_count = *result.active_pool_allocations_after;
+                active_count = active_count == INT32_MIN
+                    ? INT32_MAX : active_count - 1;
+            } else {
+                add_issue(SceneRendererDeferredDrainIssue::active_allocation_count_unobserved);
+            }
+            if (!node.next_address.has_value()) {
+                add_issue(SceneRendererDeferredDrainIssue::broken_node_link);
+                bucket_failed[slot] = true;
+                return;
+            }
+            expected_node = *node.next_address;
+            ++node_index;
+        }
+
+        SceneRendererDeferredDrainAction cleanup{};
+        cleanup.kind = SceneRendererDeferredDrainActionKind::helper_call;
+        cleanup.helper = 0x004525E0U;
+        cleanup.queue_slot = slot;
+        cleanup.texture_handle = handle;
+        result.actions.push_back(cleanup);
+        SceneRendererDeferredDrainAction clear{};
+        clear.kind = SceneRendererDeferredDrainActionKind::clear_queue_head;
+        clear.queue_slot = slot;
+        clear.texture_handle = handle;
+        clear.integer_arguments[0] = 0U;
+        result.actions.push_back(clear);
+        result.queue_heads_after[slot] = 0U;
+        ++result.buckets_cleared;
+        bucket_drained[slot] = true;
+    };
+
+    // First pass: 0x4540E0 true leaves that bucket for the unconditional pass.
+    for (std::size_t slot = 0; slot < input.buckets.size(); ++slot) {
+        const auto& bucket = input.buckets[slot];
+        if (!bucket.head_address.has_value()) {
+            add_issue(SceneRendererDeferredDrainIssue::queue_head_unobserved);
+            bucket_failed[slot] = true;
+            continue;
+        }
+        if (*bucket.head_address == 0U) {
+            bucket_drained[slot] = true;
+            continue;
+        }
+        const auto handle = static_cast<std::int32_t>(slot) - 1;
+        add_helper(0x004540E0U, slot, handle);
+        bool skip_first_pass = false;
+        if (handle == -1) {
+            if (bucket.skip_in_first_pass.value_or(false)) {
+                add_issue(SceneRendererDeferredDrainIssue::first_pass_gate_observation_contradicted);
+            }
+        } else if (!bucket.skip_in_first_pass.has_value()) {
+            add_issue(SceneRendererDeferredDrainIssue::first_pass_gate_unobserved);
+            continue;
+        } else {
+            skip_first_pass = *bucket.skip_in_first_pass;
+        }
+        if (!skip_first_pass) {
+            drain_bucket(slot);
+        }
+    }
+
+    // 0x450DA0 always calls 0x450E50, which drains every remaining known head.
+    add_helper(0x00450E50U, 0U, -1);
+    add_helper(0x00457AF0U, 0U, -1);
+    for (std::size_t slot = 0; slot < input.buckets.size(); ++slot) {
+        if (bucket_drained[slot] || bucket_failed[slot]) {
+            continue;
+        }
+        const auto& bucket = input.buckets[slot];
+        if (!bucket.head_address.has_value()) {
+            continue;
+        }
+        if (*bucket.head_address != 0U) {
+            drain_bucket(slot);
+        } else {
+            bucket_drained[slot] = true;
+        }
+    }
+    return result;
+}
+
 SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
     const SceneCarEffectParticleGeneratorInput& input) noexcept
 {

@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added `plan_scene_renderer_deferred_drain` for
+  `0x450DA0` plus its unconditional `0x450E50` remainder pass. It projects the
+  gate-ordered first pass, second state sync, LIFO node draw order, per-node
+  pool return/count decrement, no-op and bucket-head clear. All 119 bucket
+  chains are bounded; unknown gates, heads, links, or null node pointers are
+  surfaced as incomplete issues. The Release `viper_race_scene_flow` target
+  builds and `git diff --check` passes; no tests were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** Added a bounded `0x450EE0` deferred-render
   enqueue projection. It models the fixed 1,024-node/16-byte pool pop, the
   active-allocation counter, all four queue-node DWORDs, the `handle + 1`

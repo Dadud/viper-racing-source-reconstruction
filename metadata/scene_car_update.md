@@ -552,8 +552,8 @@ setup/`0x513A0(1)` cleanup around the always-issued `0x51610(0x100)`,
 `0x51940(0x10)`, `0x44F7D0(+0x38, transform)`, and state restoration calls.
 Missing config outcome marks the plan incomplete but keeps the known ordered
 calls. `0x44F7D0` performs its own transform/culling and alpha gates before
-calling model traversal `0x44FC80`; its inner descriptor/device loop remains a
-separate renderer gap. Evidence: copy and setup from `0x461D10`
+calling model traversal `0x44FC80`; the descriptor traversal and deferred
+queue paths are projected below. Evidence: copy and setup from `0x461D10`
 (`ev_a4a4a2d073b9a755c6bff9559873afd61b7ab1c59281513e7030812e5740a946`,
 `ev_2f4824439dec4e2aa0bfa5ae78086075ff01fe4d14b6b098e1c6f1331625ea1c`,
 `ev_cc884629cf5b7fe86370cb5565d2b8a829880978a5afb2564655417343929319`,
@@ -612,8 +612,27 @@ pool return `0x419870` `ev_1b5f360f31d2e576841b3878ab44ca1eb7c8549803ddea1ab94b4
 queue setup `0x450D10` `ev_14fbfd92846033b6008b4849c6f88034e3ff6ff656eeffb072d3d0c3dcaa560f`,
 panic wrapper `0x411000` `ev_33e3e536e1f2727e9ac6c24e63969e9720ddc0d6590e3ad31c2ce3978cc79c58`,
 and panic termination helper `0x416020` `ev_3f91ad4ab1c6dfdb5430f89d2815a39a7229215eb91d3acba447dc346ad54faf`.
-The queue drain at `0x450DA0` and unconditional remainder drain at `0x450E50`
-are traced but still need a bounded linked-node rendering/recycling projection.
+
+`plan_scene_renderer_deferred_drain` now projects the complete ordered drain
+prefix of `0x450DA0` and `0x450E50` over 119 bounded bucket observations. The
+first pass clears `0x509EDC`, synchronizes renderer state, queries
+`0x4540E0(handle)` for each nonempty bucket, and renders buckets whose gate is
+false. The function then always calls `0x450E50`, synchronizes state again,
+and drains every remaining observed bucket, including those skipped by the
+first gate. Both passes bind `handle = slot - 1`, submit through `0x455D70`,
+draw the binding node's `+0x18..+0x24` range, return each queue node through
+`0x419870`, call `0x4525E0`, and clear the bucket head after a complete chain.
+Pool free-head links, active-count decrement, chain order, and queue head
+clears are recorded. A missing pool manager is surfaced at the node-return
+call after the draw, matching the native operation order. Missing heads/gates/
+links or null node pointers mark the plan incomplete and stop only the affected
+chain. Evidence: first pass
+`0x450DA0` `ev_c7939d6620b3d579b5815bec43bf6c300b5d9bb0b5d617eadccddda0341b56f3`,
+unconditional drain `0x450E50` `ev_fe7127a557a131f4be4d6899e7301a5b0c8ec70b91c110ecb95b5d716fd250bc`,
+gate `0x4540E0` `ev_cf04f42b829b5299ec30d322202c94128ff598a559bb372e0cee19e0403a5c4b`,
+and pool return `0x419870` `ev_1b5f360f31d2e576841b3878ab44ca1eb7c8549803ddea1ab94b423cb23c0e67`.
+Actual indirect renderer backends and device execution remain outside this
+projection.
 
 ### Scene-car virtual `+0x18` callout
 
