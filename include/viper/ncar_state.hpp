@@ -485,9 +485,77 @@ struct NcarInterpolatedRecordSelectionPlan {
     std::array<std::uint8_t, ncar_interpolated_record_bytes> second_record{};
 };
 
+inline constexpr std::size_t ncar_registered_object_count = 16;
+using NcarRegisteredObjectTable =
+    std::array<std::uint32_t, ncar_registered_object_count>;
+
+struct NcarObjectRegistrationObservation {
+    NcarRegisteredObjectTable table{};
+    std::int32_t index{};
+    std::uint32_t object_pointer{};
+};
+
+struct NcarObjectRegistrationPlan {
+    NcarRegisteredObjectTable table{};
+    bool pre_registration_noop_0x415090_called{true};
+    bool post_registration_noop_0x4150a0_called{true};
+    bool index_in_table{};
+    bool out_of_table_write_unmodeled{};
+    bool table_write_applied{};
+};
+
+struct NcarObjectLookupObservation {
+    NcarRegisteredObjectTable table{};
+    std::int32_t index{};
+};
+
+struct NcarObjectLookupPlan {
+    bool no_op_helper_0x420960_called{true};
+    bool index_in_table{};
+    bool out_of_table_read_unmodeled{};
+    std::optional<std::uint32_t> object_pointer;
+};
+
+// Models the 16-entry object-pointer registry initialized by 0x420480, updated
+// by 0x4208F0, and read by 0x420930. The native helpers do not bounds-check.
+[[nodiscard]] NcarObjectRegistrationPlan register_ncar_object(
+    const NcarObjectRegistrationObservation& observation) noexcept;
+[[nodiscard]] NcarObjectLookupPlan lookup_ncar_object(
+    const NcarObjectLookupObservation& observation) noexcept;
+
+struct NcarRegisteredObjectInfluenceObservation {
+    std::array<float, 3> destination_position_0x5c{};
+    std::array<float, 3> source_position_0xe08{};
+    float source_radius_0xe14{};
+    std::array<float, 3> source_vector_0x234{};
+    std::array<float, 3> destination_accumulator_0xdfc{};
+    bool source_virtual_gate_0x30_nonzero{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct NcarRegisteredObjectInfluencePlan {
+    std::array<float, 3> destination_accumulator_0xdfc{};
+    std::array<float, 3> position_delta{};
+    float distance_squared{};
+    float radius_squared{};
+    float influence_fraction{};
+    bool source_virtual_gate_0x30_called{true};
+    bool source_virtual_gate_accepted{};
+    bool inside_strict_radius{};
+    bool influence_applied{};
+    bool fdiv_compatibility_used{};
+    bool x87_extended_precision_approximated{true};
+};
+
+// Projects the pairwise registered-object influence at 0x432300. The target's
+// +0xDFc accumulator is kept separate from the source object's pose/vector.
+[[nodiscard]] NcarRegisteredObjectInfluencePlan
+apply_ncar_registered_object_influence(
+    const NcarRegisteredObjectInfluenceObservation& observation) noexcept;
+
 // Runtime observations used by the outer object dispatcher around 0x427630.
-// Dynamic callback-table and transform-table contents are supplied explicitly;
-// they are populated by runtime registration and are not present in the PE.
+// Dynamic callback-table, object-registry, and transform-payload contents are
+// supplied explicitly; they are populated at runtime and are not in the PE.
 struct NcarInterpolatedDispatchObservation {
     NcarInterpolatedRecordSelectionObservation selection{};
     NcarInterpolatedUpdateObservation update{};
@@ -500,6 +568,7 @@ struct NcarInterpolatedDispatchObservation {
     // Resolution of the indexed target pointer passed to 0x41D1C0.
     bool indexed_target_pointer_nonnull{};
     std::optional<std::uint32_t> indexed_target_value_0x2c;
+    std::optional<NcarRegisteredObjectTable> registered_object_table_0x507d70;
     // Runtime transform returned by 0x420930 for the +0xEC8 index.
     std::optional<std::array<float, 12>> registered_transform_0x38;
     // AL from the global +0x40 virtual callback; unknown means dispatch is
@@ -516,7 +585,13 @@ struct NcarInterpolatedDispatchPlan {
     std::uint32_t indexed_target_write_0x04{};
     std::uint32_t indexed_target_write_0x08{};
     bool indexed_target_null_dereference{};
-    bool registered_transform_callback_0x420930_called{};
+    bool registered_transform_lookup_0x420930_called{};
+    bool registered_object_table_observation_available{};
+    bool registered_object_table_observation_missing{};
+    NcarObjectLookupPlan registered_object_lookup{};
+    bool registered_object_out_of_table_access_unmodeled{};
+    bool registered_transform_null_dereference{};
+    bool registered_transform_copy_attempted{};
     bool registered_transform_copy_valid{};
     std::array<float, 12> copied_transform_0x38{};
     std::optional<std::uint32_t> object_flags_after_virtual_callback_0x04;

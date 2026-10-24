@@ -1091,12 +1091,104 @@ NcarInterpolatedRecordSelectionPlan select_ncar_interpolated_records(
     return result;
 }
 
+NcarObjectRegistrationPlan register_ncar_object(
+    const NcarObjectRegistrationObservation& observation) noexcept
+{
+    NcarObjectRegistrationPlan result{};
+    result.table = observation.table;
+    if (observation.index < 0 ||
+        observation.index >= static_cast<std::int32_t>(
+            ncar_registered_object_count)) {
+        result.out_of_table_write_unmodeled = true;
+        return result;
+    }
+
+    result.index_in_table = true;
+    result.table[static_cast<std::size_t>(observation.index)] =
+        observation.object_pointer;
+    result.table_write_applied = true;
+    return result;
+}
+
+NcarObjectLookupPlan lookup_ncar_object(
+    const NcarObjectLookupObservation& observation) noexcept
+{
+    NcarObjectLookupPlan result{};
+    if (observation.index < 0 ||
+        observation.index >= static_cast<std::int32_t>(
+            ncar_registered_object_count)) {
+        result.out_of_table_read_unmodeled = true;
+        return result;
+    }
+
+    result.index_in_table = true;
+    result.object_pointer = observation.table[
+        static_cast<std::size_t>(observation.index)];
+    return result;
+}
+
+NcarRegisteredObjectInfluencePlan apply_ncar_registered_object_influence(
+    const NcarRegisteredObjectInfluenceObservation& observation) noexcept
+{
+    NcarRegisteredObjectInfluencePlan result{};
+    result.destination_accumulator_0xdfc =
+        observation.destination_accumulator_0xdfc;
+    result.source_virtual_gate_0x30_called = true;
+    if (!observation.source_virtual_gate_0x30_nonzero) {
+        return result;
+    }
+    result.source_virtual_gate_accepted = true;
+
+    long double distance_squared = 0.0L;
+    long double radius_squared = 0.0L;
+    for (std::size_t axis = 0; axis < result.position_delta.size(); ++axis) {
+        result.position_delta[axis] = observation.source_position_0xe08[axis] -
+            observation.destination_position_0x5c[axis];
+        const long double delta = result.position_delta[axis];
+        distance_squared += delta * delta;
+    }
+    result.distance_squared = static_cast<float>(distance_squared);
+    const long double radius = observation.source_radius_0xe14;
+    radius_squared = radius * radius;
+    result.radius_squared = static_cast<float>(radius_squared);
+    if (!(result.distance_squared < result.radius_squared)) {
+        return result;
+    }
+    result.inside_strict_radius = true;
+
+    const long double numerator =
+        static_cast<long double>(result.radius_squared) -
+        result.distance_squared;
+    const long double fraction = divide_with_vc98_fdiv_compatibility(
+        numerator, result.radius_squared,
+        observation.fdiv_compatibility_enabled);
+    result.influence_fraction = static_cast<float>(fraction);
+    result.fdiv_compatibility_used =
+        observation.fdiv_compatibility_enabled;
+    for (std::size_t axis = 0; axis <
+         result.destination_accumulator_0xdfc.size(); ++axis) {
+        result.destination_accumulator_0xdfc[axis] = static_cast<float>(
+            static_cast<long double>(observation.source_vector_0x234[axis]) *
+                fraction +
+            observation.destination_accumulator_0xdfc[axis]);
+    }
+    result.influence_applied = true;
+    return result;
+}
+
 NcarInterpolatedDispatchPlan dispatch_ncar_interpolated_object(
     const NcarInterpolatedDispatchObservation& observation) noexcept
 {
     NcarInterpolatedDispatchPlan result{};
     result.indexed_target_table_byte_offset = 0xA4U +
         observation.object_callback_index_0x510 * 116U;
+    std::uint32_t flags = observation.object_flags_0x04;
+    if (observation.object_gate_0xed4 > 0 &&
+        observation.selection.object_limit_0xef8 != 0) {
+        flags |= 1U;
+    }
+    result.object_flags_after_gate_0x04 = flags;
+
     if (observation.indexed_target_pointer_nonnull &&
         observation.indexed_target_value_0x2c.has_value()) {
         result.indexed_target_stores_valid = true;
@@ -1109,15 +1201,26 @@ NcarInterpolatedDispatchPlan dispatch_ncar_interpolated_object(
         return result;
     }
 
-    std::uint32_t flags = observation.object_flags_0x04;
-    if (observation.object_gate_0xed4 > 0 &&
-        observation.selection.object_limit_0xef8 != 0) {
-        flags |= 1U;
-    }
-    result.object_flags_after_gate_0x04 = flags;
-
     if ((flags & 1U) == 0) {
-        result.registered_transform_callback_0x420930_called = true;
+        result.registered_transform_lookup_0x420930_called = true;
+        if (!observation.registered_object_table_0x507d70.has_value()) {
+            result.registered_object_table_observation_missing = true;
+            return result;
+        }
+        result.registered_object_table_observation_available = true;
+        result.registered_object_lookup = lookup_ncar_object(
+            {*observation.registered_object_table_0x507d70,
+                std::bit_cast<std::int32_t>(
+                    observation.object_transform_index_0xec8)});
+        if (!result.registered_object_lookup.index_in_table) {
+            result.registered_object_out_of_table_access_unmodeled = true;
+            return result;
+        }
+        if (*result.registered_object_lookup.object_pointer == 0U) {
+            result.registered_transform_null_dereference = true;
+            return result;
+        }
+        result.registered_transform_copy_attempted = true;
         if (observation.registered_transform_0x38.has_value()) {
             result.registered_transform_copy_valid = true;
             result.copied_transform_0x38 =

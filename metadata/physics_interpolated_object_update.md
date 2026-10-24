@@ -235,3 +235,41 @@ and tail callback/counter (`ev_d9b563852421b30c5ed2094de5e9a865e5651b0a9c13be1b0
 `ev_56d03dcd2ac7a488f7183e295c8ffd854b1dd2f99fd8d73eb87898d59907c7f8`).
 The complete instruction observations are bundled in
 `metadata/ncar_interpolation_dispatch.evidence.json`.
+
+### Registered object table and pairwise influence
+
+The table at `0x507D70` is a 16-entry object-pointer registry, not a static
+transform array: `0x420480` clears all 16 DWORDs during initialization,
+`0x4208F0` writes `param_1` to `table[param_2]`, and `0x420930` reads the
+pointer at its signed index before the dispatch copies from that object's
+`+0x38`. The registration wrappers `0x415090`/`0x4150A0` and lookup helper
+`0x420960` are one-byte `RET` routines in this build, so the registration
+write has no effective lock. Neither native access checks the index. The
+source projection bounds its own 16-entry snapshot and explicitly reports
+out-of-table access as unmodeled instead of simulating adjacent-memory
+corruption. The dispatch additionally reports an observed zero object pointer
+as a fault at the subsequent `+0x38` read; transform payload bytes remain a
+separate observation.
+
+The same registry feeds the pairwise loop in `0x421050`: if the alternate-time
+gate is clear, every nonnull entry `i` is paired, in ascending order, with
+each nonnull `j != i`, calling `0x432300` with entry `i` as `this` and entry
+`j` as its parameter. `apply_ncar_registered_object_influence` models that
+pair primitive. The parameter object's `+0x30` virtual callback gates the
+operation; on acceptance, the helper compares the squared distance between
+source `+0xE08..+0xE10` and destination `+0x5C..+0x64` against source radius
+`+0xE14` squared. Strictly inside the radius, it adds source vector
+`+0x234..+0x23C` scaled by `(radius_squared - distance_squared) /
+radius_squared` to destination accumulator `+0xDFC..+0xE04`. The legacy FDIV
+branch is retained, while x87 rounding is approximate. The pairwise inputs
+and virtual-gate results remain observations; registry traversal and downstream
+object state are not fabricated.
+
+Evidence: initialization `ev_b3969ce0ed7661c09bc1c4b6c36050333512037ece3893fdfadd017abdb7146f`,
+registration/accessors `ev_4a390a130f8316b24f5cb6541adbf054b784337d070a8b265edb576ab64fe7e6`,
+`ev_2c7a5e0fcc3afb15362b41c8f54797c4b9184e099a16a5ecf4fe6a78f1462f71`,
+no-op wrappers `ev_f5207b56dd88b645e454d45c5260179c71145b9d0f645c0faa0b12789111c773`,
+`ev_b45dabe8cee4f301d0d1528c54d5286ac17704d0236c35457333a65c2860b840`,
+and `ev_e260a711fd62344e49a5f5fae0b38022c9188127c700b042d866da6478f38d7e`,
+pair iteration `ev_aefa6a2d466f478adf238aafc416bc8b2096abc5d5a58260a34dffb29dd767a`,
+and influence helper `ev_093a726660d0859203c394c4b6a10b413bfe3b6bc47d73582e1b7837d83f1bf4`.
