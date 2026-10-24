@@ -209,4 +209,72 @@ AcarDriverCallbackPlan evaluate_acar_driver_callback(
     return plan;
 }
 
+AcarSecondaryCandidateResult update_acar_secondary_candidate(
+    AcarFallbackState& state,
+    const float candidate_range,
+    const std::uint32_t candidate_value,
+    const std::uint32_t candidate_endpoint) noexcept
+{
+    AcarSecondaryCandidateResult result{};
+    bool replace = !state.candidate_valid_0xf08;
+    if (state.candidate_valid_0xf08) {
+        state.candidate_replaced_0xf09 = true;
+        result.replaced_flag_set = true;
+        replace = candidate_range < state.candidate_range_0xef8;
+    }
+    if (replace) {
+        state.candidate_range_0xef8 = candidate_range;
+        state.candidate_value_0xefc = candidate_value;
+        state.candidate_endpoint_0xf04 = candidate_endpoint;
+        state.candidate_valid_0xf08 = true;
+        result.candidate_replaced = true;
+    }
+    return result;
+}
+
+AcarRecoveryUpdateResult apply_acar_recovery_state(
+    AcarFallbackState& state) noexcept
+{
+    AcarRecoveryUpdateResult result{};
+    state.copied_route_value_0xfd0 = state.route_value_0xf0c;
+    state.damping_value_0xde4 = 0.1F;
+    state.response_value_0xde8 = 1.0F;
+    state.mode_value_0xde0 = 0.0F;
+    state.mode_value_0xdec = 0.0F;
+
+    const auto target = state.route_direction_0xf18 < 1 ? -1.0F : 1.0F;
+    result.steering_delta = target - state.steering_value_0x500;
+    if (result.steering_delta <= 0.24F) {
+        if (std::bit_cast<std::uint32_t>(result.steering_delta) >
+            0xbe75c28fU) {
+            result.steering_delta = -0.24F;
+        }
+    } else {
+        result.steering_delta = 0.24F;
+    }
+    result.requested_steering =
+        state.steering_value_0x500 + result.steering_delta;
+    if (result.requested_steering > 1.0F) {
+        result.requested_steering = 1.0F;
+    }
+    if (0xbf800000U <
+        std::bit_cast<std::uint32_t>(result.requested_steering)) {
+        result.requested_steering = -1.0F;
+    }
+    result.applied_steering = result.requested_steering;
+    result.wheel_pair_output =
+        state.steering_scale_0xdcc * result.applied_steering;
+    result.alternate_wheel_pair_selected =
+        state.alternate_wheel_pair_gate_0xbe4;
+    if (result.alternate_wheel_pair_selected) {
+        state.wheel_pair_value_0x978 = -result.wheel_pair_output;
+        state.wheel_pair_value_0xb1c = -result.wheel_pair_output;
+    } else {
+        state.wheel_pair_value_0x630 = result.wheel_pair_output;
+        state.wheel_pair_value_0x7d4 = result.wheel_pair_output;
+    }
+    state.steering_value_0x500 = result.applied_steering;
+    return result;
+}
+
 } // namespace viper

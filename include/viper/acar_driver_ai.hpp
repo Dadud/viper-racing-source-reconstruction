@@ -83,4 +83,51 @@ struct AcarDriverCallbackPlan {
     const AcarDriverAiObservation& observation,
     bool fallback_helper_result) noexcept;
 
+struct AcarFallbackState {
+    float candidate_range_0xef8{};
+    std::uint32_t candidate_value_0xefc{};
+    std::uint32_t candidate_endpoint_0xf04{};
+    bool candidate_valid_0xf08{};
+    bool candidate_replaced_0xf09{};
+    std::uint32_t route_value_0xf0c{};
+    std::int32_t route_direction_0xf18{};
+    std::uint32_t copied_route_value_0xfd0{};
+    float mode_value_0xde0{};
+    float damping_value_0xde4{};
+    float response_value_0xde8{};
+    float mode_value_0xdec{};
+    float steering_value_0x500{};
+    float steering_scale_0xdcc{};
+    bool alternate_wheel_pair_gate_0xbe4{};
+    float wheel_pair_value_0x630{};
+    float wheel_pair_value_0x7d4{};
+    float wheel_pair_value_0x978{};
+    float wheel_pair_value_0xb1c{};
+};
+
+struct AcarSecondaryCandidateResult {
+    bool candidate_replaced{};
+    bool replaced_flag_set{};
+};
+
+// Models 0x42B3E0's range-minimum candidate and its +0xF09 replacement flag.
+[[nodiscard]] AcarSecondaryCandidateResult update_acar_secondary_candidate(
+    AcarFallbackState& state,
+    float candidate_range,
+    std::uint32_t candidate_value,
+    std::uint32_t candidate_endpoint) noexcept;
+
+struct AcarRecoveryUpdateResult {
+    float steering_delta{};
+    float requested_steering{};
+    float applied_steering{};
+    float wheel_pair_output{};
+    bool alternate_wheel_pair_selected{};
+};
+
+// Models 0x42ACB0's fixed fallback state writes and the 0x4330F0 smoothed
+// steering/control update. This mutates only the portable projection state.
+[[nodiscard]] AcarRecoveryUpdateResult apply_acar_recovery_state(
+    AcarFallbackState& state) noexcept;
+
 } // namespace viper

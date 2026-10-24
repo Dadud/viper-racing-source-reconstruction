@@ -608,3 +608,21 @@ The wrapper call and branch sequence is supported by instructions `0x42AD80`
 `0x42AD89` `ev_3b2cc9e45cb543f86fab43b3b64471c22d63172c73e7e206b53b56a14aab6363`,
 `0x42AD90` `ev_d99f444141352b03eb457e8bc2f5d6c474fe1779dce6429bdabc27181fc3388`,
 and success return at `0x42ADA5` `ev_774cc7af43f607868f1e4d126f3e17c64cfb42dae3cc6e39b95c716363075025`.
+
+Two terminal effects of `0x42B040` are now separately projected. The
+`update_acar_secondary_candidate` helper models `0x42B3E0`'s strict range
+minimum at `+0xEF8`, paired raw payload stores at `+0xEFC/+0xF04`, validity
+flag `+0xF08`, and replacement-seen flag `+0xF09`. The
+`apply_acar_recovery_state` helper models the `0x42ACB0` fixed writes
+(`+0xFD0`, `+0xDE0`, `+0xDE4`, `+0xDE8`, `+0xDEC`) and its `0x4330F0`
+steering step: signed route choice, raw-bit lower clamp, `+/-0.24` approach,
+[-1,1] bounds, scale by `+0xDCC`, and the `+0xBE4` wheel-pair destination
+branch. These helpers are not yet wired into the full `0x42B040` route gate;
+its terrain-relative geometry and selection conditions remain open. Evidence:
+`0x42B3E0` `ev_abc606ef5bbc526eae79eea29582655c19911c98386f694c35896c1749055482`,
+`0x42ACB0` `ev_6f6fdcddecfea72cbd9ae79a348a1b32db98bd7b51faaaf6478c7ffaefd7150a`,
+and `0x4330F0` `ev_d2ff91300e7fe5989a96b1723e67a7f9a91b12d91f1f6259430123810fba6691`;
+the immediate setters are `ev_985b150bd698d190e02732dbb8ae7b75ef0248366c9a97b122fdf5308da4f4ce`,
+`ev_6be9d7eab90202728f763356e39fdd44ba8d52b2e8afa6db7937b0c5908da3fa`,
+`ev_c4b47e34375fbf4bd3cb556c06f630cca74cfbc46dce80a77aed30a155152827`, and
+`ev_4e237485e955a5ada3411b37c141b93778bcfda352b438d4c0414812405a213a`.
