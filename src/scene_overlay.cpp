@@ -4504,8 +4504,14 @@ SceneDashboardMetricResult update_scene_dashboard_metric(
     if (!result.value_above_raw_threshold) {
         return result;
     }
+    const auto resource_generation_matches =
+        observation.current_resource_generation_value.has_value() &&
+                observation.cached_resource_generation_value.has_value()
+            ? *observation.current_resource_generation_value ==
+                *observation.cached_resource_generation_value
+            : observation.resource_generation_matches;
     result.refresh_resource = observation.selected_object_type_0x18 != 3 &&
-        !observation.resource_generation_matches;
+        !resource_generation_matches;
 
     const auto numeric_value = static_cast<double>(value);
     if (observation.selected_object_type_0x18 == 3) {

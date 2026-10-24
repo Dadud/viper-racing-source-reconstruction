@@ -1503,6 +1503,10 @@ register the Best resource with bit `0x80` in `0x4EB484` for `+0x10`, or the
 Last resource with bit `1` in `0x4EB2BC` for `+0x14`. Above-threshold
 non-type-3 paths refresh the matching resource when its generation differs
 from `0x4D3868`; type 3 uses its global embedded string and skips that refresh.
+The model can derive the refresh comparison from raw generation words: Best's
+cached value is at `0x4EB348` and Last's at `0x4EB338`, compared with
+`0x4D3868` as observed at `0x403FFE`/`0x404003` and `0x4041C7`/`0x4041CC`.
+The precomputed match flag remains a fallback when either raw value is absent.
 Raw field meanings and external resource values remain inputs. String-pointer
 arguments can be resolved with `scene_dashboard_crt_string_argument` when the
 raw pointer bits are known. Type 3 formats

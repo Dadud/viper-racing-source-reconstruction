@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added raw generation-word inputs for Best and
+  Last resource refresh. The metric projection now compares cached DWORDs at
+  `0x4EB348`/`0x4EB338` with current generation `0x4D3868`, preserving the
+  existing match flag as fallback. Release build and `git diff --check` pass;
+  no tests were run. See `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Replaced TestTrack's opaque resource-generation
   match inputs with optional raw cached/current DWORDs. The branch now derives
   refresh decisions from the exact comparisons at `0x403D74`, `0x403E1F`, and

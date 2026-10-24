@@ -935,6 +935,10 @@ struct SceneDashboardMetricObservation {
     std::uint32_t time_global_value_0x0c_bits{};
     std::uint32_t type_3_global_value_0x1c_bits{};
     bool resource_generation_matches{};
+    // Raw resource generation words for Best (+0x10) and Last (+0x14).
+    // When both are present, their equality overrides the boolean fallback.
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> cached_resource_generation_value;
     char time_marker{};
     std::string prefix_text_from_0x4eb344_or_0x4eb334;
     std::string global_text_0x08;
