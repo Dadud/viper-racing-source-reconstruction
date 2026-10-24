@@ -58,3 +58,12 @@ Evidence from the shipped `race.bin` (SHA-256
 The parser's synthetic malformed-input regression runs in CTest. The local
 asset validation and three-frame WARP smoke also exercise loading and drawing
 the external Viper0 payload when the game install is present beside the repo.
+
+## Empty material labels
+
+FNIM group names are stored as fixed 16-byte labels. A group with an all-zero
+label is present in the shipped `plane1.mod` model, while its vertex and
+triangle ranges are valid. The parser therefore retains an empty material
+name instead of rejecting an otherwise structurally valid mesh. Material
+resolution for that group remains an engine-level question; the development
+renderer currently draws it with its fallback color.

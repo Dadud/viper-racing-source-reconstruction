@@ -5,10 +5,9 @@
 The completion plan is tracked in [the feature ledger](metadata/completion_ledger.md)
 and [reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
-parses Bemidji's terrain, ideal line, Viper setup, and indexed Viper0 mesh, and
-draws the recovered terrain triangles with the route and a provisionally
-projected Viper mesh in a top-down Direct3D development view. It does not yet
-render a 3D track scene or run a race.
+parses the selected track's terrain and ideal line plus the selected car's
+setup and level-0 indexed mesh, and draws them in a top-down Direct3D
+development view. It does not yet render a 3D track scene or run a race.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell
@@ -17,9 +16,17 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --validate-assets
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData
+./build/Release/viper_game.exe --data-dir ../game_install/GameData --track dundas --car sports
 # Bounded graphics initialization/presentation check using software rendering:
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --software --smoke-frames 3
 ```
+
+`--track NAME` and `--car NAME` select a `.trk` and `.car` bundle by filename
+stem. The current development view can load and validate the eight shipped
+track bundles and five shipped car bundles; this is asset selection and loading,
+not yet the game's frontend roster or a playable race. When the original data
+directory is beside the checkout, CTest adds an asset-validation case for each
+shipped track and car, plus a WARP rendering smoke for each selected track/car.
 
 Public CI runs without original assets. Runtime checks use an external data
 directory, also configurable through `VIPER_DATA_DIR`. On Windows, CTest adds

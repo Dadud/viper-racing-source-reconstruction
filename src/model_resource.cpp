@@ -97,8 +97,8 @@ std::optional<ModelResource> parse_model_resource(
         group.end_vertex = read_u16(payload, base + 0x1aU);
         group.first_triangle = read_u16(payload, base + 0x1cU);
         group.end_triangle = read_u16(payload, base + 0x1eU);
-        if (group.material_name.empty() || group.first_vertex > group.end_vertex ||
-            group.end_vertex > vertex_count || group.first_triangle > group.end_triangle ||
+        if (group.first_vertex > group.end_vertex || group.end_vertex > vertex_count ||
+            group.first_triangle > group.end_triangle ||
             group.end_triangle > triangle_count) return std::nullopt;
         const auto index_count = static_cast<std::size_t>(group.end_triangle - group.first_triangle) * 3U;
         group.local_indices.reserve(index_count);

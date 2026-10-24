@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -80,6 +81,8 @@ HRESULT compile_shader(const char* source, const char* entry, const char* target
 
 struct Options {
     std::filesystem::path data_dir;
+    std::string track{"bemidji"};
+    std::string car{"viper"};
     bool validate_assets{};
     bool help{};
     bool software{};
@@ -89,7 +92,7 @@ struct Options {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--validate-assets] [--smoke-frames N] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--software] [--help]\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
 }
 
@@ -132,6 +135,18 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--data-dir") {
             if (++i >= argc) throw std::runtime_error("--data-dir requires a path");
             options.data_dir = argv[i];
+        } else if (arg == L"--track" || arg == L"--car") {
+            if (++i >= argc) throw std::runtime_error(std::filesystem::path(arg).string() + " requires a name");
+            const std::wstring_view value(argv[i]);
+            std::string name;
+            name.reserve(value.size());
+            for (const wchar_t ch : value) {
+                if (ch > 0x7f || ch < 0x20)
+                    throw std::runtime_error("track and car names must be ASCII stems");
+                name.push_back(static_cast<char>(ch));
+            }
+            if (arg == L"--track") options.track = std::move(name);
+            else options.car = std::move(name);
         } else {
             throw std::runtime_error("unknown argument: " + std::filesystem::path(arg).string());
         }
@@ -139,22 +154,26 @@ Options parse_options(const int argc, wchar_t** argv)
     return options;
 }
 
-viper::GameAssets load_assets(const std::filesystem::path& root)
+viper::GameAssets load_assets(const std::filesystem::path& root,
+                              const std::string_view track,
+                              const std::string_view car)
 {
     if (root.empty()) {
         throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
     }
-    auto assets = viper::GameAssets::load(root);
-    for (const auto name : {"common.res", "ui.res", "race.res", "viper.car", "bemidji.trk"})
+    auto assets = viper::GameAssets::load(root, track, car);
+    const auto car_bundle = std::string(assets.car_name()) + ".car";
+    const auto track_bundle = std::string(assets.track_name()) + ".trk";
+    for (const auto name : {"common.res", "ui.res", "race.res", car_bundle.c_str(), track_bundle.c_str()})
         std::cout << "Loaded " << name << ": " << assets.bundle(name).entries().size() << " resources\n";
     std::cout << "Loaded english.lng: " << assets.language().entries.size() << " strings\n"
-              << "Parsed Bemidji terrain: " << assets.terrain().planes.size() << " planes, "
+              << "Parsed " << assets.track_name() << " terrain: " << assets.terrain().planes.size() << " planes, "
               << assets.terrain().partition_nodes.size() << " partition nodes\n"
-              << "Parsed Bemidji ideal line: " << assets.ideal_line().records.size()
+              << "Parsed " << assets.track_name() << " ideal line: " << assets.ideal_line().records.size()
               << " records\n"
-              << "Parsed Viper CARF: version " << assets.player_car().car_file->resource_version
+              << "Parsed " << assets.car_name() << " CARF: version " << assets.player_car().car_file->resource_version
               << ", " << assets.player_car().car_file->raw_words.size() << " configuration words\n"
-              << "Parsed Viper0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
+              << "Parsed " << assets.car_name() << " level-0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
               << assets.player_model().material_groups.size() << " material groups, "
               << assets.player_model().section_counts[2] << " triangles; validated "
               << assets.model_resource_count() << " FNIM resources total\n"
@@ -527,6 +546,8 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 }
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
+               const std::string_view track_name,
+               const std::string_view car_name,
                const viper::TerrainSurfaceResourcePayload& terrain,
                const viper::IdealLineTrackData& ideal_line,
                const viper::ModelResource& player_model)
@@ -543,7 +564,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
-    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Bemidji Terrain & Viper Mesh View",
+    const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
+        " & " + std::string(car_name) + " Mesh View";
+    const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
+    if (title_length <= 0) return 1;
+    std::wstring title(static_cast<std::size_t>(title_length), L'\0');
+    if (MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1,
+            title.data(), title_length) <= 0) return 1;
+    title.pop_back();
+    HWND hwnd = CreateWindowExW(0, class_name, title.c_str(),
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
@@ -589,9 +618,10 @@ int wmain(int argc, wchar_t** argv)
     try {
         const auto options = parse_options(argc, argv);
         if (options.help) { usage(std::cout); return 0; }
-        auto assets = load_assets(options.data_dir);
+        auto assets = load_assets(options.data_dir, options.track, options.car);
         if (options.validate_assets) return 0;
-        return run_window(options.software, options.smoke_frames, assets.terrain(),
+        return run_window(options.software, options.smoke_frames,
+            assets.track_name(), assets.car_name(), assets.terrain(),
             assets.ideal_line(), assets.player_model());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';

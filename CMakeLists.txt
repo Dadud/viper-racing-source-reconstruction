@@ -208,6 +208,29 @@ if(BUILD_TESTING)
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
             add_test(NAME game_warp_render_smoke
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3)
+            set(VIPER_SHIPPED_TRACKS
+                bemidji dundas hastings heaven kenyon limbo nfield uptown)
+            set(VIPER_SHIPPED_CARS viper exotic plane sedan sports)
+            foreach(track IN LISTS VIPER_SHIPPED_TRACKS)
+                add_test(NAME game_track_${track}_asset_validation
+                    COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
+                        --track "${track}" --car viper --validate-assets)
+                add_test(NAME game_track_${track}_warp_smoke
+                    COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
+                        --track "${track}" --car viper --software --smoke-frames 3)
+                set_tests_properties(game_track_${track}_asset_validation
+                    game_track_${track}_warp_smoke PROPERTIES TIMEOUT 30)
+            endforeach()
+            foreach(car IN LISTS VIPER_SHIPPED_CARS)
+                add_test(NAME game_car_${car}_asset_validation
+                    COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
+                        --track bemidji --car "${car}" --validate-assets)
+                add_test(NAME game_car_${car}_warp_smoke
+                    COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
+                        --track bemidji --car "${car}" --software --smoke-frames 3)
+                set_tests_properties(game_car_${car}_asset_validation
+                    game_car_${car}_warp_smoke PROPERTIES TIMEOUT 30)
+            endforeach()
             set_tests_properties(game_original_asset_validation game_warp_render_smoke
                 PROPERTIES TIMEOUT 30)
         endif()

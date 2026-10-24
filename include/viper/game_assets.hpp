@@ -8,6 +8,7 @@
 
 #include <array>
 #include <filesystem>
+#include <string>
 #include <string_view>
 
 namespace viper {
@@ -15,9 +16,14 @@ namespace viper {
 // Owns the startup assets used by the runtime for its full session lifetime.
 class GameAssets {
 public:
-    [[nodiscard]] static GameAssets load(const std::filesystem::path& root);
+    [[nodiscard]] static GameAssets load(
+        const std::filesystem::path& root,
+        std::string_view track = "bemidji",
+        std::string_view car = "viper");
 
     [[nodiscard]] const std::filesystem::path& root() const noexcept { return root_; }
+    [[nodiscard]] std::string_view track_name() const noexcept { return track_name_; }
+    [[nodiscard]] std::string_view car_name() const noexcept { return car_name_; }
     [[nodiscard]] const ResourceBundle& bundle(std::string_view name) const;
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
@@ -29,6 +35,9 @@ public:
 private:
     std::filesystem::path root_;
     std::array<ResourceBundle, 5> bundles_;
+    std::array<std::string, 5> bundle_names_;
+    std::string track_name_;
+    std::string car_name_;
     LanguageResource language_;
     TerrainSurfaceResourcePayload terrain_;
     IdealLineTrackData ideal_line_;

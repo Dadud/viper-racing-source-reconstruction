@@ -11,6 +11,15 @@ three-frame D3D11 WARP smoke run that exits cleanly. Record these as startup and
 asset-validation runs only; they do not constitute a gameplay comparison or
 replace the paired playable scenario below.
 
+A private original-client startup attempt is recorded at
+`../analysis/reference_captures/original_graphics_failure.json`. The extracted
+local layout was adapted temporarily to the launcher's expected `Data` path;
+the client passed its data/CD checks but stopped during graphics initialization
+with its own video-driver error dialog, including when started with `-no3dfx`.
+The capture includes the window image, artifact/data hashes, launch setup, and
+host OS details. This is a measured startup failure, not a paired gameplay
+capture; gameplay behavior remains unverified against the original.
+
 ## Pairing a scenario
 
 Run the original and reconstruction separately on the same Windows machine and

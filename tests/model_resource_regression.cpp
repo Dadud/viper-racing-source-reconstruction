@@ -1,5 +1,6 @@
 #include "viper/model_resource.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstddef>
@@ -75,6 +76,14 @@ int main()
         const auto legacy_version = viper::parse_model_resource(0U, bytes);
         check(legacy_version && legacy_version->resource_version == 1U,
             "supported legacy FNIM version was not normalized");
+
+        auto empty_material = triangle_model();
+        std::fill(empty_material.begin() + 136, empty_material.begin() + 152,
+            std::byte{0});
+        const auto empty_material_model = viper::parse_model_resource(1U, empty_material);
+        check(empty_material_model &&
+                empty_material_model->material_groups.front().material_name.empty(),
+            "valid empty FNIM material label was rejected");
 
         check(!viper::parse_model_resource(2U, bytes), "unsupported FNIM version accepted");
         bytes.pop_back();
