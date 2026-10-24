@@ -1,7 +1,10 @@
 #pragma once
 
+#include "viper/acar_curve_tracker.hpp"
+
 #include <array>
 #include <cstdint>
+#include <optional>
 
 namespace viper {
 
@@ -129,5 +132,48 @@ struct AcarRecoveryUpdateResult {
 // steering/control update. This mutates only the portable projection state.
 [[nodiscard]] AcarRecoveryUpdateResult apply_acar_recovery_state(
     AcarFallbackState& state) noexcept;
+
+struct AcarRouteFallbackObservation {
+    AcarCurveLookupObservation curve_lookup{};
+    float profile_threshold_0xf10{};
+    float lateral_tolerance_0xf14{};
+    std::uint32_t selected_driver_ordinal_0x510{};
+    std::int16_t route_owner_0x00{};
+    std::array<float, 2> route_direction_0x04_0x08{};
+    std::array<float, 4> target_route_values{};
+    float velocity_x_0x234{};
+    float velocity_z_0x23c{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct AcarRouteFallbackPlan {
+    AcarCurveLookupPlan curve_lookup{};
+    std::optional<float> curve_position_x;
+    std::optional<float> curve_position_y;
+    float route_lateral_error{};
+    float route_forward_projection{};
+    float remaining_distance_0xf10{};
+    float approach_ratio{};
+    float steering_candidate{};
+    float interpolated_route_scalar_0x3c{};
+    bool lookup_called{};
+    bool input_incomplete{};
+    bool curve_candidate_found{};
+    bool curve_node_inputs_complete{};
+    bool distance_and_speed_gates_passed{};
+    bool lateral_tolerance_passed{};
+    bool recovery_state_branch_reached{};
+    bool secondary_candidate_branch_reached{};
+    bool secondary_candidate_rejected_below_one{};
+    bool returned_true{};
+    std::optional<AcarSecondaryCandidateResult> secondary_candidate_result;
+    std::optional<AcarRecoveryUpdateResult> recovery_state_result;
+};
+
+// Projects the route geometry and state selection in fallback helper 0x42B040.
+// The global route table row and node +0x3c values are explicit observations.
+[[nodiscard]] AcarRouteFallbackPlan plan_acar_route_fallback(
+    AcarFallbackState& state,
+    const AcarRouteFallbackObservation& observation);
 
 } // namespace viper

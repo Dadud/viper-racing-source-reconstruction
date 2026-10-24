@@ -15,6 +15,7 @@ struct AcarCurveNodeObservation {
     float tangent_x_0x0c{};
     float tangent_y_0x10{};
     float update_denominator_0x20{};
+    std::optional<float> route_scalar_0x3c;
 };
 
 struct AcarCurveTrackerObservation {

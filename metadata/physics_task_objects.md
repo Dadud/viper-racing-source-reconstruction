@@ -626,3 +626,18 @@ the immediate setters are `ev_985b150bd698d190e02732dbb8ae7b75ef0248366c9a97b122
 `ev_6be9d7eab90202728f763356e39fdd44ba8d52b2e8afa6db7937b0c5908da3fa`,
 `ev_c4b47e34375fbf4bd3cb556c06f630cca74cfbc46dce80a77aed30a155152827`, and
 `ev_4e237485e955a5ada3411b37c141b93778bcfda352b438d4c0414812405a213a`.
+
+`plan_acar_route_fallback` now composes the major `0x42B040` gates. It bounds
+the `0x42AD20` curve search by `4 * +0xF10`, evaluates the selected linked
+segment with `0x42A580` Hermite weights and normalized tangent from
+`0x41FD80`, computes target-relative lateral/progress projections, and applies
+the raw threshold comparisons for remaining distance, route alignment, and
+the `+0xF14` lateral tolerance. The final progress-bit branch selects the
+`0x42B3E0` minimum-candidate update or the `0x42ACB0` recovery/steering update.
+The linked nodes' `+0x3C` values, target-route table row, selected-driver
+route orientation, and vehicle state remain explicit observations. Missing
+node/scalar captures report `input_incomplete`; no native pointers are read.
+Evidence: `0x42B040`
+`ev_5ba2192d1ee356002d5e7559588da142bf016877e8f1c911f588ec3bf8052c74`,
+`0x42A580` `ev_6b56f4cc7104146b456d6f99f2d11682aa093e37d97212c39ced7d5e5eb78005`,
+and `0x41FD80` `ev_d77fad4cfa1a3a294bad814d28b62842dcfb5e7b14fc476f4c9c0b09adbb131e`.
