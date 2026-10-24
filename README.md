@@ -47,6 +47,11 @@ the shipped 32-bit Windows binaries. The original executables and extracted
 game payload remain outside the repository. No original symbols or source
 files were present.
 
+The Windows runtime now validates the current `drivers.res` AIDR v2 layout
+and preserves its eight groups of raw driver records; see
+[`metadata/ai_driver_resource.md`](metadata/ai_driver_resource.md). Legacy AIDR
+conversion and ADNT note selection are still under reconstruction.
+
 ## Current reconstruction
 
 - `src/launcher_reconstruction.c` documents and reconstructs launcher checks,

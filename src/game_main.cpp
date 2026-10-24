@@ -172,7 +172,7 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
     }
     const auto car_bundle = std::string(assets.car_name()) + ".car";
     const auto track_bundle = std::string(assets.track_name()) + ".trk";
-    for (const auto name : {"common.res", "ui.res", "race.res", car_bundle.c_str(), track_bundle.c_str()})
+    for (const auto name : {"common.res", "ui.res", "race.res", car_bundle.c_str(), track_bundle.c_str(), "drivers.res"})
         std::cout << "Loaded " << name << ": " << assets.bundle(name).entries().size() << " resources\n";
     std::cout << "Loaded english.lng: " << assets.language().entries.size() << " strings\n"
               << "Parsed " << assets.track_name() << " terrain: " << assets.terrain().planes.size() << " planes, "
@@ -193,6 +193,13 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << assets.player_model().section_counts[2] << " triangles; validated "
               << assets.model_resource_count() << " FNIM resources total\n"
               << "Required assets validated in " << assets.root().string() << '\n';
+    constexpr std::array<std::string_view, viper::ai_driver_group_count> ai_group_names{
+        "easy", "medium", "hard", "career1", "career2", "career3", "career4", "career5"};
+    std::cout << "Parsed drivers.res AIDR v2 groups:";
+    for (std::size_t index = 0; index < ai_group_names.size(); ++index)
+        std::cout << ' ' << ai_group_names[index] << '='
+                  << assets.ai_drivers().active_counts[index];
+    std::cout << '\n';
     return assets;
 }
 

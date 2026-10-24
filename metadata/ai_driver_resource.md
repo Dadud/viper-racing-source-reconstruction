@@ -1,0 +1,31 @@
+# AI driver resource
+
+`drivers.res` owns the `aidriver.adr` resource (type `AIDR`, version 2). The
+shipped resource has a `0x11020`-byte payload. Native function `0x41B550`
+accepts this size for version 2 and initializes the driver manager from it;
+`0x41B2E0` lays out eight groups of sixteen `0x220`-byte records and reads a
+DWORD count after each group's records. The group stride is `0x2204`, making
+the complete current layout eight groups, or `0x11020` bytes. The related
+`0x41B340` code uses these groups to create localized driver-name keys for
+Easy, Intermediate (the medium profile), Hard, and Career1 through Career5.
+
+`parse_ai_driver_resource` validates the version, current payload size, and
+that each group count is at most sixteen. It preserves all sixteen raw slots
+per group because the record fields have not been semantically recovered.
+`GameAssets` now requires and owns this parsed resource alongside its shared,
+car, and track bundles. The parser currently does not accept the legacy
+`0x660C`-byte version-2 payload that the native loader also recognizes and
+converts.
+
+Evidence from `race.bin` (SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
+
+- `0x41B550`: `ev_183fa2e38cb18d1bc0e73cea55dd40c5b7eceea2ef11ba2c785cd1af3793c28e`
+- `0x41B2E0`: `ev_651ded3da66343924f102182038532ca0820d63bfbee2ee8f43fa9e325deb0a0`
+- `0x41B340`: `ev_7734202bfa6baa8fb9a35a2831295c3af2a63205c72758a4f53e45654e4c839d`
+
+The extracted `drivers.res` inventory reports `aidriver.adr`, type `0x41494472`,
+attributes/version 2, and 69,664 (`0x11020`) payload bytes. The native initializer
+also uses these records with runtime-generated ADNT note resources to select
+AI parameters; track lookup comes from `common.res`'s `tracks.tab`. Those note
+selection and parameter application paths remain separate reconstruction work.

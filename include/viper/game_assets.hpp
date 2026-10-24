@@ -1,6 +1,7 @@
 #pragma once
 
 #include "viper/language_resource.hpp"
+#include "viper/ai_driver_resource.hpp"
 #include "viper/game_options.hpp"
 #include "viper/model_resource.hpp"
 #include "viper/resource_bundle.hpp"
@@ -31,6 +32,7 @@ public:
     [[nodiscard]] std::string_view car_name() const noexcept { return car_name_; }
     [[nodiscard]] const ResourceBundle& bundle(std::string_view name) const;
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
+    [[nodiscard]] const AIDriverResource& ai_drivers() const noexcept { return ai_drivers_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
     [[nodiscard]] const TrackObjectTextTable& track_objects() const noexcept { return track_objects_; }
     [[nodiscard]] const std::array<std::byte, 0x8c>& ai_vehicle_setup() const noexcept { return ai_vehicle_setup_; }
@@ -44,11 +46,12 @@ public:
 
 private:
     std::filesystem::path root_;
-    std::array<ResourceBundle, 5> bundles_;
-    std::array<std::string, 5> bundle_names_;
+    std::array<ResourceBundle, 6> bundles_;
+    std::array<std::string, 6> bundle_names_;
     std::string track_name_;
     std::string car_name_;
     LanguageResource language_;
+    AIDriverResource ai_drivers_;
     TerrainSurfaceResourcePayload terrain_;
     TrackObjectTextTable track_objects_;
     std::array<std::byte, 0x8c> ai_vehicle_setup_{};

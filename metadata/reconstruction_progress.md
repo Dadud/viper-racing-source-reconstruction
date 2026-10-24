@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24 AI driver resource:** Added a bounds-checked parser for the
+  shipped `drivers.res` `aidriver.adr` AIDR v2 payload. It reads the eight
+  difficulty group counts and retains the sixteen raw `0x220`-byte slots per
+  group; `GameAssets` now owns this resource and reports all group counts.
+  Native evidence identifies the layout as eight `0x2204`-byte groups in a
+  `0x11020`-byte payload. The legacy `0x660C`-byte v2 conversion and ADNT note
+  selection remain open. The Release `viper_game` target builds successfully;
+  no runtime checks were run for this change. See
+  `metadata/ai_driver_resource.md`.
+
 - **2026-10-24 runtime Viper configuration:** `GameAssets` now parses and
   retains Viper's version-6 `viper.cf` CARF payload (138 DWORDs) through the
   existing resource-aware car parser. Asset validation reports the parsed car

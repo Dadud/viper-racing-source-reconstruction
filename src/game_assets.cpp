@@ -11,6 +11,7 @@ namespace {
 
 constexpr std::array<std::string_view, 3> kSharedBundleNames{
     "common.res", "ui.res", "race.res"};
+constexpr std::uint32_t kAIDriverResourceType = 0x41494472U;
 
 std::string normalize_asset_stem(const std::string_view value, const char* label)
 {
@@ -61,6 +62,7 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         assets.bundle_names_[i] = kSharedBundleNames[i];
     assets.bundle_names_[3] = assets.car_name_ + ".car";
     assets.bundle_names_[4] = assets.track_name_ + ".trk";
+    assets.bundle_names_[5] = "drivers.res";
 
     for (std::size_t i = 0; i < assets.bundle_names_.size(); ++i) {
         const auto& bundle_name = assets.bundle_names_[i];
@@ -86,6 +88,15 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     if (!parsed_default_tire)
         throw std::runtime_error("common.res default tire resource def_tire.tir is invalid");
     assets.default_tire_ = *parsed_default_tire;
+    const auto& driver_bundle = assets.bundle(assets.bundle_names_[5]);
+    const auto* ai_driver_entry = driver_bundle.find("aidriver.adr", kAIDriverResourceType);
+    if (ai_driver_entry == nullptr)
+        throw std::runtime_error("drivers.res AIDR resource aidriver.adr is missing");
+    const auto ai_drivers = parse_ai_driver_resource(
+        ai_driver_entry->attributes, driver_bundle.payload(*ai_driver_entry));
+    if (!ai_drivers)
+        throw std::runtime_error("drivers.res aidriver.adr has an unsupported version, size, or group count");
+    assets.ai_drivers_ = *ai_drivers;
     assets.options_ = options ? std::move(*options) : GameOptions{};
     constexpr std::uint32_t car_setup_type = 0x43435330U;
     const auto& car_bundle = assets.bundle(assets.bundle_names_[3]);
