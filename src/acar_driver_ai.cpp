@@ -983,6 +983,112 @@ AcarThrottleTailPlan plan_acar_throttle_tail(
     return plan;
 }
 
+AcarBrakeTailPlan plan_acar_brake_tail(
+    const float brake_input,
+    const AcarBrakeTailObservation& observation) noexcept
+{
+    AcarBrakeTailPlan plan{};
+    const auto input_bits = std::bit_cast<std::uint32_t>(brake_input);
+    float requested_brake{};
+    if (input_bits < 0x80000001U) {
+        requested_brake =
+            std::bit_cast<std::int32_t>(brake_input) > 0x3f800000
+                ? 1.0F : brake_input;
+    }
+    plan.clamped_brake_input = requested_brake;
+
+    const auto alignment_complete = observation.motion_axis_0x50.has_value() &&
+        observation.velocity_x_0x234.has_value() &&
+        observation.motion_axis_0x58.has_value() &&
+        observation.velocity_z_0x23c.has_value() &&
+        observation.motion_axis_0x238.has_value() &&
+        observation.velocity_y_0x54.has_value();
+    if (alignment_complete) {
+        const auto dot =
+            static_cast<long double>(*observation.motion_axis_0x50) *
+                *observation.velocity_x_0x234 +
+            static_cast<long double>(*observation.motion_axis_0x58) *
+                *observation.velocity_z_0x23c +
+            static_cast<long double>(*observation.motion_axis_0x238) *
+                *observation.velocity_y_0x54;
+        plan.motion_alignment_dot = dot;
+    }
+
+    bool panic_gate_known = false;
+    bool panic_gate = false;
+    if (observation.route_distance_bits_0xf10.has_value()) {
+        const auto route_distance = std::bit_cast<std::int32_t>(
+            *observation.route_distance_bits_0xf10);
+        if (route_distance < 0x3ee38e3a ||
+            route_distance > 0x410e38e3) {
+            panic_gate_known = true;
+        } else if (plan.motion_alignment_dot.has_value()) {
+            panic_gate_known = true;
+            panic_gate = !(*plan.motion_alignment_dot >= 0.0L);
+        }
+    } else if (plan.motion_alignment_dot.has_value() &&
+               *plan.motion_alignment_dot >= 0.0L) {
+        panic_gate_known = true;
+    }
+    if (panic_gate_known) {
+        plan.panic_brake_gate_passed = panic_gate;
+    } else {
+        plan.input_incomplete = true;
+    }
+
+    std::optional<float> requested_output;
+    if (plan.panic_brake_gate_passed == true) {
+        requested_output = 1.0F;
+        plan.panic_brake_message_called = true;
+    } else if (plan.panic_brake_gate_passed == false) {
+        std::uint32_t wheel_flag_sum{};
+        bool wheel_flags_complete = true;
+        for (const auto& flag : observation.wheel_flags) {
+            if (!flag.has_value()) {
+                wheel_flags_complete = false;
+            } else {
+                wheel_flag_sum += *flag;
+            }
+        }
+        if (wheel_flags_complete) {
+            const auto wheel_gate_passed = wheel_flag_sum == 4U;
+            plan.wheel_flag_sum_is_four = wheel_gate_passed;
+            requested_output = wheel_gate_passed ? requested_brake : 0.0F;
+        } else {
+            plan.input_incomplete = true;
+        }
+    }
+
+    if (!requested_output.has_value() ||
+        !observation.brake_state_0xde4.has_value()) {
+        plan.input_incomplete = true;
+        return plan;
+    }
+
+    auto brake_output = *requested_output;
+    const auto previous_brake = *observation.brake_state_0xde4;
+    if (brake_output < previous_brake) {
+        plan.blend_branch_reached = true;
+        if (!observation.profile_blend_0xf58_plus_0x08.has_value() ||
+            !observation.speed_0x1020.has_value()) {
+            plan.input_incomplete = true;
+            return plan;
+        }
+        auto blend_factor = *observation.profile_blend_0xf58_plus_0x08;
+        if (blend_factor <= 0.8F) {
+            blend_factor = 0.8F;
+        }
+        if (blend_factor <= *observation.speed_0x1020) {
+            blend_factor = *observation.speed_0x1020;
+        }
+        brake_output = static_cast<float>(
+            static_cast<long double>(blend_factor) * previous_brake +
+            (1.0L - blend_factor) * brake_output);
+    }
+    plan.brake_output_0xde4 = brake_output;
+    return plan;
+}
+
 AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     const AcarDriverAiState& driver_state,
     const AcarBehaviorControlChainObservation& observation)
@@ -1061,6 +1167,12 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     plan.throttle_tail_plan = plan_acar_throttle_tail(throttle_observation);
     plan.input_incomplete = plan.input_incomplete ||
         plan.throttle_tail_plan->input_incomplete;
+    auto brake_observation = observation.brake_tail;
+    brake_observation.speed_0x1020 = observation.speed_0x1020;
+    plan.brake_tail_plan = plan_acar_brake_tail(
+        plan.local_output_1, brake_observation);
+    plan.input_incomplete = plan.input_incomplete ||
+        plan.brake_tail_plan->input_incomplete;
     plan.tail_argument_0x428cd0 = plan.local_output_0;
     plan.tail_argument_0x428e20 = plan.local_output_1;
     plan.tail_argument_0x4331d0 = plan.final_argument_0x2c;

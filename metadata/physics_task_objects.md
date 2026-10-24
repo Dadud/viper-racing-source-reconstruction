@@ -704,8 +704,8 @@ sign-change response ramp, final `[-1,1]` clamp, and paired `+0x630/+0x7D4`
 control writes. Its profile step, incoming history/ramp/control values,
 speed, and scale are explicit observations. Evidence:
 `0x428CD0` `ev_79e703e41d739bc81a42eec4fb785446b74af8830a2245fdd8cdd4824aba92be`.
-The later brake helper and nested `0x43FDD0` work called from `0x433230`
-remain open.
+The nested `0x43FDD0` work and subsequent `+0xD64` state copy from
+`0x433230` remain open.
 
 `plan_acar_alternate_route_throttle_limit` also reconstructs the callback's
 independent `+0xF30` write to `+0x103C`: it preserves the existing value when
@@ -727,3 +727,12 @@ four-contact aggregator `0x428CA0`
 contact predicate `0x428C90`
 `ev_9caeb9c8a4f871bd2e82f0538d0b9a355ab35fc78a70370ed091fdaf8af557b2`, and
 setter `0x4331A0` `ev_4e59e75710114fdaaf0e5efbd82f79122611a72256a329e7f11e688c94985138`.
+
+`plan_acar_brake_tail` models `0x428E20`'s raw-bit `[0,1]` input clamp,
+negative motion-alignment panic-brake gate over the observed `+0xF10` range,
+four-byte wheel-flag sum gate, and profile/speed blend into `+0xDE4`. It
+preserves the panic-brake message condition and reports incomplete required
+observations rather than assuming wheel state. Evidence: `0x428E20`
+`ev_28e0c53cd235953d972d75a96d6f6d0a93b92440f2c140816e8cf1a690b9f6bc` and
+setter `0x4331B0`
+`ev_1a4a9aa0de75046dcf27829d381e8b598229fc3405d356d9b5e94638c4cf9036`.

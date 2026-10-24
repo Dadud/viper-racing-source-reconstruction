@@ -383,6 +383,36 @@ struct AcarThrottleTailPlan {
 [[nodiscard]] AcarThrottleTailPlan plan_acar_throttle_tail(
     const AcarThrottleTailObservation& observation) noexcept;
 
+struct AcarBrakeTailObservation {
+    std::optional<float> motion_axis_0x50;
+    std::optional<float> velocity_x_0x234;
+    std::optional<float> motion_axis_0x58;
+    std::optional<float> velocity_z_0x23c;
+    std::optional<float> motion_axis_0x238;
+    std::optional<float> velocity_y_0x54;
+    std::optional<std::uint32_t> route_distance_bits_0xf10;
+    std::array<std::optional<std::uint8_t>, 4> wheel_flags{};
+    std::optional<float> brake_state_0xde4;
+    std::optional<float> profile_blend_0xf58_plus_0x08;
+    std::optional<float> speed_0x1020;
+};
+
+struct AcarBrakeTailPlan {
+    std::optional<float> clamped_brake_input;
+    std::optional<long double> motion_alignment_dot;
+    std::optional<bool> panic_brake_gate_passed;
+    std::optional<bool> wheel_flag_sum_is_four;
+    std::optional<float> brake_output_0xde4;
+    bool panic_brake_message_called{};
+    bool blend_branch_reached{};
+    bool input_incomplete{};
+};
+
+// Projects callback tail helper 0x428E20 and its +0xDE4 setter.
+[[nodiscard]] AcarBrakeTailPlan plan_acar_brake_tail(
+    float brake_input,
+    const AcarBrakeTailObservation& observation) noexcept;
+
 struct AcarBehaviorControlChainObservation {
     AcarBehaviorGeometryObservation geometry{};
     AcarRouteSteeringObservation route_steering{};
@@ -390,6 +420,7 @@ struct AcarBehaviorControlChainObservation {
     AcarForwardCandidateSteeringObservation forward_steering{};
     AcarSteeringHistoryTailObservation steering_history{};
     AcarThrottleTailObservation throttle_tail{};
+    AcarBrakeTailObservation brake_tail{};
     std::optional<float> route_value_0xf0c;
     std::optional<float> route_scalar_0xfbc;
     std::optional<float> existing_throttle_limit_0x103c;
@@ -405,6 +436,7 @@ struct AcarBehaviorControlChainPlan {
     std::optional<AcarSteeringHistoryTailPlan> steering_history_plan;
     AcarAlternateRouteThrottlePlan alternate_route_throttle_plan{};
     std::optional<AcarThrottleTailPlan> throttle_tail_plan;
+    std::optional<AcarBrakeTailPlan> brake_tail_plan;
     std::vector<AcarBehaviorControlTailCall> tail_call_order;
     float local_output_0{};
     float local_output_1{};
