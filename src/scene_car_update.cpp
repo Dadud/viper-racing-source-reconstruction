@@ -1084,7 +1084,9 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
     const bool depth_fade = callback_address == 0x00455F40U;
     const bool palette_fade = callback_address == 0x004569C0U;
     const bool palette_lighting = callback_address == 0x00456230U;
-    const bool dual_palette = callback_address == 0x004563E0U;
+    const bool dual_palette = callback_address == 0x004563E0U ||
+        callback_address == 0x00456D00U;
+    const bool distance_faded_dual_palette = callback_address == 0x00456D00U;
     const bool environment_pre_lit = callback_address == 0x00456660U;
     const bool palette_callback = palette_fade || palette_lighting || dual_palette ||
         environment_pre_lit;
@@ -1175,7 +1177,17 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
                 result.status = SceneRenderScanlineConversionStatus::secondary_lighting_table_observation_exhausted;
                 return result;
             }
-            write(0x14U, observation.secondary_lighting_words[secondary_index]);
+            const auto secondary_word = observation.secondary_lighting_words[secondary_index];
+            write(0x14U, secondary_word);
+            if (distance_faded_dual_palette) {
+                if (row_index >= observation.distance_fade_alpha_bytes.size()) {
+                    result.status = SceneRenderScanlineConversionStatus::distance_fade_alpha_observation_exhausted;
+                    return result;
+                }
+                const auto alpha_mask = static_cast<std::uint32_t>(
+                    observation.distance_fade_alpha_bytes[row_index]) << 24U;
+                write(0x14U, secondary_word | alpha_mask);
+            }
             ++result.rows_processed;
             ++result.row_counter_increments;
             continue;

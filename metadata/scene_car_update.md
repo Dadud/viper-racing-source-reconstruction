@@ -716,6 +716,40 @@ and mode-2 ordered writes/counter (`ev_5d01648eca1c070731f49276331b01507d876f347
 `ev_2ea5358720268173fd25911e09876f4614cb4a5d16b4cfcbe6c20489ad879d9e`,
 `ev_acec99eb35253ec60ebd9c65cad803ae3e88bd595b22a1b18aa000030ea2672c`,
 `ev_c7171b93c2ab8b9e6fe923568af3a7dcbc81f6ed83db2f9469090086e1f0cc7e`).
+Callback `0x456D00`, selected with second-slot callback `0x455F20`, extends
+the dual-table conversion with distance-faded alpha. Modes 0–1 write the
+primary masked palette color at `+0x10`, the second-table word at `+0x14`,
+then OR the distance-derived alpha byte into the high byte of that second word.
+Mode 2 writes `0xFFFFFFFF` and `0xFF000000`, replaces `+0x14` with its
+secondary-table word, then calls `0x4575A0`, which applies the same distance
+threshold/fade and ORs the resulting alpha into `+0x14`. The two palette
+indices and final alpha byte are observed inputs; if alpha is unavailable, the
+plan retains the table word and omits the final alpha write/counter increment.
+Evidence: callback and mode gate (`ev_e071224bb6bc060e73e08a508d230ef8d368509b569e2105036d6b9ce0296b68`,
+`ev_915a859f0a67e221537c16e25c505b46898402d4d39d7234cfc3d6f31533dd8a`,
+`ev_6374acc524943edce232b519ac0d26cb48e99f952a1cfcf896e4159852ab2012`), row
+copy and secondary-table store (`ev_49b4b710db8ed1ce294caeb0109391bc6e7b986a860b7dbed0e4b2571f939943`,
+`ev_bf3988fb216658556b5dfcaf2c98816f12aa11c3463452ace30f44d3313d98f2`,
+`ev_4b43977c088b079b1a1b713ecb5e24f570146f59c466f6cd14499a62af0f6283`,
+`ev_ad8cdb2f3245852f01a8fa6cfac7c08c8a6b14d122bf9ee21121722a7e2450a2`,
+`ev_30eec3afc43700b0832d94cb8c36a83b3c33b22682f43b1c8395a07972130d29`),
+inline fade threshold/alpha OR/counter (`ev_a1439b216264bef545659e0cc049f28f470ac6a2ad2558820c9d0cc6f3cbfa6a`,
+`ev_46d26d05a34f2c202c3e46a85644c7b9bbae3114a75bd2166f8c1b3cc8b9c950`,
+`ev_b3af9aa42004d2836648cc7dbc8c6a20575e293c35f38eb47ebaa81cbc1181a5`,
+`ev_2c105eb6462058804b1679c46334261b44d01984582504cfcfd565543d6e8d43`,
+`ev_e8f2324331ae598d40363191846d7446fc6d5af3ec9b1a4b8ee7a8c6440daf3b`,
+`ev_6032a73d843be20d136c1193e1d3ebb54b80972f25a1d1dac66df9442b1efcd0`),
+mode-2 sentinel/table/helper route (`ev_0f49e168d114b3552c850c131330b6bc9b2b4bfd529e2f7aacf32f9a90c572d2`,
+`ev_ac3170b24d15c9b37c1ab4b6c0bb244b924b7a87d130f53a400862fc9d24d8ce`,
+`ev_510a8d2c4e9e0015c0126651079b75dae237cbc59f44d9d8760340b6b01b6220`,
+`ev_ed27feaaea8c686f9dbceed0abbeab962f9bcaabb0d2d7b40c707d6f8532fdec`,
+`ev_dd2d634d6d93db67f8b7f1a367a2d978e2ffa3c1331bb1a8aeff7b4fba859be7`,
+`ev_02b66a4033ddd9940f6c61277c8a46c51c2efcb26f2b5623fa21e9e4b5a623bb`),
+and `0x4575A0` alpha gate/output (`ev_ad11b94bfff01d00f4de9fb169dd3a4392f2e331597b298bfac427216ac7e436`,
+`ev_144d3407a7acf514313e768daf9b9dc06e3ac089ccd4614598efbbaa93f51a0`,
+`ev_2dd5d5e404c384e89357f740b7c34f0eb22392b5861aebcd6e633e5c04062beb`,
+`ev_1460a189168ddffd72648e6a1c56d92531a58262d317b21ae3192f5f84801f3d`,
+`ev_1615b4426b3acbc7bc4b1d49a260a80accffc810aaa1ec5ca9dc04aa4b3d267f`).
 Callback `0x456660` is the prelit-object variant paired with diagnostic stub
 `0x455F30`. Modes 0–1 copy the same five row words and select the masked
 `0x50C890` palette color for `+0x10`. Mode 2 writes `0xFFFFFFFF` at `+0x10`

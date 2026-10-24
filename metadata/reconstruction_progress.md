@@ -1,5 +1,9 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended the dual-table planner to `0x456D00`, adding the
+  distance-fade OR into the second palette word and mode-2 delegation to
+  `0x4575A0`. The final alpha remains an explicit input; incomplete fade
+  observations preserve the already-produced table word.
 - **2026-10-24:** Added the prelit-object callback `0x456660` with its three
   descriptor modes, shared palette path, `DAT_0050D2DC == 2` transform gate,
   and mode-2 helper route through `0x457460`. Transformed `+0x18/+0x1C` words
