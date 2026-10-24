@@ -921,6 +921,14 @@ color `0x7F000000` to `0x4484C0`. The second branch gates on copied byte
 `0x4EB2F8`, centers the `0x4EB448` metric pair against the same raw surface
 dimensions, and emits another `0x4484C0` operation. It derives the `0x404890`
 suppression from copied results byte `0x4EB2F8` and splash flag `0x4EB1E8`.
+The geometry operation trace now includes both calls to that predicate in
+their original positions, even when the returned suppression value skips the
+following text-overlay block. `0x404890` returns true when the results byte is
+nonzero; otherwise it returns the `0x4EB1E8` byte via `0x401DF0`. Evidence:
+`ev_2d409f9f2cca7c8c137ba2687dc95a0170ec2fcdc3faa45f95cd0f5c3d465b94`
+(`0x404890`) and
+`ev_ab094b5171d133fe86ce13f0add682eed6ee00de9f12a4e79a74c0541609edca`
+(`0x401DF0`).
 When neither is set, copied bytes `0x4EB2F9` and `0x4EB2FA` select two more
 line-shaped rectangle calls. Their resource-generation mismatches emit
 `0x418CC0` refresh calls for objects `0x4EB290` and `0x4EB428`; their helper

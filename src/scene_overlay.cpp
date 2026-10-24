@@ -927,7 +927,8 @@ scene_dashboard_callback_geometry_plan(
 {
     SceneDashboardCallbackGeometryPlan result{};
     result.copied_bytes_0x4eb2f8 = observation.source_bytes_0x4eb318;
-    const bool overlays_suppressed = result.copied_bytes_0x4eb2f8[0] != 0 ||
+    result.overlay_content_suppressed =
+        result.copied_bytes_0x4eb2f8[0] != 0 ||
         observation.splash_loading_flag_0x4eb1e8;
     auto& operations = result.operations;
     bool batch_started = false;
@@ -1048,7 +1049,11 @@ scene_dashboard_callback_geometry_plan(
         });
     }
 
-    if (!overlays_suppressed &&
+    operations.push_back({
+        SceneDashboardCallbackGeometryKind::check_overlay_suppression_0x404890,
+        0x00404890,
+    });
+    if (!result.overlay_content_suppressed &&
         result.copied_bytes_0x4eb2f8[1] != 0) {
         if (!observation.resource_0x4eb290_generation_matches) {
             refresh_resource(0x004EB290);
@@ -1073,7 +1078,11 @@ scene_dashboard_callback_geometry_plan(
         rectangle({0, 0x40, text_width, font_extent});
     }
 
-    if (!overlays_suppressed &&
+    operations.push_back({
+        SceneDashboardCallbackGeometryKind::check_overlay_suppression_0x404890,
+        0x00404890,
+    });
+    if (!result.overlay_content_suppressed &&
         result.copied_bytes_0x4eb2f8[2] != 0) {
         if (!observation.resource_0x4eb428_generation_matches) {
             refresh_resource(0x004EB428);

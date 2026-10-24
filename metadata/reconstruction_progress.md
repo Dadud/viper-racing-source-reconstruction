@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added the two ordered `0x404890` suppression-predicate calls
+  to the state-0 `0x4052E0` callback geometry operation trace. The plan now
+  exposes the exact result-byte/`0x4EB1E8` gate and records both call sites,
+  including calls that skip their following overlay branch. Release build and
+  `git diff --check` passed; no tests were run.
+
 - **2026-10-24:** Connected `raster_scene_dashboard_core_callback` to
   `plan_race_loop_shared_overlay`. The compositor can now derive per-call
   renderer mode and framebuffer geometry from successful context acquisition,

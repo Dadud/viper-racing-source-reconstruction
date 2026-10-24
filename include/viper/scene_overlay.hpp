@@ -343,6 +343,7 @@ enum class SceneDashboardCallbackGeometryKind : std::uint8_t {
     measure_text_0x44db10,
     measure_font_0x44dc50,
     rectangle_0x4484c0,
+    check_overlay_suppression_0x404890,
     finish_batch_0x448490,
 };
 
@@ -441,6 +442,9 @@ struct SceneDashboardCallbackGeometryOperation {
 
 struct SceneDashboardCallbackGeometryPlan {
     std::array<std::uint8_t, 6> copied_bytes_0x4eb2f8{};
+    // 0x404890 returns true when the results byte or splash-loading byte is
+    // nonzero. The callback invokes this predicate at two ordered call sites.
+    bool overlay_content_suppressed{};
     std::optional<SceneDashboardTextWidthResult>
         flag_0x4eb294_measured_width;
     std::optional<SceneDashboardTextWidthResult>
