@@ -133,4 +133,33 @@ bool commit_route_motion_after_terrain_query(
     return true;
 }
 
+std::vector<RouteRaceStanding> build_route_race_standings(
+    const RouteMotionState& player_state,
+    const std::span<const RouteMotionState> participants,
+    const std::size_t player_participant_index)
+{
+    std::vector<RouteRaceStanding> standings;
+    standings.reserve(participants.size());
+    if (player_state.race.finished &&
+        std::isfinite(player_state.race.elapsed_seconds) &&
+        player_state.race.elapsed_seconds >= 0.0F) {
+        standings.push_back({player_participant_index,
+            player_state.race.elapsed_seconds, true});
+    }
+    for (std::size_t index = 0; index < participants.size(); ++index) {
+        if (index == player_participant_index) continue;
+        const auto& state = participants[index];
+        if (!state.race.finished || !std::isfinite(state.race.elapsed_seconds) ||
+            state.race.elapsed_seconds < 0.0F) continue;
+        standings.push_back({index, state.race.elapsed_seconds, false});
+    }
+    std::stable_sort(standings.begin(), standings.end(),
+        [](const RouteRaceStanding& left, const RouteRaceStanding& right) {
+            if (left.finish_time_seconds != right.finish_time_seconds)
+                return left.finish_time_seconds < right.finish_time_seconds;
+            return left.participant_index < right.participant_index;
+        });
+    return standings;
+}
+
 } // namespace viper

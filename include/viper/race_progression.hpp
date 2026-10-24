@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <array>
 #include <span>
+#include <vector>
 
 namespace viper {
 
@@ -29,6 +30,12 @@ struct RouteMotionResult {
     bool valid{};
     bool lap_completed{};
     bool finished{};
+};
+
+struct RouteRaceStanding {
+    std::size_t participant_index{};
+    float finish_time_seconds{};
+    bool player{};
 };
 
 void initialize_race_progression(
@@ -63,5 +70,13 @@ void advance_race_clock(
     RouteMotionState& state,
     const RouteMotionState& candidate,
     bool terrain_query_succeeded) noexcept;
+
+// Builds deterministic finish standings from completed finite route-race
+// states. `participants` is indexed by rendered entrant slot; player_state is
+// supplied separately because the runtime keeps it outside that array.
+[[nodiscard]] std::vector<RouteRaceStanding> build_route_race_standings(
+    const RouteMotionState& player_state,
+    std::span<const RouteMotionState> participants,
+    std::size_t player_participant_index);
 
 } // namespace viper

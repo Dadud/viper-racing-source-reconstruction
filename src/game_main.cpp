@@ -540,7 +540,25 @@ private:
         constexpr float scale = 2.0F;
         constexpr float advance = 18.0F;
         constexpr float line_height = 22.0F;
-        append_rectangle(panel_x, panel_y, panel_x + 290.0F, panel_y + 108.0F,
+        std::size_t line_count = 1U;
+        std::size_t longest_line = 0U;
+        std::size_t current_line = 0U;
+        for (const char character : text) {
+            if (character == '\n') {
+                longest_line = (std::max)(longest_line, current_line);
+                current_line = 0U;
+                ++line_count;
+            } else {
+                ++current_line;
+            }
+        }
+        longest_line = (std::max)(longest_line, current_line);
+        const float panel_width = (std::max)(290.0F,
+            16.0F + static_cast<float>(longest_line) * advance);
+        const float panel_height = (std::max)(108.0F,
+            12.0F + static_cast<float>(line_count) * line_height);
+        append_rectangle(panel_x, panel_y, panel_x + panel_width,
+            panel_y + panel_height,
             {0.035F, 0.060F, 0.080F});
         float x = panel_x + 8.0F;
         float y = panel_y + 6.0F;
@@ -1331,6 +1349,36 @@ struct WindowState {
 
     std::string hud_text() const
     {
+        bool every_entrant_finished = motion.race.finished;
+        for (std::size_t index = 0; index < opponent_motions.size() &&
+                every_entrant_finished; ++index) {
+            if (index != player_car_index &&
+                !opponent_motions[index].race.finished) {
+                every_entrant_finished = false;
+            }
+        }
+        if (every_entrant_finished) {
+            const auto standings = viper::build_route_race_standings(
+                motion, opponent_motions, player_car_index);
+            std::string results = "RACE RESULTS";
+            for (std::size_t rank = 0; rank < standings.size(); ++rank) {
+                const auto& standing = standings[rank];
+                const auto minutes = static_cast<unsigned>(
+                    standing.finish_time_seconds / 60.0F);
+                const auto seconds = static_cast<unsigned>(
+                    standing.finish_time_seconds) % 60U;
+                const auto hundredths = static_cast<unsigned>(std::fmod(
+                    standing.finish_time_seconds, 1.0F) * 100.0F);
+                results += "\n" + std::to_string(rank + 1U) + " ";
+                results += standing.player ? "YOU " : "AI ";
+                if (!standing.player) results += std::to_string(standing.participant_index + 1U) + " ";
+                results += std::to_string(minutes) + ":" +
+                    (seconds < 10U ? "0" : "") + std::to_string(seconds) + "." +
+                    (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
+            }
+            results += "\nESC TO EXIT";
+            return results;
+        }
         const auto minutes = static_cast<unsigned>(motion.race.elapsed_seconds / 60.0F);
         const auto seconds = static_cast<unsigned>(motion.race.elapsed_seconds) % 60U;
         const auto hundredths = static_cast<unsigned>(

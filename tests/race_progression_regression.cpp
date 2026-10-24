@@ -103,6 +103,21 @@ int main()
                     candidate_motion.race.elapsed_seconds &&
                 staged_motion.race.completed_laps == 1U,
             "successful terrain validation must commit the complete candidate state");
+
+        std::array<viper::RouteMotionState, 4> finishers{};
+        finishers[0].race = {0U, 1U, 12.5F, true};
+        finishers[1].race = {0U, 1U, 0.0F, false};
+        finishers[2].race = {0U, 1U, 9.25F, true};
+        finishers[3].race = {0U, 1U, 0.0F, false};
+        auto finished_player = staged_motion;
+        finished_player.race = {0U, 1U, 10.0F, true};
+        const auto standings = viper::build_route_race_standings(
+            finished_player, finishers, 3U);
+        require(standings.size() == 3U &&
+                standings[0].participant_index == 2U &&
+                standings[1].player && standings[1].participant_index == 3U &&
+                standings[2].participant_index == 0U,
+            "race standings must sort only completed entrants by finish time and slot");
         std::cout << "race progression regression checks passed\n";
         return 0;
     } catch (const std::exception& error) {
