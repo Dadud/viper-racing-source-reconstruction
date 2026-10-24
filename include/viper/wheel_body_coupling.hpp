@@ -585,6 +585,8 @@ struct NcarWheelCoreInitialization {
     float value_0x48{};
     float value_0x40{};
     float value_0x4c{};
+    float coefficient_0x9c{};
+    float coefficient_0xa0{};
     WheelPiecewiseTerms suspension_piecewise_terms{};
 };
 

@@ -254,11 +254,26 @@ It also selects the axle's CARF values at `+0xD4/+0xDC` (front) or
 and `2.67` factors and explicit FDIV-compatibility input, then applies helper
 `0x440560` to reconstruct the four `WheelPiecewiseTerms` stored at wheel
 `+0x24..+0x30`. These terms feed the existing evidence-backed spring-response
-evaluator. This completes only the constructor's coefficient setup; the live
-runtime still does not populate persistent wheel histories or run the body and
-wheel update pipeline. Evidence: `0x441C10` pseudocode
-`ev_c5aa0c77b19958eb9c8ba45643b19d858c19899f5cfc958f00b97ab6df232f06` and
-`0x440560` pseudocode `ev_906c8fea850a24b83239803069e5c805da97ac274918d073c7ab9625a12ce57b`.
+evaluator. It also reconstructs wheel coefficients `+0x9C/+0xA0`: `0x441C10`
+calls `0x4405F0` twice with caller constants `26.666666` and `71.111115`, and
+the helper computes `(stack[+0x18] + 4.4444447) * stack[+0x10] * 1.25e-7`.
+The caller combines those outputs with constants `71.111115`, `-26.666666`,
+`711.1111`, and `5056.7905`, then multiplies by `-1.1865233e-5`. The resulting
+values are retained by raw offset only; this does not assign a physical meaning
+to them. The motion projection and global polarity input to the subsequent
+surface adjustment remain unresolved, so the live runtime still does not run
+the body and wheel update pipeline. Evidence: `0x441C10` dossier
+`ev_c5aa0c77b19958eb9c8ba45643b19d858c19899f5cfc958f00b97ab6df232f06`,
+`0x440560` pseudocode
+`ev_906c8fea850a24b83239803069e5c805da97ac274918d073c7ab9625a12ce57b`,
+`0x4405F0` pseudocode/assembly
+`ev_311692f6381f833250f9e99ec0b64e513be1545a4e787536e5dfb310e1e4b1ef`, and
+its callers at `0x4424B7/0x4424DF`
+(`ev_85b20f0f77be2de61e97c56c8f8083049f3be07ca334dad33d49afe8ffab7e3d`).
+The helper constants at `0x4C86CC/0x4C86D0` are recorded by read-bytes evidence
+`ev_b7f25654e7d7408d86571c2be62dc6957a1ddc76ca13fd2f7b4800d88e5c38b7`; the
+combination constants at `0x4C88C4..0x4C88D4` are recorded by
+`ev_fdc9f13cf1e4928a622c7fa1346ca7d759704afd450041ce8453a312ff764c46`.
 Its input explicitly includes the car object's mass-like scalar at `+0x1F0` and
 the observed FDIV-compatibility flag. A short runtime record or wheel index
 outside 0..3 is rejected. The final suspension-height correction uses the

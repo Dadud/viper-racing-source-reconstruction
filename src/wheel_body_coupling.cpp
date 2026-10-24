@@ -371,6 +371,25 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         (piecewise_param4 * 0.13333334F - piecewise_param3) * -1.1538461F;
     const float nonpositive_intercept =
         (piecewise_param3 - nonpositive_slope) * 9.84252F;
+    const auto wheel_constructor_scalar_0x4405f0 = [track_scale](
+        const float caller_stack_value_0x18) {
+        return (static_cast<long double>(caller_stack_value_0x18) +
+            static_cast<long double>(4.44444465637207F)) *
+            static_cast<long double>(track_scale) *
+            static_cast<long double>(1.2499999968440534e-7F);
+    };
+    const long double constructor_scalar_0 = wheel_constructor_scalar_0x4405f0(
+        26.66666603088379F);
+    const long double constructor_scalar_1 = wheel_constructor_scalar_0x4405f0(
+        71.11111450195312F);
+    const float coefficient_0x9c = static_cast<float>(
+        (constructor_scalar_0 * 71.11111450195312L -
+         26.66666603088379L * constructor_scalar_1) *
+        -1.1865233318530954e-5L);
+    const float coefficient_0xa0 = static_cast<float>(
+        (constructor_scalar_1 * 711.111083984375L -
+         constructor_scalar_0 * 5056.79052734375L) *
+        -1.1865233318530954e-5L);
     const std::array<float, 3> candidate_position{
         side_sign * std::fabs(lateral_setup) * 0.0254F * 0.5F,
         -(read_float(0x128U) * 0.0254F + value_0x44),
@@ -395,6 +414,8 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         value_0x48,
         0.0F,
         track_scale,
+        coefficient_0x9c,
+        coefficient_0xa0,
         {positive_slope, positive_intercept,
          nonpositive_slope, nonpositive_intercept}};
 }

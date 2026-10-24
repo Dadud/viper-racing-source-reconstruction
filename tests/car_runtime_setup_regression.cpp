@@ -270,6 +270,21 @@ int main()
         write_float(0x13cU, 6.0F);
         write_float(0x140U, 8.0F);
         write_float(0x144U, 4.0F);
+        const auto expected_surface_coefficients = [](const float track_scale) {
+            const auto helper = [track_scale](const float stack_value_0x18) {
+                return (static_cast<long double>(stack_value_0x18) +
+                    static_cast<long double>(4.44444465637207F)) *
+                    static_cast<long double>(track_scale) *
+                    static_cast<long double>(1.2499999968440534e-7F);
+            };
+            const auto first = helper(26.66666603088379F);
+            const auto second = helper(71.11111450195312F);
+            return std::array<float, 2>{
+                static_cast<float>((first * 71.11111450195312L -
+                    26.66666603088379L * second) * -1.1865233318530954e-5L),
+                static_cast<float>((second * 711.111083984375L -
+                    first * 5056.79052734375L) * -1.1865233318530954e-5L)};
+        };
         const auto front_tire_setup = viper::initialize_ncar_wheel_tire_setup(
             wheel_record, 0U, tire_definition, false);
         const auto rear_tire_setup = viper::initialize_ncar_wheel_tire_setup(
@@ -294,6 +309,8 @@ int main()
             wheel_record, 0U, front_anchor, 0.5F, false});
         const float front_base_height = 8.0F * 0.0254F;
         const float front_track_scale = 0.1F * 175.19684F;
+        const auto front_surface_coefficients =
+            expected_surface_coefficients(front_track_scale);
         const float front_height_correction = static_cast<float>(
             (static_cast<long double>(0.5F * 0.25F * 4.905F) -
              static_cast<long double>(front_base_height * 2.0F) * 0.5L *
@@ -313,6 +330,8 @@ int main()
                     0.3365F) < 1.0e-6F &&
                 front_wheel->value_0x40 == 0.0F &&
                 front_wheel->value_0x4c == front_track_scale &&
+                front_wheel->coefficient_0x9c == front_surface_coefficients[0] &&
+                front_wheel->coefficient_0xa0 == front_surface_coefficients[1] &&
                 std::fabs(front_wheel->suspension_piecewise_terms.positive_slope -
                     ((0.01F / 0.0254F * 2.67F * 0.13333334F -
                       0.01F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F &&
@@ -331,6 +350,8 @@ int main()
             wheel_record, 2U, {-0.4F, -0.254F, -1.27F}, 0.5F, false});
         const float rear_base_height = 9.0F * 0.0254F;
         const float rear_track_scale = 0.2F * 175.19684F;
+        const auto rear_surface_coefficients =
+            expected_surface_coefficients(rear_track_scale);
         const float rear_height_correction = static_cast<float>(
             (static_cast<long double>(0.5F * 0.75F * 4.905F) -
              static_cast<long double>(rear_base_height * 2.0F) * 0.5L *
@@ -343,6 +364,8 @@ int main()
                 std::fabs(rear_wheel->angle_0x60 - 0.34906584F) < 1.0e-6F &&
                 std::fabs(rear_wheel->angle_0x64 - 0.69813168F) < 1.0e-6F &&
                 std::fabs(rear_wheel->candidate_position[2] + 1.27F) < 1.0e-6F &&
+                rear_wheel->coefficient_0x9c == rear_surface_coefficients[0] &&
+                rear_wheel->coefficient_0xa0 == rear_surface_coefficients[1] &&
                 std::fabs(rear_wheel->suspension_piecewise_terms.positive_slope -
                     ((0.02F / 0.0254F * 2.67F * 0.13333334F -
                       0.02F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F &&
