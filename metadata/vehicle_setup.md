@@ -846,20 +846,38 @@ coordinates divided by 10, converted with x87 `__ftol`, then shifted right by
 and stored as little-endian 16-bit values; bytes 9-12 are zero; byte 13 is the
 vehicle ordinal. The conversion values, body transform, and compatibility
 divider are represented in `apply_ncar_integrator_virtual_record_callback`.
-The target's mesh/resource response remains unresolved. Evidence:
+The `+0x3C` wrapper forwards the force and position pointers and passes zero
+for both target flags, enabling vertex displacement without sign reversal.
+`apply_ncar_integrator_mesh_response` now models the secondary handler's
+mesh deformation when its resource views are supplied: it finds the nearest
+0x20-stride vertex to the adjusted impact position, offsets the focus by
+`0.48000002` along normalized force, and applies the capped displacement to
+vertices within strict squared radius `0.36`. It performs two UV-band passes,
+`[0,0.75)` and `[0.75,1)`, computes the `+0x18/+0x1C` rectangle bounds for the
+metadata index interval, and calls the `+0x48E` mask projection for both bands.
+Afterward it copies each group's indexed main-mesh XYZ coordinates and models
+the main plus five group descriptor refreshes that clear `+0x15`. Vertex/group
+spans and descriptor pointers remain explicit caller inputs; out-of-range
+indices are reported as unprocessed rather than dereferenced.
+Evidence:
 `0x430BF0` `ev_87738c6e1979745e751f9357b19ee919aadf3b5e649373d76b826a4db0238731`,
 event enqueue `0x4273C0` `ev_4b5569385e553dacbb0ddc508b7d9467e3208f081cc0b277ac6b27ad9a05d436`,
 and nested handler `0x430610` `ev_1d43c9b43216ba441eb9a29e9156ce92b767363305dda9c9f0449178b15faca5`.
+Wrapper bytes `ev_06388009b91840790c955a840d7f13b192b6081e6e6cc9598e894fdefc18ddc6`
+confirm both target flags are passed as zero.
 Evidence bundle: `metadata/ncar_integrator_virtual_record.evidence.json`.
 
-The nested handler calls `0x430B70` twice to OR a rectangular bit range into
-the `+0x48E` 16-bit mask rows. `apply_ncar_mesh_bounds_mask` models its four
-float boundaries after the shared `15.99` scale and `__ftol` conversion. It
-applies only rows present in the supplied span and reports out-of-range rows
-instead of reproducing native out-of-bounds writes. The caller's vertex-derived
-rectangle bounds and the later mesh/resource copy remain uncomposed. Evidence:
+The nested handler calls `0x430B70` twice to OR each band's rectangular bit
+range into the same `+0x48E` 16-bit mask base. `apply_ncar_mesh_bounds_mask`
+models its four float boundaries after the shared `15.99` scale and `__ftol`
+conversion. It applies only rows present in the supplied span and reports
+out-of-range rows instead of reproducing native out-of-bounds writes. The
+resource data itself must still be supplied by the caller. Evidence:
 `0x430B70` `ev_ce9b5c3a5ae397c8a061c290479bb584c98eeb9454e658600384011e1ac641e0`,
 scale bytes `0x4C7DA8` `ev_c3ef9ca6494f43d2e2252d646d0e6d7fc012722f81c7ae96bcf30b2863aca4bc`.
+Descriptor-refresh flag behavior is supported by `0x44F750`
+`ev_0e3f082206eadcd208a106544e27f61ba1c7f6e9d6dc64293634a909a82d21cc` and
+`0x44F9C0` `ev_f8b14f5c934c3ebeaec98b7b4d2c274e69d0c4b6db674daed52393fbeeae7a50`.
 
 The embedded-record helper `0x4473D0` transforms its stored point through
 `0x437BA0`, which multiplies the local point by the basis at body `+0x38..+0x58`

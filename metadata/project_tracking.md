@@ -316,4 +316,4 @@ After a meaningful change:
 
 - **2026-10-24:** Modeled the duration-normalized integrator virtual-record gate, timeout writes, and the complete type-5 event payload encoding. Ratings unchanged; nested mesh/resource mutation and runtime validation remain open.
 
-- **2026-10-24:** Added a bounded model of  x430B70's scaled mesh bit-mask row writes. Ratings unchanged because the geometry-derived rectangles, mesh deformation loop, and resource group updates in  x430610 remain incomplete.
+- **2026-10-24:** Added bounded 0x430B70 mask writes and composed the known 0x430610 mesh deformation plus five group vertex copies and descriptor refreshes. Ratings unchanged because runtime mesh inputs and full game validation remain external observations.

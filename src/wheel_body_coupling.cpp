@@ -7,6 +7,7 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
+#include <utility>
 
 namespace viper {
 
@@ -552,6 +553,8 @@ apply_ncar_integrator_virtual_record_callback(
         input.vehicle_ordinal_0x510);
     result.event_payload_bytes_resolved = true;
     result.secondary_virtual_call_reached = true;
+    result.mesh_response = apply_ncar_integrator_mesh_response(
+        state, input, result.event_local_force, result.event_local_position);
     return result;
 }
 
@@ -617,6 +620,180 @@ NcarMeshBoundsMaskResult apply_ncar_mesh_bounds_mask(
     }
     result.rows_out_of_range = static_cast<std::uint64_t>(row_count) -
         result.rows_written;
+    return result;
+}
+
+NcarIntegratorMeshResponseResult apply_ncar_integrator_mesh_response(
+    NcarPostBodyState& state,
+    const NcarIntegratorVirtualRecordCallbackInput& input,
+    const PhysicsVector3& local_force,
+    const PhysicsVector3& local_position) noexcept
+{
+    NcarIntegratorMeshResponseResult result{};
+    result.handler_reached = true;
+    state.timeout_pending_0x48c = 1U;
+    result.timeout_state_written = true;
+    result.input_complete = input.mesh_vertex_buffer_resolved &&
+        input.mesh_vertex_index_range_resolved;
+    if (!input.mesh_vertex_buffer_resolved ||
+        !input.mesh_vertex_index_range_resolved) {
+        return result;
+    }
+
+    constexpr auto force_squared_offset = 741.6666F;
+    constexpr auto force_to_damage_scale = 0.0026966294F;
+    constexpr auto maximum_damage_scale = 40.0F;
+    constexpr auto vertex_displacement_step = 0.016F;
+    constexpr auto near_vertex_distance_squared = 0.36F;
+    constexpr auto focus_offset = 0.48000002F;
+
+    const auto force_magnitude = std::sqrt(
+        (static_cast<long double>(local_force.y) * local_force.y +
+         static_cast<long double>(local_force.z) * local_force.z) +
+        static_cast<long double>(local_force.x) * local_force.x);
+    const auto force_excess = static_cast<float>(
+        force_magnitude - static_cast<long double>(force_squared_offset));
+    const auto normalized_component = [&](const float component) noexcept {
+        return static_cast<float>(divide_with_vc98_fdiv_compatibility(
+            static_cast<long double>(component), force_magnitude,
+            input.fdiv_compatibility_enabled));
+    };
+    const PhysicsVector3 force_direction{
+        normalized_component(local_force.x),
+        normalized_component(local_force.y),
+        normalized_component(local_force.z)};
+    auto damage_scale = force_excess * force_to_damage_scale;
+    if (damage_scale > maximum_damage_scale) {
+        damage_scale = maximum_damage_scale;
+    }
+    result.displacement_scale = damage_scale * vertex_displacement_step;
+    const auto displacement_component = [&](const float component) noexcept {
+        return component * damage_scale * vertex_displacement_step;
+    };
+
+    const auto query_x = local_position.x * 1.3F;
+    const auto query_y_minus_one = local_position.y - 1.0F;
+    const auto query_y_scaled = query_y_minus_one * 1.3F;
+    const auto query_y = query_y_scaled + 1.0F;
+    const auto query_z = local_position.z * 1.3F;
+    const PhysicsVector3 query_position{
+        query_x, query_y, query_z};
+    auto nearest_candidate = local_force;
+    auto nearest_distance_squared = 1.0e6F;
+    for (std::size_t index = 0; index < input.mesh_vertices.size(); ++index) {
+        const auto& vertex = input.mesh_vertices[index];
+        const auto dx = vertex[0] - query_position.x;
+        const auto dy = vertex[1] - query_position.y;
+        const auto dz = vertex[2] - query_position.z;
+        const auto distance_squared = dx * dx + dz * dz + dy * dy;
+        if (distance_squared < nearest_distance_squared) {
+            nearest_distance_squared = distance_squared;
+            nearest_candidate = {vertex[0], vertex[1], vertex[2]};
+            result.nearest_vertex_index = index;
+            result.nearest_vertex_found = true;
+        }
+    }
+    result.mesh_focus_center = {
+        nearest_candidate.x - force_direction.x * focus_offset,
+        nearest_candidate.y - force_direction.y * focus_offset,
+        nearest_candidate.z - force_direction.z * focus_offset};
+
+    constexpr std::array<std::array<float, 2>, 2> vertical_bands{{
+        {{0.0F, 0.75F}}, {{0.75F, 1.0F}}}};
+    for (std::size_t pass = 0; pass < vertical_bands.size(); ++pass) {
+        auto lower_u = 0.0F;
+        auto upper_u = 1.0F;
+        auto lower_v = 0.0F;
+        auto upper_v = 1.0F;
+        for (std::size_t index = 0; index < input.mesh_vertices.size(); ++index) {
+            auto& vertex = input.mesh_vertices[index];
+            const auto dx = vertex[0] - result.mesh_focus_center.x;
+            const auto dy = vertex[1] - result.mesh_focus_center.y;
+            const auto dz = vertex[2] - result.mesh_focus_center.z;
+            const auto distance_squared = dx * dx + dz * dz + dy * dy;
+            if (distance_squared >= near_vertex_distance_squared) {
+                continue;
+            }
+
+            vertex[0] += displacement_component(force_direction.x);
+            vertex[1] += displacement_component(force_direction.y);
+            vertex[2] += displacement_component(force_direction.z);
+            ++result.vertex_displacement_stores;
+
+            const auto uv_x = vertex[6];
+            const auto uv_y = vertex[7];
+            const auto vertex_index = static_cast<std::int64_t>(index);
+            if (vertex_index < input.mesh_vertex_index_begin ||
+                vertex_index >= input.mesh_vertex_index_end ||
+                uv_y < vertical_bands[pass][0] ||
+                uv_y >= vertical_bands[pass][1]) {
+                continue;
+            }
+            upper_u = std::min(upper_u, uv_x - 0.05F);
+            upper_v = std::min(upper_v, uv_y - 0.05F);
+            lower_u = std::max(lower_u, uv_x + 0.05F);
+            lower_v = std::max(lower_v, uv_y + 0.05F);
+        }
+
+        auto mask_rows = std::span<std::uint16_t>{state.timeout_values_0x48e};
+        result.bounds_mask_updates[pass] = apply_ncar_mesh_bounds_mask({
+            mask_rows, upper_v, lower_v, upper_u, lower_u});
+        if (result.bounds_mask_updates[pass].rows_out_of_range != 0U) {
+            result.input_complete = false;
+        }
+    }
+
+    result.main_descriptor_refresh_reached = true;
+    state.integrator_mesh_descriptor_flag_0x15 = 0U;
+    if (input.mesh_descriptor_pointer_0x10) {
+        state.integrator_mesh_descriptor_0x10 =
+            *input.mesh_descriptor_pointer_0x10;
+    } else {
+        result.input_complete = false;
+    }
+
+    for (std::size_t group_index = 0;
+         group_index < input.mesh_groups.size(); ++group_index) {
+        const auto& group = input.mesh_groups[group_index];
+        result.group_descriptor_refresh_reached[group_index] = true;
+        state.resource_flag_0x15[group_index] = 0U;
+        if (group.destination_vertex_buffer_resolved &&
+            group.source_vertex_index_buffer_resolved) {
+            const auto count = std::min(group.destination_vertices.size(),
+                                        group.source_vertex_indices.size());
+            for (std::size_t vertex_index = 0; vertex_index < count;
+                 ++vertex_index) {
+                const auto source_index = static_cast<std::size_t>(
+                    group.source_vertex_indices[vertex_index]);
+                if (source_index >= input.mesh_vertices.size()) {
+                    ++result.group_vertices_unprocessed[group_index];
+                    continue;
+                }
+                auto& destination = group.destination_vertices[vertex_index];
+                const auto& source = input.mesh_vertices[source_index];
+                destination[0] = source[0];
+                destination[1] = source[1];
+                destination[2] = source[2];
+                ++result.group_vertices_copied[group_index];
+            }
+            result.group_vertices_unprocessed[group_index] +=
+                group.destination_vertices.size() - count;
+            if (result.group_vertices_unprocessed[group_index] != 0U) {
+                result.input_complete = false;
+            }
+        } else {
+            result.group_vertices_unprocessed[group_index] =
+                group.destination_vertices.size();
+            result.input_complete = false;
+        }
+
+        if (group.descriptor_pointer_0x10) {
+            state.resource_descriptor_0x10[group_index] =
+                *group.descriptor_pointer_0x10;
+        } else {
+            result.input_complete = false;
+        }
+    }
     return result;
 }
 
@@ -1593,11 +1770,23 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
              kinematics_at_step_start.position.z},
             input.post_body_input.global_update_gate_0x425870,
             input.post_body_input.fdiv_compatibility_enabled,
+            input.post_body_input.integrator_mesh_vertices,
+            input.post_body_input.integrator_mesh_vertex_buffer_resolved,
+            input.post_body_input.integrator_mesh_vertex_index_begin,
+            input.post_body_input.integrator_mesh_vertex_index_end,
+            input.post_body_input.integrator_mesh_vertex_index_range_resolved,
+            input.post_body_input.integrator_mesh_descriptor_pointer_0x10,
+            input.post_body_input.integrator_mesh_groups,
             input.post_body_input.current_time_0x425790,
             input.post_body_input.vehicle_ordinal_0x510};
+        auto callback_result = apply_ncar_integrator_virtual_record_callback(
+            result.post_body_state, callback_input);
+        if (callback_result.secondary_virtual_call_reached &&
+            !callback_result.mesh_response.input_complete) {
+            result.input_complete = false;
+        }
         result.integrator_virtual_record_callbacks.push_back(
-            apply_ncar_integrator_virtual_record_callback(
-                result.post_body_state, callback_input));
+            std::move(callback_result));
     }
 
     auto kinematics_input = kinematics_at_step_start;

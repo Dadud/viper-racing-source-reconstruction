@@ -178,10 +178,20 @@ struct NcarPostBodyState {
     std::array<float, 3> cleared_vector_0x37f{};
     std::uint8_t timeout_pending_0x48c{};
     std::uint8_t timeout_auxiliary_0x48d{};
-    std::array<std::uint32_t, 8> timeout_values_0x48e{};
+    std::array<std::uint16_t, 16> timeout_values_0x48e{};
     float timeout_start_0x488{};
     std::array<std::uint32_t, 5> resource_descriptor_0x10{};
     std::array<std::uint8_t, 5> resource_flag_0x15{};
+    std::uint32_t integrator_mesh_descriptor_0x10{};
+    std::uint8_t integrator_mesh_descriptor_flag_0x15{};
+};
+
+struct NcarImpactMeshGroupInput {
+    std::span<std::array<float, 8>> destination_vertices;
+    bool destination_vertex_buffer_resolved{};
+    std::span<const std::uint16_t> source_vertex_indices;
+    bool source_vertex_index_buffer_resolved{};
+    std::optional<std::uint32_t> descriptor_pointer_0x10;
 };
 
 struct NcarIntegratorVirtualRecordCallbackInput {
@@ -191,27 +201,15 @@ struct NcarIntegratorVirtualRecordCallbackInput {
     std::array<float, 3> body_center_0x5c{};
     bool global_update_gate_0x425870{};
     bool fdiv_compatibility_enabled{};
+    std::span<std::array<float, 8>> mesh_vertices;
+    bool mesh_vertex_buffer_resolved{};
+    std::int16_t mesh_vertex_index_begin{};
+    std::int16_t mesh_vertex_index_end{};
+    bool mesh_vertex_index_range_resolved{};
+    std::optional<std::uint32_t> mesh_descriptor_pointer_0x10;
+    std::array<NcarImpactMeshGroupInput, 5> mesh_groups{};
     float current_time_0x425790{};
     std::uint32_t vehicle_ordinal_0x510{};
-};
-
-struct NcarIntegratorVirtualRecordCallbackResult {
-    bool callback_reached{};
-    float force_magnitude_squared{};
-    bool global_gate_passed{};
-    bool impact_threshold_passed{};
-    bool timeout_state_written{};
-    float timeout_start_time_written{};
-    std::uint32_t event_helper{0x004273C0};
-    std::uint8_t event_type{5};
-    std::uint8_t event_payload_size{0x0e};
-    bool event_payload_bytes_resolved{};
-    std::array<std::uint8_t, 14> event_payload{};
-    PhysicsVector3 event_local_position{};
-    PhysicsVector3 event_local_force{};
-    bool secondary_virtual_call_reached{};
-    std::uint32_t secondary_virtual_wrapper{0x00427E00};
-    std::uint32_t secondary_virtual_target{0x00430610};
 };
 
 struct NcarMeshBoundsMaskInput {
@@ -232,9 +230,51 @@ struct NcarMeshBoundsMaskResult {
     std::uint64_t rows_out_of_range{};
 };
 
+struct NcarIntegratorMeshResponseResult {
+    bool handler_reached{};
+    bool timeout_state_written{};
+    bool input_complete{};
+    bool nearest_vertex_found{};
+    std::size_t nearest_vertex_index{};
+    PhysicsVector3 mesh_focus_center{};
+    float displacement_scale{};
+    std::size_t vertex_displacement_stores{};
+    std::array<NcarMeshBoundsMaskResult, 2> bounds_mask_updates{};
+    bool main_descriptor_refresh_reached{};
+    std::array<std::size_t, 5> group_vertices_copied{};
+    std::array<std::size_t, 5> group_vertices_unprocessed{};
+    std::array<bool, 5> group_descriptor_refresh_reached{};
+};
+
+struct NcarIntegratorVirtualRecordCallbackResult {
+    bool callback_reached{};
+    float force_magnitude_squared{};
+    bool global_gate_passed{};
+    bool impact_threshold_passed{};
+    bool timeout_state_written{};
+    float timeout_start_time_written{};
+    std::uint32_t event_helper{0x004273C0};
+    std::uint8_t event_type{5};
+    std::uint8_t event_payload_size{0x0e};
+    bool event_payload_bytes_resolved{};
+    std::array<std::uint8_t, 14> event_payload{};
+    PhysicsVector3 event_local_position{};
+    PhysicsVector3 event_local_force{};
+    bool secondary_virtual_call_reached{};
+    NcarIntegratorMeshResponseResult mesh_response{};
+    std::uint32_t secondary_virtual_wrapper{0x00427E00};
+    std::uint32_t secondary_virtual_target{0x00430610};
+};
+
 // Reconstructs the bounded row/column bit-mask writes in 0x430B70.
 [[nodiscard]] NcarMeshBoundsMaskResult apply_ncar_mesh_bounds_mask(
     const NcarMeshBoundsMaskInput& input) noexcept;
+
+[[nodiscard]] NcarIntegratorMeshResponseResult apply_ncar_integrator_mesh_response(
+    NcarPostBodyState& state,
+    const NcarIntegratorVirtualRecordCallbackInput& input,
+    const PhysicsVector3& local_force,
+    const PhysicsVector3& local_position) noexcept;
 
 // Models the PCAR/NCAR vtable +0x38 method reached by duration-gated records.
 [[nodiscard]] NcarIntegratorVirtualRecordCallbackResult
@@ -263,6 +303,13 @@ struct NcarPostBodyInput {
     float current_time_0x425790{};
     bool global_update_gate_0x425870{};
     bool fdiv_compatibility_enabled{};
+    std::span<std::array<float, 8>> integrator_mesh_vertices;
+    bool integrator_mesh_vertex_buffer_resolved{};
+    std::int16_t integrator_mesh_vertex_index_begin{};
+    std::int16_t integrator_mesh_vertex_index_end{};
+    bool integrator_mesh_vertex_index_range_resolved{};
+    std::optional<std::uint32_t> integrator_mesh_descriptor_pointer_0x10;
+    std::array<NcarImpactMeshGroupInput, 5> integrator_mesh_groups{};
     std::array<NcarResetResourceGroupInput, 5> timeout_resource_groups{};
     std::uint32_t vehicle_ordinal_0x510{};
 };
