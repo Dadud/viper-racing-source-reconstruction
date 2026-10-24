@@ -521,3 +521,8 @@ render-context, viewport, and submission order for the active `0x4020E0` path.
 Build with CMake 3.20+ and a C++20 compiler. The full Release target has been
 compiled successfully with Visual Studio 18 Build Tools (MSVC 19.51) and CMake;
 this confirms the reconstruction utilities build, not game runtime behavior.
+
+The merged state-4 paused-banner pixel batch can be applied through the race-loop
+lifecycle helper when the frame submit, shared callback, and surface-unlock
+sequence match the observed order. The destination locked-surface span and
+native DirectDraw lock lifetime remain caller-owned.

@@ -1,5 +1,6 @@
 #include "viper/race_scene_render_flow.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <utility>
 
@@ -457,6 +458,55 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
     }
     return plan;
+}
+
+RaceLoopPausedBannerSurfaceWriteResult
+apply_race_loop_paused_banner_to_locked_surface(
+    const RaceLoopSharedOverlayPlan& plan,
+    const std::span<std::uint8_t> locked_surface)
+{
+    RaceLoopPausedBannerSurfaceWriteResult result{};
+    const auto& frame = plan.state_transition_and_frame.following_frame;
+    result.frame_submitted = frame.frame_submitted;
+    result.banner_write_plan_available =
+        plan.shared_paused_banner_frame_raster.has_value() &&
+        plan.shared_paused_banner_frame_raster->reached &&
+        plan.shared_paused_banner_frame_raster->input_complete;
+
+    if (!result.frame_submitted || !plan.shared_callback_reached ||
+        (plan.shared_callback_wrapper != 0x00404960U &&
+         plan.shared_callback_wrapper != 0x004052D0U) ||
+        !frame.surface_unlock.has_value() ||
+        !frame.surface_unlock->reached ||
+        frame.surface_unlock->ordered_helpers !=
+            std::array<std::uint32_t, 3>{
+                0x00415090U, 0x00459030U, 0x004150A0U}) {
+        return result;
+    }
+
+    const auto callback = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [&](const auto& call) {
+            return call.address == plan.shared_callback_wrapper;
+        });
+    const auto submit = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x0045C090U;
+        });
+    const auto unlock = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x00447CE0U;
+        });
+    if (callback == frame.calls.end() || submit == frame.calls.end() ||
+        unlock == frame.calls.end() || !(submit < callback && callback < unlock)) {
+        return result;
+    }
+
+    result.banner_callback_before_surface_unlock = true;
+    if (result.banner_write_plan_available) {
+        result.application = apply_scene_paused_banner_frame_raster(
+            *plan.shared_paused_banner_frame_raster, locked_surface);
+    }
+    return result;
 }
 
 } // namespace viper

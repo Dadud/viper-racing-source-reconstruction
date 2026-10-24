@@ -1996,3 +1996,11 @@ page at `0x508758`, `0x49BEA0` sets `0x4E3220`, `0x425800` clears `0x508760`,
 opaque timeout-menu result, page-helper mutations, second active-state read,
 and graphics backend effects remain caller observations. Evidence is in
 `race_loop_outer_iteration.evidence.json`.
+
+`apply_race_loop_paused_banner_to_locked_surface` connects the composed state-4
+banner pixel batch to the active-frame lifecycle. It only applies the batch if
+the frame was submitted, the observed state-0 or state-4 shared callback lies
+between `0x45C090` submission and `0x447CE0` unlock, and the unlock wrapper has
+the observed `0x415090`/`0x459030`/`0x4150A0` helper order. The caller still owns
+the locked-surface span and its lifetime; this projection does not perform the
+native lock, unlock, or flip.

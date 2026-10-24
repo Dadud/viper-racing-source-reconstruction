@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "viper/race_loop_callbacks.hpp"
@@ -117,9 +118,23 @@ struct RaceLoopSharedOverlayPlan {
         shared_paused_banner_frame_raster;
 };
 
+struct RaceLoopPausedBannerSurfaceWriteResult {
+    bool frame_submitted{};
+    bool banner_callback_before_surface_unlock{};
+    bool banner_write_plan_available{};
+    ScenePausedBannerFrameApplyResult application{};
+};
+
 // Carries the event-0x31 state change through callback dispatch and, when a
 // wrapper is reached, through known state-0 dashboard geometry and shared tail.
 [[nodiscard]] RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
     const RaceLoopSharedOverlayObservation& observation);
+
+// Applies the merged paused-banner writes only when the composed callback is
+// inside a submitted frame and precedes the observed 0x447CE0 unlock wrapper.
+[[nodiscard]] RaceLoopPausedBannerSurfaceWriteResult
+apply_race_loop_paused_banner_to_locked_surface(
+    const RaceLoopSharedOverlayPlan& plan,
+    std::span<std::uint8_t> locked_surface);
 
 } // namespace viper
