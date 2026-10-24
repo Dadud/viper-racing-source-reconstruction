@@ -618,6 +618,17 @@ flag at `+0x20` is set, the `+0x3C` product is reduced by 90 percent. The
 combined scalar corresponds to the wheel store at `+0x178`; field meanings
 remain raw offsets.
 
+The per-frame wheel update context at `0x4329C0` copies body `+0x50C` into
+wheel-context `+0x158` before calling the wheel routine. The NCAR body
+constructor `0x43E490` does not initialize body `+0x50C` in its observed
+pseudocode, so this term cannot be sourced from the currently modeled body
+constructor or safely defaulted to zero. The producer or reset path for body
+`+0x50C` must be recovered before the runtime can populate this suspension
+input faithfully. Evidence: `0x4329C0` dossier
+`ev_ec495a0523b6b3e8a6e16deb0b941496b12fb9879319d848e6ea55c41bb6ad6e` and
+`0x43E490` dossier
+`ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`.
+
 After that base scalar, `adjust_wheel_suspension_for_surface` models the next
 adjustment. The updater projects a wheel-motion vector onto body basis values,
 takes the absolute projection, caps a copy at `1`, then forms
