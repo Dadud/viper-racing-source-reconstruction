@@ -8,6 +8,14 @@
   possible over-read beyond the sixteen initialized local records. Added the
   new caller/helper evidence to `scene_car_dispatch_correction.evidence.json`.
 
+- **2026-10-24:** Reconstructed the `0x462CF0`/`0x462D00`/`0x462D30`
+  callback registry lifecycle and `0x462D90` byte parser. The portable parser
+  preserves ordered duplicate-tag callbacks, last-handler cursor results,
+  sentinel/unknown-tag termination, signed cursor wrap, and bounded missing
+  observations. Recorded the scene-context tag-1/tag-2 handlers separately
+  from the effects-context tag-0 handler; handler bodies remain explicit
+  external effects.
+
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table
   at `0x81C`, embedded data base, and optional relocation. Added font character

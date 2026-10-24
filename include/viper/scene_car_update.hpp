@@ -103,6 +103,78 @@ struct SceneCarDispatcherPlan {
 [[nodiscard]] SceneCarDispatcherPlan plan_scene_car_dispatcher(
     const SceneCarDispatcherInput& input);
 
+inline constexpr std::size_t scene_car_byte_handler_entry_capacity = 16;
+struct SceneCarByteHandlerEntry {
+    std::uint32_t callback_address{};
+    std::uint8_t tag{};
+    std::array<std::uint8_t, 3> trailing_bytes{};
+};
+static_assert(sizeof(SceneCarByteHandlerEntry) == 8);
+
+struct SceneCarByteHandlerRegistry {
+    std::vector<SceneCarByteHandlerEntry> entries;
+    bool capacity_overrun_possible{};
+};
+
+struct SceneCarByteHandlerRegistration {
+    std::uint32_t callback_address{};
+    std::uint8_t tag{};
+};
+
+[[nodiscard]] std::array<SceneCarByteHandlerRegistration, 2>
+scene_car_handlers_registered_by_scene_context() noexcept;
+[[nodiscard]] SceneCarByteHandlerRegistration
+scene_car_handler_registered_by_effect_context() noexcept;
+void reset_scene_car_byte_handler_registry(SceneCarByteHandlerRegistry& registry) noexcept;
+void register_scene_car_byte_handler(
+    SceneCarByteHandlerRegistry& registry,
+    SceneCarByteHandlerEntry handler);
+
+struct SceneCarByteHandlerRemovalResult {
+    bool removed{};
+    bool reporter_called{};
+};
+[[nodiscard]] SceneCarByteHandlerRemovalResult remove_scene_car_byte_handler(
+    SceneCarByteHandlerRegistry& registry,
+    std::uint32_t callback_address) noexcept;
+
+enum class SceneCarByteParserStatus : std::uint8_t {
+    complete,
+    stopped_on_unregistered_tag,
+    stopped_by_handler_sentinel,
+    payload_input_exhausted,
+    callback_result_input_exhausted,
+    invalid_negative_cursor,
+};
+
+struct SceneCarByteCallbackOperation {
+    std::size_t payload_offset{};
+    std::size_t handler_index{};
+    std::uint32_t callback_address{};
+    std::uint8_t tag{};
+    std::int32_t returned_payload_bytes{};
+};
+
+struct SceneCarByteParserInput {
+    std::int32_t declared_payload_bytes{};
+    std::span<const std::uint8_t> payload{};
+    const SceneCarByteHandlerRegistry* registry{};
+    // Results are consumed only for matching handlers, in table order.
+    std::span<const std::int32_t> callback_results{};
+};
+
+struct SceneCarByteParserPlan {
+    SceneCarByteParserStatus status{SceneCarByteParserStatus::complete};
+    std::int32_t cursor_after{};
+    std::size_t callback_results_consumed{};
+    std::vector<SceneCarByteCallbackOperation> callbacks;
+};
+
+// Models 0x462D90's ordered tag scan. Handler reads and writes are external;
+// callback return values supply each observed payload length or -1 sentinel.
+[[nodiscard]] SceneCarByteParserPlan plan_scene_car_byte_parser(
+    const SceneCarByteParserInput& input);
+
 struct SceneCarDistanceThreshold {
     float distance{};
     std::array<std::uint32_t, 2> opaque{};

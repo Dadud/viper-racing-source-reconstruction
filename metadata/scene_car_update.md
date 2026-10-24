@@ -54,6 +54,27 @@ for the outer function and composed helper paths is retained in
 `0x463530` (`ev_f9850233a2e11181b469ce382e050cc61f2121757d46767bcb95f7bd51841373`),
 and `0x45DAE0` (`ev_fc14044ec6dbfe6acc27e9edd6f2c8a73ab86b83baca33a6e0ac959e7a68311e`).
 
+The parser and handler registry are now modeled separately. The registry reset
+at `0x462CF0` clears the count; `0x462D00` appends an eight-byte
+`{callback, tag, trailing}` record and increments the count without a capacity
+check; `0x462D30` removes the first matching callback by replacing it with the
+last entry, or calls the reporter if absent. The known registrations are
+`0x468290` for tag 2 and `0x468450` for tag 1 from the scene-effects setup,
+and `0x4692A0` for tag 0 from the effects setup. The two setup contexts are
+kept distinct because simultaneous activation is not established. At each
+payload offset, `0x462D90` scans every registered entry in order and invokes
+every handler whose tag matches the current byte, passing the bytes after the
+tag. No match stops parsing. Otherwise the last matching handler's return
+controls the cursor: `-1` stops; any other value advances by that value plus
+one. The portable plan records each callback/result and guards missing payload
+or callback observations; actual handler side effects and out-of-bounds reads
+are not fabricated. Evidence: `0x462CF0` (`ev_87fc51588d2e71449560f2e725d0887ac52f4f6a0d86eaf3264f7f853b5c2d05`),
+`0x462D00` (`ev_27eaa986b6a64fe0b410e9978355b330863059004d75665dbb84e16d4425f4d4`),
+`0x462D30` (`ev_0399058f16c0cb7effc2a23bb68d22c10c549f947822e8f6f6523c8efe153d22`),
+`0x462D90` (`ev_df7587de6759c93e8fe32013823fe73d67e71deaae9c459db883dc1b01281cf0`),
+`0x468090` (`ev_b466aa22faf505aca957c810ba12a54714f045b5f4b12bf6b0055211483b2d98`),
+and `0x469300` (`ev_48b9e3596cb4dfa50d1ba5991c3ebb11ac926bf35e4073d6b395ec00385f1e90`).
+
 The wrapper measures the distance from object position `+0x28..+0x30` to the
 camera globals `0x509B58..0x509B60` using `0x448C10`; the following scale
 constant at `0x4D11D4` is exactly 1.0. It initializes indices `+0x510` and

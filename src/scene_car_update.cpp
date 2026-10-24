@@ -104,6 +104,110 @@ SceneCarDispatcherPlan plan_scene_car_dispatcher(
     return result;
 }
 
+std::array<SceneCarByteHandlerRegistration, 2>
+scene_car_handlers_registered_by_scene_context() noexcept
+{
+    return {{{0x00468290U, 2U}, {0x00468450U, 1U}}};
+}
+
+SceneCarByteHandlerRegistration scene_car_handler_registered_by_effect_context() noexcept
+{
+    return {0x004692A0U, 0U};
+}
+
+void reset_scene_car_byte_handler_registry(SceneCarByteHandlerRegistry& registry) noexcept
+{
+    registry.entries.clear();
+    registry.capacity_overrun_possible = false;
+}
+
+void register_scene_car_byte_handler(
+    SceneCarByteHandlerRegistry& registry,
+    const SceneCarByteHandlerEntry handler)
+{
+    registry.entries.push_back(handler);
+    registry.capacity_overrun_possible =
+        registry.entries.size() > scene_car_byte_handler_entry_capacity;
+}
+
+SceneCarByteHandlerRemovalResult remove_scene_car_byte_handler(
+    SceneCarByteHandlerRegistry& registry,
+    const std::uint32_t callback_address) noexcept
+{
+    const auto found = std::find_if(
+        registry.entries.begin(), registry.entries.end(),
+        [callback_address](const SceneCarByteHandlerEntry& entry) {
+            return entry.callback_address == callback_address;
+        });
+    if (found == registry.entries.end()) return {false, true};
+
+    *found = registry.entries.back();
+    registry.entries.pop_back();
+    registry.capacity_overrun_possible =
+        registry.entries.size() > scene_car_byte_handler_entry_capacity;
+    return {true, false};
+}
+
+SceneCarByteParserPlan plan_scene_car_byte_parser(const SceneCarByteParserInput& input)
+{
+    SceneCarByteParserPlan result{};
+    const auto handler_count = input.registry == nullptr
+        ? std::size_t{0}
+        : input.registry->entries.size();
+    if (input.declared_payload_bytes <= 0) return result;
+
+    const auto length = input.declared_payload_bytes;
+    std::int32_t cursor = 0;
+    while (cursor < length) {
+        if (static_cast<std::size_t>(cursor) >= input.payload.size()) {
+            result.status = SceneCarByteParserStatus::payload_input_exhausted;
+            result.cursor_after = cursor;
+            return result;
+        }
+
+        const auto tag = input.payload[static_cast<std::size_t>(cursor)];
+        bool matched = false;
+        std::int32_t last_result = -1;
+        for (std::size_t index = 0; index < handler_count; ++index) {
+            const auto& handler = input.registry->entries[index];
+            if (handler.tag != tag) continue;
+            matched = true;
+            if (result.callback_results_consumed >= input.callback_results.size()) {
+                result.status = SceneCarByteParserStatus::callback_result_input_exhausted;
+                result.cursor_after = cursor;
+                return result;
+            }
+            last_result = input.callback_results[result.callback_results_consumed++];
+            result.callbacks.push_back({
+                static_cast<std::size_t>(cursor), index, handler.callback_address,
+                tag, last_result});
+        }
+
+        if (!matched) {
+            result.status = SceneCarByteParserStatus::stopped_on_unregistered_tag;
+            result.cursor_after = cursor;
+            return result;
+        }
+        if (last_result == -1) {
+            result.status = SceneCarByteParserStatus::stopped_by_handler_sentinel;
+            result.cursor_after = cursor;
+            return result;
+        }
+
+        const auto cursor_bits = std::bit_cast<std::uint32_t>(cursor);
+        const auto advance_bits = std::bit_cast<std::uint32_t>(last_result) + 1U;
+        cursor = std::bit_cast<std::int32_t>(cursor_bits + advance_bits);
+        if (cursor < 0) {
+            result.status = SceneCarByteParserStatus::invalid_negative_cursor;
+            result.cursor_after = cursor;
+            return result;
+        }
+    }
+
+    result.cursor_after = cursor;
+    return result;
+}
+
 SceneCarDispatchIndices select_scene_car_dispatch_indices(
     const SceneCarDispatchIndicesInput& input) noexcept
 {
