@@ -145,18 +145,19 @@ enum class PhysicsTimeCommandPayloadStatus : std::uint8_t {
     complete,
     unknown_command,
     incomplete_payload,
-    task_index_out_of_range,
-    null_task_object,
+    registered_object_index_out_of_range,
+    null_registered_object,
 };
 
 struct PhysicsTimeCommandPayloadObservation {
     std::uint8_t command_id{};
     std::span<const std::uint8_t> payload;
     std::int32_t secondary_context{};
-    std::span<const std::uint32_t> task_object_addresses;
+    RegisteredObjectTable registered_object_addresses_0x507d70{};
     std::uint32_t event_buffer_size{};
     std::uint32_t record_ring_cursor{};
-    bool record_ring_slot_has_target{};
+    bool record_ring_slot_nested_target_nonnull{};
+    std::optional<std::uint32_t> record_ring_target_scalar_before_bits_0x08;
 };
 
 struct PhysicsTimeCommandPayloadPlan {
@@ -167,9 +168,11 @@ struct PhysicsTimeCommandPayloadPlan {
     bool event_buffer_append_succeeded{};
     std::uint32_t event_buffer_size_after{};
     std::uint8_t event_buffer_record_type{};
-    std::optional<std::int32_t> task_index;
-    std::uint32_t task_object_address{};
-    bool unguarded_task_object_call_would_fault{};
+    std::array<std::uint8_t, 28> event_buffer_payload{};
+    bool event_buffer_payload_known{};
+    std::optional<std::int32_t> registered_object_index;
+    std::uint32_t registered_object_address{};
+    bool unguarded_registered_object_call_would_fault{};
     bool reset_callback_0x433920_called{};
     bool virtual_0x3c_called{};
     bool command5_vectors_decoded{};
@@ -185,6 +188,13 @@ struct PhysicsTimeCommandPayloadPlan {
     bool record_ring_update_callback_called{};
     std::array<std::uint32_t, 3> record_vector_words{};
     std::uint32_t record_scalar_bits{};
+    bool record_ring_entry_vector_write_applied{};
+    std::optional<bool> record_ring_target_scalar_changed;
+    std::optional<std::uint32_t> record_ring_target_scalar_after_bits_0x08;
+    std::optional<bool> record_ring_target_change_flag_0x2c_set;
+    bool record_ring_target_flag_0x29_set{};
+    bool record_ring_target_flag_0x2b_cleared{};
+    bool record_ring_target_flag_0x2a_cleared{};
 };
 
 // Decodes fixed-width command payload effects recovered from raw handler

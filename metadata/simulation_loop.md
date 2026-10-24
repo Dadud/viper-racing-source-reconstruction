@@ -1741,11 +1741,13 @@ host-approximated. Evidence: `0x426A10`,
 `0x426C10` sample interpolation `ev_c96e8668f387991b8e27677bbd50ff6fbfa984a0a76cc81a6d1793c9501391c1`, and the `1/6` constant `ev_cbf6642097c18046bb6b861a7850b8524db7e1db6998eb9789c00651cfdd9120`.
 
 `plan_physics_time_command_payload` separately projects the known command
-payload effects: ID 3's bounded event-buffer append, ID 4's validation/panic
-gate, IDs 5 and 7's signed task-object lookup and reset/update calls, and ID
-1's record-ring update arguments. It reports unsafe table-index and null-object
-paths without dereferencing them; queue/object memory writes are observations,
-not mutations by this portable model.
+payload effects: ID 3's bounded event-buffer append and copied 28-byte payload,
+ID 4's validation/panic gate, IDs 5 and 7's signed index lookup through the
+registered-object table at `0x507D70` and reset/update calls, and ID 1's
+record-ring update arguments. ID 1's cursor wraps by signed remainder after
+increment. It reports unsafe index and null-object paths without dereferencing
+them; queue/object memory writes are observations, not mutations by this
+portable model.
 
 That ring bookkeeping is now projected by `plan_physics_time_ring_transition`.
 `0x4272C0` always sets `DAT_00508A34`. With old slot `-1`, it zeros the new

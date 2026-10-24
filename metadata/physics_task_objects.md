@@ -267,14 +267,55 @@ and `ev_27d135dea58c6cf970bf47c5e625b76a777054c4fd4b0c3ee308e5e88b8d07b4`.
 
 `plan_physics_time_command_payload` now turns those fixed-size payloads into
 bounded command effects. ID 3 models the strict `queue_size + 29 < 0x400`
-append gate and its leading record-type byte 0. ID 4 reads a DWORD and records
-the panic call unless it is 0 or 1. IDs 5 and 7 sign-extend their task index
-bytes (offset 13 and 0 respectively), resolve through the supplied task table,
+append gate, its leading record-type byte 0, and the 28 payload bytes copied on
+success. ID 4 reads a DWORD and records the panic call unless it is 0 or 1.
+IDs 5 and 7 sign-extend their index bytes (offset 13 and 0 respectively),
+resolve through the 16-entry registered-object table at `0x507D70`,
 and report the unguarded null/out-of-range callback path; ID 5 distinguishes
 context 2's reset from its virtual `+0x3C` callback. ID 1 exposes its current
-eight-slot ring index and, when the slot's nested target is present, the three
-payload DWORDs and scalar bits passed to `0x435FE0`. These are portable effect
-projections: they do not mutate game object memory or the event buffer.
+signed eight-slot ring index and, when the slot's nested target is present,
+the three payload DWORDs and scalar bits passed to `0x435FE0`. Its next cursor
+uses signed remainder after increment, and negative or greater-than-seven
+indices are marked out of range. These are portable effect projections: they do
+not mutate game object memory or the event buffer.
+
+The `0x435FE0` callback is invoked for the selected ring slot. If the pointer at
+slot `+0x0C` is nonnull, it writes the three vector DWORDs to slot offsets
+`0x1C..0x24` and compares the incoming scalar with the nested target's float at
+`+0x08`. An ordered unequal value replaces that scalar and sets target flag
+`+0x2C`; equal or unordered (including NaN) comparisons leave it unchanged.
+For either outcome it sets target `+0x29` and clears `+0x2B` and `+0x2A`. A null
+pointer at slot `+0x0C` makes the helper a no-op. The projection reports scalar
+comparison results only when the observation supplies the prior scalar bits;
+vector and flag effects require an observed nonnull nested target. Evidence:
+`ev_04253f3643c884dbc389a7b25838c9b860f180b996d81c377f063b4e569269d0`.
+
+The new raw-fragment pass confirms handler identity and return sizes without
+assuming these ranges are standalone functions. ID 7 at `0x431110` sign-extends
+payload byte 0, calls `0x420930`, passes its result to `0x433920`, and returns
+2. ID 5 at `0x430FB0` sign-extends payload byte 13 and performs the same object
+lookup before selecting the context-2 reset or decoding the two vectors for
+virtual `+0x3C`; both exits return 14. ID 4 at `0x4280D0` accepts values 0 and
+1, calls the panic reporter for other values, and returns 44. ID 1 at
+`0x436190` passes the selected 40-byte ring slot and four payload words to
+`0x435FE0`, increments the global cursor, and wraps using signed remainder by
+8; it returns 20. Evidence for ID 7: `ev_837423e1a56fc40c868b2d151c59b94f1593746825abd27ff809dab1fce2ffa2`,
+`ev_a12a0bb689f3f47109c406d2c63806318b1153469278c82eae4cff55e216cd20`,
+`ev_56d269e90510481762cb2a09582e190fabb1ac2a7405b9cb5d18049e92047e1e`,
+`ev_01bfe992ced09333d2a7e024f5bfc56fb73d4db1653d0bea438524744fbf9733`,
+and `ev_8e7691e554ee6eed9078c8b6dfd06708fe3113886d8f7d9df7ff7714e7ba4627`;
+ID 5: `ev_6de4ecfc6c91245fd8fdd129661631424281d9226a455ff82efa2e423826c693`,
+`ev_c80fc56e42c431cdad3c232b175e7333dbefb4d13fedf4f7a7a77c3a1a0bf6fa`,
+`ev_762257a81c5c9baa0411630e0619a358cdaeac52597305af1e67b7b96b99e604`,
+`ev_dabbf16b8fb504f389c7ada2d81605a15cd6c65187fb661378e8a88bf538855b`,
+and `ev_d4c9fa398b50182e33ecf12edac23b0fdbf00e8394afd16ba32e901982c39904`;
+ID 4: `ev_4a9cbfcbdf485e2813f39965f1f39d30f5e862199ebc2c8823120234b2a52e33`,
+`ev_64eb7a9b1aa5e39689bd223c03e504f6f0420cc3d88a5b54c5b66930332a4f7c`,
+and `ev_dc097dbe21ba191cbba52c849ca4dfb3c608fbf4d747d7d6295bbae1e5aa11c9`;
+ID 1 ring/update and signed wrap: `ev_0200252991fdd1d457d9ee2a2d5f3607073212220aacac0b59f6a0cca8799f72`,
+`ev_a3f0e7ff8b4fd06b28a8925495ded26a53a05e8f80df370e70518d3fcfb761a7`,
+`ev_0c520f6618e6e0e61074ef95117db990c21e80d3ca51953e48e96ae1515b072f`,
+and `ev_12db4dd6bde982a7d974bfdd91c5d9b73733a59871cfc4f9eaeabf27ec84bfbd`.
 
 ## Record-read projection
 

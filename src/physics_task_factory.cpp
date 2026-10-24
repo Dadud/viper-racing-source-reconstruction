@@ -107,10 +107,12 @@ PhysicsTimeCommandPayloadPlan plan_physics_time_command_payload(
     switch (observation.command_id) {
     case 1U:
         plan.record_ring_index_used = observation.record_ring_cursor;
-        plan.record_ring_cursor_after = (observation.record_ring_cursor + 1U) & 7U;
-        plan.record_ring_index_out_of_range = observation.record_ring_cursor >= 8U;
-        plan.record_ring_update_callback_called =
-            observation.record_ring_slot_has_target;
+        plan.record_ring_index_out_of_range =
+            std::bit_cast<std::int32_t>(observation.record_ring_cursor) < 0 ||
+            observation.record_ring_cursor >= 8U;
+        plan.record_ring_cursor_after = std::bit_cast<std::uint32_t>(
+            std::bit_cast<std::int32_t>(observation.record_ring_cursor + 1U) % 8);
+        plan.record_ring_update_callback_called = true;
         if (plan.record_ring_update_callback_called) {
             plan.record_vector_words = {
                 read_little_endian_u32(observation.payload, 4U),
@@ -118,6 +120,25 @@ PhysicsTimeCommandPayloadPlan plan_physics_time_command_payload(
                 read_little_endian_u32(observation.payload, 12U)};
             plan.record_scalar_bits =
                 read_little_endian_u32(observation.payload, 16U);
+            if (observation.record_ring_slot_nested_target_nonnull) {
+                plan.record_ring_entry_vector_write_applied = true;
+                plan.record_ring_target_flag_0x29_set = true;
+                plan.record_ring_target_flag_0x2b_cleared = true;
+                plan.record_ring_target_flag_0x2a_cleared = true;
+            }
+            if (observation.record_ring_slot_nested_target_nonnull &&
+                observation.record_ring_target_scalar_before_bits_0x08) {
+                const auto before = std::bit_cast<float>(
+                    *observation.record_ring_target_scalar_before_bits_0x08);
+                const auto incoming = std::bit_cast<float>(plan.record_scalar_bits);
+                const bool changed = before != incoming &&
+                    !std::isunordered(before, incoming);
+                plan.record_ring_target_scalar_changed = changed;
+                plan.record_ring_target_change_flag_0x2c_set = changed;
+                plan.record_ring_target_scalar_after_bits_0x08 = changed
+                    ? plan.record_scalar_bits
+                    : *observation.record_ring_target_scalar_before_bits_0x08;
+            }
         }
         break;
     case 3U: {
@@ -127,6 +148,11 @@ PhysicsTimeCommandPayloadPlan plan_physics_time_command_payload(
         plan.event_buffer_append_succeeded = new_size < 0x400U;
         if (plan.event_buffer_append_succeeded) {
             plan.event_buffer_size_after = new_size;
+            for (std::size_t index = 0; index <
+                 plan.event_buffer_payload.size(); ++index) {
+                plan.event_buffer_payload[index] = observation.payload[index];
+            }
+            plan.event_buffer_payload_known = true;
         } else {
             plan.event_buffer_size_after = observation.event_buffer_size;
         }
@@ -143,7 +169,25 @@ PhysicsTimeCommandPayloadPlan plan_physics_time_command_payload(
         const auto raw_index = observation.payload[payload_index];
         const auto signed_index = static_cast<std::int32_t>(
             static_cast<std::int8_t>(raw_index));
-        plan.task_index = signed_index;
+        plan.registered_object_index = signed_index;
+        if (signed_index < 0 || signed_index >= static_cast<std::int32_t>(
+                observation.registered_object_addresses_0x507d70.size())) {
+            plan.status = PhysicsTimeCommandPayloadStatus::
+                registered_object_index_out_of_range;
+            plan.unguarded_registered_object_call_would_fault = true;
+            return plan;
+        }
+        plan.registered_object_address =
+            observation.registered_object_addresses_0x507d70[
+            static_cast<std::size_t>(signed_index)];
+        if (plan.registered_object_address == 0U) {
+            plan.status = PhysicsTimeCommandPayloadStatus::null_registered_object;
+            plan.unguarded_registered_object_call_would_fault = true;
+            plan.reset_callback_0x433920_called =
+                observation.command_id == 7U ||
+                observation.secondary_context == 2;
+            return plan;
+        }
         if (observation.command_id == 5U && observation.secondary_context == 2) {
             plan.reset_callback_0x433920_called = true;
         } else if (observation.command_id == 5U) {
@@ -164,19 +208,6 @@ PhysicsTimeCommandPayloadPlan plan_physics_time_command_payload(
             }
         } else {
             plan.reset_callback_0x433920_called = true;
-        }
-        if (signed_index < 0
-            || static_cast<std::size_t>(signed_index)
-                >= observation.task_object_addresses.size()) {
-            plan.status = PhysicsTimeCommandPayloadStatus::task_index_out_of_range;
-            plan.unguarded_task_object_call_would_fault = true;
-            return plan;
-        }
-        plan.task_object_address = observation.task_object_addresses[
-            static_cast<std::size_t>(signed_index)];
-        if (plan.task_object_address == 0U) {
-            plan.status = PhysicsTimeCommandPayloadStatus::null_task_object;
-            plan.unguarded_task_object_call_would_fault = true;
         }
         break;
     }
