@@ -535,10 +535,12 @@ the same serialized car records, and traces the scene-side pose/wheel update;
 the NCAR model captures recovered numeric timing gates and first-entry field
 writes without assigning semantic labels to opaque record fields;
 the game's full simulation, rendering, input, audio, persistence, replays, and
-networking remain unimplemented. The next milestone is resolving remaining
-class-specific callback effects and tracing race-state transitions into render
-submission. `plan_race_loop_active_frame` preserves the observed callback,
-render-context, viewport, and submission order for the active `0x4020E0` path.
+networking remain unimplemented. The active `0x4020E0` path now preserves
+callback, render-context, viewport, and submission order, and the scene-car
+update projects its ordered four-wheel transform/resource pass. The next
+milestone is integrating recovered scene objects and draw calls into a complete
+race renderer; native DirectDraw execution, many class-specific effects, and
+original-game comparison remain open.
 Build with CMake 3.20+ and a C++20 compiler. The full Release target has been
 compiled successfully with Visual Studio 18 Build Tools (MSVC 19.51) and CMake;
 this confirms the reconstruction utilities build, not game runtime behavior.

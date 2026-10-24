@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added `plan_scene_car_wheel_frame` to compose
+  the four `0x465800` wheel iterations in order: transform first, then that
+  wheel's gated auxiliary update or release, carrying four independent resource
+  states across frames. Updated the README's next milestone to reflect that
+  active race-frame callback/submission ordering is already modeled and that
+  the larger gap is a complete scene renderer. Binary evidence for the loop is
+  `ev_9bc59c0c0669289e8d06530e19a0d8bd4088c0dab36f2066e9d10870d81aacc6`.
+  `git diff --check` passes and the Release `viper_race_scene_flow` target
+  builds successfully with Visual Studio 18 MSBuild. No tests were run.
+
 - **2026-10-24 continuation:** Added a bounded source-shaped model for the
   renderer's texture-pressure recovery at `0x453F70`. It traverses the 250
   `0x28`-byte rows, projects the cached-surface clears and texture-reference
