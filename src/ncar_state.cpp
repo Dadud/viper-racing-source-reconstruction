@@ -2472,16 +2472,15 @@ NcarWheelConstructorPlan plan_ncar_wheel_constructor(
     return result;
 }
 
-bool materialize_ncar_wheel_constructor(
+bool apply_ncar_wheel_object_writes(
     NcarWheelRuntimeObjectState& destination,
     const std::uint32_t wheel_object_offset,
-    const NcarWheelConstructorPlan& plan) noexcept
+    const std::span<const NcarObjectFieldWrite> writes) noexcept
 {
-    if (!plan.unknown_fill_offsets.empty()) return false;
     auto materialized = destination;
     const auto object_begin = static_cast<std::uint64_t>(wheel_object_offset);
     const auto object_end = object_begin + ncar_wheel_object_bytes;
-    for (const auto& write : plan.writes) {
+    for (const auto& write : writes) {
         if ((write.width_bytes != 1U && write.width_bytes != 4U) ||
             write.offset < object_begin ||
             static_cast<std::uint64_t>(write.offset) + write.width_bytes > object_end) {
@@ -2497,6 +2496,16 @@ bool materialize_ncar_wheel_constructor(
     }
     destination = materialized;
     return true;
+}
+
+bool materialize_ncar_wheel_constructor(
+    NcarWheelRuntimeObjectState& destination,
+    const std::uint32_t wheel_object_offset,
+    const NcarWheelConstructorPlan& plan) noexcept
+{
+    if (!plan.unknown_fill_offsets.empty()) return false;
+    return apply_ncar_wheel_object_writes(destination, wheel_object_offset,
+        plan.writes);
 }
 
 NcarSoundConstructorPlan plan_ncar_sound_constructor(

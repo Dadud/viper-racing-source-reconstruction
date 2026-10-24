@@ -1828,6 +1828,31 @@ struct WindowState {
             player_wheel_contact_observations[wheel] = observation;
             player_wheel_contact_results[wheel] = viper::update_wheel_contact(
                 player_wheel_contact_states[wheel], observation);
+
+            const auto wheel_object_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+            std::array<viper::NcarObjectFieldWrite, 5> writes{};
+            std::size_t write_count = 0U;
+            const auto& contact_state = player_wheel_contact_states[wheel];
+            writes[write_count++] = {wheel_object_offset + 0x19cU, 4U,
+                std::bit_cast<std::uint32_t>(contact_state.contact_feature_0x19c)};
+            writes[write_count++] = {wheel_object_offset + 0x168U, 1U,
+                contact_state.contact_active_0x168};
+            if (player_wheel_contact_results[wheel].reached_contact_callback_0x443f00) {
+                writes[write_count++] = {wheel_object_offset + 0x130U, 4U,
+                    std::bit_cast<std::uint32_t>(contact_state.contact_point_0x130.x)};
+                writes[write_count++] = {wheel_object_offset + 0x134U, 4U,
+                    std::bit_cast<std::uint32_t>(contact_state.contact_point_0x130.y)};
+                writes[write_count++] = {wheel_object_offset + 0x138U, 4U,
+                    std::bit_cast<std::uint32_t>(contact_state.contact_point_0x130.z)};
+            }
+            if (!viper::apply_ncar_wheel_object_writes(
+                    player_runtime_state.wheel_objects[wheel], wheel_object_offset,
+                    std::span<const viper::NcarObjectFieldWrite>(writes.data(),
+                        write_count))) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
         }
     }
 

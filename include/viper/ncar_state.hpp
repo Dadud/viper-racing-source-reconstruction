@@ -308,8 +308,15 @@ struct NcarWheelRuntimeObjectState {
     std::uint32_t wheel_object_offset,
     const NcarWheelConstructorObservation& observation);
 
-// Applies only fully resolved plan writes within the wheel's bounded object
-// storage. The destination is unchanged on unknown fills or invalid writes.
+// Applies bounded writes atomically and marks the bytes initialized. The
+// destination is unchanged when any write is invalid.
+[[nodiscard]] bool apply_ncar_wheel_object_writes(
+    NcarWheelRuntimeObjectState& destination,
+    std::uint32_t wheel_object_offset,
+    std::span<const NcarObjectFieldWrite> writes) noexcept;
+
+// Applies only fully resolved constructor writes; unknown fills or invalid
+// writes leave the destination unchanged.
 [[nodiscard]] bool materialize_ncar_wheel_constructor(
     NcarWheelRuntimeObjectState& destination,
     std::uint32_t wheel_object_offset,

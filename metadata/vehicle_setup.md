@@ -626,6 +626,15 @@ the prior contact point. This captures the caller's branch and stores, not
 the query helper's terrain lookup or the global reset hook. The call to
 `0x443F00` is a direct call to an observed empty routine and has no recovered
 state effect (`ev_f8618067a91dd813de20b3cb89e18bd09a63aac451ea4e8d976525435816f29e`).
+The live player's wheel-object byte storage now receives the modeled feature
+word at `+0x19C` and active byte at `+0x168` after each contact update. The
+three contact-point floats at `+0x130..+0x138` are copied only when the modeled
+branch reaches `0x443F00`; failed gates therefore preserve both the typed
+contact point and the corresponding object bytes. These stores use the
+four constructor-owned objects at car `+0x554 + 0x1A4*i` and mark only written
+bytes initialized. The runtime still uses its route pose and yaw-only terrain
+query, so these are persistent outputs of the existing contact model rather
+than full native body-contact simulation.
 
 The next scalar section is represented by `evaluate_wheel_suspension`. It
 subtracts the previous depth at `+0xE8`, scales travel by `62.5`, computes a
