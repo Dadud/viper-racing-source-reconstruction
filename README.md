@@ -55,7 +55,8 @@ files were present.
 - `include/viper/frontend_dispatch.hpp` and `src/frontend_dispatch.cpp`
   reproduce the verified numeric selector-to-handler dispatch table from
   `0x401E10`, the verified visible main-menu selector values, and the
-  pre-race screen's observed return classifications;
+  pre-race screen's observed return classifications. The `0x4805C0` menu plan
+  can resolve all eight registered label keys from a parsed LANGRES0 table;
   the caller-side setup/initialization routes and escape-menu numeric events
   are also modeled, while mapping those values to visible actions is still
   unknown.

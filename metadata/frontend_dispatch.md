@@ -80,8 +80,11 @@ resource and the six visible menu labels, preserving their native refresh
 order (SingleRace, Career, Multiplayer, Replay, Options, Exit). The plan also
 records the player-name prepare/save helper addresses `0x46B020` and
 `0x46B080`, and retains the raw `0x472B30` interaction result and its
-`0x4805C0` normalization. This projection does not claim localization
-contents, resource-manager side effects, or menu-control callback execution.
+`0x4805C0` normalization. If a parsed `LanguageResource` is supplied, the plan
+resolves the eight registered keys in registration order (default name, player
+name, then the six visible labels) and records a bit mask for keys found.
+Resource-manager side effects and menu-control callback execution remain
+outside this projection.
 Shipped-image evidence for the main-menu routine is
 `ev_46296befbc4dd8fa5baf76ce27d21d870878fd89e0817e31afeb7087f4d97e0e`.
 

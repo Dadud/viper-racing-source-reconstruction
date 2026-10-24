@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected the parsed LANGRES0 table to
+  `plan_main_menu_screen`; it can now resolve all eight `Main_Menu:*` keys
+  registered by `0x4805C0` and returns a resolution bit mask alongside the
+  localized text. The shipped `english.lng` contains all eight keys. Main-menu
+  resource-manager side effects and callback execution remain open. Evidence:
+  `ev_46296befbc4dd8fa5baf76ce27d21d870878fd89e0817e31afeb7087f4d97e0e`.
+
 - **2026-10-24 continuation:** Extended render-context acquisition to accept
   the raw 27-DWORD `0x458FB0` output descriptor. After lock success, the plan
   now derives the pitch from `+0x10` and locked pixel pointer from `+0x28`

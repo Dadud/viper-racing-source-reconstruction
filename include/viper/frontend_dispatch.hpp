@@ -11,6 +11,8 @@
 
 namespace viper {
 
+struct LanguageResource;
+
 // Visible main-menu items and their recovered UI control values. Exit's -1
 // control result is normalized by the original UI to selector 8.
 enum class MainMenuItem {
@@ -38,6 +40,7 @@ struct MainMenuScreenObservation {
     bool default_player_name_resource_stale{};
     // SingleRace, Career, Multiplayer, Replay, Options, Exit cache tests.
     std::array<bool, 6> label_resources_stale{};
+    const LanguageResource* language_resource{};
     int raw_menu_result{};
 };
 
@@ -76,6 +79,10 @@ struct MainMenuInteractionPlan {
 
 struct MainMenuScreenPlan {
     std::vector<MainMenuLabelRegistration> registrations;
+    // Resolved in registration order: default name, player name, then the
+    // six visible menu labels. Missing keys leave their bit clear.
+    std::array<std::string, 8> localized_label_text{};
+    std::uint8_t localized_label_mask{};
     std::vector<std::uint32_t> refreshed_resource_objects;
     MainMenuInteractionPlan interaction;
     std::uint32_t initialized_label_mask_after{};

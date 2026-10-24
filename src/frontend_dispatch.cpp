@@ -1,5 +1,7 @@
 #include "viper/frontend_dispatch.hpp"
 
+#include "viper/language_resource.hpp"
+
 #include <algorithm>
 #include <utility>
 
@@ -40,9 +42,30 @@ MainMenuScreenPlan plan_main_menu_screen(
         0x00561010U, 0x00560f50U, 0x00560f98U,
         0x00561058U, 0x00560f68U, 0x00560ec0U,
     }};
+    constexpr std::array<std::string_view, 8> localization_keys{{
+        "Main_Menu:DefaultPlayerName",
+        "Main_Menu:PlayerName",
+        "Main_Menu:SingleRace",
+        "Main_Menu:Career",
+        "Main_Menu:Multiplayer",
+        "Main_Menu:Replay",
+        "Main_Menu:Options",
+        "Main_Menu:Exit",
+    }};
 
     MainMenuScreenPlan plan{};
     plan.initialized_label_mask_after = observation.initialized_label_mask;
+    if (observation.language_resource != nullptr) {
+        for (std::size_t index = 0; index < localization_keys.size(); ++index) {
+            const auto text = observation.language_resource->find(
+                localization_keys[index]);
+            if (text.has_value()) {
+                plan.localized_label_text[index] = *text;
+                plan.localized_label_mask |=
+                    static_cast<std::uint8_t>(1U << index);
+            }
+        }
+    }
     for (const auto& label : labels) {
         if ((observation.initialized_label_mask &
              label.initialized_mask_bit) == 0) {
