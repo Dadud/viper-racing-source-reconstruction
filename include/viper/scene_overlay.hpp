@@ -978,6 +978,10 @@ struct SceneDashboardAuxiliaryReadoutObservation {
     std::uint32_t record_value_0x4c_bits{};
     std::uint32_t global_value_0x1c_bits{};
     bool redraw_all{};
+    // When present, resolves the signed advance for ASCII '0' from the
+    // observed font table at +0x204 + 0x30*2.
+    const SceneDashboardFontObservation* font_observation{};
+    // Compatibility fallback used when the font table was not captured.
     std::int16_t zero_glyph_advance{};
     std::string global_text_0x18;
     std::string stack_text_after_esp_0x18_plus_5;

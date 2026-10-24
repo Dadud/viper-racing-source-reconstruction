@@ -4580,8 +4580,10 @@ SceneDashboardAuxiliaryReadoutResult scene_dashboard_auxiliary_readout_plan(
         // integer has more than three characters, including a minus sign.
         result.numeric_text = "999";
     }
-    const auto vertical_advance = static_cast<std::int64_t>(
-        observation.zero_glyph_advance) *
+    const auto zero_glyph_advance = observation.font_observation != nullptr
+        ? observation.font_observation->glyph_advance[0x30U]
+        : observation.zero_glyph_advance;
+    const auto vertical_advance = static_cast<std::int64_t>(zero_glyph_advance) *
         static_cast<std::int64_t>(result.numeric_text.size());
     result.numeric_text_x = static_cast<std::int32_t>(0x22A - vertical_advance);
 

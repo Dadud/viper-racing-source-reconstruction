@@ -1550,7 +1550,9 @@ the resulting text is longer than three characters, it substitutes the fixed
 string `999`. The draw's x coordinate is
 `0x22A - (zero-glyph advance * displayed character count)` and y is 45; the advance is
 the signed 16-bit entry for byte `0x30` at font `0x4EB304 + 0x204 + 0x30*2`,
-as measured by `0x44DB10`, and remains an input. The numeric row at
+as measured by `0x44DB10`. The race-loop composer now obtains that entry from
+the same layout-font observation used by the callback raster path; the scalar
+advance remains a fallback when font bytes are unavailable. The numeric row at
 `0x4043E8` is emitted every visit. On a full redraw, the callback draws the
 string at runtime global object `[0x4F04F4] + 0x18` at `(560,45)`; instruction
 `0x418370` initializes the global pointer at `0x4F04F4` to `0x4F04F8`. Its second

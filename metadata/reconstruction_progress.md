@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected the auxiliary numeric readout's
+  centering width to the observed dashboard font's signed ASCII `'0'` advance
+  (`+0x204 + 0x30*2`). The race-loop passes its layout font into the callback;
+  the prior scalar advance is now only a fallback when no font table is
+  available. Release build and `git diff --check` pass; no tests were run.
+  See `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Corrected dashboard rotating-gear coordinate
   conversion to match `0x4BD1F8`, which sets x87 truncation before `FISTP` and
   restores the prior control word. Geometry, scanline intersections, and

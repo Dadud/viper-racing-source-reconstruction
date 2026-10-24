@@ -260,6 +260,11 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             dashboard_observation.language_resource =
                 observation.language_resource;
         }
+        if (dashboard_observation.auxiliary_readout.font_observation == nullptr &&
+            observation.state0_dashboard_raster.has_value()) {
+            dashboard_observation.auxiliary_readout.font_observation =
+                &observation.state0_dashboard_raster->layout_font;
+        }
         plan.dashboard_core_callback = scene_dashboard_core_callback_plan(
             dashboard_observation);
         plan.dashboard_core_text_calls =
