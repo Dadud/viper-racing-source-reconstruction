@@ -216,7 +216,8 @@ if(WIN32)
         viper_sound_resource
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
-        viper_scene_model viper_race_setup_model d3d11 dxgi dsound user32)
+        viper_scene_model viper_race_setup_model viper_wheel_body_coupling
+        d3d11 dxgi dsound user32)
 endif()
 
 include(CTest)

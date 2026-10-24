@@ -12,6 +12,8 @@
 #include "viper/race_participants.hpp"
 #include "viper/race_progression.hpp"
 #include "viper/sound_resource.hpp"
+#include "viper/wheel_body_coupling.hpp"
+#include "viper/world_track_objects.hpp"
 
 #include <array>
 #include <algorithm>
@@ -1088,6 +1090,14 @@ struct WindowState {
     viper::RouteMotionState motion{};
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<std::array<float, 4>> pose_buffer;
+    // Base setup-derived native constructor inputs retained for the session.
+    // They currently feed diagnostics/future physics integration; route motion
+    // remains the visible pose authority until the missing simulation inputs
+    // are reconstructed.
+    std::vector<std::byte> player_runtime_car_record;
+    std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
+    std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
+    bool player_constructor_inputs_ready{};
     bool accelerate{};
     bool brake{};
     bool left{};
@@ -1101,6 +1111,60 @@ struct WindowState {
     std::uint32_t target_laps{1U};
     ULONGLONG last_title_update{};
     ULONGLONG last_tick{};
+
+    bool initialize_player_constructor_inputs(
+        const viper::CarFileResourcePayloads& car_resources,
+        const std::span<const std::byte> player_setup,
+        const std::span<const viper::ModelVertex> model_vertices,
+        const std::array<viper::TireDefinition, 4>& tire_definitions)
+    {
+        bool host_fdiv_compatibility = false;
+#if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
+#else
+        // The x86 compatibility probe is not yet wired into this runtime.
+        return false;
+#endif
+        const auto preparation =
+            viper::prepare_car_file_runtime_mapping_from_setup_payload(
+                car_resources, player_setup, {}, false, host_fdiv_compatibility);
+        if (!preparation.input_complete || !preparation.mapping.has_value())
+            return false;
+        player_runtime_car_record.assign(
+            viper::CarFileRuntimeMapping::runtime_record_size, std::byte{0});
+        if (!viper::apply_car_file_runtime_mapping(
+                player_runtime_car_record, *preparation.mapping)) {
+            player_runtime_car_record.clear();
+            return false;
+        }
+        player_wheel_anchors =
+            viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
+                player_runtime_car_record, model_vertices);
+        if (!player_wheel_anchors.has_value()) {
+            player_runtime_car_record.clear();
+            return false;
+        }
+        if (!std::all_of(player_wheel_anchors->vertex_indices.begin(),
+                player_wheel_anchors->vertex_indices.end(),
+                [](const auto& index) { return index.has_value(); })) {
+            player_runtime_car_record.clear();
+            player_wheel_anchors.reset();
+            return false;
+        }
+        for (std::size_t wheel = 0; wheel < player_wheel_tire_setups.size(); ++wheel) {
+            player_wheel_tire_setups[wheel] =
+                viper::initialize_ncar_wheel_tire_setup(
+                    player_runtime_car_record, wheel, tire_definitions[wheel],
+                    host_fdiv_compatibility);
+            if (!player_wheel_tire_setups[wheel].has_value()) {
+                player_runtime_car_record.clear();
+                player_wheel_anchors.reset();
+                player_wheel_tire_setups = {};
+                return false;
+            }
+        }
+        player_constructor_inputs_ready = true;
+        return true;
+    }
 
     void refresh_title(const bool force = false)
     {
@@ -1353,6 +1417,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::ModelResource& ai_model,
                const viper::TrackObjectTextTable& track_objects,
                const viper::ResourceBundle& car_bundle,
+               const viper::CarFileResourcePayloads& player_car_resources,
+               const std::array<std::byte, 0x8c>& player_car_setup,
+               const std::array<viper::TireDefinition, 4>& wheel_tires,
                const viper::GameOptions& options)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -1368,6 +1435,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     }
     WindowState state;
     state.terrain = &terrain;
+    if (!state.initialize_player_constructor_inputs(player_car_resources,
+            player_car_setup, player_model.vertices, wheel_tires)) {
+        std::cerr << "Could not prepare base CARF wheel constructor inputs from the active setup.\n";
+        return 1;
+    }
+    std::cout << "Prepared session-owned base CARF wheel inputs: mapped record, "
+              << state.player_wheel_anchors->vertex_indices.size()
+              << " FNIM anchors, and four axle-selected tire response objects. "
+              << "Upgrade overlays are not requested in this race path.\n";
     state.playback_active = playback_trace != nullptr;
     state.route = extract_ideal_line_points(ideal_line);
     state.player_car_index = player_car_index;
@@ -1635,6 +1711,7 @@ int wmain(int argc, wchar_t** argv)
             assets.track_name(), assets.car_name(), assets.terrain(),
             assets.ideal_line(), assets.player_model(), assets.ai_model(), assets.track_objects(),
             assets.bundle(std::string(assets.car_name()) + ".car"),
+            assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
             assets.options());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';

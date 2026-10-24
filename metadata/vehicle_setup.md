@@ -322,6 +322,15 @@ from runtime `+0x130` (front) or `+0x13C` (rear), matching the axle branch in
 explicit FDIV-compatibility input and places that result in object `+0x2C`.
 The other `0x435B50` arguments do not feed stores in `0x435BF0`.
 
+The Windows race session now retains the active player setup's mapped CARF
+runtime record, all four FNIM-selected anchors, and each axle-selected
+0x40-byte tire response object for its full window lifetime. The current quick
+race has no upgrade-selection UI, so this session path requests no UPGS
+overlay. Its x64 host has no Pentium FDIV defect and selects the ordinary host
+division path. A WARP smoke run with external Viper/Bemidji assets reached this
+initialization. These retained constructor inputs do not yet replace the
+route-driven visible motion or initialize all wheel/body fields.
+
 ### Car-to-wheel update path and runtime curve consumers
 
 The base constructor's body initializer `0x43E490` calls `0x4375C0`, initializes
