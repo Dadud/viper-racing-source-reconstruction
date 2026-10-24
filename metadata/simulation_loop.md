@@ -689,8 +689,11 @@ batch writes follow the race-results branch. Function evidence:
 in the recovered predicate order: pause, cheater, `0x4048E0`, `0x404900`,
 `0x404920`, race results, then splash loading. It feeds one shared raw-global
 observation to each branch while keeping branch-specific measurements, data
-buffers, and resource generations explicit. The optional dashboard body
-before these predicates is not part of this shared-tail plan. Evidence for the
+buffers, and cached resource generations explicit. When supplied, the shared
+current-generation DWORD feeds both pause and splash comparisons, and the
+resource-init mask feeds Splash:Loading's registration bit. The optional
+dashboard body before these predicates is not part of this shared-tail plan.
+Evidence for the
 branch order and loading lifecycle is the `0x404970` instruction stream
 `ev_76ecfc938780e22fc3861f3c54d3e690ccdd6d00a0cced2adf06bb05ec45a292` and
 the loading-flag evidence `ev_ab094b5171d133fe86ce13f0add682eed6ee00de9f12a4e79a74c0541609edca`.

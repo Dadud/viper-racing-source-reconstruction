@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected the common shared-overlay composer to
+  optional resource-manager state. Its current-generation DWORD now feeds both
+  the paused-banner and Splash:Loading refresh comparisons, and its init mask
+  feeds Splash:Loading registration. Release build and `git diff --check`
+  pass; no tests were run.
+
 - **2026-10-24 continuation:** Connected the paused-banner branch to raw
   resource-generation DWORDs. It now derives whether `0x418CC0` runs by
   comparing cached value `0x4EB468` with current generation `0x4D3868`; the

@@ -3631,6 +3631,10 @@ SceneSharedOverlayFramePlan scene_shared_overlay_frame_plan(
 
     auto paused = observation.paused_banner;
     paused.overlay_globals = observation.overlay_globals;
+    if (observation.current_resource_generation_value.has_value()) {
+        paused.current_resource_generation_value =
+            observation.current_resource_generation_value;
+    }
     result.paused_banner = scene_shared_paused_banner_plan(paused);
     result.paused_banner_box_pixel_writes =
         scene_paused_banner_box_pixel_writes(
@@ -3658,6 +3662,14 @@ SceneSharedOverlayFramePlan scene_shared_overlay_frame_plan(
 
     auto splash_loading = observation.splash_loading;
     splash_loading.overlay_globals = observation.overlay_globals;
+    if (observation.current_resource_generation_value.has_value()) {
+        splash_loading.current_resource_generation_value =
+            observation.current_resource_generation_value;
+    }
+    if (observation.resource_init_mask_0x4eb37c.has_value()) {
+        splash_loading.resource_init_mask_0x4eb37c =
+            *observation.resource_init_mask_0x4eb37c;
+    }
     result.splash_loading = scene_shared_loading_banner_plan(splash_loading);
     return result;
 }

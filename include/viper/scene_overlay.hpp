@@ -1708,6 +1708,9 @@ struct SceneSharedOverlayFrameObservation {
     std::uint8_t renderer_mode_0x4d7a48{};
     std::uint32_t framebuffer_base_value{};
     SceneSharedOverlayObservation overlay_globals{};
+    // Shared resource-manager state read by the paused and splash branches.
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> resource_init_mask_0x4eb37c;
     SceneSharedPausedBannerObservation paused_banner{};
     SceneSharedCheaterBannerObservation cheater_banner{};
     SceneSharedTextEffectsObservation text_effects{};
