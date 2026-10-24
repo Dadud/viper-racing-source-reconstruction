@@ -166,6 +166,14 @@ The prologue combines object fields `+0x234`, `+0x238`, and `+0x23C` with
 `0x4331A0`, `0x4331B0`, and `0x4331D0`. Further helper/setter calls include
 `0x4331E0`, `0x433210`, `0x4331C0`, and `0x433250`.
 
+`advance_pcar_callback_control_prefix` now composes this exact opening
+dataflow: it projects the body's `+0x234..+0x23C` velocity onto `+0x50..+0x58`,
+takes the absolute value, applies `0x43B8C0`, updates the `0x4330F0` smoother,
+then writes the initial `+0xDE0/+0xDE4/+0xDE8/+0xDEC` values. Body velocity,
+basis, callback globals, smoother state, and the `0x40D270` result remain
+explicit inputs. The live route session does not yet own body velocity/basis;
+it therefore does not substitute route speed or heading into this callback.
+
 The first state split is `0x43B9E0`:
 
 - If true, it calls `0x4331E0(-1)` and sets `+0x54` to the greater of the

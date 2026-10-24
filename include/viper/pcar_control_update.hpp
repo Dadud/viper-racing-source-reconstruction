@@ -128,6 +128,32 @@ void update_pcar_callback_scalar_prefix(
     const PcarCallbackGlobals& globals,
     float value_from_0x40d270) noexcept;
 
+struct PcarCallbackControlObservation {
+    // Body velocity at +0x234..+0x23C and basis at +0x50..+0x58, as read by
+    // the callback before calling 0x43B8C0 and 0x4330F0.
+    std::array<float, 3> body_velocity_0x234{};
+    std::array<float, 3> body_basis_0x50{};
+    PcarCallbackGlobals globals{};
+    float value_from_0x40d270{};
+};
+
+struct PcarCallbackControlState {
+    PcarControlFields smoother{};
+    PcarScalarFields scalar_prefix{};
+};
+
+struct PcarCallbackControlResult {
+    float absolute_velocity_projection{};
+    float scaled_smoother_request{};
+};
+
+// Composes the observed opening sequence of 0x4384D0: absolute body
+// velocity/basis projection, 0x43B8C0 scaling, 0x4330F0 smoothing, then the
+// initial +0xDE0/+0xDE4/+0xDE8/+0xDEC setter sequence.
+[[nodiscard]] PcarCallbackControlResult advance_pcar_callback_control_prefix(
+    PcarCallbackControlState& state,
+    const PcarCallbackControlObservation& observation) noexcept;
+
 // Models 0x43B8C0, including its signed comparison of the input's raw bits.
 float pcar_global_scale_0x43b8c0(float input,
                                  float global_0x509358,

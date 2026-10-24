@@ -58,5 +58,54 @@ int main()
         std::cerr << "PCAR scalar prefix did not preserve the observed field mapping.\n";
         return EXIT_FAILURE;
     }
+
+    viper::PcarCallbackControlState callback_state{};
+    callback_state.smoother.multiplier_0xdcc = 2.0F;
+    callback_state.smoother.output_0x978 = 9.0F;
+    callback_state.smoother.output_0xb1c = 8.0F;
+    viper::PcarCallbackControlObservation callback_observation{};
+    callback_observation.body_velocity_0x234 = {12.0F, 0.0F, 16.0F};
+    callback_observation.body_basis_0x50 = {0.6F, 0.0F, 0.8F};
+    callback_observation.globals = globals;
+    callback_observation.globals.value_0x509358 = 0.8F;
+    callback_observation.globals.value_0x5093f4 = 0.5F;
+    callback_observation.value_from_0x40d270 = 2.0F;
+    const auto callback_result = viper::advance_pcar_callback_control_prefix(
+        callback_state, callback_observation);
+    const float expected_scaled_request =
+        ((20.0F * -0.01730769F) + 1.269231F) * 0.8F;
+    if (std::abs(callback_result.absolute_velocity_projection - 20.0F) > 1.0e-6F ||
+        std::abs(callback_result.scaled_smoother_request - expected_scaled_request) >
+            1.0e-5F ||
+        std::abs(callback_state.smoother.value_0x500 - 0.24F) > 1.0e-6F ||
+        callback_state.smoother.output_0x630 != 0.48F ||
+        callback_state.smoother.output_0x7d4 != 0.48F ||
+        callback_state.smoother.output_0x978 != 9.0F ||
+        callback_state.smoother.output_0xb1c != 8.0F ||
+        std::abs(callback_state.scalar_prefix.value_0xde0 - 1.0F) > 1.0e-6F ||
+        std::abs(callback_state.scalar_prefix.value_0xde4 - globals.value_0x509320) >
+            1.0e-6F ||
+        std::abs(callback_state.scalar_prefix.value_0xde8 - globals.value_0x5093b8) >
+            1.0e-6F) {
+        std::cerr << "PCAR callback control prefix did not preserve native call order/dataflow.\n";
+        return EXIT_FAILURE;
+    }
+    callback_state.smoother.mode_0xbe4 = true;
+    callback_observation.body_velocity_0x234 = {};
+    callback_observation.globals.value_0x509358 = -0.5F;
+    callback_observation.globals.gate_0x5093fc = true;
+    const auto reverse_callback_result =
+        viper::advance_pcar_callback_control_prefix(
+            callback_state, callback_observation);
+    if (reverse_callback_result.absolute_velocity_projection != 0.0F ||
+        reverse_callback_result.scaled_smoother_request != -0.25F ||
+        std::abs(callback_state.smoother.value_0x500) > 1.0e-6F ||
+        callback_state.smoother.output_0x978 != 0.0F ||
+        callback_state.smoother.output_0xb1c != 0.0F ||
+        callback_state.smoother.output_0x630 != 0.48F ||
+        callback_state.smoother.output_0x7d4 != 0.48F) {
+        std::cerr << "PCAR callback control prefix lost its alternate mode/global branch.\n";
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

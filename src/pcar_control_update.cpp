@@ -140,6 +140,24 @@ void update_pcar_callback_scalar_prefix(
         pcar_callback_value_0x43b950(globals.value_0x5093c8));
 }
 
+PcarCallbackControlResult advance_pcar_callback_control_prefix(
+    PcarCallbackControlState& state,
+    const PcarCallbackControlObservation& observation) noexcept
+{
+    const auto& velocity = observation.body_velocity_0x234;
+    const auto& basis = observation.body_basis_0x50;
+    const float projection = std::abs(
+        velocity[0] * basis[0] + velocity[1] * basis[1] +
+        velocity[2] * basis[2]);
+    const float request = pcar_global_scale_0x43b8c0(
+        projection, observation.globals.value_0x509358,
+        observation.globals.gate_0x5093fc);
+    update_pcar_control(state.smoother, request);
+    update_pcar_callback_scalar_prefix(state.scalar_prefix,
+        observation.globals, observation.value_from_0x40d270);
+    return {projection, request};
+}
+
 float pcar_global_scale_0x43b8c0(const float input,
                                  const float global_0x509358,
                                  const bool square_magnitude_0x5093fc) noexcept
