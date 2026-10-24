@@ -545,3 +545,16 @@ count is a fault. On the surviving route, `0x428590` installs callbacks
 `ev_a84dec33e9d04da3fa72f6439d3c2e599ec3eeab3e6027410a8d32adb0d2ac42`,
 `ev_f4bfcbadc58c411dafa520fe96978c340227d8b44f58d8472908504b58b48201`, and
 `ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.
+
+`plan_acar_curve_tracker_update` now projects the `0x41D4F0` branch selected
+by `0x41D170`. It evaluates the linked segment's cubic Hermite position and
+normalized tangent, applies the 150-unit squared-distance reject, performs up
+to ten tangent-error/denominator updates, and follows segment links when the
+fraction crosses an endpoint. It reports null-link faults and capture gaps
+without dereferencing native addresses; x87 precision and the VC98 FDIV path
+remain explicit limitations/inputs. The optional curve observation composes
+into the ACAR runtime initialization plan only when the non-reset curve branch
+is selected. Evidence: `ev_44cc376596921a8b71472de9e75f93d2def8b1a228f10049dc831a15505294df`.
+The portable inner link walk is bounded by the captured-node set so non-finite
+fractions on cyclic captures cannot hang the reconstruction; this capture
+bound is a modeling safeguard, not a recovered game loop limit.

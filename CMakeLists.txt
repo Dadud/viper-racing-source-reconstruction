@@ -137,7 +137,10 @@ target_link_libraries(viper_scene_model PUBLIC viper_render_context)
 target_link_libraries(viper_race_setup_model PUBLIC viper_scene_model)
 
 add_library(viper_physics_scheduler src/physics_scheduler.cpp)
-target_sources(viper_physics_scheduler PRIVATE src/physics_task_factory.cpp)
+target_sources(viper_physics_scheduler PRIVATE
+    src/physics_task_factory.cpp
+    src/acar_curve_tracker.cpp
+)
 target_include_directories(viper_physics_scheduler PUBLIC include)
 target_compile_features(viper_physics_scheduler PUBLIC cxx_std_20)
 target_link_libraries(viper_physics_scheduler PUBLIC viper_legacy_fdiv)

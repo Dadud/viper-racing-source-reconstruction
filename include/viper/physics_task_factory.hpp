@@ -1,5 +1,7 @@
 #pragma once
 
+#include "viper/acar_curve_tracker.hpp"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -789,6 +791,7 @@ struct PhysicsAcarRuntimeInitializationObservation {
     std::optional<std::uint32_t> model_object_address;
     bool model_object_has_records{};
     bool model_object_reset_flag_0x28{};
+    std::optional<AcarCurveTrackerObservation> model_curve_observation;
     std::optional<std::uint32_t> timer_value_0xfb8;
     std::optional<float> linked_object_value_0x18;
     std::optional<float> last_model_node_value_0x18;
@@ -805,6 +808,7 @@ struct PhysicsAcarRuntimeInitializationPlan {
     std::vector<PhysicsTaskPointerWrite> runtime_entry_writes;
     std::vector<PhysicsTaskObjectFieldWrite> model_object_writes;
     std::optional<std::uint32_t> model_object_address;
+    std::optional<AcarCurveTrackerPlan> model_curve_update_plan;
     std::optional<float> derived_threshold_0x1044;
     std::optional<float> normalized_value_0x1030;
     std::uint32_t cleared_runtime_entries{};

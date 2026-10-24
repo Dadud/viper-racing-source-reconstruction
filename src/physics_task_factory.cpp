@@ -1611,6 +1611,10 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
             plan.model_object_reset_flag_cleared = true;
         } else {
             plan.model_curve_update_0x41d4f0_called = true;
+            if (observation.model_curve_observation.has_value()) {
+                plan.model_curve_update_plan = plan_acar_curve_tracker_update(
+                    *observation.model_curve_observation);
+            }
         }
     }
 
