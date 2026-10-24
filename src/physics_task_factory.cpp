@@ -1083,6 +1083,81 @@ plan_physics_checkpoint_task_constructor(
     return plan;
 }
 
+PhysicsBallTaskConstructorPlan plan_physics_ball_task_constructor(
+    const PhysicsBallTaskConstructorObservation& observation)
+{
+    PhysicsBallTaskConstructorPlan plan{};
+    plan.derived_vtable_installed = true;
+    plan.object_writes.push_back({0U, 0x004c8300U});
+    plan.object_writes.push_back({0x47cU, observation.registration_index_0x34});
+    for (std::size_t axis = 0U; axis < observation.position_0x18.size(); ++axis) {
+        plan.object_writes.push_back({
+            0x5cU + static_cast<std::uint32_t>(axis * sizeof(std::uint32_t)),
+            std::bit_cast<std::uint32_t>(observation.position_0x18[axis])});
+    }
+
+    plan.child_allocation_attempted = true;
+    plan.child_pointer_stored = true;
+    plan.child_count_incremented = true;
+    plan.child_registration_value = observation.object_address;
+    plan.child_registration_address = 0x005092c0U
+        + observation.registration_index_0x34 * sizeof(std::uint32_t);
+    plan.child_base_matrix_address = observation.object_address + 0x38U;
+    plan.registration_table_written = true;
+    if (!observation.child_allocation_succeeded) {
+        plan.object_writes.push_back({0x14U, 0U});
+    } else if (observation.child_address.has_value()) {
+        plan.object_writes.push_back({0x14U, *observation.child_address});
+    }
+    plan.object_writes.push_back({0x24U, plan.child_count_after});
+    plan.object_writes.push_back({0x474U, 1U});
+    plan.object_writes.push_back({0x478U, 0U});
+
+    if (!observation.child_allocation_succeeded) {
+        plan.status = PhysicsBallTaskConstructorStatus::child_allocation_failed;
+        plan.child_address = 0U;
+    } else {
+        plan.status = PhysicsBallTaskConstructorStatus::child_constructed;
+        plan.child_constructor_0x42be10_called = true;
+        plan.child_address = observation.child_address;
+        plan.child_resource_id = observation.child_resource_id_0x30;
+        constexpr auto length_scale = std::bit_cast<float>(0x3cd013a9U);
+        constexpr auto radius_scale = std::bit_cast<float>(0x432f3264U);
+        plan.child_length = static_cast<float>(
+            static_cast<long double>(observation.child_length_source_0x24)
+                * static_cast<long double>(length_scale));
+        const auto factor_scaled = static_cast<long double>(
+            observation.child_radius_factor_source_0x28)
+            * static_cast<long double>(radius_scale);
+        const auto radius_x87 = static_cast<long double>(
+            observation.child_radius_source_0x2c)
+            * static_cast<long double>(observation.child_radius_source_0x2c)
+            * factor_scaled;
+        plan.child_radius_parameter = static_cast<float>(radius_x87);
+        plan.child_writes.push_back({0U, 0x004c7c48U});
+        plan.child_writes.push_back({0x08U, plan.child_base_matrix_address});
+        plan.child_writes.push_back({0x04U, observation.object_address});
+        plan.child_writes.push_back({0x14U, 0x53504852U});
+        plan.child_writes.push_back({0x0cU,
+            std::bit_cast<std::uint32_t>(plan.child_radius_parameter)});
+        plan.child_writes.push_back({0x18U, 100U});
+        plan.child_writes.push_back({0x10U,
+            observation.child_resource_id_0x30});
+        plan.child_writes.push_back({0U, 0x004c7c68U});
+        plan.child_writes.push_back({0x20U, 0U});
+        plan.child_writes.push_back({0x24U, 0U});
+        plan.child_writes.push_back({0x28U, 0U});
+        plan.child_writes.push_back({0x2cU, 0U});
+        plan.child_writes.push_back({0x30U, 0U});
+        plan.child_writes.push_back({0x1cU,
+            std::bit_cast<std::uint32_t>(plan.child_length)});
+        plan.child_writes.push_back({0x34U, 0U});
+        plan.child_writes.push_back({0x38U, 0U});
+        plan.child_writes.push_back({0x3cU, 0U});
+    }
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {

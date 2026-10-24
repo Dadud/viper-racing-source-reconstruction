@@ -157,6 +157,31 @@ matrix rotation and product `0x402D10`,
 and endpoint transform `0x42FBF0`,
 `ev_d5fb1607dd5445a7120632c22341841fcaad0ab5c8cfde4dba0d94e68a6e7bc0`.
 
+`plan_physics_ball_task_constructor` projects the `BALL` derived constructor
+after common car initialization. It installs vtable `0x4C8300`, copies record
+`+0x34` to object `+0x47C`, and copies position words from record `+0x18`
+through `+0x20` to object `+0x5C..+0x64`. It requests a `0x40`-byte sphere
+child. On allocation success, the `0x42BE10`/`0x42BDB0` chain receives the
+parent basis pointer, `SPHR` tag, record resource ID, parent pointer, radius
+`record[0x2C]^2 * record[0x28] * 0x432F3264`, and length
+`record[0x24] * 0x3CD013A9`. The child also gets a zero local center and the
+observed default fields. Allocation failure stores a null child but still
+increments parent `+0x24`, sets `+0x474`/`+0x478`, and writes the parent pointer
+to `0x5092C0 + 4*record[0x34]` with no bounds check. The parent count starts at
+zero through the common car base constructor. Evidence: `0x43ABC0`,
+`ev_fe4303e4cc4be39e47d4bda2ba909240ddc666997bd535debd396e7ad14b07de`;
+common car base `0x43E490`,
+`ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`;
+sphere constructor `0x42BE10`,
+`ev_a85d856838f6b80e0b2072601beae8b93a48d13b1723a85331744fa717352b10`;
+shape base `0x42BDB0`,
+`ev_01f840b4961b50377964104f0d7ca185ed6d911474f9ef4af2f0cc750ba839ad`;
+registration write `0x43ACB0`,
+`ev_a40b27210cfa01829d2330ce81b645dcd0ceddf95f1cffb7e3b596c472cd78e9`;
+and constants at `0x4C82D4`/`0x4C82D8`,
+`ev_23f2d49bf497261bdffb6dc6bc7a09e2a129e0fcdd29e75e6b1b69792c48e181`/
+`ev_c67ed9fed1533cc24bef5d603aed5d0e8e15c059d4f400611c14c87928ac4a40`.
+
 ## Fixed-step update dispatch
 
 `0x421050`, reached per physics step from `0x4207C0`, iterates

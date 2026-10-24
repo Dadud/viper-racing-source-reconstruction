@@ -592,6 +592,54 @@ struct PhysicsCheckpointTaskConstructorPlan {
 plan_physics_checkpoint_task_constructor(
     const PhysicsCheckpointTaskConstructorObservation& observation);
 
+struct PhysicsBallTaskConstructorObservation {
+    std::uint32_t object_address{};
+    std::array<float, 3> position_0x18{};
+    float child_length_source_0x24{};
+    float child_radius_factor_source_0x28{};
+    float child_radius_source_0x2c{};
+    std::uint32_t child_resource_id_0x30{};
+    std::uint32_t registration_index_0x34{};
+    bool child_allocation_succeeded{};
+    std::optional<std::uint32_t> child_address;
+};
+
+enum class PhysicsBallTaskConstructorStatus : std::uint8_t {
+    child_constructed,
+    child_allocation_failed,
+};
+
+struct PhysicsBallTaskConstructorPlan {
+    PhysicsBallTaskConstructorStatus status{
+        PhysicsBallTaskConstructorStatus::child_allocation_failed};
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::vector<PhysicsTaskObjectFieldWrite> child_writes;
+    std::uint32_t child_allocation_bytes{0x40U};
+    std::uint32_t child_slot_offset{0x14U};
+    std::uint32_t child_count_after{1U};
+    std::uint32_t child_vtable_address{0x004c7c68U};
+    std::uint32_t child_resource_id{};
+    std::uint32_t child_registration_address{};
+    std::uint32_t child_registration_value{};
+    std::uint32_t child_base_matrix_address{};
+    std::optional<std::uint32_t> child_address;
+    float child_length{};
+    float child_radius_parameter{};
+    bool base_car_constructor_called{true};
+    bool derived_vtable_installed{};
+    bool child_allocation_attempted{};
+    bool child_constructor_0x42be10_called{};
+    bool child_pointer_stored{};
+    bool child_count_incremented{};
+    bool registration_table_written{};
+    bool x87_intermediate_approximated{true};
+};
+
+// Projects the BALL constructor's sphere child and registration side effect.
+[[nodiscard]] PhysicsBallTaskConstructorPlan
+plan_physics_ball_task_constructor(
+    const PhysicsBallTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};
