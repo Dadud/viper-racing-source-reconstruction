@@ -852,6 +852,15 @@ event enqueue `0x4273C0` `ev_4b5569385e553dacbb0ddc508b7d9467e3208f081cc0b277ac6
 and nested handler `0x430610` `ev_1d43c9b43216ba441eb9a29e9156ce92b767363305dda9c9f0449178b15faca5`.
 Evidence bundle: `metadata/ncar_integrator_virtual_record.evidence.json`.
 
+The nested handler calls `0x430B70` twice to OR a rectangular bit range into
+the `+0x48E` 16-bit mask rows. `apply_ncar_mesh_bounds_mask` models its four
+float boundaries after the shared `15.99` scale and `__ftol` conversion. It
+applies only rows present in the supplied span and reports out-of-range rows
+instead of reproducing native out-of-bounds writes. The caller's vertex-derived
+rectangle bounds and the later mesh/resource copy remain uncomposed. Evidence:
+`0x430B70` `ev_ce9b5c3a5ae397c8a061c290479bb584c98eeb9454e658600384011e1ac641e0`,
+scale bytes `0x4C7DA8` `ev_c3ef9ca6494f43d2e2252d646d0e6d7fc012722f81c7ae96bcf30b2863aca4bc`.
+
 The embedded-record helper `0x4473D0` transforms its stored point through
 `0x437BA0`, which multiplies the local point by the basis at body `+0x38..+0x58`
 and adds the center at `+0x5C..+0x64`. `transform_body_local_point` now models

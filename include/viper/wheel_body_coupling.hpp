@@ -214,6 +214,28 @@ struct NcarIntegratorVirtualRecordCallbackResult {
     std::uint32_t secondary_virtual_target{0x00430610};
 };
 
+struct NcarMeshBoundsMaskInput {
+    std::span<std::uint16_t> row_words;
+    float row_begin{};
+    float row_end{};
+    float column_begin{};
+    float column_end{};
+};
+
+struct NcarMeshBoundsMaskResult {
+    std::int32_t row_begin_index{};
+    std::int32_t row_end_index{};
+    std::int32_t column_begin_index{};
+    std::int32_t column_end_index{};
+    std::uint16_t column_bits{};
+    std::size_t rows_written{};
+    std::uint64_t rows_out_of_range{};
+};
+
+// Reconstructs the bounded row/column bit-mask writes in 0x430B70.
+[[nodiscard]] NcarMeshBoundsMaskResult apply_ncar_mesh_bounds_mask(
+    const NcarMeshBoundsMaskInput& input) noexcept;
+
 // Models the PCAR/NCAR vtable +0x38 method reached by duration-gated records.
 [[nodiscard]] NcarIntegratorVirtualRecordCallbackResult
 apply_ncar_integrator_virtual_record_callback(

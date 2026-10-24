@@ -315,3 +315,5 @@ After a meaningful change:
 - **2026-10-24 continuation:** Reconstructed the body integrator local matrix from the nine-float copy and subsequent overlapping stores in `0x43ECE0`, resolving the prior uninitialized-stack interpretation. Physics remains at the same maturity because native virtual effects, x87 fidelity, and whole-game/runtime validation remain open; no percentage change. Release target build and `git diff --check` pass; no tests were run. Evidence: `body_integration_basis_sync.evidence.json`.
 
 - **2026-10-24:** Modeled the duration-normalized integrator virtual-record gate, timeout writes, and the complete type-5 event payload encoding. Ratings unchanged; nested mesh/resource mutation and runtime validation remain open.
+
+- **2026-10-24:** Added a bounded model of  x430B70's scaled mesh bit-mask row writes. Ratings unchanged because the geometry-derived rectangles, mesh deformation loop, and resource group updates in  x430610 remain incomplete.

@@ -555,6 +555,71 @@ apply_ncar_integrator_virtual_record_callback(
     return result;
 }
 
+NcarMeshBoundsMaskResult apply_ncar_mesh_bounds_mask(
+    const NcarMeshBoundsMaskInput& input) noexcept
+{
+    constexpr auto mask_coordinate_scale = std::bit_cast<float>(0x417FD70AU);
+    const auto ftol = [](const long double value) noexcept {
+        const auto rounded = std::nearbyint(value);
+        if (!std::isfinite(rounded) ||
+            rounded < static_cast<long double>(
+                          std::numeric_limits<std::int32_t>::min()) ||
+            rounded > static_cast<long double>(
+                          std::numeric_limits<std::int32_t>::max())) {
+            return std::numeric_limits<std::int32_t>::min();
+        }
+        return static_cast<std::int32_t>(rounded);
+    };
+    const auto scaled_index = [&](const float value) noexcept {
+        return ftol(static_cast<long double>(value) *
+                    static_cast<long double>(mask_coordinate_scale));
+    };
+
+    NcarMeshBoundsMaskResult result{};
+    result.row_begin_index = scaled_index(input.row_begin);
+    result.row_end_index = scaled_index(input.row_end);
+    result.column_begin_index = scaled_index(input.column_begin);
+    result.column_end_index = scaled_index(input.column_end);
+
+    const auto column_count = static_cast<std::int64_t>(
+        result.column_end_index) - result.column_begin_index;
+    if (column_count >= 32) {
+        result.column_bits = 0xffffU;
+    } else if (column_count > 0) {
+        for (auto column = static_cast<std::int64_t>(
+                 result.column_begin_index);
+             column < result.column_end_index; ++column) {
+            const auto shift = static_cast<unsigned>(
+                static_cast<std::uint64_t>(column) & 31U);
+            if (shift < 16U) {
+                result.column_bits = static_cast<std::uint16_t>(
+                    result.column_bits | (std::uint16_t{1} << shift));
+            }
+        }
+    }
+
+    const auto row_count = static_cast<std::int64_t>(result.row_end_index) -
+        result.row_begin_index;
+    if (row_count <= 0) {
+        return result;
+    }
+    const auto bounded_begin = std::max<std::int64_t>(
+        result.row_begin_index, 0);
+    const auto bounded_end = std::min<std::int64_t>(
+        result.row_end_index,
+        static_cast<std::int64_t>(input.row_words.size()));
+    for (auto row = bounded_begin; row < bounded_end; ++row) {
+        input.row_words[static_cast<std::size_t>(row)] =
+            static_cast<std::uint16_t>(
+                input.row_words[static_cast<std::size_t>(row)] |
+                result.column_bits);
+        ++result.rows_written;
+    }
+    result.rows_out_of_range = static_cast<std::uint64_t>(row_count) -
+        result.rows_written;
+    return result;
+}
+
 NcarPostBodyResult advance_ncar_post_body_tail(
     NcarPostBodyState& state,
     const NcarPostBodyInput& input) noexcept
