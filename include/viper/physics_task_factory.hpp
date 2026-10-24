@@ -506,6 +506,57 @@ struct PhysicsWoblTaskConstructorPlan {
 plan_physics_wobl_task_constructor(
     const PhysicsWoblTaskConstructorObservation& observation);
 
+struct PhysicsGcarTaskConstructorObservation {
+    std::uint32_t object_address{};
+    std::uint32_t record_word_0x1e0{};
+    std::uint32_t base_car_identity_0x510{};
+    bool sample_buffer_allocation_succeeded{};
+    std::optional<std::uint32_t> sample_buffer_address;
+    bool sample_source_helper_succeeded{};
+    std::array<std::uint32_t, 3> sample_header{};
+    std::uint32_t sample_source_cursor{};
+    std::span<const std::uint32_t> sample_source_words;
+};
+
+enum class PhysicsGcarTaskConstructorStatus : std::uint8_t {
+    source_helper_failed,
+    constructed,
+    null_sample_buffer_copy_fault,
+    incomplete_sample_source,
+    sample_buffer_overflow,
+};
+
+struct PhysicsGcarTaskConstructorPlan {
+    PhysicsGcarTaskConstructorStatus status{
+        PhysicsGcarTaskConstructorStatus::source_helper_failed};
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::vector<std::uint32_t> sample_buffer_words_written;
+    std::optional<std::uint32_t> sample_buffer_address;
+    std::uint32_t sample_buffer_allocation_bytes{0x23280U};
+    std::uint32_t sample_buffer_element_count{0x960U};
+    std::uint32_t sample_buffer_element_stride{0x3cU};
+    std::uint32_t sample_copy_words_requested{};
+    std::uint32_t sample_copy_words_from_observation{};
+    std::uint32_t identity_helper_call_count{};
+    std::uint32_t derived_vtable_address{0x004c7998U};
+    std::uint32_t singleton_global_address{0x00508ad4U};
+    std::uint32_t singleton_global_value{};
+    bool derived_vtable_installed{};
+    bool global_singleton_written{};
+    bool sample_buffer_allocation_attempted{};
+    bool sample_buffer_pointer_stored{};
+    bool identity_helper_calls_are_no_write{};
+    bool sample_source_copy_exceeds_capture{};
+    bool sample_copy_exceeds_allocation{};
+    bool sample_copy_faults_on_null_buffer{};
+    bool allocated_sample_buffer_contents_left_uninitialized{};
+};
+
+// Projects the GCAR task constructor and its date/sample initialization path.
+[[nodiscard]] PhysicsGcarTaskConstructorPlan
+plan_physics_gcar_task_constructor(
+    const PhysicsGcarTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};

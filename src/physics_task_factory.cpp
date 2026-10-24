@@ -869,6 +869,98 @@ PhysicsWoblTaskConstructorPlan plan_physics_wobl_task_constructor(
     return plan;
 }
 
+PhysicsGcarTaskConstructorPlan plan_physics_gcar_task_constructor(
+    const PhysicsGcarTaskConstructorObservation& observation)
+{
+    PhysicsGcarTaskConstructorPlan plan{};
+    plan.derived_vtable_installed = true;
+    plan.global_singleton_written = true;
+    plan.singleton_global_value = observation.object_address;
+    plan.object_writes.push_back({0xec8U, observation.record_word_0x1e0});
+    plan.object_writes.push_back({0xeccU, observation.base_car_identity_0x510});
+
+    plan.sample_buffer_allocation_attempted = true;
+    plan.sample_buffer_pointer_stored = true;
+    if (observation.sample_buffer_allocation_succeeded) {
+        plan.sample_buffer_address = observation.sample_buffer_address;
+    }
+    if (!observation.sample_buffer_allocation_succeeded) {
+        plan.object_writes.push_back({0xef4U, 0U});
+    } else if (observation.sample_buffer_address.has_value()) {
+        plan.object_writes.push_back({
+            0xef4U, *observation.sample_buffer_address});
+    }
+    plan.identity_helper_calls_are_no_write = true;
+    plan.identity_helper_call_count =
+        observation.sample_buffer_allocation_succeeded ? 0x960U : 0U;
+    plan.allocated_sample_buffer_contents_left_uninitialized =
+        observation.sample_buffer_allocation_succeeded;
+    plan.object_writes.push_back({0xefcU, 0U});
+
+    // 0x427A40's unconditional local resets precede the sample-source call.
+    plan.object_writes.push_back({0x50cU, 0U});
+    plan.object_writes.push_back({0xed0U, 0U});
+    plan.object_writes.push_back({0x004U, 0U});
+    if (!observation.sample_source_helper_succeeded) {
+        plan.status = PhysicsGcarTaskConstructorStatus::source_helper_failed;
+        plan.object_writes.push_back({0xed8U, 0x0012d687U});
+        plan.object_writes.push_back({0xef8U, 0U});
+        plan.object_writes.push_back({0xee0U, 0U});
+    } else {
+        const auto record_count = observation.sample_header[2];
+        const auto copy_bytes = record_count * 0x3cU;
+        plan.sample_copy_words_requested = copy_bytes / sizeof(std::uint32_t);
+        constexpr std::uint32_t allocated_words = 0x23280U /
+            sizeof(std::uint32_t);
+        plan.sample_copy_exceeds_allocation =
+            plan.sample_copy_words_requested > allocated_words;
+        plan.sample_source_copy_exceeds_capture =
+            observation.sample_source_words.size() <
+                plan.sample_copy_words_requested;
+
+        plan.object_writes.push_back({
+            0xeccU, observation.sample_source_cursor});
+        plan.object_writes.push_back({0xee0U, observation.sample_header[1]});
+        plan.object_writes.push_back({0xed8U, observation.sample_header[0]});
+        plan.object_writes.push_back({0xef8U, record_count});
+
+        if (plan.sample_copy_words_requested != 0U &&
+            !observation.sample_buffer_allocation_succeeded) {
+            plan.status = PhysicsGcarTaskConstructorStatus::
+                null_sample_buffer_copy_fault;
+            plan.sample_copy_faults_on_null_buffer = true;
+            return plan;
+        }
+
+        plan.sample_copy_words_from_observation = static_cast<std::uint32_t>(
+            std::min<std::size_t>(plan.sample_copy_words_requested,
+                                  observation.sample_source_words.size()));
+        plan.sample_buffer_words_written.assign(
+            observation.sample_source_words.begin(),
+            observation.sample_source_words.begin() +
+                plan.sample_copy_words_from_observation);
+        plan.object_writes.push_back({0xee4U, observation.sample_header[0]});
+        if (plan.sample_source_copy_exceeds_capture) {
+            plan.status = PhysicsGcarTaskConstructorStatus::
+                incomplete_sample_source;
+        } else if (plan.sample_copy_exceeds_allocation) {
+            plan.status = PhysicsGcarTaskConstructorStatus::
+                sample_buffer_overflow;
+        } else {
+            plan.status = PhysicsGcarTaskConstructorStatus::constructed;
+        }
+    }
+
+    plan.object_writes.push_back({0xeecU, 0U});
+    plan.object_writes.push_back({0xef0U, 0U});
+    plan.object_writes.push_back({0xed4U, 0xffffffffU});
+    const auto final_start_time = observation.sample_source_helper_succeeded
+        ? observation.sample_header[0]
+        : 0x0012d687U;
+    plan.object_writes.push_back({0xee4U, final_start_time});
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {

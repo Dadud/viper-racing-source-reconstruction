@@ -113,6 +113,30 @@ the link and trailing object writes do not. Evidence: `0x436ED0`,
 resource lookup `0x420970`,
 `ev_1bb2651b902d18f7d9e14701002e84f4ff795cdcc7c2b339e4c053022f73db7b`.
 
+`plan_physics_gcar_task_constructor` now covers the GCAR constructor's large
+sample buffer and the bounded tail of its source initialization. It records
+the base-car field copies at `+0xEC8` and `+0xECC`, singleton assignment at
+`0x508AD4`, allocation of `0x23280` bytes, and the `0x960` calls to
+`0x40EC80` when allocation succeeds. That helper only returns its input, so the
+new buffer remains uninitialized until optional sample data is copied. The
+`0x427A40` tail's fixed resets and the failed-source defaults are projected;
+on source success the supplied header words map to `+0xED8`, `+0xEE0`, and
+`+0xEF8`, while its cursor goes to `+0xECC`. The payload copy requests
+`count * 0x3C / 4` DWORDs, records the captured prefix, and flags null-buffer,
+truncated-observation, or allocation-overrun cases. On complete nonfaulting
+paths the `+0xEEC`, `+0xEF0`, `+0xED4`, and `+0xEE4` final writes are preserved.
+The base-car constructor `0x43DFB0` and the source helper's native data contents
+remain outside this projection. Evidence: `0x4278F0`,
+`ev_0e875134732b6d19b3ec2e544a4b320f6bcf6805a3ce9a755180727ed75d5e02`;
+base constructor `0x43DFB0`,
+`ev_1351d1ca9c7235b1a460df854f730aed6d44f570052e7efdbfb3dcbae022fbc9`;
+identity helper `0x40EC80`,
+`ev_dbf6f28c6f21285954746f955b387d97130255708255cb41461ae17ceb839963`;
+tail helper `0x427A40`,
+`ev_8dc6849321e0690e91aa1094409d0e760a24dfede861de14162468f44c8b8ee9`; and
+copy helper `0x427BF0`,
+`ev_3952797030559a14e1424ff087668b8901ca5e3a635f95d2c69d3497e61e520f`.
+
 ## Fixed-step update dispatch
 
 `0x421050`, reached per physics step from `0x4207C0`, iterates
