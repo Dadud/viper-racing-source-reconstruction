@@ -1,5 +1,7 @@
 #include "viper/graphics_startup.hpp"
 
+#include <bit>
+
 namespace viper {
 
 DirectDrawStartupPlan plan_directdraw_startup(
@@ -302,10 +304,25 @@ RenderContextAcquisitionPlan plan_render_context_acquisition(
 
     plan.ordered_operations.push_back({
         RenderContextAcquisitionOperationKind::initialize_context, 0x00449350U});
+    auto surface_bits = observation.surface_bits;
+    auto row_pitch = observation.row_pitch;
+    if (observation.locked_surface_description.has_value()) {
+        constexpr std::size_t pitch_dword_index = 0x10U / sizeof(std::uint32_t);
+        constexpr std::size_t surface_bits_dword_index =
+            0x28U / sizeof(std::uint32_t);
+        const auto& description = *observation.locked_surface_description;
+        row_pitch = std::bit_cast<std::int32_t>(
+            description[pitch_dword_index]);
+        surface_bits = static_cast<std::uintptr_t>(
+            description[surface_bits_dword_index]);
+        plan.locked_surface_description_used = true;
+    }
+    plan.acquired_surface_bits = surface_bits;
+    plan.acquired_row_pitch = row_pitch;
     initialize_render_context_from_surface(
-        plan.context, observation.format_tag, observation.surface_bits,
-        observation.width, observation.height, observation.row_pitch);
-    if (observation.surface_bits == 0) {
+        plan.context, observation.format_tag, surface_bits,
+        observation.width, observation.height, row_pitch);
+    if (surface_bits == 0) {
         plan.disposition = RenderContextAcquisitionDisposition::null_page_pointer;
         plan.ordered_operations.push_back({
             RenderContextAcquisitionOperationKind::report_null_page, 0x00410EA0U});

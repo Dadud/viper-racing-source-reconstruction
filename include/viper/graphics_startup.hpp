@@ -209,6 +209,11 @@ struct RenderContextAcquisitionObservation {
     SurfaceLockObservation lock{};
     SurfaceRestoreObservation restore{};
     std::uint8_t format_tag{};
+    // Optional raw 0x6C-byte output descriptor supplied to 0x458FB0. The
+    // acquired pixel pointer is at +0x28 and pitch is at +0x10.
+    std::optional<std::array<std::uint32_t, 0x6cU / sizeof(std::uint32_t)>>
+        locked_surface_description;
+    // Compatibility observations used when the raw descriptor is absent.
     std::uintptr_t surface_bits{};
     int width{};
     int height{};
@@ -234,6 +239,9 @@ struct RenderContextAcquisitionPlan {
     RenderContextSurface context{};
     SurfaceLockPlan lock{};
     std::optional<SurfaceRestorePlan> restore;
+    bool locked_surface_description_used{};
+    std::uintptr_t acquired_surface_bits{};
+    int acquired_row_pitch{};
     std::uint32_t return_word{};
     std::vector<RenderContextAcquisitionOperation> ordered_operations;
 };

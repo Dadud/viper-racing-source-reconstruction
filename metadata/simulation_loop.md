@@ -63,6 +63,16 @@ CPU-side context while leaving DirectDraw surface acquisition and ownership as
 runtime effects. Evidence: `0x449350` (`ev_4c62c3530ed4eb9919749db8d6e9f56f28d183dd940a27d68e25e59b18a23c71`)
 and `0x44E210` (`ev_69e36407f8dcd985df72374cb753e2f780f22bfbebaf0c8e48e5549d6c49f5ee`).
 
+The lock output is a zero-initialized `0x6C`-byte descriptor passed to
+`0x458FB0`. After lock success, `0x44E210` reads pitch from descriptor
+`+0x10` and the pixel pointer from `+0x28`; the format tag, width, and height
+are read from globals `0x509C78`, `0x509C60`, and `0x509C3C`, respectively.
+`RenderContextAcquisitionObservation` can now carry all 27 descriptor DWORDs,
+and `plan_render_context_acquisition` derives those two lock outputs before
+calling `0x449350`. The separate observations remain supported for cases where
+the raw descriptor is unavailable. Evidence: `0x44E210`
+(`ev_9370d82a0b15bd920e1a5eb259e692723161968f45b7da03a523b5b0fd1585f7`).
+
 The lock performed by `0x458FB0` is separately projected by
 `plan_surface_lock`. Each supplied HRESULT represents one call through the
 surface vtable at `+0x64`, with flags `0` and the caller's surface descriptor.

@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Extended render-context acquisition to accept
+  the raw 27-DWORD `0x458FB0` output descriptor. After lock success, the plan
+  now derives the pitch from `+0x10` and locked pixel pointer from `+0x28`
+  before calling the `0x449350` context initializer; renderer format, width,
+  and height remain their separately observed globals. Release build passes;
+  no tests were run. Evidence: `0x44E210`
+  (`ev_9370d82a0b15bd920e1a5eb259e692723161968f45b7da03a523b5b0fd1585f7`).
+
 - **2026-10-24 continuation:** Added a paused-banner frame-write compositor
   that merges fallback boxes, the optional STMP resource image, and text in the
   recovered operation order. The race-loop result now exposes the merged list,
