@@ -1220,6 +1220,14 @@ corresponding explicit observation as fallback. The offsets are raw record
 coordinates, not semantic gameplay names. This projection is grounded in the
 `0x4035E0` byte range evidence
 `ev_5f60fd107734e816e45359b06c10c71e1300a8c15309a630ac4de08ed745912e`.
+When a language table is supplied, the composed `0x4036EA`, `0x403820`, and
+`0x40391C` resource calls resolve `Dashboard:Position`, `Dashboard:RaceTime`,
+and `Dashboard:Lap`. The numeric `0x40372E` and `0x403972` calls also carry
+their modeled `position/count` and `lap/count` strings. These resolved
+arguments live on the corresponding `SceneDashboardTextCall`; the core raster
+stage uses them before consulting its aligned fallback argument span, so the
+four calls need no separately formatted caller strings. Unresolved calls
+continue to require their runtime-formatted input.
 The LapTime result carries its own ordered calls and state changes. The core
 plan returns the updated state snapshot and combines the core reached text
 site bits; the race-frame flow resolves those bits through

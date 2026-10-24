@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Carried resolved dashboard row strings on their
+  text-call descriptors. The core callback now resolves Position, RaceTime,
+  and Lap labels from the supplied language table and derives both numeric
+  `position/count` and `lap/count` arguments from its modeled state. The
+  dashboard raster stage consumes these known arguments directly and still
+  accepts caller-formatted strings for unresolved sites. The source addresses
+  and keys are recorded in `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Added a bounded projection of the selected
   dashboard record's observed DWORD fields relative to the `0x4035E0` ESI
   pointer (`record +0x138`). The core callback now derives Position, Lap,

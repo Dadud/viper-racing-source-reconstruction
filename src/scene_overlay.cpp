@@ -2231,6 +2231,40 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
            const SceneDashboardTextCall& right) {
             return left.call_site < right.call_site;
         });
+    const auto attach_text = [&](const std::uint32_t call_site,
+                                 std::string text) {
+        const auto call = std::find_if(result.ordered_text_calls.begin(),
+            result.ordered_text_calls.end(),
+            [call_site](const SceneDashboardTextCall& candidate) {
+                return candidate.call_site == call_site;
+            });
+        if (call != result.ordered_text_calls.end()) {
+            call->resolved_text_argument = std::move(text);
+        }
+    };
+    if (observation.language_resource != nullptr) {
+        const auto resolve_resource = [&](const std::uint32_t call_site,
+                                          const std::string_view key) {
+            const auto value = observation.language_resource->find(key);
+            if (value.has_value()) {
+                attach_text(call_site, std::string(*value));
+            }
+        };
+        resolve_resource(0x004036EA, "Dashboard:Position");
+        resolve_resource(0x00403820, "Dashboard:RaceTime");
+        resolve_resource(0x0040391C, "Dashboard:Lap");
+    }
+    const auto format_pair = [](const std::int32_t first,
+                                const std::int32_t second) {
+        return std::to_string(first) + "/" + std::to_string(second);
+    };
+    attach_text(0x0040372E, format_pair(result.position.displayed_position,
+                                        result.position.displayed_count));
+    if (result.lap.normal_lap_branch) {
+        attach_text(0x00403972, format_pair(
+            result.lap.displayed_lap,
+            std::bit_cast<std::int32_t>(result.lap.displayed_lap_count)));
+    }
     return result;
 }
 
@@ -3798,19 +3832,24 @@ SceneDashboardCoreCallbackRasterPlan raster_scene_dashboard_core_callback(
     SceneDashboardCoreCallbackRasterPlan result{};
     result.expected_call_count = callback.ordered_text_calls.size();
     result.input_complete =
-        observation.formatted_text_arguments.size() == result.expected_call_count &&
         observation.per_call_renderers.size() == result.expected_call_count;
 
-    const auto call_count = std::min({
-        result.expected_call_count,
-        observation.formatted_text_arguments.size(),
-        observation.per_call_renderers.size(),
-    });
+    const auto call_count = std::min(result.expected_call_count,
+        observation.per_call_renderers.size());
     for (std::size_t index = 0; index < call_count; ++index) {
+        const auto& call = callback.ordered_text_calls[index];
+        std::string_view text_argument;
+        if (call.resolved_text_argument.has_value()) {
+            text_argument = *call.resolved_text_argument;
+        } else if (index < observation.formatted_text_arguments.size()) {
+            text_argument = observation.formatted_text_arguments[index];
+        } else {
+            result.input_complete = false;
+            ++result.renderer_contexts_used;
+            continue;
+        }
         const auto layout = layout_scene_dashboard_text(
-            callback.ordered_text_calls[index],
-            observation.formatted_text_arguments[index],
-            layout_font);
+            call, text_argument, layout_font);
         const auto raster = raster_scene_dashboard_text(
             layout, atlas_font, observation.per_call_renderers[index]);
         ++result.text_arguments_used;
@@ -3820,6 +3859,10 @@ SceneDashboardCoreCallbackRasterPlan raster_scene_dashboard_core_callback(
         result.ordered_pixel_writes.insert(
             result.ordered_pixel_writes.end(), raster.pixel_writes.begin(),
             raster.pixel_writes.end());
+    }
+    if (observation.formatted_text_arguments.size() >
+        result.expected_call_count) {
+        result.input_complete = false;
     }
     return result;
 }

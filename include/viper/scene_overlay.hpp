@@ -748,6 +748,9 @@ struct SceneDashboardTextCall {
     std::uint32_t color_source{};
     std::uint32_t font_source{};
     std::uint32_t format_flags{};
+    // When the callback has recovered every argument, its exact preformatted
+    // byte string can be rasterized without a parallel caller observation.
+    std::optional<std::string> resolved_text_argument;
 };
 
 struct SceneDashboardFontObservation {
@@ -1938,8 +1941,8 @@ scene_paused_banner_style14_measure_width(
     std::int32_t text_width) noexcept;
 
 struct SceneDashboardCoreCallbackRasterObservation {
-    // One preformatted argument and renderer context for each ordered callback
-    // text call. Missing entries preserve the known prefix and report partial.
+    // Optional fallback preformatted arguments aligned with ordered callback
+    // calls. A call's resolved_text_argument takes precedence when available.
     std::span<const std::string_view> formatted_text_arguments;
     std::span<const SceneDashboardRasterObservation> per_call_renderers;
 };
