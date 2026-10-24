@@ -814,6 +814,49 @@ struct SceneRenderCallbackSelectionPlan {
     bool state_0x50d0a8,
     const SceneRenderCallbackSelectionObservation& observation);
 
+using SceneRenderRowRecord = std::array<std::uint32_t, 8>;
+
+enum class SceneRenderScanlineConversionStatus : std::uint8_t {
+    complete,
+    unsupported_callback,
+    unsupported_descriptor_mode,
+    negative_row_pointer,
+    source_observation_exhausted,
+    destination_observation_exhausted,
+};
+
+struct SceneRenderScanlineConversionObservation {
+    std::int16_t first_row{}; // descriptor +0x18, signed
+    std::int16_t end_row{}; // descriptor +0x1A, exclusive and signed
+    std::uint8_t descriptor_mode{}; // descriptor +0x10, used by 0x455E00
+    std::uint8_t alpha_byte_0x50d110{}; // used by 0x455D90
+    std::uint32_t color_or_mask_0x50d114{}; // used by 0x455E00
+    std::span<const SceneRenderRowRecord> source_rows;
+    std::span<const SceneRenderRowRecord> destination_before;
+};
+
+struct SceneRenderScanlineWrite {
+    std::size_t row_index{};
+    std::uint8_t byte_offset{};
+    std::uint32_t value{};
+};
+
+struct SceneRenderScanlineConversionPlan {
+    SceneRenderScanlineConversionStatus status{SceneRenderScanlineConversionStatus::complete};
+    std::uint32_t callback_address{};
+    std::size_t rows_processed{};
+    std::size_t row_counter_increments{}; // DAT_0050D304
+    std::vector<SceneRenderRowRecord> destination_after;
+    std::vector<SceneRenderScanlineWrite> writes;
+};
+
+// Models the two default callbacks selected by 0x455C80. Writes remain
+// bounded by supplied source/destination rows; destination word +0x0C is
+// deliberately preserved because the native loop leaves it untouched.
+[[nodiscard]] SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
+    std::uint32_t callback_address,
+    const SceneRenderScanlineConversionObservation& observation);
+
 struct SceneWheelResourceFrameOperation {
     SceneWheelResourceFrameOperationKind kind{};
     std::uint32_t argument{};

@@ -596,3 +596,37 @@ Evidence: notifier `0x455A60`
 (`ev_a6223e48f4c508515c27b7eab8eded92b5b74178b6b50b7ae10566d1e93b49c6`)
 and selector `0x455C80`
 (`ev_68291d80b42b224b56e5bf259e990878f9c0ee36bf8bb4dc924e36a4a38f6e7c`).
+
+The first two code targets in the `0x455C80` default callback pair now have a
+bounded row-buffer model. Each callback reads signed top/end rows from the
+record at `+0x18/+0x1A`, advances source and destination by `0x20` bytes per
+row, and increments `DAT_0050D304` once per completed row. Callback `0x455D90`
+copies dwords at `+0,+4,+8,+0x18,+0x1C`, forms the `+0x10` word from
+`DAT_0050D110 << 24 | 0x00FFFFFF`, and writes `0xFF000000` at `+0x14`.
+Callback `0x455E00` accepts record modes 0–2, copies the same source words,
+ORs source `+0x10` with `DAT_0050D114`, and writes `0xFF000000` at `+0x14`.
+Both preserve destination `+0x0C`. The model returns ordered dword writes and
+an updated bounded destination view; rows outside supplied spans stop with an
+explicit incomplete status. Evidence: `0x455D90` entry
+(`ev_0e240ba033f5420a5f69cd9b4d20b1dd89e697fe9b6b290ca0db94d6ab475355`),
+signed row bounds (`ev_7ca24ef80c66548a58f1e801fa43f60d2e6a3a4b3f403ab2e5d816e50a509e1a`,
+`ev_6491ef452681fcb8e60b38b949d42db4d053f1dbd56279c62d317b9c50506f90`),
+row stride (`ev_c57ad1556fdf90a4880fb51a9b01f98e6a3d9f891ed3620035cf3fa428faf742`),
+alpha-color construction (`ev_5da884dafd9d69819c0092e00040c05c2ebf79981307ec8c3c4e2e472c48c3e1`,
+`ev_b84ca772fd1a6d1c9f35b8a8c55fed261c07a5ad8e5bc2d6e4e00c5e3c29d1e2`,
+`ev_902de21683878c201d637fdaed827a166fb986521b3b23ac4be7500a1e19dc3a`),
+and writes/counter (`ev_fe451c9b7955ec591b3c5db0702fb3c88f58d357e4c21ee821ed07507267522f`,
+`ev_c392f9a6e5eae13d6a6ad39f5e4514ce500e6a59e0fa889523eaa9105d8b1241`,
+`ev_59e88921d5914642dbc582f821b94a538e346a47c9dbb39e5f354901eeae8b91`).
+For `0x455E00`, the descriptor mode and accepted comparisons are observed at
+`0x455E19` (`ev_4cd212502f71103cc5a699781418c1be1ffcc2f1bc2f474888220cd9ee5a9920`),
+`0x455E26` (`ev_c922c89fe1551a29751f580c5464a93087762de9b325222d2c01d811146b2591`),
+and `0x455E2B` (`ev_c7b47c6c0892f7c73502e148800359547c5ae62ff516369d3e9491d95afce21b`).
+The masked word and output stores are `0x455E6A`
+(`ev_27578e6d856ad1df8a6263c98dc7929b0893c460882bcfdcdb1a736296fa0b6f`),
+`0x455E70` (`ev_82da6352bac58a33861b92adf64061e7d27bd9e4c865c3d5d96cc87eb8c46ba4`),
+and `0x455E73` (`ev_d66f2fe2c0bef1a69b925bf08d94346e0b7005654e140e8b083993ccd7b38e91`);
+the second loop's stride and counter are `0x455E49`
+(`ev_95c9538bceda0852df6ac94bbd4e7e2f1a88daabde825882008fc4f705b75c7c`)
+and `0x455E76`
+(`ev_74d88c40605eed9fb3c86b35a844d84a3c76a8cc902f31637627197893206bd4`).

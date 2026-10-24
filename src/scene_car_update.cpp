@@ -1071,6 +1071,73 @@ SceneRenderCallbackSelectionPlan plan_scene_render_callback_selection(
     return {0x004569C0U, 0x00455F40U};
 }
 
+SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
+    const std::uint32_t callback_address,
+    const SceneRenderScanlineConversionObservation& observation)
+{
+    SceneRenderScanlineConversionPlan result{};
+    result.callback_address = callback_address;
+    result.destination_after.assign(observation.destination_before.begin(),
+        observation.destination_before.end());
+    const bool alpha_fill = callback_address == 0x00455D90U;
+    const bool color_mask = callback_address == 0x00455E00U;
+    if (!alpha_fill && !color_mask) {
+        result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
+        return result;
+    }
+    if (color_mask && observation.descriptor_mode > 2U) {
+        result.status = SceneRenderScanlineConversionStatus::unsupported_descriptor_mode;
+        return result;
+    }
+
+    if (observation.end_row <= observation.first_row) {
+        return result;
+    }
+    if (observation.first_row < 0) {
+        result.status = SceneRenderScanlineConversionStatus::negative_row_pointer;
+        return result;
+    }
+
+    for (std::int32_t row = observation.first_row; row < observation.end_row; ++row) {
+        const auto row_index = static_cast<std::size_t>(row);
+        if (row_index >= observation.source_rows.size()) {
+            result.status = SceneRenderScanlineConversionStatus::source_observation_exhausted;
+            return result;
+        }
+        if (row_index >= result.destination_after.size()) {
+            result.status = SceneRenderScanlineConversionStatus::destination_observation_exhausted;
+            return result;
+        }
+
+        const auto& source = observation.source_rows[row_index];
+        auto& destination = result.destination_after[row_index];
+        const auto write = [&result, row_index, &destination](const std::uint8_t byte_offset,
+            const std::uint32_t value) {
+            result.writes.push_back({row_index, byte_offset, value});
+            destination[byte_offset / sizeof(std::uint32_t)] = value;
+        };
+
+        // Both native loops copy words +0,+4,+8,+0x18,+0x1C in this order.
+        write(0x00U, source[0]);
+        write(0x04U, source[1]);
+        write(0x08U, source[2]);
+        write(0x18U, source[6]);
+        write(0x1CU, source[7]);
+        if (alpha_fill) {
+            const std::uint32_t alpha_color =
+                (static_cast<std::uint32_t>(observation.alpha_byte_0x50d110) << 24U) |
+                0x00FFFFFFU;
+            write(0x10U, alpha_color);
+        } else {
+            write(0x10U, source[4] | observation.color_or_mask_0x50d114);
+        }
+        write(0x14U, 0xFF000000U);
+        ++result.rows_processed;
+        ++result.row_counter_increments;
+    }
+    return result;
+}
+
 SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(
     const SceneSharedRenderStateSyncObservation& observation)
 {

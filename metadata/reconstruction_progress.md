@@ -1,5 +1,9 @@
 # Reconstruction progress
 
+- **2026-10-24:** Modeled the two default row converters selected by `0x455C80`.
+  The bounded projection preserves native copy/store order, signed row bounds,
+  mode rejection, untouched destination `+0x0C`, and per-row counter updates.
+  See `scene_car_update.md` and refreshed `scene_wheel_lifecycle.evidence.json`.
 - **2026-10-24:** Extended the wheel renderer path from indexed submission
   through texture binding and shared graphics-state handling. `0x4525F0`
   projects texture-handle cache branches; `0x457AF0` projects changed-state
