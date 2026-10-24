@@ -2046,7 +2046,7 @@ SceneCarCalloutRasterPlan raster_scene_car_callout(
     for (const auto& operation : callout.operations) {
         switch (operation.kind) {
         case SceneCarCalloutOperationKind::draw_primary_text_0x4d710:
-            raster_text(operation, observation.primary_text);
+            raster_text(operation, callout.primary_text);
             break;
         case SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0: {
             const auto first_write = result.ordered_pixel_writes.size();
@@ -2075,7 +2075,7 @@ SceneCarCalloutRasterPlan raster_scene_car_callout(
             break;
         }
         case SceneCarCalloutOperationKind::draw_secondary_text_0x4d710:
-            raster_text(operation, observation.secondary_text);
+            raster_text(operation, callout.secondary_text);
             break;
         default:
             break;

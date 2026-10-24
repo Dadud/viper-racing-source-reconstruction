@@ -1850,6 +1850,11 @@ SceneCarWheelFramePlan plan_scene_car_wheel_frame(
 SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
 {
     SceneCarCalloutPlan result{};
+    const auto c_string_prefix = [](const std::string_view text) {
+        const auto terminator = text.find('\0');
+        return text.substr(0, terminator == std::string_view::npos
+            ? text.size() : terminator);
+    };
     if (input.object_ordinal == input.selected_car_ordinal) {
         result.status = SceneCarCalloutStatus::selected_car_suppressed;
         return result;
@@ -1886,8 +1891,16 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
     }
 
     if (input.primary_text_gate_0x49be40) {
+        const auto record_text = input.primary_record_text_0x05.has_value()
+            ? c_string_prefix(*input.primary_record_text_0x05)
+            : std::string_view{"(null)"};
+        result.primary_text.reserve(record_text.size() + 16U);
+        result.primary_text.append(record_text);
+        result.primary_text.append(" (");
+        result.primary_text.append(std::to_string(input.primary_record_value_0x140));
+        result.primary_text.push_back(')');
         const auto x_bits = std::bit_cast<std::uint32_t>(input.primary_text_x_after_ftol)
-            - static_cast<std::uint32_t>(input.primary_text_length) * 4U;
+            - static_cast<std::uint32_t>(result.primary_text.size()) * 4U;
         const auto y_bits = std::bit_cast<std::uint32_t>(input.primary_text_y_after_ftol)
             - 4U;
         result.operations.push_back({
@@ -1895,15 +1908,17 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
             0x0044D710U, 0x004DCDA4U, 5, 0x140,
             std::bit_cast<std::int32_t>(x_bits),
             std::bit_cast<std::int32_t>(y_bits),
-            input.primary_text_length, 0x0044D6A0U});
+            result.primary_text.size(), 0x0044D6A0U});
     }
 
+    const auto secondary_text = c_string_prefix(input.secondary_record_text_0x32);
     result.operations.push_back({
         SceneCarCalloutOperationKind::check_secondary_text_gate_0x40d250,
         0x0040D250U});
     if (input.secondary_global_a_0x4d10fc
         && input.secondary_global_b_0x4ecc98
-        && input.secondary_record_text_present) {
+        && !secondary_text.empty()) {
+        result.secondary_text.assign(secondary_text);
         result.operations.push_back({
             SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0,
             0x0044D0C0U, 0U, 0x7B4, 0,
@@ -1914,10 +1929,10 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
             0x0044D710U, 0x0053F194U, 0x32, 0,
             std::bit_cast<std::int32_t>(
                 std::bit_cast<std::uint32_t>(input.secondary_text_x_after_ftol)
-                - static_cast<std::uint32_t>(input.secondary_record_text_length) * 4U),
+                - static_cast<std::uint32_t>(result.secondary_text.size()) * 4U),
             std::bit_cast<std::int32_t>(
                 std::bit_cast<std::uint32_t>(input.secondary_text_y_after_ftol) - 4U),
-            input.secondary_record_text_length, 0x0044D6A0U});
+            result.secondary_text.size(), 0x0044D6A0U});
     }
     return result;
 }

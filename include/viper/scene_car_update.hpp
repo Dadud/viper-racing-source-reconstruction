@@ -1066,28 +1066,31 @@ struct SceneCarCalloutInput {
     float squared_distance_threshold{};
     bool projection_visible_0x448cd0{};
     bool record_observed{};
+    std::optional<std::string_view> primary_record_text_0x05;
+    std::int32_t primary_record_value_0x140{};
+    std::string_view secondary_record_text_0x32;
     bool primary_text_gate_0x49be40{};
     bool secondary_global_a_0x4d10fc{};
     bool secondary_global_b_0x4ecc98{};
-    bool secondary_record_text_present{};
     std::int32_t primary_text_x_after_ftol{};
     std::int32_t primary_text_y_after_ftol{};
     std::int32_t secondary_text_x_after_ftol{};
     std::int32_t secondary_text_y_after_ftol{};
     std::int32_t secondary_resource_x_after_ftol{};
     std::int32_t secondary_resource_y_after_ftol{};
-    std::size_t primary_text_length{};
-    std::size_t secondary_record_text_length{};
 };
 
 struct SceneCarCalloutPlan {
     SceneCarCalloutStatus status{SceneCarCalloutStatus::complete};
     double squared_distance{};
+    std::string primary_text;
+    std::string secondary_text;
     std::vector<SceneCarCalloutOperation> operations;
 };
 
 // Projects scene-car virtual +0x18 at 0x4648A0. Projection and record/global
-// values that depend on renderer/device state are supplied observations.
+// values that depend on renderer/device state are supplied observations. It
+// formats record +0x05/+0x140 using the observed "%s (%d)" source.
 [[nodiscard]] SceneCarCalloutPlan plan_scene_car_callout(
     const SceneCarCalloutInput& input);
 

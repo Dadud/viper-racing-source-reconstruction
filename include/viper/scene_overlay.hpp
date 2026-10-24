@@ -1988,8 +1988,6 @@ raster_scene_dashboard_builtin_font(
     const SceneDashboardBuiltinFontObservation& observation);
 
 struct SceneCarCalloutRasterObservation {
-    std::string_view primary_text;
-    std::string_view secondary_text;
     std::uint32_t color_0x53f194{};
     SceneDashboardRasterObservation renderer;
     std::optional<bool> secondary_resource_pointer_nonnull;

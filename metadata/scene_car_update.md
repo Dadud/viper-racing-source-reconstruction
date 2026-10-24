@@ -459,19 +459,25 @@ position conversion to `0x452350`/device transform state.
 After projection succeeds, the callback sets its text context through
 `0x449900` and looks up the scene object's ordinal through `0x45DFB0`. Gate
 `0x49BE40` enables the primary formatted string using record offsets `+5` and
-`+0x140`, format source `0x4DCDA4`, and draw helper `0x4D710`. The later
+`+0x140`, format source `0x4DCDA4` (`"%s (%d)"`), and draw helper `0x4D710`.
+The plan now formats that string directly from the supplied record text and
+signed 32-bit value; a null `%s` uses the target CRT's `"(null)"` substitution.
+The later
 `0x40D250` gate is true only when both `0x4D10FC` and `0x4ECC98` are nonzero;
 record byte `+0x32` must also be nonzero before the callback calls `0x44D0C0`
 with object field `+0x7B4` and then draws that record string through `0x4D710`.
 The portable plan preserves these ordered call gates and record offsets. Device
-projection results, formatted text, and `__ftol` pixel coordinates remain
-inputs because their results depend on runtime transform/device and CRT state.
+projection results and `__ftol` pixel coordinates remain inputs because their
+results depend on runtime transform/device and CRT state. Secondary text comes
+directly from the record's `+0x32` NUL-terminated string.
 Evidence: vtable/submit path and raw callback instructions in
 `metadata/simulation_loop.md` and `disasm/engine_.text.asm`; helper dossiers
 `ev_863e3d62425fc238f2f7d05582aadddfb0a640870bf31a34c16400574dbc1d0b`,
 `ev_b66f1af6bc9ebabb616d42d22c6e9cc544095105e212c61780e913c9b146754f`,
 `ev_0d1cac05b94aa5dc4c850cd384bb6e6cb97abe2a8a92e0f36bab0295f5a90e28`,
 `ev_a66356af194e82eb5f16751b35cd3e4030ff0e736b2f0b30de2f2e8efeb0f482`,
+`ev_12c7933039b3238473154d37bdabe4f63dbb0f16d420023c69e59395f5edb870`
+(`0x4DCDA4` format string),
 `ev_e4f38a37529c74fb1934ce169ee89e3c9c8c18cf28d87e00f91d02081272917e`
 (`0x44D710`), and `ev_530a782028b247007aab203e8ab52d18b606f9b47ea2ac4fffd1c8904092d1ba`
 (`0x44D6A0`). The callout plan also applies the text helper's exact layout:
@@ -491,8 +497,8 @@ caller-owned `ResourceBundle`, and the raster plan decodes frame 0 through
 `raster_scene_stamp_image` between the two text segments when the pointer and
 image are observed. On the shipped `race.res`, `thought.stp` is a complete
 55x45, single-frame image producing 445 palette-pixel writes in both inspected
-renderer modes. It reports mismatched NUL-terminated text lengths or missing
-image data rather than silently treating the branch as rendered. Native
+renderer modes. The rasterizer verifies the plan's stored string lengths and
+reports missing image data rather than silently treating the branch as rendered. Native
 surface ownership and constructor resource-pointer success remain inputs.
 Evidence: constructor `ev_3d36327c6db8aa39bef1e99f31d9e286bd657c7d16d95295605c813b8a46b2a3`,
 destructor `ev_f73b4d9052d98fd990e4a7d4ae0ee6ba739ff38cbe0403521b83290f560d9da0`,

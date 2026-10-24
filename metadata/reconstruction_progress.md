@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Resolved the primary scene-car callout format
+  from string object `0x4DCDA4` as `"%s (%d)"`. `plan_scene_car_callout` now
+  formats record `+0x05` with signed value `+0x140` itself, carries the raw
+  secondary string at `+0x32`, and the rasterizer consumes those plan-owned
+  strings rather than duplicate caller text. Release `viper_race_scene_flow`
+  build and `git diff --check` pass; no tests were run. Evidence:
+  `ev_12c7933039b3238473154d37bdabe4f63dbb0f16d420023c69e59395f5edb870`.
+
 - **2026-10-24 continuation:** Added a frame-lifecycle application path for
   the scene-car callout's ordered text and `thought.stp` writes. It requires
   the callback to be observed inside the submitted `0x45C090` pass before
