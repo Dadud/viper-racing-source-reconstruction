@@ -105,6 +105,9 @@ struct RaceLoopSharedOverlayPlan {
     std::vector<State0BitmapProjection> state0_dashboard_bitmap_projections;
     std::vector<SceneRectangleFillPixelWrite>
         state0_dashboard_fill_pixel_writes;
+    bool state0_dashboard_mode_zero_gear_fill_complete{};
+    std::vector<SceneRectangleFillPixelWrite>
+        state0_dashboard_mode_zero_gear_fill_writes;
     bool shared_results_raster_reached{};
     SceneSharedResultsHeadingTextRasterPlan shared_results_heading_raster{};
     SceneSharedResultsRasterPlan shared_results_rows_raster{};
@@ -148,10 +151,10 @@ struct RaceLoopState0DashboardSurfaceWriteResult {
     std::size_t pixel_writes_applied{};
 };
 
-// Applies the 0x405100 background fill/bitmap batch from the state-0 wrapper
-// only when its callback is inside a submitted frame and precedes surface unlock.
+// Applies modeled state-0 background writes and the mode-0 gear rectangle only
+// when the callback is inside a submitted frame and precedes surface unlock.
 [[nodiscard]] RaceLoopState0DashboardSurfaceWriteResult
-apply_race_loop_state0_dashboard_background_to_locked_surface(
+apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
     const RaceLoopSharedOverlayPlan& plan,
     std::span<std::uint8_t> locked_surface);
 

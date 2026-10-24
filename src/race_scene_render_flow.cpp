@@ -173,8 +173,49 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         auto gear_observation = observation.dashboard_gear_display;
         gear_observation.dashboard_path_enabled =
             plan.optional_dashboard_branch_enabled;
+        if (plan.render_context_acquisition.has_value() &&
+            plan.render_context_acquisition->disposition ==
+                RenderContextAcquisitionDisposition::acquired) {
+            const auto& context = plan.render_context_acquisition->context;
+            gear_observation.render_context = context.viewport;
+            gear_observation.renderer_mode_0x4d7a48 =
+                static_cast<std::uint8_t>(
+                    observation.state0_dashboard_render
+                        .renderer_mode_0x4d7a48);
+            gear_observation.framebuffer_base_value =
+                static_cast<std::uint32_t>(context.surface_bits_0x04);
+        } else if (plan.optional_dashboard_branch_enabled) {
+            gear_observation.render_context =
+                observation.state0_dashboard_render.render_context;
+            gear_observation.renderer_mode_0x4d7a48 =
+                static_cast<std::uint8_t>(
+                    observation.state0_dashboard_render
+                        .renderer_mode_0x4d7a48);
+            gear_observation.framebuffer_base_value =
+                observation.state0_dashboard_render.framebuffer_base_value;
+        }
         plan.dashboard_gear_display = scene_dashboard_gear_display_plan(
             gear_observation);
+        if (plan.optional_dashboard_branch_enabled &&
+            gear_observation.mode_0x45c200 == 0) {
+            const auto fill = std::find_if(
+                plan.dashboard_gear_display.operations.begin(),
+                plan.dashboard_gear_display.operations.end(),
+                [](const auto& operation) {
+                    return operation.kind ==
+                        SceneDashboardGearOperationKind::fill_mode_zero_rectangle;
+                });
+            if (fill != plan.dashboard_gear_display.operations.end()) {
+                plan.state0_dashboard_mode_zero_gear_fill_writes =
+                    scene_rectangle_fill_pixel_writes(
+                        fill->left_or_x, fill->top_or_y, fill->right,
+                        fill->bottom, fill->resource_or_fill_argument,
+                        gear_observation.render_context,
+                        gear_observation.renderer_mode_0x4d7a48,
+                        gear_observation.framebuffer_base_value);
+                plan.state0_dashboard_mode_zero_gear_fill_complete = true;
+            }
+        }
         if (plan.optional_dashboard_branch_enabled) {
             auto render_observation = observation.state0_dashboard_render;
             if (plan.dashboard_core_callback_reached) {
@@ -533,7 +574,7 @@ apply_race_loop_paused_banner_to_locked_surface(
 }
 
 RaceLoopState0DashboardSurfaceWriteResult
-apply_race_loop_state0_dashboard_background_to_locked_surface(
+apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
     const RaceLoopSharedOverlayPlan& plan,
     const std::span<std::uint8_t> locked_surface)
 {
@@ -615,6 +656,25 @@ apply_race_loop_state0_dashboard_background_to_locked_surface(
         for (const auto& write : projection->pixel_writes) {
             writes.push_back({write.destination_offset, write.value, 0U,
                               write.bytes_per_pixel, false});
+        }
+    }
+    const auto mode_zero_gear_fill = std::find_if(
+        plan.dashboard_gear_display.operations.begin(),
+        plan.dashboard_gear_display.operations.end(), [](const auto& operation) {
+            return operation.kind ==
+                SceneDashboardGearOperationKind::fill_mode_zero_rectangle;
+        });
+    if (complete && mode_zero_gear_fill !=
+            plan.dashboard_gear_display.operations.end()) {
+        if (!plan.state0_dashboard_mode_zero_gear_fill_complete) {
+            complete = false;
+        } else {
+            for (const auto& write :
+                 plan.state0_dashboard_mode_zero_gear_fill_writes) {
+                writes.push_back({write.destination_offset, write.value,
+                                  write.write_mask, write.bytes_per_pixel,
+                                  write.preserves_existing_bits});
+            }
         }
     }
     result.dashboard_write_plan_available = complete;

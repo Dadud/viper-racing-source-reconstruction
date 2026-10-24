@@ -812,13 +812,18 @@ observations, and the output reports projected writes without claiming device
 submission.
 The state-0 `0x405100` background fill and bitmap writes can now be applied as
 one ordered batch through
-`apply_race_loop_state0_dashboard_background_to_locked_surface`. It requires
+`apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface`. It requires
 the submitted frame's `0x4052D0` callback to precede the observed `0x447CE0`
 unlock, and validates all pixel destinations before writing. It covers only the
-background fill/bitmap operations; viewport/device calls, gear/text effects,
-and native surface ownership remain separate or externally supplied. The
+background fill/bitmap operations plus the mode-0 gear rectangle fill;
+viewport/device calls, other gear/text effects, and native surface ownership
+remain separate or externally supplied. The
 `0x404970` pseudocode confirms that `0x405100` precedes the wrapper's later
 gear/banner/text effects (`ev_a058b9f23799a14959f9a4c014c5676ed3461968e94bbb8ac13c1c3cb3687e65`).
+The mode-0 gear rectangle's position and raw color come from the already
+recovered gear branch (`ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`);
+the race-loop composer now supplies the acquired context to that pixel
+projection. Rotating-gear spans/edges are still projected separately.
 `scene_dashboard_viewport_plan` emits just the resulting `0x4498A0` calls,
 preserving row addresses and required bits. `scene_dashboard_render_plan`
 composes the observed order around them: on a full redraw with nonzero
