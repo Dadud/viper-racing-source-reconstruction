@@ -1034,19 +1034,21 @@ NcarInterpolatedRecordSelectionPlan select_ncar_interpolated_records(
     const NcarInterpolatedRecordSelectionObservation& observation) noexcept
 {
     NcarInterpolatedRecordSelectionPlan result{};
-    if (observation.frame_step < 0 || observation.record_count == 0U ||
-        observation.record_count > observation.records.size() /
+    if (observation.frame_step_param_3 < 0 ||
+        observation.global_count_0x508a58 == 0U ||
+        observation.global_count_0x508a58 > observation.records.size() /
             ncar_interpolated_record_bytes) {
         return result;
     }
 
-    const auto step = static_cast<std::size_t>(observation.frame_step);
-    const auto current_slot = (step / 6U) % observation.record_count;
-    const auto next_slot = (current_slot + 1U) % observation.record_count;
+    const auto step = static_cast<std::size_t>(observation.frame_step_param_3);
+    const auto current_slot = (step / 6U) % observation.global_count_0x508a58;
+    const auto next_slot =
+        (current_slot + 1U) % observation.global_count_0x508a58;
     result.record_window_valid = true;
     result.first_record_index = current_slot;
     result.second_record_index = next_slot;
-    if (next_slot >= observation.record_limit) {
+    if (next_slot >= observation.upper_limit_param_4) {
         return result;
     }
 

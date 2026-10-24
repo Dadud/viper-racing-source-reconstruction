@@ -32,14 +32,24 @@ offset `0x23` into `+0xD68` and `+0xD64`. The `0x427630` caller selects
 records with a `0x3C`-byte stride. This is a distinct layout from the
 `0x3E`-byte `NcarSampleRecord` history payload; the new
 `select_ncar_interpolated_records` projection preserves that distinction. Its
-index is `(frame_step / 6) % record_count`, the next index is modulo the same
-count, and it calls `0x427B10` only when that next index is less than the
-caller-supplied limit. The interpolation fraction is `(frame_step % 6) *
-0.16666667`. Evidence: `ev_5414f1bab7fbe8468b429851feddd8e526f06a75951618dba0a23d22e5f02da1`
+index is `(param_3 / 6) % DAT_00508A58`, the next index is modulo the same
+global, and it calls `0x427B10` only when the next index is less than
+`param_4`. The interpolation fraction is `(param_3 % 6) * 0.16666667`. The
+global `DAT_00508A58` is also validated as the replay table capacity by
+`0x426790`, which separately bounds its loaded frame count by that capacity.
+The direct call to `0x427630` is at `0x427DA3`, which Ghidra does not associate
+with any procedure, so the caller-supplied `param_4` value remains unresolved;
+the model keeps both values as explicit observations. Evidence: `ev_5414f1bab7fbe8468b429851feddd8e526f06a75951618dba0a23d22e5f02da1`
 (`0x432420`), `ev_ad8b6ec25530cd6f3e8b18886d04cab06a7fb03245737dbdad467b187ccc8fe7`
 (`0x427630`), `ev_541d5c1b7d180cc6cc8db1a02735e4657330aa015805cbe060945d8863cb16f5`
 (`0x426670`), and `ev_4cb2c0f90d46528bf13f96c52d78ae8437f22e4fa7aa8b306fde6a0be95de7bf`
-(`0x426940`). Bundle: [`ncar_interpolation_ring.evidence.json`](ncar_interpolation_ring.evidence.json).
+(`0x426940`). Replay-table and orphan-caller evidence: `ev_755f78caf1b538eacabe2f2bbe13f931431a55df97448083c2db2f9b79688fd4`
+(`0x426790`), `ev_9a7c638a499304d222c0abd9fa833b82f0832aff4fb8ae1afb3fc7ee143bbcf9`
+(`0x427630` xrefs), `ev_85c6eb02fa91005b7ce530236672d8f5f3942054e7ff23c2f2b57deaa060e373`
+(`0x427DA3` instruction), and `ev_6516c44e3e663b96ede78a8b1c395a0e990fdd95de79f36cb033ce5164405c81`
+(`0x427DA3` containing-procedure lookup). Bundles:
+[`ncar_interpolation_ring.evidence.json`](ncar_interpolation_ring.evidence.json),
+[`ncar_replay_cursor.evidence.json`](ncar_replay_cursor.evidence.json).
 
 The direct subset is exposed as `update_ncar_interpolated_object`. It models
 the record ushort at `0x1E` into object `+0xD70` (`value*14000/32768 - 2000`),

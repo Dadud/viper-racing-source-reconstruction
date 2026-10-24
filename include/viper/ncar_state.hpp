@@ -461,9 +461,11 @@ struct NcarInterpolatedUpdatePlan {
 
 struct NcarInterpolatedRecordSelectionObservation {
     std::span<const std::byte> records;
-    std::int32_t frame_step{};
-    std::size_t record_count{};
-    std::size_t record_limit{};
+    std::int32_t frame_step_param_3{};
+    // DAT_00508A58 in 0x426670/0x426940.
+    std::size_t global_count_0x508a58{};
+    // 0x427630 calls 0x427B10 only when the next slot is below this value.
+    std::size_t upper_limit_param_4{};
 };
 
 struct NcarInterpolatedRecordSelectionPlan {
