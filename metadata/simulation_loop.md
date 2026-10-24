@@ -476,6 +476,17 @@ The 14-record raster bundle and 16-record style-initialization bundle are
 retained in `metadata/state4_paused_banner_raster.evidence.json` and
 `metadata/state4_style14_initialization.evidence.json`.
 
+The optional paused-banner resource-image path now sends the `0x44D0C0` draw
+through the shared indexed-RLE rasterizer. The supplied resource frame provides
+width, height, origin, row runs, and both embedded palette planes; the ordered
+banner operation supplies destination coordinates and frame index. The
+acquired context supplies clipping, pitch, mode, and framebuffer base. Palette
+plane selection matches the native mode-3 versus other-mode pointer offset.
+Resource lookup/decompression and native surface ownership/presentation remain
+external. Evidence: `0x44D0C0`
+(`ev_3bbd3fcdbe60647b79111eef559e4f597ef123048430898b07f080d4fa525bde`),
+retained in `metadata/state4_paused_banner_resource.evidence.json`.
+
 `scene_shared_paused_banner_plan` composes the shared raw-global gate,
 resource-generation refresh decision, and inner paused-banner layout. The
 state-4 shared callback can therefore resolve this branch from the same

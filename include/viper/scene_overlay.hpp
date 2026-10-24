@@ -1626,6 +1626,12 @@ struct SceneDashboardRasterObservation {
     std::vector<std::uint16_t> explicit_palette;
 };
 
+struct ScenePausedBannerResourceRasterObservation {
+    bool resource_pointer_nonnull{true};
+    SceneDashboardAtlasFontObservation image;
+    SceneDashboardRasterObservation renderer;
+};
+
 // Style index 0x0E is descriptor 14 in the runtime table built by 0x4714E0.
 // Resource constructors still supply the two resulting handles as inputs.
 struct ScenePausedBannerStyle14Observation {
@@ -1646,8 +1652,8 @@ struct ScenePausedBannerTextRasterObservation {
     // The 0x479580 helper skips line draws when its text pointer is null.
     bool text_pointer_nonnull{true};
     std::string_view text;
-    // Style-0x0E table values remain observations because their runtime
-    // initialization is not established by the shipped data bytes.
+    // Used when style14 is absent; style14 derives flags and offsets from the
+    // initialized 0x4DE7A8 descriptor while retaining resource handles as inputs.
     SceneDashboardTextCall style{};
     std::int32_t style_x_offset_0x20{};
     std::int32_t style_y_offset_0x1c{};
@@ -1669,6 +1675,13 @@ struct SceneDashboardRasterPlan {
     std::size_t glyph_rows_missing{};
     std::size_t palette_indices_missing{};
     std::vector<SceneTextPixelWrite> pixel_writes;
+};
+
+struct ScenePausedBannerResourceRasterPlan {
+    bool draw_reached{};
+    bool input_complete{true};
+    std::size_t frame_index{};
+    SceneDashboardRasterPlan raster;
 };
 
 struct SceneSharedTextEffectsRasterObservation {
@@ -1718,6 +1731,13 @@ raster_scene_dashboard_builtin_font(
     const SceneDashboardTextLayout& layout,
     const SceneDashboardAtlasFontObservation& font,
     const SceneDashboardRasterObservation& renderer);
+
+// Projects a paused-banner resource draw through 0x44D0C0's frame-row RLE,
+// clipping, palette-plane choice, and 16-bit writes.
+[[nodiscard]] ScenePausedBannerResourceRasterPlan
+raster_scene_paused_banner_resource(
+    const ScenePausedBannerRenderPlan& banner,
+    const ScenePausedBannerResourceRasterObservation& observation);
 
 // Rasterizes the line calls performed by the paused banner's 0x479580 helper.
 // Style-table offsets, font height, localized text, and line renderer state

@@ -3170,6 +3170,48 @@ SceneState5OverlayPlan state5_numeric_overlay_plan(
     return result;
 }
 
+ScenePausedBannerResourceRasterPlan raster_scene_paused_banner_resource(
+    const ScenePausedBannerRenderPlan& banner,
+    const ScenePausedBannerResourceRasterObservation& observation)
+{
+    ScenePausedBannerResourceRasterPlan result{};
+    const auto draw = std::find_if(
+        banner.ordered_operations.begin(), banner.ordered_operations.end(),
+        [](const ScenePausedBannerOperation& operation) {
+            return operation.kind ==
+                ScenePausedBannerOperationKind::resource_draw_0x44d0c0;
+        });
+    if (draw == banner.ordered_operations.end()) {
+        return result;
+    }
+    result.draw_reached = true;
+    if (!observation.resource_pointer_nonnull || draw->raw_mode < 0 ||
+        draw->raw_mode > std::numeric_limits<std::int16_t>::max() ||
+        static_cast<std::size_t>(draw->raw_mode) >=
+            observation.image.glyph_count) {
+        result.input_complete = false;
+        return result;
+    }
+
+    result.frame_index = static_cast<std::size_t>(draw->raw_mode);
+    SceneDashboardTextLayout image_layout{};
+    image_layout.glyph_calls.push_back({
+        draw->helper,
+        draw->x,
+        draw->y,
+        0,
+        static_cast<std::int16_t>(draw->raw_mode),
+    });
+    // 0x40C790 passes a null fifth argument to 0x44D0C0, selecting the
+    // appropriate palette plane embedded in the resource object.
+    auto native_renderer = observation.renderer;
+    native_renderer.explicit_palette.clear();
+    result.raster = raster_scene_dashboard_text(
+        image_layout, observation.image, native_renderer);
+    result.input_complete = result.raster.input_complete;
+    return result;
+}
+
 ScenePausedBannerStyle14Plan scene_paused_banner_style14_plan(
     const ScenePausedBannerStyle14Observation& observation) noexcept
 {

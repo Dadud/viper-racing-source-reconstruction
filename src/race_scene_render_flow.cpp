@@ -293,6 +293,58 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     raster_observation.layout_font,
                     raster_observation.atlas_font);
         }
+        if (observation.shared_paused_banner_raster.has_value() &&
+            plan.shared_overlay.paused_banner.inner_render.draws_resource_text &&
+            observation.shared_paused_banner_raster->resource_image.has_value()) {
+            auto resource_renderer =
+                observation.shared_paused_banner_raster->resource_renderer;
+            const auto apply_resource_context = [&] (
+                const RenderContextViewport& context,
+                const std::uint8_t renderer_mode,
+                const std::uint32_t framebuffer_base) {
+                resource_renderer.renderer_mode = renderer_mode;
+                resource_renderer.clip_left = context.viewport_left_0x14;
+                resource_renderer.clip_top = context.viewport_top_0x18;
+                resource_renderer.clip_right = context.viewport_right_0x1c;
+                resource_renderer.clip_bottom = context.viewport_bottom_0x20;
+                resource_renderer.framebuffer_pitch_bytes =
+                    context.row_pitch_0x10;
+                resource_renderer.framebuffer_base = framebuffer_base;
+            };
+            if (plan.render_context_acquisition.has_value() &&
+                plan.render_context_acquisition->disposition ==
+                    RenderContextAcquisitionDisposition::acquired) {
+                const auto& context =
+                    plan.render_context_acquisition->context;
+                const auto renderer_mode =
+                    plan.optional_dashboard_branch_enabled
+                    ? static_cast<std::uint8_t>(
+                        observation.state0_dashboard_render
+                            .renderer_mode_0x4d7a48)
+                    : shared_overlay_observation.renderer_mode_0x4d7a48;
+                apply_resource_context(
+                    context.viewport,
+                    renderer_mode,
+                    static_cast<std::uint32_t>(context.surface_bits_0x04));
+            } else if (plan.optional_dashboard_branch_enabled) {
+                apply_resource_context(
+                    observation.state0_dashboard_render.render_context,
+                    static_cast<std::uint8_t>(
+                        observation.state0_dashboard_render
+                            .renderer_mode_0x4d7a48),
+                    observation.state0_dashboard_render
+                        .framebuffer_base_value);
+            }
+            const ScenePausedBannerResourceRasterObservation resource_observation{
+                true,
+                *observation.shared_paused_banner_raster->resource_image,
+                std::move(resource_renderer),
+            };
+            plan.shared_paused_banner_resource_raster =
+                raster_scene_paused_banner_resource(
+                    plan.shared_overlay.paused_banner.inner_render,
+                    resource_observation);
+        }
         const auto& text_effects = plan.shared_overlay.text_effects;
         if (text_effects.predicate_0x4048e0.has_text_draw ||
             text_effects.predicate_0x404900.has_text_draw) {

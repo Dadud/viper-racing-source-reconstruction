@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected the paused-banner `0x44D0C0`
+  resource-image branch to the shared indexed-RLE raster core. The resource
+  frame supplies dimensions, origin, palette planes, and row runs; the banner
+  operation supplies destination coordinates/frame and the acquired render
+  context supplies clipping and framebuffer addressing. Resource lookup,
+  decompression, surface ownership, and presentation remain open. Release build
+  and `git diff --check` pass; no tests were run. Evidence:
+  `ev_3bbd3fcdbe60647b79111eef559e4f597ef123048430898b07f080d4fa525bde`.
+
 - **2026-10-24 continuation:** Recovered state-4 paused-banner style descriptor
   14 at `0x4DE7A8` from `0x4714E0`, and the descriptor-to-runtime-row copies in
   `0x478EE0`. Added a style projection that fixes its zero flags and `0x24`
