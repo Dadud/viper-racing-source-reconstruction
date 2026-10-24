@@ -1,5 +1,9 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added the dual-table callback `0x4563E0`. The planner now
+  records both palette lookups and mode-2's ordered `+0x14` initialization
+  followed by replacement from the second table. x87-derived indices remain
+  observations; source row bounds and partial writes remain explicit.
 - **2026-10-24:** Added primary callback `0x456230`: modes 0–1 use the
   observed palette-index/table inputs and preserve destination `+0x14`; mode
   2 writes opaque white. The planner now covers this callback's mode-specific

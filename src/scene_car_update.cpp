@@ -1084,7 +1084,8 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
     const bool depth_fade = callback_address == 0x00455F40U;
     const bool palette_fade = callback_address == 0x004569C0U;
     const bool palette_lighting = callback_address == 0x00456230U;
-    const bool palette_callback = palette_fade || palette_lighting;
+    const bool dual_palette = callback_address == 0x004563E0U;
+    const bool palette_callback = palette_fade || palette_lighting || dual_palette;
     if (!alpha_fill && !color_mask && !depth_fade && !palette_callback) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
         return result;
@@ -1154,6 +1155,25 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
             if (observation.descriptor_mode == 2U) {
                 write(0x14U, 0xFF000000U);
             }
+            ++result.rows_processed;
+            ++result.row_counter_increments;
+            continue;
+        }
+        if (dual_palette) {
+            if (observation.descriptor_mode == 2U) {
+                write(0x14U, 0xFF000000U);
+            }
+            if (row_index >= observation.secondary_lighting_indices.size()) {
+                result.status = SceneRenderScanlineConversionStatus::secondary_lighting_index_observation_exhausted;
+                return result;
+            }
+            const auto secondary_index = static_cast<std::size_t>(
+                observation.secondary_lighting_indices[row_index]);
+            if (secondary_index >= observation.secondary_lighting_words.size()) {
+                result.status = SceneRenderScanlineConversionStatus::secondary_lighting_table_observation_exhausted;
+                return result;
+            }
+            write(0x14U, observation.secondary_lighting_words[secondary_index]);
             ++result.rows_processed;
             ++result.row_counter_increments;
             continue;
