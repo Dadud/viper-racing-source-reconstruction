@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <iterator>
 #include <utility>
 
 namespace viper {
@@ -220,14 +221,29 @@ SingleRaceSetupPostReadPlan plan_single_race_setup_post_read(
         result.input_complete = false;
     }
 
+    const auto entrant_for_row = [&observation](const std::size_t row)
+        -> const SingleRaceEntrantRecordPlan* {
+        const auto found = std::find_if(
+            observation.entrants.begin(), observation.entrants.end(),
+            [row](const auto& entrant) { return entrant.record_index == row; });
+        if (found == observation.entrants.end()) return nullptr;
+        if (std::find_if(std::next(found), observation.entrants.end(),
+                [row](const auto& entrant) { return entrant.record_index == row; }) !=
+            observation.entrants.end()) return nullptr;
+        return &*found;
+    };
     const auto available_count = std::min(
         expected_count, observation.entrants.size());
     for (std::size_t index = 0; index < available_count; ++index) {
-        const auto& entrant = observation.entrants[index];
-        if (entrant.car_resource_name.has_value()) {
+        const auto* entrant = entrant_for_row(index);
+        if (entrant == nullptr) {
+            result.input_complete = false;
+            continue;
+        }
+        if (entrant->car_resource_name.has_value()) {
             result.resource_actions.push_back({
                 SingleRaceResourceActionKind::load_resource_set,
-                std::string(c_string_prefix(*entrant.car_resource_name)) +
+                std::string(c_string_prefix(*entrant->car_resource_name)) +
                     ".car",
                 0x00417740U,
                 index,
@@ -239,7 +255,12 @@ SingleRaceSetupPostReadPlan plan_single_race_setup_post_read(
 
     result.entrant_initializers.reserve(available_count);
     for (std::size_t index = 0; index < available_count; ++index) {
-        const auto marker = observation.entrants[index].marker_value;
+        const auto* entrant = entrant_for_row(index);
+        if (entrant == nullptr) {
+            result.input_complete = false;
+            continue;
+        }
+        const auto marker = entrant->marker_value;
         SingleRaceEntrantInitializerPlan init{};
         init.entrant_index = index;
         init.marker_value = marker;

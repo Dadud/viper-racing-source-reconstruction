@@ -194,6 +194,25 @@ int main()
         require(setup.entrant_initializers[7].initializer_address == 0x0045efd0U &&
                 setup.entrant_initializers[7].vehicle_record_offset_0x34_used,
             "human row setup must dispatch through 0x45EFD0 using row +0x34");
+
+        auto reordered_rows = plan.records;
+        std::reverse(reordered_rows.begin(), reordered_rows.end());
+        setup_observation.entrants = reordered_rows;
+        const auto reordered_setup = viper::plan_single_race_setup_post_read(
+            setup_observation);
+        require(reordered_setup.input_complete &&
+                reordered_setup.entrant_initializers.size() == 8U &&
+                reordered_setup.entrant_initializers.front().entrant_index == 0U &&
+                reordered_setup.entrant_initializers.front().marker_value == 1U &&
+                reordered_setup.entrant_initializers.back().entrant_index == 7U &&
+                reordered_setup.entrant_initializers.back().marker_value == 0U,
+            "post-read setup must dispatch rows by native record_index when input storage is reordered");
+        reordered_rows.pop_back();
+        setup_observation.entrants = reordered_rows;
+        const auto missing_row_setup = viper::plan_single_race_setup_post_read(
+            setup_observation);
+        require(!missing_row_setup.input_complete,
+            "post-read setup must reject a missing native participant row");
         test_ai_configured_setup();
         test_single_race_ai_setup_selection();
         std::cout << "race participant regression checks passed\n";
