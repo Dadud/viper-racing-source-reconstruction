@@ -1990,9 +1990,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::cout << "Inherited constructor argument 2 is unresolved at track.obt row "
                   << row << " (" << (line ? *line : std::string_view{})
                   << "); its serialized class advance is not yet mapped. ";
+    } else if (cursor_plan.incomplete_row.has_value()) {
+        std::cout << "Inherited constructor argument 2 is unresolved because track.obt "
+                  << "row " << *cursor_plan.incomplete_row << " is incomplete. ";
     } else {
-        std::cout << "Inherited constructor argument 2 is unresolved because an "
-                  << "earlier non-car physics object is not yet mapped. ";
+        switch (cursor_plan.status) {
+        case viper::TrackPhysicsCursorStatus::player_car_not_found:
+            std::cout << "Inherited constructor argument 2 is unresolved because player "
+                      << "car index " << player_car_index
+                      << " has no matching car directive in track.obt. ";
+            break;
+        case viper::TrackPhysicsCursorStatus::stream_plan_failed:
+            std::cout << "Inherited constructor argument 2 is unresolved because the "
+                      << "mapped physics-task cursor fold failed. ";
+            break;
+        case viper::TrackPhysicsCursorStatus::track_data_incomplete:
+        case viper::TrackPhysicsCursorStatus::unsupported_prior_object:
+        case viper::TrackPhysicsCursorStatus::complete:
+            std::cout << "Inherited constructor argument 2 is unresolved; track object "
+                      << "ordering did not produce a complete physics-task cursor. ";
+            break;
+        }
     }
     std::cout
               << "Upgrade overlays are not requested in this race path.\n";
