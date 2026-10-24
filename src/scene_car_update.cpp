@@ -1019,8 +1019,143 @@ SceneWheelResourceManagerDestroyPlan destroy_scene_wheel_resource_allocator(
     return result;
 }
 
+SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(
+    const SceneSharedRenderStateSyncObservation& observation)
+{
+    SceneSharedRenderStateSyncPlan result{};
+    result.synchronization_gate_open = observation.synchronization_gate_0x44e400;
+    result.cached_state_after = observation.cached_state;
+    if (!observation.synchronization_gate_0x44e400) {
+        return result;
+    }
+
+    const auto state_i32 = [](const std::array<std::uint8_t, 24>& state,
+        const std::size_t offset) {
+        const std::uint32_t raw = static_cast<std::uint32_t>(state[offset]) |
+            (static_cast<std::uint32_t>(state[offset + 1]) << 8U) |
+            (static_cast<std::uint32_t>(state[offset + 2]) << 16U) |
+            (static_cast<std::uint32_t>(state[offset + 3]) << 24U);
+        return std::bit_cast<std::int32_t>(raw);
+    };
+    const auto add_call = [&result](const std::uint32_t address,
+        const std::int32_t argument_0 = 0, const std::int32_t argument_1 = 0,
+        const std::int32_t argument_2 = 0, const std::uint8_t count = 1,
+        const bool side_effect_gate = true) {
+        result.calls.push_back({address, {argument_0, argument_1, argument_2}, count,
+            side_effect_gate});
+    };
+    const auto& state = observation.desired_state;
+    const auto& cached = observation.cached_state;
+    bool changed = false;
+    bool state_14_changed = false;
+
+    if (state[0] != cached[0]) {
+        changed = true;
+        const std::int32_t mode = state[0] == 0 ? 1 : 2;
+        add_call(0x00458040U, mode);
+        const std::int32_t value = state[0] == 0 ? 1 :
+            (observation.alternate_blend_factor_0x509b7d ? 4 : 2);
+        add_call(0x00458180U, value);
+    }
+    if (state[0x14] != cached[0x14]) {
+        changed = true;
+        add_call(0x00457F60U, state[0x14] == 0 ? 3 : 2);
+    }
+    if (state[8] != cached[8]) {
+        changed = true;
+        add_call(0x00458080U, state[8] != 0 ? 1 : 0);
+    }
+    if (state[9] != cached[9]) {
+        changed = true;
+        add_call(0x004580C0U, state[9] != 0 ? 1 : 0);
+    }
+    if (state[10] != cached[10]) {
+        changed = true;
+        add_call(0x00458000U, state[10] != 0 ? 1 : 0);
+    }
+    if (state[11] != cached[11] || state[0x15] != cached[0x15]) {
+        changed = true;
+        const std::int32_t enabled = state[11] != 0 ? 1 : 0;
+        const std::int32_t mode = state[0x15] != 0 ? 1 : 0;
+        const std::int32_t first = enabled == 0 ? (mode == 0 ? 1 : 3) : (mode == 0 ? 2 : 4);
+        add_call(0x00458120U, first, enabled == 0 ? 1 : 2, 0, 2);
+        if (observation.alpha_reference_gate_0x509b7c) {
+            const auto blend = mode == 0 ? 0 : std::bit_cast<std::int32_t>(0x3D4CCCCDU);
+            add_call(0x00458220U, blend);
+        }
+        add_call(0x004581A0U, enabled, 0, 0, 1,
+            observation.color_write_gate_0x509b7b);
+    }
+    if (state[0x0C] != cached[0x0C]) {
+        changed = true;
+        add_call(0x00458200U, state[0x0C] != 0 ? 1 : 0);
+    }
+    if (state[0x0D] != cached[0x0D]) {
+        changed = true;
+        add_call(0x00458060U, state[0x0D] != 0 ? 1 : 0);
+    }
+    if (state[0x0E] != cached[0x0E]) {
+        changed = true;
+        state_14_changed = true;
+        const std::int32_t enabled = state[0x0E] != 0 ? 1 : 0;
+        add_call(0x004581C0U, enabled);
+        add_call(0x004581E0U, enabled);
+    }
+
+    const std::int32_t mode = state_i32(state, 0x10);
+    if (mode != state_i32(cached, 0x10)) {
+        changed = true;
+        switch (mode) {
+        case 0: add_call(0x00458150U, 5, 6, 0, 2); break;
+        case 1: add_call(0x00458150U, 5, 2, 0, 2); break;
+        case 2: add_call(0x00458150U, 9, 1, 0, 2); break;
+        case 3: add_call(0x00458150U, 5, 1, 0, 2); break;
+        case 4: add_call(0x00458150U, 2, 2, 0, 2); break;
+        default:
+            result.unsupported_mode_value = mode;
+            add_call(0x00411000U, 0, 0, 0, 0);
+            break;
+        }
+    }
+
+    if (state[1] != cached[1] || (state[1] != 0 && state_14_changed)) {
+        changed = true;
+        const bool enabled = state[1] != 0 && state[0x0E] == 0;
+        add_call(0x004580E0U, enabled ? 1 : 0);
+    }
+    if (state_i32(state, 4) != state_i32(cached, 4)) {
+        changed = true;
+        add_call(0x00458100U, state_i32(state, 4));
+    }
+
+    if (state[0x16] != cached[0x16] || state[0x17] != cached[0x17]) {
+        changed = true;
+        const bool primary = state[0x16] != 0;
+        const bool secondary = state[0x17] != 0;
+        if (!primary) {
+            add_call(0x00457F80U, secondary ? 1 : 3, 0, 0, 3);
+            add_call(0x00457FC0U, 3);
+            add_call(0x00457FE0U, secondary ? 1 : 3);
+        } else if (secondary) {
+            add_call(0x00457F80U, 1, 0, 0, 3);
+        } else {
+            add_call(0x00457F80U, 1, 0, 0, 3);
+            add_call(0x00457FC0U, 1);
+            add_call(0x00457FE0U, 3);
+        }
+    }
+
+    result.dirty_flag_cleared = true;
+    if (changed) {
+        result.cached_state_after = state;
+        result.cache_snapshot_updated = true;
+    }
+    return result;
+}
+
 SceneWheelTextureBindingPlan plan_scene_wheel_texture_binding(
-    const SceneWheelTextureBindingObservation& observation)
+    const SceneWheelTextureBindingObservation& observation,
+    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync)
 {
     SceneWheelTextureBindingPlan result{};
     result.cached_handle_after = observation.cached_handle;
@@ -1035,6 +1170,9 @@ SceneWheelTextureBindingPlan plan_scene_wheel_texture_binding(
     const auto synchronize = [&]() {
         add_action(SceneWheelTextureBindingActionKind::synchronize_render_state, 0x00457AF0U);
         result.render_state_synchronization_called = true;
+        if (render_state_sync.has_value()) {
+            result.synchronized_states = plan_scene_shared_render_state_sync(*render_state_sync);
+        }
     };
     const auto set_texture_enabled = [&result](const bool enabled) {
         result.texture_enabled_after = enabled;
@@ -1121,7 +1259,8 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     SceneWheelResourceAllocatorState& allocator,
     const bool frame_gate_0x45c380,
     const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations,
-    const std::optional<SceneWheelTextureBindingObservation>& texture_binding)
+    const std::optional<SceneWheelTextureBindingObservation>& texture_binding,
+    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync)
 {
     SceneWheelResourceFramePlan result{};
     if (!frame_gate_0x45c380) {
@@ -1151,7 +1290,8 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
         0U, 0U, 0U, 0x3F800000U,
     };
     if (texture_binding.has_value()) {
-        result.texture_binding = plan_scene_wheel_texture_binding(*texture_binding);
+        result.texture_binding = plan_scene_wheel_texture_binding(
+            *texture_binding, render_state_sync);
     }
 
     constexpr std::array<std::array<std::uint32_t, 2>, 4> uv_bits{{

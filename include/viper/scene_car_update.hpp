@@ -719,6 +719,36 @@ enum class SceneWheelTextureBindingActionKind : std::uint8_t {
     report_device_error,
 };
 
+struct SceneSharedRenderStateSyncObservation {
+    // Raw 24-byte records at DAT_0050D74C (desired) and DAT_0050D760 (cache).
+    // Integer fields at +0x04 and +0x10 are little-endian x86 values.
+    std::array<std::uint8_t, 24> desired_state{};
+    std::array<std::uint8_t, 24> cached_state{};
+    bool synchronization_gate_0x44e400{};
+    bool alternate_blend_factor_0x509b7d{};
+    bool alpha_reference_gate_0x509b7c{};
+    bool color_write_gate_0x509b7b{};
+};
+
+struct SceneSharedRenderStateSyncCall {
+    std::uint32_t wrapper_address{};
+    std::array<std::int32_t, 3> arguments{};
+    std::uint8_t argument_count{};
+    bool wrapper_side_effect_gate_passed{true};
+};
+
+struct SceneSharedRenderStateSyncPlan {
+    bool synchronization_gate_open{};
+    bool cache_snapshot_updated{};
+    bool dirty_flag_cleared{};
+    std::optional<std::int32_t> unsupported_mode_value;
+    std::array<std::uint8_t, 24> cached_state_after{};
+    std::vector<SceneSharedRenderStateSyncCall> calls;
+};
+
+[[nodiscard]] SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(
+    const SceneSharedRenderStateSyncObservation& observation);
+
 struct SceneWheelTextureBindingAction {
     SceneWheelTextureBindingActionKind kind{};
     std::uint32_t address{};
@@ -750,11 +780,13 @@ struct SceneWheelTextureBindingPlan {
     bool cache_dirty_after{};
     std::optional<bool> texture_enabled_after;
     bool render_state_synchronization_called{};
+    std::optional<SceneSharedRenderStateSyncPlan> synchronized_states;
     std::vector<SceneWheelTextureBindingAction> actions;
 };
 
 [[nodiscard]] SceneWheelTextureBindingPlan plan_scene_wheel_texture_binding(
-    const SceneWheelTextureBindingObservation& observation);
+    const SceneWheelTextureBindingObservation& observation,
+    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync = std::nullopt);
 
 struct SceneWheelResourceFrameOperation {
     SceneWheelResourceFrameOperationKind kind{};
@@ -792,7 +824,8 @@ struct SceneWheelResourceFramePlan {
     SceneWheelResourceAllocatorState& allocator,
     bool frame_gate_0x45c380,
     const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations,
-    const std::optional<SceneWheelTextureBindingObservation>& texture_binding = std::nullopt);
+    const std::optional<SceneWheelTextureBindingObservation>& texture_binding = std::nullopt,
+    const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync = std::nullopt);
 
 struct SceneWheelResourceAllocation {
     bool allocated{};

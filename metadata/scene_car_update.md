@@ -522,3 +522,40 @@ analyzed evidence is `ev_9bc59c0c0669289e8d06530e19a0d8bd4088c0dab36f2066e9d1087
 The helper dossier for `0x462600` is `ev_16ef11a026ee34982b250f91f5e205dce42af00d23f03c529c4bc366e81cdb95`;
 allocator evidence is preserved in `metadata/scene_auxiliary.evidence.json`
 (`ev_713bb6ee2b9dcfac640fa7261907bbb2f18965a88d66912fb5dc113dffcf3e39`).
+
+The formerly opaque `0x457AF0` synchronization is now projected from the
+observed 24-byte desired and cached records. When gate `0x44E400` is closed it
+returns without changing the cache. When open it emits the ordered helper
+calls selected by changed byte fields and little-endian integer fields at
+offsets `+0x04` and `+0x10`; it also records clearing the dirty flag and copies
+the full 24-byte snapshot only when any state changed. The action list keeps
+the binary's helper addresses and arguments, including the mode mappings,
+secondary blend factor, alpha-reference gate, and color-write side-effect
+gate. Unsupported mode values retain the observed `0x411000` fallback call
+without assigning it an invented meaning. This models state selection and
+cache behavior, while device HRESULTs and the effects of the final wrapper
+calls remain external. Evidence: sync routine `0x457AF0`
+(`ev_be3fba64119c81e80dc48b62ec2ff7f65e6dc71bdfe6ac1daefcb9f2e4d619b2`),
+gate accessor `0x44E400`
+(`ev_b99b14d268be19ab381542ac0bf594045853f5ccd997f361312fd1f66db5e213`),
+and helper wrappers `0x457F60` (`ev_485553f29ebfa97a054cefff993c5424691dee51d2b114c9bc75f14b806390c5`),
+`0x457F80` (`ev_db26947b3d76b72d4aa256e75ea66041d82bd36393f2d822066d7082bcb36a18`),
+`0x457FC0` (`ev_44f4afe4b1b2509ce03ab73a312e6ac0345b3166454a1379c81a15af10eff0d7`),
+`0x457FE0` (`ev_4ab786f2976b004cf86660f806d91222efa994b807e80b6e3e360ed9fa2b7dc6`),
+`0x458000` (`ev_c0e9ad6a4cd8810fc1549bcd6f86c70a0bc6fa3bfa8edd2aaea228694eb2510a`),
+`0x458040` (`ev_e53f9318a84d4beee0904e8b457495ccd68ef67f7761af2c334a53387468fa26`),
+`0x458060` (`ev_4d390d06f0e162677578089065b1ac3281437b7783283172e2bd3ec5cec4da69`),
+`0x458080` (`ev_260a7195dfa95522020351936f64995a33ee748cef3ca2d9e8d62e34f608fd83`),
+`0x4580C0` (`ev_722cdf4ef3a521767c860295cc551bd8ceef8c07388574ec4048b885ea190256`),
+`0x4580E0` (`ev_95b32403d7de622fe1f77d5890a8338e00aed166120bbc94f09878aebd0b21c0`),
+`0x458100` (`ev_2187a93266e5e8bfc05f902f7475c3f6d28d5852334ed48bf4a5d894278b7ed9`),
+`0x458120` (`ev_5f7edce263f32fc27b2f71ea9ca8f8639f9a077ce8dca2feb52eaad3d6699a72`),
+`0x458150` (`ev_dc50289ecf7725babc5526e2dee07d6767ff14cc331939bcf78a9952820f20bb`),
+`0x458180` (`ev_8ae3a79abd9d97f9be07673384d9afea2a701f73dfaad06f87effd19085373cf`),
+`0x4581A0` (`ev_6657bb1bf05a38cc2fffbddb177d1b2813cbfe1a373ec99c0c1bc8831611720c`),
+`0x4581C0` (`ev_6c7ac11d83c9d3415f9cff9eff1e2ab3714eb2d0366b920195bea919403713de`),
+`0x4581E0` (`ev_bdcb274e21391edb1900ba70566ea88991adbfbe805fc8c890dcfadccf353d47`),
+`0x458200` (`ev_70683ba37c796cfa15f3dcf068663cf58edd2c801104a0011498f9e3d4963ad5`),
+`0x458220` (`ev_1c498908c2a7db93192602dbed7f982a5a85ef3b4dd9895dbe05030ca297ac81`),
+and device wrapper `0x458BC0`
+(`ev_3f3f2bd8815c0b4e866d99d3d2664fe6e74bbada0fe5591eae3d2a6a67145519`).
