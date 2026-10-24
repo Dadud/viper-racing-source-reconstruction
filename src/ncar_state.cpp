@@ -109,8 +109,9 @@ DerivativeCoefficients history_derivative_coefficients(
     };
 }
 
+template <std::size_t RecordBytes>
 std::array<float, 12> axis_angle_record_matrix(
-    const std::array<std::uint8_t, 0x3e>& record,
+    const std::array<std::uint8_t, RecordBytes>& record,
     const bool fdiv_compatibility_enabled) noexcept
 {
     constexpr long double angle_scale = 0.0003834952L;
@@ -1026,6 +1027,39 @@ NcarInterpolatedWheelPlan update_ncar_interpolated_wheel(
     result.flags_0x120 = observation.first_record[4];
     result.flag_0x20 = (result.flags_0x120 & 0x40U) != 0 ? 1U : 0U;
     result.copied_body_velocity_0xbc = observation.body_velocity_0x234;
+    return result;
+}
+
+NcarInterpolatedRecordSelectionPlan select_ncar_interpolated_records(
+    const NcarInterpolatedRecordSelectionObservation& observation) noexcept
+{
+    NcarInterpolatedRecordSelectionPlan result{};
+    if (observation.frame_step < 0 || observation.record_count == 0U ||
+        observation.record_count > observation.records.size() /
+            ncar_interpolated_record_bytes) {
+        return result;
+    }
+
+    const auto step = static_cast<std::size_t>(observation.frame_step);
+    const auto current_slot = (step / 6U) % observation.record_count;
+    const auto next_slot = (current_slot + 1U) % observation.record_count;
+    result.record_window_valid = true;
+    result.first_record_index = current_slot;
+    result.second_record_index = next_slot;
+    if (next_slot >= observation.record_limit) {
+        return result;
+    }
+
+    result.interpolation_callback_0x427b10_reached = true;
+    result.interpolation_fraction =
+        static_cast<float>(step % 6U) * 0.16666667F;
+    const auto* const records = observation.records.data();
+    std::memcpy(result.first_record.data(),
+        records + current_slot * ncar_interpolated_record_bytes,
+        ncar_interpolated_record_bytes);
+    std::memcpy(result.second_record.data(),
+        records + next_slot * ncar_interpolated_record_bytes,
+        ncar_interpolated_record_bytes);
     return result;
 }
 

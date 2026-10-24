@@ -28,9 +28,18 @@ rounding is approximate.
 The parent interpolates its rotation/velocity through `0x43F3A0`, updates
 scalar fields and flags, runs four wheel updates at `+0x554 + i*0x1A4` using
 five-byte records at `+0x24 + i*5`, and stores the signed record byte at
-offset `0x23` into `+0xD68` and `+0xD64`. Its input records are 0x3E bytes but
-are not the decoded `NcarSampleRecord` history format; keep their layouts
-separate. Evidence: `ev_5414f1bab7fbe8468b429851feddd8e526f06a75951618dba0a23d22e5f02da1`.
+offset `0x23` into `+0xD68` and `+0xD64`. The `0x427630` caller selects
+records with a `0x3C`-byte stride. This is a distinct layout from the
+`0x3E`-byte `NcarSampleRecord` history payload; the new
+`select_ncar_interpolated_records` projection preserves that distinction. Its
+index is `(frame_step / 6) % record_count`, the next index is modulo the same
+count, and it calls `0x427B10` only when that next index is less than the
+caller-supplied limit. The interpolation fraction is `(frame_step % 6) *
+0.16666667`. Evidence: `ev_5414f1bab7fbe8468b429851feddd8e526f06a75951618dba0a23d22e5f02da1`
+(`0x432420`), `ev_ad8b6ec25530cd6f3e8b18886d04cab06a7fb03245737dbdad467b187ccc8fe7`
+(`0x427630`), `ev_541d5c1b7d180cc6cc8db1a02735e4657330aa015805cbe060945d8863cb16f5`
+(`0x426670`), and `ev_4cb2c0f90d46528bf13f96c52d78ae8437f22e4fa7aa8b306fde6a0be95de7bf`
+(`0x426940`). Bundle: [`ncar_interpolation_ring.evidence.json`](ncar_interpolation_ring.evidence.json).
 
 The direct subset is exposed as `update_ncar_interpolated_object`. It models
 the record ushort at `0x1E` into object `+0xD70` (`value*14000/32768 - 2000`),

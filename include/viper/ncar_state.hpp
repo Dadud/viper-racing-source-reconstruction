@@ -35,6 +35,9 @@ struct NcarStateFields {
 
 inline constexpr std::size_t ncar_sample_record_bytes = 0x3e;
 inline constexpr std::size_t ncar_sample_window_bytes = 3 * ncar_sample_record_bytes;
+// 0x427630 advances interpolation records by 0x3c bytes. This is a separate
+// layout from the 0x3e-byte timed sample payload used by the history queue.
+inline constexpr std::size_t ncar_interpolated_record_bytes = 0x3c;
 
 using NcarResetResourceRecord = std::array<std::uint32_t, 8>;
 
@@ -400,8 +403,8 @@ struct NcarInterpolatedWheelPlan {
 };
 
 struct NcarInterpolatedObjectObservation {
-    std::array<std::uint8_t, 0x3e> first_record{};
-    std::array<std::uint8_t, 0x3e> second_record{};
+    std::array<std::uint8_t, ncar_interpolated_record_bytes> first_record{};
+    std::array<std::uint8_t, ncar_interpolated_record_bytes> second_record{};
     float interpolation_fraction{};
     bool object_reset_gate_0x48c_nonzero{};
     bool object_flag_0xbe4_nonzero{};
@@ -455,6 +458,30 @@ struct NcarInterpolatedUpdatePlan {
     float interpolated_speed_0xed0{};
     bool x87_extended_precision_approximated{true};
 };
+
+struct NcarInterpolatedRecordSelectionObservation {
+    std::span<const std::byte> records;
+    std::int32_t frame_step{};
+    std::size_t record_count{};
+    std::size_t record_limit{};
+};
+
+struct NcarInterpolatedRecordSelectionPlan {
+    bool record_window_valid{};
+    bool interpolation_callback_0x427b10_reached{};
+    std::size_t first_record_index{};
+    std::size_t second_record_index{};
+    float interpolation_fraction{};
+    std::array<std::uint8_t, ncar_interpolated_record_bytes> first_record{};
+    std::array<std::uint8_t, ncar_interpolated_record_bytes> second_record{};
+};
+
+// Models the indexed ring selection in 0x427630 and its 0x3c-byte record
+// stride. Invalid spans are rejected before copying; native inputs are assumed
+// to point to a valid table.
+[[nodiscard]] NcarInterpolatedRecordSelectionPlan
+select_ncar_interpolated_records(
+    const NcarInterpolatedRecordSelectionObservation& observation) noexcept;
 
 // Projects one five-byte wheel sample update in 0x444240. The follow-up
 // effect and basis helpers are reported as calls; their additional writes are
