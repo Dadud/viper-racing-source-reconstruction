@@ -93,13 +93,12 @@ Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x43FAE0`).
 
 Immediately after the child controller, `0x431150` calls the virtual getter at
-`+0x339`, multiplies its float return by `+0xDD0`, and truncates the resulting
-single-precision value into dword `+0xDDC`; the caller callback remains an
-explicit observation, and an out-of-range/non-finite product is reported as
-unrepresentable instead of invoking undefined C++ conversion behavior. The
-integrator copies byte `+0xC3C` to `+0xE49`. If byte `+0x2F9` is set and the
-signed raw DWORD at `+0x35C` is greater than `0x44FA0000`, it calls `0x43F8E0`
-to store float 1.0 into `+0xC7C`. It then always calls `0x43F830` on the
+`+0xCE4` (array index `+0x339`), multiplies its float return by `+0xDD0`, and
+stores the single-precision product at `+0xDDC`. The caller callback remains an
+explicit observation. The integrator copies byte `+0xC3C` to `+0xE49`. If
+byte `+0xBE4` (array index `+0x2F9`) is set and the signed raw DWORD at `+0xD70`
+(array index `+0x35C`) is greater than `0x44FA0000`, it calls `0x43F8E0` to
+store float 1.0 into `+0xC7C`. It then always calls `0x43F830` on the
 six-field block beginning at `+0xC7C`. The helper obtains returns from the
 virtual getters through `+0xC84` and `+0xC80`, forms their difference times
 `+0xC90`, clamps it using `+0xC8C * +0xC7C`, and smooths `+0xC94` with binary
@@ -109,12 +108,23 @@ its negation. `advance_ncar_integrator_signal` reports those setter arguments;
 external callback and target-object effects are not emulated. The `+0xC7C`
 input to the earlier curve gate seeds this shared block's value.
 
+Next, the virtual callback at slot `+0x4C` receives four floats initialized to
+`[+0xDE4, +0xDE4, max(+0xDE4,+0xDE8), max(+0xDE4,+0xDE8)]`. Its resulting
+four-float buffer is copied to wheel subobject `+0xE0` fields starting at
+parent `+0x634`, with `0x1A4` bytes between wheels. When the signed raw DWORD at
+`+0xDE8` exceeds `0x3DCCCCCD`, buffer entries 2 and 3 are negated before the
+stores. `advance_ncar_integrator_wheel_scalars` takes the callback-mutated
+buffer as an observation, applies that pairwise sign gate, and exposes the
+four direct wheel stores.
+
 Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x431150`), `ev_561bda702abc7970b5b820be76dc22cedb78968c7da2d82ede95809777fcf6c1`
 (`0x43F830`), `ev_e1224f8c92d66a13ee1793d2d6ed81095204c66493ad2a6b1423e4e65cc60352`
 (`0x43F8E0`), and `ev_c3a729ee52e88cb9fda90eb175a7221995a84e0f6df71064034ccfebfdf3c791`
 (`0x4C8640` constant bytes). The five-record bundle is retained at
 [`ncar_integrator_signal.evidence.json`](ncar_integrator_signal.evidence.json).
+The adjacent `+0x4C` callback and four strided wheel stores are in the caller's
+same assembly evidence.
 
 ## PCAR callback at `0x4384D0`
 

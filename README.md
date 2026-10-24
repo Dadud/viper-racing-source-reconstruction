@@ -403,8 +403,10 @@ files were present.
   stores, while `advance_ncar_animation_controller` models that controller's
   six transition states and applies its two direct child-target writes.
   `advance_ncar_integrator_signal` follows that controller with the observed
-  `+0xDDC/+0xE49` stores and the bounded/smoothed `+0xC7C` signal helper; virtual
-  returns and paired setter targets remain explicit observations.
+  float `+0xDDC`/byte `+0xE49` stores and the bounded/smoothed `+0xC7C` signal
+  helper. `advance_ncar_integrator_wheel_scalars` applies the `+0x4C` callback's
+  observed four-value result and conditional sign reversal before the strided
+  wheel `+0xE0` writes; virtual returns and setter targets remain explicit.
   Exact x87 rounding and the Pentium FDIV-emulation
   branch remain under study.
 - `include/viper/timed_event_queue.hpp` and `src/timed_event_queue.cpp` model

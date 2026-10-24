@@ -166,18 +166,12 @@ NcarIntegratorSignalResult advance_ncar_integrator_signal(
 {
     NcarIntegratorSignalResult result{};
     const float scaled_callback = input.callback_value_0x339 * input.multiplier_0xdd0;
-    const double scaled_callback_wide = static_cast<double>(scaled_callback);
-    if (std::isfinite(scaled_callback_wide) &&
-        scaled_callback_wide >= -2147483648.0 &&
-        scaled_callback_wide < 2147483648.0) {
-        state.stored_value_0xddc = static_cast<std::int32_t>(scaled_callback);
-        result.stored_value_representable = true;
-    }
+    state.stored_value_0xddc = scaled_callback;
     state.copied_flag_0xe49 = copied_flag_0xc3c;
 
     constexpr std::int32_t ramp_threshold_bits = 0x44FA0000;
-    if (input.ramp_gate_0x2f9 != 0U &&
-        std::bit_cast<std::int32_t>(input.previous_value_bits_0x35c) >
+    if (input.ramp_gate_0xbe4 != 0U &&
+        std::bit_cast<std::int32_t>(input.previous_value_bits_0xd70) >
             ramp_threshold_bits) {
         state.value_bits_0xc7c = 0x3F800000U;
         result.ramp_setter_0x43f8e0_reached = true;
@@ -210,6 +204,32 @@ NcarIntegratorSignalResult advance_ncar_integrator_signal(
     result.smoothed_value = state.smoothed_value_0xc94;
     result.paired_setter_value = paired_value;
     result.paired_setter_opposite = -paired_value;
+    return result;
+}
+
+NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
+    const NcarIntegratorWheelScalarInput& input) noexcept
+{
+    NcarIntegratorWheelScalarResult result{};
+    const auto maximum = input.value_0xde4 <=
+            std::bit_cast<float>(input.value_bits_0xde8)
+        ? std::bit_cast<float>(input.value_bits_0xde8)
+        : input.value_0xde4;
+    result.seed_values = {
+        input.value_0xde4,
+        input.value_0xde4,
+        maximum,
+        maximum};
+    result.callback_values = input.callback_values;
+    result.callback_0x4c_reached = true;
+
+    constexpr std::int32_t sign_gate_bits = 0x3DCCCCCD;
+    if (std::bit_cast<std::int32_t>(input.value_bits_0xde8) > sign_gate_bits) {
+        result.callback_values[2] = -result.callback_values[2];
+        result.callback_values[3] = -result.callback_values[3];
+        result.negative_pair_gate_passed = true;
+    }
+    result.wheel_values_0xe0 = result.callback_values;
     return result;
 }
 
@@ -848,6 +868,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         result.integrator_signal_state,
         input.integrator_signal_input,
         result.integrator_curve_gate_state.parent_flag_0xc3c);
+    result.integrator_wheel_scalars = advance_ncar_integrator_wheel_scalars(
+        input.integrator_wheel_scalar_input);
     result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;

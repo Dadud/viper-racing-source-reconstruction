@@ -366,7 +366,7 @@ struct NcarIntegratorCurveGateInput {
 };
 
 struct NcarIntegratorSignalState {
-    std::int32_t stored_value_0xddc{};
+    float stored_value_0xddc{};
     std::uint8_t copied_flag_0xe49{};
     std::uint32_t value_bits_0xc7c{};
     float limit_scale_0xc8c{};
@@ -375,8 +375,8 @@ struct NcarIntegratorSignalState {
 };
 
 struct NcarIntegratorSignalInput {
-    std::uint8_t ramp_gate_0x2f9{};
-    std::uint32_t previous_value_bits_0x35c{};
+    std::uint8_t ramp_gate_0xbe4{};
+    std::uint32_t previous_value_bits_0xd70{};
     float callback_value_0x339{};
     float multiplier_0xdd0{};
     float callback_value_0xc84{};
@@ -384,7 +384,6 @@ struct NcarIntegratorSignalInput {
 };
 
 struct NcarIntegratorSignalResult {
-    bool stored_value_representable{};
     bool ramp_setter_0x43f8e0_reached{};
     bool helper_0x43f830_reached{};
     bool paired_setters_reached{};
@@ -394,6 +393,21 @@ struct NcarIntegratorSignalResult {
     float paired_setter_opposite{};
 };
 
+struct NcarIntegratorWheelScalarInput {
+    float value_0xde4{};
+    std::uint32_t value_bits_0xde8{};
+    // The four values after the external virtual call at vtable slot +0x4C.
+    std::array<float, 4> callback_values{};
+};
+
+struct NcarIntegratorWheelScalarResult {
+    bool callback_0x4c_reached{};
+    bool negative_pair_gate_passed{};
+    std::array<float, 4> seed_values{};
+    std::array<float, 4> callback_values{};
+    std::array<float, 4> wheel_values_0xe0{};
+};
+
 // Models the post-controller signal stores and bounded smoother at 0x431150.
 // Virtual callback returns are supplied as observations; the two setter
 // arguments are reported without emulating their external target objects.
@@ -401,6 +415,12 @@ struct NcarIntegratorSignalResult {
     NcarIntegratorSignalState& state,
     const NcarIntegratorSignalInput& input,
     std::uint8_t copied_flag_0xc3c) noexcept;
+
+// Records the four-value callback at 0x431150 and its optional sign reversal
+// before the values are stored to the wheel subobjects' +0xE0 fields.
+[[nodiscard]] NcarIntegratorWheelScalarResult
+advance_ncar_integrator_wheel_scalars(
+    const NcarIntegratorWheelScalarInput& input) noexcept;
 
 struct NcarIntegratorCurveGateResult {
     bool curve_helper_0x4402d0_reached{};
@@ -478,6 +498,7 @@ struct FourWheelBodyStepInput {
     NcarIntegratorCurveGateInput integrator_curve_gate_input{};
     NcarIntegratorSignalState integrator_signal_state{};
     NcarIntegratorSignalInput integrator_signal_input{};
+    NcarIntegratorWheelScalarInput integrator_wheel_scalar_input{};
     NcarIntegratorChildControlStepInput integrator_child_control_input{};
     NcarIntegratorModeForceInput mode_force_input{};
     NcarIntegratorWheelPairDifferentialInput wheel_pair_differential_input{};
@@ -550,6 +571,7 @@ struct FourWheelBodyStepResult {
     NcarIntegratorChildControlStepResult integrator_child_control{};
     NcarIntegratorSignalResult integrator_signal{};
     NcarIntegratorSignalState integrator_signal_state{};
+    NcarIntegratorWheelScalarResult integrator_wheel_scalars{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};
