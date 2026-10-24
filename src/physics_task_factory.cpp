@@ -1493,6 +1493,11 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
     }
     plan.object_writes.push_back({0x534U, 1U});
     plan.final_setup_helper_0x428790_called = true;
+    if (observation.curve_source_record.has_value()) {
+        plan.configured_curve_controller = configure_acar_update_curve(
+            observation.object_address, *observation.curve_source_record,
+            observation.fdiv_compatibility_enabled);
+    }
     return plan;
 }
 

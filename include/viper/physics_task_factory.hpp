@@ -1,6 +1,7 @@
 #pragma once
 
 #include "viper/acar_curve_tracker.hpp"
+#include "viper/update_curve.hpp"
 
 #include <array>
 #include <cstddef>
@@ -739,6 +740,8 @@ struct PhysicsAcarTaskConstructorObservation {
     bool blend_source_result_available{};
     std::span<const std::array<std::uint32_t, 2>> blend_source_pairs;
     std::span<const PhysicsAcarModelNodeObservation> model_nodes;
+    std::optional<AcarCurveSourceRecord> curve_source_record;
+    bool fdiv_compatibility_enabled{};
     std::uint32_t runtime_entry_count{};
     bool runtime_entry_allocation_succeeded{};
     std::optional<std::uint32_t> runtime_entry_buffer_address;
@@ -753,6 +756,7 @@ struct PhysicsAcarTaskConstructorPlan {
     std::uint32_t registration_count_after{};
     std::optional<std::uint32_t> model_descriptor_buffer_address;
     std::optional<std::uint32_t> runtime_entry_buffer_address;
+    std::optional<ConfiguredUpdateCurve> configured_curve_controller;
     bool base_constructor_called{true};
     bool derived_vtable_installed{};
     bool first_instance_panic_handler_registered{};

@@ -513,6 +513,23 @@ to 2 with stride `0x1A4`. The constructor then sets `+0x534` and calls
 The setter bodies and their stride helpers are directly analyzed in
 `ev_7f2a7638cef433bcdbf414083f784135b5b01cd65d2b69716ca37eb6939c7e6e`.
 
+The constructor's `0x433C00` path also configures the curve object at `+0xBFC`
+from the vehicle record. `0x440060` derives six evaluator coefficients from
+record fields `+0x68/+0x6C/+0x70/+0x74/+0x84`; `0x4401D0` then uses those
+coefficients with `+0x78/+0x7C/+0x80/+0x84`. `AcarCurveSourceRecord` preserves
+those raw offsets, and `configure_acar_update_curve` derives the configured
+controller returned by `PhysicsAcarTaskConstructorPlan` when that record is
+captured. That result can be passed as `curve_controller` to the composed ACAR
+callback, closing the observed constructor-to-selector data path. The
+coefficient builder and configuration call are supported by
+`0x433C00` `ev_fbd640d5fbdc72a165c76c2dee2639411e71c3beaf9416d13c51fc2bd9d7ee93`,
+`0x440060` `ev_51fe14341ac7e9945724cb0e6a077c15095a8b23f43714ecc4f00c7e660f085f`,
+and `0x4401D0` `ev_526b27be310dedb1c7a98f7bd538049eb926532ccc16736c185aa53a07a2cf2c`.
+The parameter-4 array is passed explicitly as six values. Portable arithmetic
+does not reproduce the original x87 register-stack precision at every
+intermediate step; invalid divisors and exceptional operand behavior remain
+outside this projection.
+
 The `0x429440` helper is now expanded through `0x429010` and `0x429510`:
 each 0x18-byte descriptor clears its first two fields, either copies a pair
 from the optional blend source or writes zeroes when the source is absent,

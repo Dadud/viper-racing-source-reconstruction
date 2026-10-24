@@ -34,6 +34,17 @@ struct ConfiguredUpdateCurve {
     UpdateCurveFields scoring{};
 };
 
+struct AcarCurveSourceRecord {
+    float value_0x68{};
+    float value_0x6c{};
+    float value_0x70{};
+    float value_0x74{};
+    float value_0x78{};
+    float value_0x7c{};
+    float value_0x80{};
+    float value_0x84{};
+};
+
 // Models 0x440100 followed by 0x4401D0 for the fields used by the recovered
 // evaluator. The six input coefficients map in order to offsets +0x44..+0x58.
 [[nodiscard]] ConfiguredUpdateCurve configure_update_curve(
@@ -42,7 +53,15 @@ struct ConfiguredUpdateCurve {
     float parameter_3,
     const std::array<float, 6>& parameter_4,
     float parameter_5,
-    float parameter_6) noexcept;
+    float parameter_6,
+    bool fdiv_compatibility_enabled = false) noexcept;
+
+// Reconstructs the 0x440060 coefficient builder and following 0x4401D0
+// configuration call made by the ACAR constructor.
+[[nodiscard]] ConfiguredUpdateCurve configure_acar_update_curve(
+    std::uintptr_t parent_object,
+    const AcarCurveSourceRecord& record,
+    bool fdiv_compatibility_enabled = false) noexcept;
 
 // Reconstructs the piecewise arithmetic observed at 0x4404A0 for ordinary
 // finite inputs. It does not infer the curve's application-level meaning.

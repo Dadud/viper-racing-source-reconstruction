@@ -1,5 +1,7 @@
 #include "viper/update_curve.hpp"
 
+#include "viper/legacy_fdiv.hpp"
+
 namespace viper {
 
 ConfiguredUpdateCurve configure_update_curve(
@@ -8,12 +10,15 @@ ConfiguredUpdateCurve configure_update_curve(
     const float parameter_3,
     const std::array<float, 6>& parameter_4,
     const float parameter_5,
-    const float parameter_6) noexcept
+    const float parameter_6,
+    const bool fdiv_compatibility_enabled) noexcept
 {
     ConfiguredUpdateCurve configured{};
     configured.opaque_0x04 = parameter_1;
     configured.value_0x08 = parameter_2;
-    configured.reciprocal_0x0c = 1.0F / parameter_2;
+    configured.reciprocal_0x0c = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(
+            1.0L, parameter_2, fdiv_compatibility_enabled));
     configured.getter_value_0x10 = 1000.0F;
 
     auto& curve = configured.scoring;
@@ -38,8 +43,49 @@ ConfiguredUpdateCurve configure_update_curve(
         + curve.intercept_0x4c;
     const float denominator_base = parameter_6 > 1000.0F ? parameter_6 : 1000.0F;
     const float denominator = (parameter_5 / denominator_base) * curve_value;
-    configured.derived_value_0x30 = parameter_6 / denominator * parameter_3;
+    configured.derived_value_0x30 = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(
+            parameter_6, denominator, fdiv_compatibility_enabled)
+        * static_cast<long double>(parameter_3));
     return configured;
+}
+
+ConfiguredUpdateCurve configure_acar_update_curve(
+    const std::uintptr_t parent_object,
+    const AcarCurveSourceRecord& record,
+    const bool fdiv_compatibility_enabled) noexcept
+{
+    constexpr auto torque_scale =
+        static_cast<long double>(1.3515152F);
+    const auto scaled_parameter_4 =
+        static_cast<long double>(record.value_0x68) * torque_scale;
+    const auto torque_at_scale = static_cast<float>(
+        static_cast<long double>(record.value_0x84) * torque_scale);
+    const auto ratio = divide_with_vc98_fdiv_compatibility(
+        record.value_0x6c, record.value_0x74,
+        fdiv_compatibility_enabled);
+    const auto horsepower_term = ratio * 5252.0L * torque_scale;
+    const auto rpm_delta = static_cast<long double>(record.value_0x74)
+        - static_cast<long double>(record.value_0x70);
+    const auto quadratic = divide_with_vc98_fdiv_compatibility(
+        horsepower_term - scaled_parameter_4, rpm_delta * rpm_delta,
+        fdiv_compatibility_enabled);
+    const std::array<float, 6> coefficients{
+        static_cast<float>(quadratic),
+        static_cast<float>(static_cast<long double>(record.value_0x70)
+            * quadratic * -2.0L + torque_at_scale),
+        static_cast<float>(static_cast<long double>(record.value_0x70)
+            * record.value_0x70 * quadratic + scaled_parameter_4),
+        torque_at_scale,
+        record.value_0x74,
+        static_cast<float>(horsepower_term
+            * static_cast<long double>(0.000125F))};
+    const auto value_0x08 = static_cast<float>(
+        static_cast<long double>(record.value_0x80)
+        * static_cast<long double>(0.042279866F));
+    return configure_update_curve(parent_object, value_0x08,
+        torque_at_scale, coefficients, record.value_0x7c, record.value_0x78,
+        fdiv_compatibility_enabled);
 }
 
 float evaluate_update_curve(
