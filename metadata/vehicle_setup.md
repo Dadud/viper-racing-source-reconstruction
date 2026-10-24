@@ -683,6 +683,20 @@ multiplied by `3`; 30 percent is added back to the base response and stored at
 `+0x178`. This model accepts the projection and polarity as inputs because
 their upstream vector calculation and global helper have separate effects.
 
+The composed four-wheel body step now derives the motion projection from the
+prior wheel contact point and current body kinematics before running the new
+contact query. It uses `0x43E9B0` to calculate point velocity from body center,
+linear velocity, and angular velocity, then projects X/Y/Z through body fields
+`+0x50/+0x58/+0x54`, matching the operand order in `0x442530`. The same
+pre-query point velocity is reused by the later tire response stages, matching
+the native local computed before `0x443F00` can replace wheel contact point
+`+0x130`. The polarity value remains a separate unresolved global-phase
+result; static constructor state cannot supply it. Evidence: `0x442530`
+`ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`,
+`0x43E9B0` `ev_55e374cea3290f211e8f05c04418071e112cc7253a3051ed7ff43e7214c913b0`,
+and polarity chain `0x4193F0` `ev_ac4ff3b289c237c75c0e1fd826f40009860951ca0f75f62d7779fda1dab6ee56`,
+`0x419620` `ev_5668e7c3e79d449296ddfc128d3dab5f90212b66427fcf6a38a15fcffb166086`.
+
 `finalize_wheel_suspension` covers the following common tail. A negative
 response (detected with the binary's raw sign-bit comparison) or an inactive
 contact clears the response and contact flag, then computes the next depth
@@ -694,7 +708,9 @@ the suspension pipeline does not invoke it automatically. Division-by-zero
 and x87 rounding behavior are not normalized by this portable model.
 `evaluate_wheel_suspension_pipeline` connects the three observed scalar stages
 in order, while keeping contact query results, projected motion, and
-polarity-helper output as explicit inputs.
+polarity-helper output as explicit inputs. The four-wheel body step derives the
+projection from its current kinematics and prior contact state before calling
+this lower-level pipeline.
 
 `advance_wheel_update_pipeline` now composes that suspension pipeline with the
 reconstructed transformed-point terrain query. It passes the clamped contact
@@ -703,9 +719,10 @@ feature into the surface adjustment, and the wheel direction into force
 finalization. It applies the final contact reset back to `+0x168`, then runs
 the feature dispatch and returns its profile plus resulting animation/response
 state. This follows the order at `0x0044302F..0x0044324B`. Spring/tire tuning
-values, motion projection, and the global polarity result remain explicit
-inputs because they come from separate wheel fields or unresolved helper
-paths. The later body-accumulator call remains separate.
+values and global polarity result remain explicit inputs because they come
+from separate wheel fields or unresolved helper paths; the four-wheel body
+step derives motion projection as described above. The later body-accumulator
+call remains separate.
 
 At the start of each `0x442530` wheel update, `+0xAC` is advanced by
 `+0x124 * 0x4C88DC` and stored as a float. The stored float's raw bits are

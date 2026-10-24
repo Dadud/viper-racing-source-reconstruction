@@ -418,6 +418,12 @@ struct BodyPointVelocityInput {
     PhysicsVector3 angular_velocity_0x240{};
 };
 
+// Projects 0x43E9B0's point velocity through 0x442530's body fields
+// +0x50/+0x58/+0x54, in X/Y/Z operand order.
+[[nodiscard]] float project_body_point_velocity_0x442530(
+    const PhysicsVector3& point_velocity,
+    const std::array<float, 12>& body_transform_0x38_to_0x64) noexcept;
+
 struct WheelMomentVectorInput {
     // Car matrix (+0x38..+0x58) consumed by FUN_00422F30 and its +0x44 axis.
     std::array<float, 9> body_basis_0x38_to_0x58{};

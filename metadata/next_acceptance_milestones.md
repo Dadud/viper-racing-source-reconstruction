@@ -71,9 +71,12 @@ collector, and body-integrator state are still not owned by `WindowState`.
 Build those persistent inputs and connect them to the existing wheel/body
 compositions before replacing route motion as the rendered pose authority.
 All currently modeled `0x441C10` outputs are now materialized at their wheel
-offsets, so the next unresolved wheel inputs are per-frame `+0x158` from body
-`+0x50C`, initialized-history `+0xE8`, and the body-motion projection and
-environment polarity used by surface adjustment. Do not promote the initial
+offsets. The composed `advance_four_wheel_body_step` now derives the surface
+motion projection from the prior contact point and step-start body kinematics,
+before the current contact query can replace that point. This composition is
+still not called by the production race session. The next unresolved wheel
+inputs are per-frame `+0x158` from body `+0x50C`, initialized-history `+0xE8`,
+and the global environment-polarity phase. Do not promote the initial
 constructor value of `+0x50C` to a per-frame value until the callback/sample
 state that mutates it is connected.
 

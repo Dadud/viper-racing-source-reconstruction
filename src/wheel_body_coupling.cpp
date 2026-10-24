@@ -1688,6 +1688,15 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                 result.wheel_tire_accumulator_states[wheel].state_0xf0;
             wheel_update_input.feature_state.response_gate_0x11c =
                 result.wheel_tire_dynamics_states[wheel].response_gate_0x11c;
+            const auto point_velocity = derive_body_point_velocity_0x43e9b0({
+                kinematics_at_step_start.position,
+                result.wheel_contact_states[wheel].contact_point_0x130,
+                kinematics_at_step_start.linear_velocity,
+                kinematics_at_step_start.angular_velocity});
+            result.wheel_point_velocities_0x43e9b0[wheel] = point_velocity;
+            wheel_update_input.suspension.surface.signed_motion_projection =
+                project_body_point_velocity_0x442530(point_velocity,
+                    wheel_update_input.point_transform.body_transform_0x38_to_0x64);
             result.wheel_contact_pipeline_results[wheel] = advance_wheel_update_pipeline(
                 result.wheel_contact_states[wheel],
                 wheel_update_input);
@@ -1724,12 +1733,6 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             curve_factor_input.suspension_response_components = {
                 suspension_force.x, suspension_force.y, suspension_force.z};
 
-            const auto point_velocity = derive_body_point_velocity_0x43e9b0({
-                kinematics_at_step_start.position,
-                result.wheel_contact_states[wheel].contact_point_0x130,
-                kinematics_at_step_start.linear_velocity,
-                kinematics_at_step_start.angular_velocity});
-            result.wheel_point_velocities_0x43e9b0[wheel] = point_velocity;
             const auto& forward = response_vector_input.forward_basis;
             const auto& normal = response_vector_input.contact_normal;
             const PhysicsVector3 lateral{

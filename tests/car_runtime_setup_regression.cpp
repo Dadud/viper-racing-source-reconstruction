@@ -369,6 +369,30 @@ int main()
                 materialized_front_wheel.initialized_bytes[0x03cU] != 0U &&
                 materialized_front_wheel.initialized_bytes[0x0a0U + 3U] != 0U,
             "live wheel bytes must retain exact constructor geometry and spring fields");
+        const std::array<float, 12> projection_transform{
+            0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+            1.0F, 3.0F, 2.0F, 0.0F, 0.0F, 0.0F};
+        require(viper::project_body_point_velocity_0x442530(
+                    {10.0F, 20.0F, 30.0F}, projection_transform) == 140.0F,
+            "wheel surface projection must preserve native +0x50/+0x58/+0x54 operand order");
+        viper::FourWheelBodyStepInput body_step_input{};
+        body_step_input.wheel_contact_pipeline_enabled = true;
+        body_step_input.integrator_prefix_input.state_0x4fc = 1U;
+        body_step_input.kinematics.linear_velocity = {1.0F, 2.0F, 3.0F};
+        body_step_input.kinematics.angular_velocity = {0.0F, 0.0F, 2.0F};
+        body_step_input.wheel_contact_states[0].contact_point_0x130 = {4.0F, 5.0F, 0.0F};
+        auto& body_step_wheel = body_step_input.wheel_update_pipeline_inputs[0];
+        body_step_wheel.point_transform.body_transform_0x38_to_0x64 =
+            projection_transform;
+        body_step_wheel.suspension.base.spring_scale_0x3c = 1.0F;
+        const auto body_step = viper::advance_four_wheel_body_step(body_step_input);
+        require(body_step.wheel_point_velocities_0x43e9b0[0].x == -9.0F &&
+                body_step.wheel_point_velocities_0x43e9b0[0].y == 10.0F &&
+                body_step.wheel_point_velocities_0x43e9b0[0].z == 3.0F,
+            "four-wheel step must calculate point velocity from prior contact state");
+        require(body_step.wheel_contact_pipeline_results[0]
+                    .suspension.surface.absolute_motion_projection == 20.0F,
+            "four-wheel step must project point velocity through the body fields");
         const auto right_front_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 1U, {0.4F, -0.254F, 3.81F}, 0.5F, false});
         require(right_front_wheel.has_value() && right_front_wheel->front_axle &&

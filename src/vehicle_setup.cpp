@@ -1045,6 +1045,16 @@ PhysicsVector3 derive_body_point_velocity_0x43e9b0(
     return {velocity[0], velocity[1], velocity[2]};
 }
 
+float project_body_point_velocity_0x442530(
+    const PhysicsVector3& point_velocity,
+    const std::array<float, 12>& body_transform_0x38_to_0x64) noexcept
+{
+    const auto& transform = body_transform_0x38_to_0x64;
+    return transform[6] * point_velocity.x +
+        transform[8] * point_velocity.y +
+        transform[7] * point_velocity.z;
+}
+
 WheelMomentVectorResult derive_wheel_moment_vector_0x43e7f0(
     const WheelMomentVectorInput& input) noexcept
 {
