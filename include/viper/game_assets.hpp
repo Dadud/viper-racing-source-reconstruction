@@ -2,6 +2,7 @@
 
 #include "viper/language_resource.hpp"
 #include "viper/resource_bundle.hpp"
+#include "viper/terrain_surface.hpp"
 
 #include <array>
 #include <filesystem>
@@ -17,11 +18,13 @@ public:
     [[nodiscard]] const std::filesystem::path& root() const noexcept { return root_; }
     [[nodiscard]] const ResourceBundle& bundle(std::string_view name) const;
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
+    [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
 
 private:
     std::filesystem::path root_;
     std::array<ResourceBundle, 5> bundles_;
     LanguageResource language_;
+    TerrainSurfaceResourcePayload terrain_;
 };
 
 } // namespace viper

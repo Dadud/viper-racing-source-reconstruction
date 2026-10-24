@@ -91,6 +91,8 @@ viper::GameAssets load_assets(const std::filesystem::path& root)
     for (const auto name : {"common.res", "ui.res", "race.res", "viper.car", "bemidji.trk"})
         std::cout << "Loaded " << name << ": " << assets.bundle(name).entries().size() << " resources\n";
     std::cout << "Loaded english.lng: " << assets.language().entries.size() << " strings\n"
+              << "Parsed Bemidji terrain: " << assets.terrain().planes.size() << " planes, "
+              << assets.terrain().partition_nodes.size() << " partition nodes\n"
               << "Required assets validated in " << assets.root().string() << '\n';
     return assets;
 }

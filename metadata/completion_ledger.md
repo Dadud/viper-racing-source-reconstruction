@@ -5,16 +5,16 @@ Original-client interoperability is out of scope. Original game assets remain
 external to this source repository; the reconstruction may load a user's
 separately supplied installation. This ledger tracks observed implementation
 and evidence, not reverse-engineering progress. The current `viper_game`
-foundation validates five original bundles and 822 language entries with
+foundation validates five original bundles and 822 language entries, and parses
+Bemidji's TPPB terrain (10,431 planes and 34,712 partition nodes) with
 `--validate-assets`; a D3D11 WARP smoke run renders three frames and exits
-cleanly. This establishes asset-loading and window/render-loop startup only;
-there is no playable gameplay yet. **Partial** means useful code or analysis
+cleanly. The runtime still has no playable gameplay. **Partial** means useful code or analysis
 exists, but the acceptance condition is unmet; **unverified** means there is
 not an integrated implementation with runtime evidence.
 
 | Feature | Evidence / existing implementation | Runtime gap | Acceptance condition | Status |
 |---|---|---|---|---|
-| Build and application lifecycle | `viper_game` builds. `--validate-assets` loads five original bundles and 822 language entries. D3D11 WARP rendered three smoke frames and exited cleanly. Startup evidence is in `metadata/engine_application_entry.md` and `metadata/graphics_startup.md`. | Smoke path has no game scene or playable flow; repeated lifecycle and device/resource failure paths remain unverified. | Clean Windows checkout configures and builds `viper_game`; app starts, reaches gameplay, returns to frontend, and exits cleanly over repeat runs without stale state. | partial |
+| Build and application lifecycle | `viper_game` builds. `GameAssets` owns five original bundles, 822 language entries, and parsed Bemidji terrain (10,431 planes, 34,712 partition nodes). D3D11 WARP rendered three smoke frames and exited cleanly. Startup evidence is in `metadata/engine_application_entry.md` and `metadata/graphics_startup.md`. | Smoke path has no game scene or playable flow; repeated lifecycle and device/resource failure paths remain unverified. | Clean Windows checkout configures and builds `viper_game`; app starts, reaches gameplay, returns to frontend, and exits cleanly over repeat runs without stale state. | partial |
 | Frontend and settings | `metadata/frontend_dispatch.md`, `metadata/race_input_bindings.md`; parsers and callback projections exist. | No integrated menus for starting a race, choosing options, controls, graphics, or audio; settings persistence unverified. | Navigate menus with keyboard/controller, change and retain supported settings, and reach race setup using only the new app. | partial |
 | Shipped track inventory | `../game_install/GameData` contains `bemidji.trk`, `dundas.trk`, `hastings.trk`, `heaven.trk`, `kenyon.trk`, `limbo.trk`, `nfield.trk`, and `uptown.trk`. `metadata/world_track_objects.md` and `metadata/terrain_resource.evidence.json` document track and terrain analysis. | Inventory presence does not establish menu listing, loadability, race readiness, or selectable tracks. | Each listed track can be selected in the new frontend, loaded into a race, completed, and compared against the original using the capture protocol. | partial |
 | Shipped vehicle inventory | `../game_install/GameData` contains `exotic.car`, `plane.car`, `sedan.car`, `sports.car`, and `viper.car`. `metadata/vehicle_setup.md` and `metadata/car_update_branches.md` document parsed setup and physics analysis. | Inventory presence does not establish menu listing, complete setup, drivability, or that every file represents a player-selectable car; some may be hidden or resource-only. | Verify the intended selectable roster from the original game's frontend/resources. Every supported player-selectable vehicle is selectable and drivable; classify hidden/resource-only files separately and document the evidence. | partial |

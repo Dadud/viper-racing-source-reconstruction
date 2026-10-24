@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 runtime track-data integration:** `GameAssets` now parses and
+  retains Bemidji's `track.bpp` TPPB terrain using the existing terrain model;
+  startup validation reports 10,431 planes and 34,712 partition nodes alongside
+  the five loaded bundles and language data. This puts real track collision
+  source data under runtime ownership, but the app still clears a blank window:
+  no terrain rendering, player state, controls, or race loop is integrated.
+  Release build and all three CTest checks pass; installed-asset validation
+  passes. See `metadata/completion_ledger.md`.
+
 - **2026-10-24 runtime foundation:** Added the Windows `viper_game` shell with
   external data-directory selection, required resource/language loading,
   Direct3D 11 swapchain initialization, resize/close handling, and hidden

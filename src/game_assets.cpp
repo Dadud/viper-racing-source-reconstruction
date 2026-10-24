@@ -40,6 +40,11 @@ GameAssets GameAssets::load(const std::filesystem::path& root)
     } catch (const std::exception& e) {
         throw std::runtime_error("invalid language resource " + language_path.string() + ": " + e.what());
     }
+    const auto terrain = parse_track_terrain_resource(assets.bundle("bemidji.trk"));
+    if (!terrain) {
+        throw std::runtime_error("Bemidji track.bpp terrain resource is missing or unsupported");
+    }
+    assets.terrain_ = *terrain;
     return assets;
 }
 
