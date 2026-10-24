@@ -585,3 +585,14 @@ local state/cache observations immediately after each actual `DAT_00509B39`
 flip, then uses the resulting records for the following `0x457AF0` plan.
 Evidence: `0x457A20`
 (`ev_c42837495c0f84efbfe27caca7ad1b880eec14ae75246e16742027b7ceb3ddc2`).
+
+The wheel's `0x455A60` toggle notification also updates a pair of indirect
+render callback slots through `0x455C80`. When `DAT_0050D0A8` is false, both
+slots select `0x455D90`. When true, the pair depends on the supplied
+`DAT_0050D119`, `DAT_0050D2DC`, and `DAT_0050D118` observations. Each actual
+`DAT_00509B39` flip now optionally records that selected pair; the callback
+bodies and their eventual effects are not inferred from the pointer values.
+Evidence: notifier `0x455A60`
+(`ev_a6223e48f4c508515c27b7eab8eded92b5b74178b6b50b7ae10566d1e93b49c6`)
+and selector `0x455C80`
+(`ev_68291d80b42b224b56e5bf259e990878f9c0ee36bf8bb4dc924e36a4a38f6e7c`).

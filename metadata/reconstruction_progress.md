@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended the wheel renderer path from indexed submission
+  through texture binding and shared graphics-state handling. `0x4525F0`
+  projects texture-handle cache branches; `0x457AF0` projects changed-state
+  helper calls and cache updates. The frame path now follows its `0x100`
+  enable toggle through `0x4513A0`/`0x451610`, `0x457A20` invalidation
+  sentinels, and `0x455C80` callback-slot selection. Runtime state remains an
+  explicit observation; device HRESULTs and callback execution remain outside
+  the portable model. Details are in `scene_car_update.md` and evidence in
+  `scene_wheel_lifecycle.evidence.json`.
+
 - **2026-10-24:** Added a bounded model of the generic render frame at
   `0x45BEB0`: exact enable-state gate, camera-matrix rewrite/restore,
   graphics-state and viewport call order, optional mode-dependent camera

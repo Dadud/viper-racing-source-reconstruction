@@ -799,6 +799,21 @@ struct SceneRenderStateSnapshotRefreshPlan {
     const std::array<std::uint8_t, 24>& cached_state,
     bool dirty_flag_0x50d778);
 
+struct SceneRenderCallbackSelectionObservation {
+    bool state_0x50d119{};
+    bool alternate_0x50d2dc{};
+    bool alternate_0x50d118{};
+};
+
+struct SceneRenderCallbackSelectionPlan {
+    std::uint32_t callback_slot_0x4db744{};
+    std::uint32_t callback_slot_0x4db748{};
+};
+
+[[nodiscard]] SceneRenderCallbackSelectionPlan plan_scene_render_callback_selection(
+    bool state_0x50d0a8,
+    const SceneRenderCallbackSelectionObservation& observation);
+
 struct SceneWheelResourceFrameOperation {
     SceneWheelResourceFrameOperationKind kind{};
     std::uint32_t argument{};
@@ -830,6 +845,7 @@ struct SceneWheelResourceFrameOperation {
     // Value passed to 0x455A60 when the toggle changes; otherwise absent.
     std::optional<bool> state_toggle_notification_value;
     std::optional<SceneRenderStateSnapshotRefreshPlan> state_snapshot_refresh;
+    std::optional<SceneRenderCallbackSelectionPlan> callback_selection;
 };
 
 struct SceneWheelResourceStateMaskObservation {
@@ -838,6 +854,7 @@ struct SceneWheelResourceStateMaskObservation {
     std::array<std::uint8_t, 24> state_record_0x509b30{};
     std::array<std::uint8_t, 24> cached_render_state_0x50d760{};
     bool dirty_flag_0x50d778{};
+    std::optional<SceneRenderCallbackSelectionObservation> callback_selection_context;
 };
 
 struct SceneWheelResourceFramePlan {

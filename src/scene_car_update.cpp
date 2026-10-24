@@ -1046,6 +1046,31 @@ SceneRenderStateSnapshotRefreshPlan plan_scene_render_state_snapshot_refresh(
     return result;
 }
 
+SceneRenderCallbackSelectionPlan plan_scene_render_callback_selection(
+    const bool state_0x50d0a8,
+    const SceneRenderCallbackSelectionObservation& observation)
+{
+    if (!state_0x50d0a8) {
+        return {0x00455D90U, 0x00455D90U};
+    }
+    if (!observation.state_0x50d119) {
+        if (observation.alternate_0x50d2dc) {
+            return {0x00456660U, 0x00455F30U};
+        }
+        if (observation.alternate_0x50d118) {
+            return {0x004563E0U, 0x00455F20U};
+        }
+        return {0x00456230U, 0x00455E00U};
+    }
+    if (observation.alternate_0x50d2dc) {
+        return {0x00457090U, 0x00456220U};
+    }
+    if (observation.alternate_0x50d118) {
+        return {0x00456D00U, 0x00456210U};
+    }
+    return {0x004569C0U, 0x00455F40U};
+}
+
 SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(
     const SceneSharedRenderStateSyncObservation& observation)
 {
@@ -1334,6 +1359,10 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
                 operation.state_snapshot_refresh = plan_scene_render_state_snapshot_refresh(
                     state_record, cached_render_state, state_mask->dirty_flag_0x50d778);
                 cached_render_state = operation.state_snapshot_refresh->cached_state_after;
+                if (state_mask->callback_selection_context.has_value()) {
+                    operation.callback_selection = plan_scene_render_callback_selection(
+                        next_enabled, *state_mask->callback_selection_context);
+                }
             }
         }
         operation.state_mask_after = current_state_mask;
