@@ -672,19 +672,16 @@ int wmain(int argc, wchar_t** argv)
         if (options.help) { usage(std::cout); return 0; }
         if (options.data_dir.empty())
             throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
-        constexpr std::array<std::string_view, 8> tracks{
-            "bemidji", "dundas", "hastings", "heaven", "kenyon", "limbo", "nfield", "uptown"};
-        constexpr std::array<std::string_view, 5> cars{
-            "viper", "exotic", "plane", "sedan", "sports"};
         const auto config_path = options.data_dir / "options.def";
         viper::GameOptions configured_options;
         std::error_code config_error;
         if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
             configured_options = viper::GameOptions::load(config_path);
-        const auto track = options.track.value_or(
-            configured_stem(configured_options, "track_no", tracks, "bemidji"));
-        const auto car = options.car.value_or(
-            configured_stem(configured_options, "car_no", cars, "viper"));
+        // The observed options.def values are numeric, but the original game's
+        // index-to-resource tables have not yet been reconstructed. Do not
+        // treat those values as indices into an alphabetical asset list.
+        const auto track = options.track.value_or("bemidji");
+        const auto car = options.car.value_or("viper");
         auto assets = load_assets(options.data_dir, track, car,
             std::move(configured_options));
         if (options.validate_assets) return 0;
