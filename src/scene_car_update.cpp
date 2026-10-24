@@ -1850,37 +1850,63 @@ SceneCarWheelFramePlan plan_scene_car_wheel_frame(
 SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
 {
     SceneCarCalloutPlan result{};
+    constexpr float distance_squared_limit = 10000.0F; // 0x4C9384
+    constexpr float projection_height_offset = 1.0F; // 0x4C9358
+    constexpr float projected_y_offset = 32.0F; // 0x4C9388
+    constexpr std::int32_t resource_y_offset = 9;
     const auto c_string_prefix = [](const std::string_view text) {
         const auto terminator = text.find('\0');
         return text.substr(0, terminator == std::string_view::npos
             ? text.size() : terminator);
+    };
+    const auto ftol = [](const float value) {
+        if (!std::isfinite(value) ||
+            static_cast<double>(value) < std::numeric_limits<std::int32_t>::min() ||
+            static_cast<double>(value) >= 2147483648.0) {
+            return std::numeric_limits<std::int32_t>::min();
+        }
+        return static_cast<std::int32_t>(value);
+    };
+    const auto wrap_subtract = [](const std::int32_t value,
+                                  const std::int32_t decrement) {
+        return std::bit_cast<std::int32_t>(
+            std::bit_cast<std::uint32_t>(value)
+            - std::bit_cast<std::uint32_t>(decrement));
     };
     if (input.object_ordinal == input.selected_car_ordinal) {
         result.status = SceneCarCalloutStatus::selected_car_suppressed;
         return result;
     }
 
-    const double delta_x = static_cast<double>(input.camera_position[0])
-        - input.object_position[0];
-    const double delta_y = static_cast<double>(input.camera_position[1])
-        - input.object_position[1];
-    const double delta_z = static_cast<double>(input.camera_position[2])
-        - input.object_position[2];
-    result.squared_distance = delta_y * delta_y + delta_z * delta_z + delta_x * delta_x;
+    // The three subtractions spill to binary32 locals in the native code;
+    // the following x87 sum remains wider until its comparison.
+    const float delta_x = input.camera_position[0] - input.object_position[0];
+    const float delta_y = input.camera_position[1] - input.object_position[1];
+    const float delta_z = input.camera_position[2] - input.object_position[2];
+    result.squared_distance = static_cast<double>(delta_y) * delta_y
+        + static_cast<double>(delta_z) * delta_z
+        + static_cast<double>(delta_x) * delta_x;
     // The native C0 test skips when C0 is clear. X87 unordered comparisons set
     // C0, so NaN follows the projection path just like the original branch.
-    if (result.squared_distance >= input.squared_distance_threshold) {
+    if (result.squared_distance >= distance_squared_limit) {
         result.status = SceneCarCalloutStatus::outside_distance_threshold;
         return result;
     }
 
+    auto projection_position = input.object_position;
+    projection_position[1] += projection_height_offset;
     result.operations.push_back({
         SceneCarCalloutOperationKind::project_world_position_0x448cd0,
-        0x00448CD0U});
-    if (!input.projection_visible_0x448cd0) {
+        0x00448CD0U, 0U, 0, 0, 0, 0, 0U, 0U, 0,
+        projection_position});
+    if ((input.projection_return_0x452350 & 0xffU) == 0U) {
         result.status = SceneCarCalloutStatus::projection_rejected;
         return result;
     }
+
+    const auto projected_x = ftol(input.transformed_position_0x452350[0]);
+    const auto projected_y = ftol(
+        input.transformed_position_0x452350[2] - projected_y_offset);
 
     result.operations.push_back({
         SceneCarCalloutOperationKind::set_text_context_0x449900,
@@ -1899,16 +1925,15 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
         result.primary_text.append(" (");
         result.primary_text.append(std::to_string(input.primary_record_value_0x140));
         result.primary_text.push_back(')');
-        const auto x_bits = std::bit_cast<std::uint32_t>(input.primary_text_x_after_ftol)
+        const auto x_bits = std::bit_cast<std::uint32_t>(projected_x)
             - static_cast<std::uint32_t>(result.primary_text.size()) * 4U;
-        const auto y_bits = std::bit_cast<std::uint32_t>(input.primary_text_y_after_ftol)
-            - 4U;
+        const auto y_bits = std::bit_cast<std::uint32_t>(projected_y) - 4U;
         result.operations.push_back({
             SceneCarCalloutOperationKind::draw_primary_text_0x4d710,
             0x0044D710U, 0x004DCDA4U, 5, 0x140,
             std::bit_cast<std::int32_t>(x_bits),
             std::bit_cast<std::int32_t>(y_bits),
-            result.primary_text.size(), 0x0044D6A0U});
+            result.primary_text.size(), 0x0044D6A0U, 0});
     }
 
     const auto secondary_text = c_string_prefix(input.secondary_record_text_0x32);
@@ -1922,17 +1947,17 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
         result.operations.push_back({
             SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0,
             0x0044D0C0U, 0U, 0x7B4, 0,
-            input.secondary_resource_x_after_ftol,
-            input.secondary_resource_y_after_ftol});
+            projected_x, wrap_subtract(projected_y, resource_y_offset),
+            0U, 0U, 0});
         result.operations.push_back({
             SceneCarCalloutOperationKind::draw_secondary_text_0x4d710,
             0x0044D710U, 0x0053F194U, 0x32, 0,
             std::bit_cast<std::int32_t>(
-                std::bit_cast<std::uint32_t>(input.secondary_text_x_after_ftol)
+                std::bit_cast<std::uint32_t>(projected_x)
                 - static_cast<std::uint32_t>(result.secondary_text.size()) * 4U),
             std::bit_cast<std::int32_t>(
-                std::bit_cast<std::uint32_t>(input.secondary_text_y_after_ftol) - 4U),
-            result.secondary_text.size(), 0x0044D6A0U});
+                std::bit_cast<std::uint32_t>(projected_y) - 4U),
+            result.secondary_text.size(), 0x0044D6A0U, 0});
     }
     return result;
 }

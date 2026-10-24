@@ -449,12 +449,16 @@ frame method without inventing behavior for the manager's earlier gates.
 `plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached
 from submitter `0x45C090`. It suppresses the selected car, then applies the
 strict squared-distance comparison against the threshold at `0x4C9384`. The
-native x87 status-word test checks C0; unordered distances therefore continue
-to the projection path. The portable squared-distance arithmetic uses double
-intermediates and remains an approximation to x87 extended precision. Passing
-the distance gate calls `0x448CD0`; its AL result is the following visibility
-gate. The wrapper installs the identity transform and delegates the world
-position conversion to `0x452350`/device transform state.
+constant block decodes `0x4C9384` as 10,000.0, `0x4C9358` as 1.0, and
+`0x4C9388` as 32.0. The native x87 status-word test checks C0; unordered
+distances therefore continue to the projection path. The portable computation
+keeps binary32 deltas and double-precision accumulation as an approximation to
+x87 extended arithmetic. The projection input now records object position
+with 1.0 added to its Y component. `0x448CD0` installs the identity transform
+and delegates to `0x452350`; the caller continues only when the returned low
+byte is nonzero. The transformed X coordinate and transformed Z minus 32.0
+feed the native truncating `0x4BD1F8` conversions used as text pixels; the
+resource image uses the same X and Y minus 9.
 
 After projection succeeds, the callback sets its text context through
 `0x449900` and looks up the scene object's ordinal through `0x45DFB0`. Gate
@@ -466,14 +470,21 @@ The later
 `0x40D250` gate is true only when both `0x4D10FC` and `0x4ECC98` are nonzero;
 record byte `+0x32` must also be nonzero before the callback calls `0x44D0C0`
 with object field `+0x7B4` and then draws that record string through `0x4D710`.
-The portable plan preserves these ordered call gates and record offsets. Device
-projection results and `__ftol` pixel coordinates remain inputs because their
-results depend on runtime transform/device and CRT state. Secondary text comes
+The portable plan preserves these ordered call gates and record offsets. The
+final transformed vector and raw `0x452350` return value remain inputs because
+they depend on Direct3D device state; screen coordinates and resource placement
+are derived from them with the observed `FTOL` behavior. Secondary text comes
 directly from the record's `+0x32` NUL-terminated string.
 Evidence: vtable/submit path and raw callback instructions in
 `metadata/simulation_loop.md` and `disasm/engine_.text.asm`; helper dossiers
 `ev_863e3d62425fc238f2f7d05582aadddfb0a640870bf31a34c16400574dbc1d0b`,
 `ev_b66f1af6bc9ebabb616d42d22c6e9cc544095105e212c61780e913c9b146754f`,
+`ev_f157b6fda41f628e4a9c3a97646c4abdfc6a4f43de2d2414ac020be32191fd3d`
+(`0x452350`), `ev_1b55652ff18ee3312949e49a00c2c847abd298710fc9f2959b6352416839611d`
+(`0x458870`), `ev_4cba7e1b0abba7028d6f90b538f3b1e689c61b0bc5b12cde5047999e6bbf73cb`
+(`0x4C9358` and `0x4C9384` constants),
+`ev_bab23c4b30faf77ff5363ae8fbb2ef9dd1fdfb1555ac8fbd6a7cda7392f49c0e`
+(`0x4C9388` constant),
 `ev_0d1cac05b94aa5dc4c850cd384bb6e6cb97abe2a8a92e0f36bab0295f5a90e28`,
 `ev_a66356af194e82eb5f16751b35cd3e4030ff0e736b2f0b30de2f2e8efeb0f482`,
 `ev_12c7933039b3238473154d37bdabe4f63dbb0f16d420023c69e59395f5edb870`

@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Reduced the scene-car callout's guessed runtime
+  inputs: its distance threshold, projection Y offset, text pixel coordinates,
+  and image pixel coordinates are now derived from recovered constants and the
+  final device transform result. The projection path records the object position
+  with its `+1.0` Y adjustment, checks the raw projection return's low byte, and
+  applies the observed truncating pixel conversions and offsets. The transformed
+  vector and raw HRESULT-dependent return remain inputs. Release
+  `viper_race_scene_flow` build and `git diff --check` pass; no tests were run.
+  Evidence and limitations: `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** Resolved the primary scene-car callout format
   from string object `0x4DCDA4` as `"%s (%d)"`. `plan_scene_car_callout` now
   formats record `+0x05` with signed value `+0x140` itself, carries the raw

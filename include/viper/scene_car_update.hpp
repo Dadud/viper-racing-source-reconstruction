@@ -1056,6 +1056,7 @@ struct SceneCarCalloutOperation {
     std::size_t text_length{};
     std::uint32_t underlying_draw_address{};
     std::int32_t frame_index{};
+    std::array<float, 3> projection_position{};
 };
 
 struct SceneCarCalloutInput {
@@ -1063,8 +1064,8 @@ struct SceneCarCalloutInput {
     std::int32_t selected_car_ordinal{};
     std::array<float, 3> object_position{};
     std::array<float, 3> camera_position{};
-    float squared_distance_threshold{};
-    bool projection_visible_0x448cd0{};
+    std::uint32_t projection_return_0x452350{};
+    std::array<float, 3> transformed_position_0x452350{};
     bool record_observed{};
     std::optional<std::string_view> primary_record_text_0x05;
     std::int32_t primary_record_value_0x140{};
@@ -1072,12 +1073,6 @@ struct SceneCarCalloutInput {
     bool primary_text_gate_0x49be40{};
     bool secondary_global_a_0x4d10fc{};
     bool secondary_global_b_0x4ecc98{};
-    std::int32_t primary_text_x_after_ftol{};
-    std::int32_t primary_text_y_after_ftol{};
-    std::int32_t secondary_text_x_after_ftol{};
-    std::int32_t secondary_text_y_after_ftol{};
-    std::int32_t secondary_resource_x_after_ftol{};
-    std::int32_t secondary_resource_y_after_ftol{};
 };
 
 struct SceneCarCalloutPlan {
@@ -1089,8 +1084,9 @@ struct SceneCarCalloutPlan {
 };
 
 // Projects scene-car virtual +0x18 at 0x4648A0. Projection and record/global
-// values that depend on renderer/device state are supplied observations. It
-// formats record +0x05/+0x140 using the observed "%s (%d)" source.
+// Device TransformVertices outputs and record/global values remain observations.
+// The binary's distance threshold, Y projection offset, and FTOL coordinates
+// are derived internally. It formats record +0x05/+0x140 with "%s (%d)".
 [[nodiscard]] SceneCarCalloutPlan plan_scene_car_callout(
     const SceneCarCalloutInput& input);
 
