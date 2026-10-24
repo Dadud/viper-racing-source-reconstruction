@@ -167,7 +167,8 @@ files were present.
   remain observations; details are in `metadata/simulation_loop.md`.
 - `include/viper/scene_overlay.hpp` and `src/scene_overlay.cpp` record the
   text draw calls from the four numeric pages in the state-1 render callback,
-  state-2 physics overlay labels and `c`/`w` flag updates, and the state-3
+  state-2 physics-overlay labels, four wheel-bar geometry and `%1.0f` label
+  output, `c`/`w` flag updates, and the state-3
   graphics overlay's LOD/key mapping and FOG/LIGHT action bits; geometric
   drawing and most renderer/device effects remain unmodeled. State-0 dashboard
   viewport and background bitmap ordering, bitmap format dispatch and clipping,

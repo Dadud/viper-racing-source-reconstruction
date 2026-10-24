@@ -1456,10 +1456,14 @@ vector exceeds 1.2, then produce the indicator endpoint with the observed
 per-helper call order and arguments: conditional fill via `0x44A1B0`, circle
 outline via `0x44C950`, indicator line via `0x44C260`, then formatting at `0x4D4C54` and
 text submission via `0x479580` at `(x+5,y)` with size `0x11`; its operation
-record keeps both the `0x4D4C54` format source and computed numeric argument.
-These remain backend wrapper calls; the model does not rasterize them. Color values, caller
-stack reference components, and format input remain observations. Pentium FDIV
-and x87 rounding remain approximate. Evidence:
+record keeps the `0x4D4C54` format source, computed numeric argument, and
+formatted string. The format bytes at `0x4D4C54` are `%1.0f`; the call uses the
+VS 1998 `_sprintf` wrapper at `0x4BD190` before passing the resulting string to
+`0x479580`. The portable model formats the computed double with `%1.0f`; exact
+legacy CRT rounding remains approximate, and the text backend call is not
+rasterized here. Color values, caller stack reference components, and format
+input remain observations. Pentium FDIV and x87 rounding remain approximate.
+Evidence:
 helper bytes `ev_250b08ea538ca564c22f50a26e8dd6ede4a6e1abf4e02bef9ca807ef65b72b75`,
 constants `ev_c4830cfd2343199b1ac5a38f43632cf39c5e73bebe8b1d5f31b6391ed6580dfb`
 (`272`), `ev_221695e4f65c53a01436ecb21628470afd2e93b888df006a940273beb56d2f6b`
@@ -1469,6 +1473,9 @@ constants `ev_c4830cfd2343199b1ac5a38f43632cf39c5e73bebe8b1d5f31b6391ed6580dfb`
 (`1.2`), `ev_9bb6fd3e7bc1b1b1db1df32c2d6d5b8d00904ecf9db2a071bfb85631d50d2ec3`
 (`-20`), and `ev_8737a67012c86c59b7d0d7c2eb4a1c7a2ca83f90258b63531f827e54a800a7f8`
 (`20`).
+The format bytes are `ev_df8f7585aecb66ed48b18aeb711c44a9c3ea21feaa77661a3660fe1c5b941138`; `0x479580` text submission is
+`ev_8ea0d058927243f23b31fa69d01a4bcf40c15e14d826b47e3affabc9e68dfe54`, and
+the VS 1998 `_sprintf` wrapper is `ev_d511af6851b2d17d5a5a65129cda2a02ca874f07aa7a7bb722bc0df633f5698c`.
 Evidence: `ev_ba8387a20a6ac6b8e8e8614c4dcc5efcd8688e97e5dfc168aac016944cebb009`
 (`0x423380` bytes), `ev_5ae98a77cb54cf090270cf928c9325b9e81003bfb575e3b0879a5968fb5aec9e`
 (`0x4236B0` bytes), `ev_6e1b05d0565d20149d1d5471c5aeb33e787515af323ecb43aa6ed465a4201282`

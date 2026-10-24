@@ -249,6 +249,13 @@ std::array<ScenePhysicsWheelBarPlan, 4> scene_physics_wheel_bar_plans(
             (static_cast<long double>(input.format_input) - format_offset) *
                 format_scale +
             format_bias);
+        std::array<char, 64> formatted_label{};
+        const auto formatted_label_length = std::snprintf(
+            formatted_label.data(), formatted_label.size(), "%1.0f",
+            plan.format_argument);
+        plan.formatted_label_complete = formatted_label_length >= 0 &&
+            static_cast<std::size_t>(formatted_label_length) <
+                formatted_label.size();
         plan.fdiv_compatibility_approximated =
             input.fdiv_compatibility_enabled && plan.vector_normalized;
 
@@ -268,7 +275,11 @@ std::array<ScenePhysicsWheelBarPlan, 4> scene_physics_wheel_bar_plans(
         plan.ordered_operations.push_back({
             ScenePhysicsWheelBarOperationKind::formatted_text_0x479580,
             plan.x + 5, plan.y, 0x11, 0, 0U, 0x004D4C54U,
-            plan.format_argument});
+            plan.format_argument,
+            plan.formatted_label_complete
+                ? std::string(formatted_label.data(),
+                              static_cast<std::size_t>(formatted_label_length))
+                : std::string{}});
     }
     return plans;
 }

@@ -89,6 +89,8 @@ struct ScenePhysicsWheelBarOperation {
     std::uint32_t color{};
     std::uint32_t argument{};
     double numeric_argument{};
+    // The 0x479580 label call receives the result of formatting numeric_argument.
+    std::string text_argument;
 };
 
 struct ScenePhysicsWheelBarPlan {
@@ -111,6 +113,7 @@ struct ScenePhysicsWheelBarPlan {
     double format_argument{};
     bool vector_normalized{};
     bool fdiv_compatibility_approximated{};
+    bool formatted_label_complete{true};
     // Observed order inside 0x4236F0: optional fill, circle, indicator, text.
     std::vector<ScenePhysicsWheelBarOperation> ordered_operations;
 };
