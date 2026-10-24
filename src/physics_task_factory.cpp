@@ -1723,10 +1723,13 @@ PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {
     PhysicsTaskRecordLoadPlan plan{};
-    if (observation.record_length < 0) {
+    if (observation.serialized_object_stream_offset < 0) {
         plan.status = PhysicsTaskRecordLoadStatus::end_of_records;
         return plan;
     }
+
+    plan.constructor_argument_2_stream_offset = static_cast<std::uint32_t>(
+        observation.serialized_object_stream_offset);
 
     plan.payload_read = true;
     if (!observation.payload_complete) {

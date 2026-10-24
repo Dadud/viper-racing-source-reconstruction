@@ -236,15 +236,28 @@ integration.
 
 The loader's second constructor argument is the record's byte offset in the
 physics-task stream. `0x425720` writes the current `DAT_00508784` cursor as a
-DWORD before appending the serialized record, then advances the cursor by the
-class size resolved by `0x4209E0`. `0x4224D0` reads that leading DWORD and passes
-it unchanged through the object factory. The common body base constructor
-`0x4375C0` stores it at object `+0x08`. This is separate from the car's `+0x194`
-ordinal and from the serialized record length. Reproducing a car's value
-requires reproducing all preceding serialized scene objects and their order.
-Evidence: `0x425720`
+DWORD to the shared record buffer, then copies exactly `record[+0x04]` bytes
+from the complete record, including its tag and size header. It advances the
+logical cursor by the class size resolved by `0x4209E0`, which is independent
+of the copied record size. `0x4224D0` reads the leading DWORD, peeks at the
+record's eight-byte header to obtain tag and declared size, rewinds to the
+record start, then copies exactly that declared record size. It passes the
+leading DWORD unchanged through the object factory. The common body base
+constructor `0x4375C0` stores it at object `+0x08`. This is separate from the
+car's `+0x194` ordinal and from the serialized record length. The new
+`serialize_physics_task_records` adapter emits this in-band cursor DWORD plus
+the supplied complete record bytes verbatim, validates tag/size agreement,
+and applies the independent class advance. It does not generate missing
+per-class record fields. Reproducing a car's value requires reproducing all
+preceding serialized scene objects and their order. Evidence: `0x425720`
 `ev_ba7c2afe0cea1b8ac035b877fcb66094822ac8ab525d2a70a8e196e787dde737`,
 `0x4224D0` `ev_a400cb5ab86f7098dfd08c8099bbb812751892d0e3b03cc4de1165538324a68f`,
+`0x4C5D30` `ev_dfe45a34700d09b15410821005ee50b37aecc382ab64addb36fda55f8d1f20fd`,
+`0x4C5DD0` `ev_2732ed7089dc4b0444b0e61d37eb25576663fa7c814a245a8fe8c0fe472dec08`,
+`0x4C5CE0` `ev_aadace6c23412be905c5046fad577b5a68aa1be1d27b609b6b38e609c1e3d16f`,
+`0x4C5CD0` `ev_879d40a603810848599180578a02eef85595590ad7a0faa1b22748ea04e81387`,
+`0x4C5E10` `ev_a358345e1f9658dcfc712e01af974bf4f8f7f6ac9b1f973a8bc79f3d96441196`,
+`0x4C5EA0` `ev_9a1f997e3b908607dae43afa668ece3568e421066b13fac06394076a2509e1a1`,
 and `0x4375C0` `ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349f68`.
 
 `src/physics_task_stream.cpp` now models the exact tag-to-cursor-advance
@@ -471,10 +484,13 @@ and `ev_12db4dd6bde982a7d974bfdd91c5d9b73733a59871cfc4f9eaeabf27ec84bfbd`.
 ## Record-read projection
 
 `plan_physics_task_record_load` models one iteration of `0x4224D0`. A negative
-record length ends the array without reading payload bytes. For a nonnegative
-record length, the stream helpers bounds-check the 8-byte record header and the
-declared data copy. A failed bounded read sets the stream error byte and leaves
-the cursor unchanged; it does not copy beyond the captured span. However,
+serialized-object cursor ends the array without reading a record. For a
+nonnegative cursor, the loader preserves that value as constructor argument 2,
+reads the 8-byte tag/size header, rewinds to the record start, then copies the
+declared record size. The header probe is not an additional eight bytes in the
+record framing. The stream helpers bounds-check both reads. A failed bounded
+read sets the stream error byte and leaves the cursor unchanged; it does not
+copy beyond the captured span. However,
 `0x4224D0` does not inspect the error byte and continues toward factory dispatch
 with potentially uninitialized stack input. The portable projection reports
 `incomplete_payload`, the error flag, and that indeterminate factory attempt,

@@ -845,10 +845,11 @@ plan_physics_acar_runtime_initialization(
     const PhysicsAcarRuntimeInitializationObservation& observation);
 
 struct PhysicsTaskRecordLoadObservation {
-    // Negative values are the end-of-records result from 0x4C5E10.
-    std::int32_t record_length{};
-    // Portable bound: whether the bytes needed to read the record header and
-    // declared payload are available to the reconstruction.
+    // The first signed DWORD read by 0x4C5E10 is the constructor's serialized
+    // object stream offset. A negative value terminates the record array.
+    std::int32_t serialized_object_stream_offset{};
+    // Portable bound: whether both the 8-byte header probe and the declared
+    // complete-record copy are available to the reconstruction.
     bool payload_complete{true};
     std::uint32_t fourcc{};
     bool allocation_succeeded{};
@@ -881,6 +882,8 @@ struct PhysicsTaskRecordLoadPlan {
     bool stream_error_flag_set{};
     bool factory_call_attempted_after_read_error{};
     bool factory_input_indeterminate{};
+    // Exact second argument propagated through 0x422580 to the object ctor.
+    std::optional<std::uint32_t> constructor_argument_2_stream_offset;
     // 0x426F20 writes the old cursor to object +0x34 before advancing it.
     std::optional<std::uint32_t> object_task_data_offset_0x34;
     std::optional<std::uint32_t> task_data_cursor_after;
