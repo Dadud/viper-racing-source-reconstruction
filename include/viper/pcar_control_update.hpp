@@ -46,6 +46,9 @@ struct PcarConstructorControls {
     std::array<std::uint32_t, 4> wheel_traction_0x6b0{};
     std::array<std::uint32_t, 4> wheel_abs_0x6b8{};
     std::optional<std::uint32_t> game_mode_0x4f4;
+    // Raw return byte from the first 0x43BA90 call in 0x4381E0, stored at +0xD74.
+    // The helper is intentionally not reconstructed; callers may supply an observed result.
+    std::optional<std::uint8_t> value_0xd74;
     bool auto_clutch_forced_by_auto_shift{};
 };
 
@@ -57,7 +60,8 @@ struct PcarConstructorControls {
     std::optional<bool> auto_shifting,
     std::optional<bool> auto_clutch,
     std::optional<std::int32_t> yaw_control,
-    std::optional<std::uint32_t> game_mode_0x4f4) noexcept;
+    std::optional<std::uint32_t> game_mode_0x4f4,
+    std::optional<std::uint8_t> value_0xd74 = std::nullopt) noexcept;
 
 struct PcarCallbackTailFields {
     std::uint8_t value_0xc3c{};

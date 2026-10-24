@@ -1483,7 +1483,7 @@ struct WindowState {
     // but the complete ordered world stream and fixed-step ring are not yet
     // connected. Route motion remains the visible pose authority.
     std::vector<std::byte> player_runtime_car_record;
-    std::optional<viper::PhysicsTaskRecordSerialization> player_task_record_frame;
+    std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
@@ -1561,19 +1561,19 @@ struct WindowState {
             player_runtime_car_record.clear();
             return false;
         }
-        const std::array<viper::PhysicsTaskRecordInput, 1> record_input{{
-            {player_runtime_car_record}}};
-        player_task_record_frame = viper::serialize_physics_task_records(
-            record_input, *serialized_stream_offset);
-        if (player_task_record_frame->status !=
+        player_task_record_stream.emplace(*serialized_stream_offset);
+        const auto appended = player_task_record_stream->append_record(
+            player_runtime_car_record);
+        if (appended.status !=
                 viper::PhysicsTaskRecordSerializationStatus::complete ||
-            player_task_record_frame->records.size() != 1U) {
+            appended.records.size() != 1U) {
             player_runtime_car_record.clear();
-            player_task_record_frame.reset();
+            player_task_record_stream.reset();
             return false;
         }
+        const auto player_task_record_frame = player_task_record_stream->snapshot();
         const auto decoded_task_stream = viper::read_physics_task_record_stream(
-            player_task_record_frame->bytes);
+            player_task_record_frame.bytes);
         if (decoded_task_stream.status !=
                 viper::PhysicsTaskRecordStreamReadStatus::complete ||
             decoded_task_stream.records.size() != 1U ||
@@ -1581,14 +1581,14 @@ struct WindowState {
             decoded_task_stream.records[0].cursor_offset != *serialized_stream_offset ||
             decoded_task_stream.records[0].record_size != player_runtime_car_record.size() ||
             decoded_task_stream.records[0].record_bytes_offset >
-                player_task_record_frame->bytes.size() ||
-            player_runtime_car_record.size() > player_task_record_frame->bytes.size() -
+            player_task_record_frame.bytes.size() ||
+            player_runtime_car_record.size() > player_task_record_frame.bytes.size() -
                 decoded_task_stream.records[0].record_bytes_offset ||
             !std::equal(player_runtime_car_record.begin(), player_runtime_car_record.end(),
-                player_task_record_frame->bytes.begin() + static_cast<std::ptrdiff_t>(
+                player_task_record_frame.bytes.begin() + static_cast<std::ptrdiff_t>(
                     decoded_task_stream.records[0].record_bytes_offset))) {
             player_runtime_car_record.clear();
-            player_task_record_frame.reset();
+            player_task_record_stream.reset();
             return false;
         }
         const auto body_observation =
@@ -2308,7 +2308,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     std::cout << "Prepared the session PCAR record from the active CARF setup and native "
               << "placement plan: " << state.player_runtime_car_record.size()
               << " bytes, framed at physics-task cursor 0x" << std::hex
-              << state.player_task_record_frame->records[0].cursor_offset << std::dec
+              << state.player_task_record_stream->snapshot().records[0].cursor_offset
+              << std::dec
               << "; derived body scale "
               << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
               << ", inverse mass " << *state.player_body_inverse_mass_0x200

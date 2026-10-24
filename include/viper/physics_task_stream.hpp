@@ -110,6 +110,35 @@ struct PhysicsTaskRecordStreamRead {
     std::span<const PhysicsTaskRecordInput> records,
     std::uint32_t initial_cursor = 0U);
 
+// Owns an explicitly supplied, already ordered sequence of complete records
+// for one task-stream session. Records are committed only after their framing
+// and cursor advance have been validated. This does not infer serialization
+// order or model the separate fixed-step interpolation ring.
+class PhysicsTaskRecordStreamSession {
+public:
+    explicit PhysicsTaskRecordStreamSession(std::uint32_t initial_cursor = 0U)
+        : initial_cursor_(initial_cursor), final_cursor_(initial_cursor) {}
+
+    // Appends one complete record. The returned serialization describes this
+    // append; on failure the session remains unchanged and failed_record_index
+    // identifies the position the rejected record would have occupied.
+    [[nodiscard]] PhysicsTaskRecordSerialization append_record(
+        std::span<const std::byte> record_bytes);
+
+    // Returns the complete stream accumulated so far.
+    [[nodiscard]] PhysicsTaskRecordSerialization snapshot() const;
+
+    [[nodiscard]] std::uint32_t final_cursor() const noexcept {
+        return final_cursor_;
+    }
+
+private:
+    std::uint32_t initial_cursor_{};
+    std::uint32_t final_cursor_{};
+    std::vector<SerializedPhysicsTaskRecord> records_;
+    std::vector<std::byte> bytes_;
+};
+
 // Decodes the cursor-prefixed complete-record framing written above. Cursor
 // values are signed in the native reader, so a negative DWORD terminates input.
 [[nodiscard]] PhysicsTaskRecordStreamRead read_physics_task_record_stream(

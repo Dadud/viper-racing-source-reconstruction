@@ -61,7 +61,8 @@ PcarConstructorControls initialize_pcar_constructor_controls(
     const std::optional<bool> auto_shifting,
     const std::optional<bool> auto_clutch,
     const std::optional<std::int32_t> yaw_control,
-    const std::optional<std::uint32_t> game_mode_0x4f4) noexcept
+    const std::optional<std::uint32_t> game_mode_0x4f4,
+    const std::optional<std::uint8_t> value_0xd74) noexcept
 {
     PcarConstructorControls result{};
     result.traction_control = traction_control.value_or(true);
@@ -70,6 +71,7 @@ PcarConstructorControls initialize_pcar_constructor_controls(
     result.auto_clutch = auto_clutch.value_or(true);
     result.yaw_control = yaw_control.value_or(0);
     result.game_mode_0x4f4 = game_mode_0x4f4;
+    result.value_0xd74 = value_0xd74;
     if (result.auto_shifting) {
         result.auto_clutch_forced_by_auto_shift = !result.auto_clutch;
         result.auto_clutch = true;

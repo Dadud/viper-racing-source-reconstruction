@@ -1173,3 +1173,8 @@ native update paths before they affect motion. Evidence: `0x4381E0`
 `0x4330D0` `ev_c98a80c4b55e307bf7ad25561ea0a1a16f2421c8c98d9bb16c18ea59177dfc7d`,
 and game-mode accessor `0x425860`
 `ev_1c3a9bf935b6573c5a7c6279f49730c305e395a1f150383e8dc332cb85662528`.
+The first `0x43BA90` helper result is also stored as a byte at PCAR `+0xD74`.
+The model now retains that raw byte only when an observation is supplied;
+helper polarity/state and the second helper result's live source are not
+reconstructed, so runtime leaves `+0xD74` unknown. Evidence:
+`0x4381E0` `ev_365b74f41f3ffe8a5d0ca349ed3801a7069ccd56fe16be69203abbe524a123f4`.

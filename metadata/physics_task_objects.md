@@ -263,12 +263,13 @@ and `0x4375C0` `ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349
 The live session now retains the exact placement plan used for the rendered
 grid and combines it with the selected player's setup through
 `apply_car_track_runtime_record`. This produces the mapped PCAR header, model
-basename, CARF fields, and placement transform. The runtime frames this one
-complete record at the track-derived logical cursor and retains the serialized
-entry alongside its constructor inputs. This is a per-player record producer
-slice: the record entry is not yet consumed by the physics loader, preceding
-world records are not assembled into the same buffer, and the fixed-step
-11-byte interpolation ring is still absent.
+basename, CARF fields, and placement transform. A `PhysicsTaskRecordStreamSession`
+now owns and frames this one complete record at the track-derived logical
+cursor alongside its constructor inputs. Startup decodes the session snapshot
+and verifies tag, cursor, size, and record bytes. This is a per-player record
+producer slice: the record entry is not yet consumed by the physics loader,
+preceding world records are not assembled into the same buffer, and the
+fixed-step 11-byte interpolation ring is still absent.
 
 `src/physics_task_stream.cpp` now models the exact tag-to-cursor-advance
 lookup used by `0x4209E0`, from the table at `0x4D4890`. Car tags `RAC\0`,
@@ -297,6 +298,15 @@ are rejected. The serializer likewise refuses a cursor whose high bit would
 make the native loader stop before reading a record. This reader verifies
 record framing only; it does not perform the native allocation, factory, or
 physics-task construction.
+
+`PhysicsTaskRecordStreamSession` owns an accumulated stream when the caller
+supplies complete records in native order. Each append is validated at the
+current explicit cursor before the session updates its bytes or cursor, and a
+snapshot returns the framed sequence accumulated so far. This removes the
+need for callers to repeatedly rebuild a prefix merely to retain the stream.
+It deliberately does not discover scene-record ordering or model the separate
+fixed-step interpolation ring; the live race runtime still has not assembled
+all preceding world records into this session.
 
 `plan_physics_track_service` projects selector dispatch, allocation size,
 constructor/vtable choices, panic behavior, and the final unconditional

@@ -139,6 +139,38 @@ int main()
                         serialized.bytes.begin() + 4),
                 "serializer must frame each complete record with a little-endian cursor");
 
+        viper::PhysicsTaskRecordStreamSession session(0x100U);
+        const auto session_first = session.append_record(car_record);
+        require(session_first.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::complete &&
+                    session_first.records.size() == 1U &&
+                    session_first.records[0].cursor_offset == 0x100U &&
+                    session.final_cursor() == 0x28CU,
+                "session stream must append a record at its current explicit cursor");
+        const auto session_before_reject = session.snapshot();
+        const auto session_unknown_record = make_physics_record(0x12345678U, 8U);
+        const auto session_reject = session.append_record(session_unknown_record);
+        require(session_reject.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::unknown_record_tag &&
+                    session_reject.failed_record_index == 1U &&
+                    session.final_cursor() == session_before_reject.final_cursor &&
+                    session.snapshot().bytes == session_before_reject.bytes,
+                "rejected session append must leave accumulated bytes and cursor unchanged");
+        const auto session_second = session.append_record(static_record);
+        const auto session_snapshot = session.snapshot();
+        const auto session_decoded =
+            viper::read_physics_task_record_stream(session_snapshot.bytes);
+        require(session_second.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::complete &&
+                    session_snapshot.records.size() == 2U &&
+                    session_snapshot.final_cursor == 0x28CU &&
+                    session_decoded.status ==
+                        viper::PhysicsTaskRecordStreamReadStatus::complete &&
+                    session_decoded.records.size() == 2U &&
+                    session_decoded.records[1].record_tag == 0x53544154U &&
+                    session_decoded.records[1].cursor_offset == 0x28CU,
+                "session snapshot must preserve appended record order and cursor framing");
+
         const auto decoded = viper::read_physics_task_record_stream(serialized.bytes);
         require(decoded.status == viper::PhysicsTaskRecordStreamReadStatus::complete &&
                     decoded.records.size() == 3U && decoded.consumed_bytes ==

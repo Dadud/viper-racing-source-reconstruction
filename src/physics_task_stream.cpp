@@ -128,6 +128,45 @@ PhysicsTaskRecordSerialization serialize_physics_task_records(
     return result;
 }
 
+PhysicsTaskRecordSerialization PhysicsTaskRecordStreamSession::append_record(
+    const std::span<const std::byte> record_bytes) {
+    const PhysicsTaskRecordInput input{record_bytes};
+    auto appended = serialize_physics_task_records(
+        std::span<const PhysicsTaskRecordInput>(&input, 1U), final_cursor_);
+    appended.initial_cursor = final_cursor_;
+    if (appended.status != PhysicsTaskRecordSerializationStatus::complete) {
+        appended.records.clear();
+        appended.bytes.clear();
+        appended.final_cursor = final_cursor_;
+        appended.failed_record_index = records_.size();
+        return appended;
+    }
+
+    if (records_.size() == records_.max_size() ||
+        appended.bytes.size() > bytes_.max_size() - bytes_.size()) {
+        appended.status = PhysicsTaskRecordSerializationStatus::output_size_overflow;
+        appended.records.clear();
+        appended.bytes.clear();
+        appended.final_cursor = final_cursor_;
+        appended.failed_record_index = records_.size();
+        return appended;
+    }
+
+    bytes_.insert(bytes_.end(), appended.bytes.begin(), appended.bytes.end());
+    records_.push_back(appended.records.front());
+    final_cursor_ = appended.final_cursor;
+    return appended;
+}
+
+PhysicsTaskRecordSerialization PhysicsTaskRecordStreamSession::snapshot() const {
+    PhysicsTaskRecordSerialization result{};
+    result.initial_cursor = initial_cursor_;
+    result.final_cursor = final_cursor_;
+    result.records = records_;
+    result.bytes = bytes_;
+    return result;
+}
+
 PhysicsTaskRecordStreamRead read_physics_task_record_stream(
     const std::span<const std::byte> bytes) {
     PhysicsTaskRecordStreamRead result{};
