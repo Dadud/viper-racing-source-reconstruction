@@ -139,6 +139,77 @@ int main()
                         serialized.bytes.begin() + 4),
                 "serializer must frame each complete record with a little-endian cursor");
 
+        const auto decoded = viper::read_physics_task_record_stream(serialized.bytes);
+        require(decoded.status == viper::PhysicsTaskRecordStreamReadStatus::complete &&
+                    decoded.records.size() == 3U && decoded.consumed_bytes ==
+                        serialized.bytes.size() && decoded.final_cursor == 0x2C0U &&
+                    decoded.records[0].record_tag == 0x50434152U &&
+                    decoded.records[0].cursor_offset == 0x100U &&
+                    decoded.records[0].record_size == 0x1E4U &&
+                    decoded.records[0].record_bytes_offset == 4U &&
+                    decoded.records[1].cursor_offset == 0x28CU &&
+                    decoded.records[2].cursor_offset == 0x28CU,
+                "reader must recover serialized records and native cursor positions");
+        require(viper::read_physics_task_record_stream({}).status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::end_of_stream,
+                "empty byte span must be an empty stream");
+
+        const std::array<std::byte, 2> partial_cursor{std::byte{0U}, std::byte{0U}};
+        const auto incomplete_cursor =
+            viper::read_physics_task_record_stream(partial_cursor);
+        require(incomplete_cursor.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::incomplete_cursor &&
+                    incomplete_cursor.failed_record_index == 0U,
+                "partial cursor prefix must be reported as incomplete");
+        const auto incomplete_header = viper::read_physics_task_record_stream(
+            std::span<const std::byte>(serialized.bytes.data(), 8U));
+        require(incomplete_header.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::incomplete_record_header &&
+                    incomplete_header.final_cursor == 0x100U,
+                "partial record header must retain its cursor for diagnosis");
+        const auto incomplete_payload = viper::read_physics_task_record_stream(
+            std::span<const std::byte>(serialized.bytes.data(), 4U + 0x1E4U - 1U));
+        require(incomplete_payload.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::incomplete_record_payload,
+                "short record payload must be rejected");
+
+        auto cursor_mismatch_bytes = serialized.bytes;
+        cursor_mismatch_bytes[static_entry + 4U + 0x48U] = std::byte{0x8DU};
+        const auto cursor_mismatch =
+            viper::read_physics_task_record_stream(cursor_mismatch_bytes);
+        require(cursor_mismatch.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::cursor_mismatch &&
+                    cursor_mismatch.failed_record_index == 2U,
+                "subsequent record cursor must match the previous class advance");
+
+        auto unknown_tag_bytes = serialized.bytes;
+        unknown_tag_bytes[4U] = std::byte{0x78U};
+        unknown_tag_bytes[5U] = std::byte{0x56U};
+        unknown_tag_bytes[6U] = std::byte{0x34U};
+        unknown_tag_bytes[7U] = std::byte{0x12U};
+        const auto unknown_tag_read =
+            viper::read_physics_task_record_stream(unknown_tag_bytes);
+        require(unknown_tag_read.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::unknown_record_tag &&
+                    unknown_tag_read.failed_record_index == 0U,
+                "reader must reject classes without recovered cursor advances");
+
+        auto eof_stream = serialized.bytes;
+        eof_stream.insert(eof_stream.end(), {
+            std::byte{0xFFU}, std::byte{0xFFU}, std::byte{0xFFU}, std::byte{0xFFU}});
+        const auto eof_read = viper::read_physics_task_record_stream(eof_stream);
+        require(eof_read.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::end_of_stream &&
+                    eof_read.records.size() == 3U &&
+                    eof_read.consumed_bytes == eof_stream.size() &&
+                    eof_read.final_cursor == 0x2C0U,
+                "native negative cursor sentinel must end the decoded stream");
+        eof_stream.push_back(std::byte{0U});
+        require(viper::read_physics_task_record_stream(eof_stream).status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::
+                        trailing_bytes_after_end_of_stream,
+                "bytes after native end sentinel must be rejected");
+
         const std::array<std::byte, 7> short_record{};
         const std::array<viper::PhysicsTaskRecordInput, 1> short_input{{
             {short_record}}};
@@ -173,6 +244,13 @@ int main()
                     viper::PhysicsTaskRecordSerializationStatus::cursor_overflow &&
                     serialization_overflow.bytes.empty(),
                 "cursor overflow must reject a record before appending its bytes");
+        const auto signed_sentinel_cursor = viper::serialize_physics_task_records(
+            std::span<const viper::PhysicsTaskRecordInput>(input_records.data(), 1U),
+            0x80000000U);
+        require(signed_sentinel_cursor.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::cursor_overflow &&
+                    signed_sentinel_cursor.bytes.empty(),
+                "writer must reject cursors interpreted as the native EOF sentinel");
 
         const auto bemidji_prefix = make_track_object_table({
             "out\\track.txt", "map test.map", "ai test.vf",

@@ -75,10 +75,44 @@ struct PhysicsTaskRecordSerialization {
     std::optional<std::size_t> failed_record_index;
 };
 
+enum class PhysicsTaskRecordStreamReadStatus : std::uint8_t {
+    complete,
+    end_of_stream,
+    incomplete_cursor,
+    incomplete_record_header,
+    incomplete_record_payload,
+    trailing_bytes_after_end_of_stream,
+    cursor_mismatch,
+    cursor_not_representable,
+    unknown_record_tag,
+};
+
+struct DecodedPhysicsTaskRecord {
+    std::uint32_t record_tag{};
+    std::uint32_t cursor_offset{};
+    std::uint32_t record_size{};
+    std::uint32_t cursor_advance{};
+    std::size_t record_bytes_offset{};
+};
+
+struct PhysicsTaskRecordStreamRead {
+    PhysicsTaskRecordStreamReadStatus status{
+        PhysicsTaskRecordStreamReadStatus::end_of_stream};
+    std::vector<DecodedPhysicsTaskRecord> records;
+    std::size_t consumed_bytes{};
+    std::uint32_t final_cursor{};
+    std::optional<std::size_t> failed_record_index;
+};
+
 // Serializes complete, already reconstructed records using the native stream
 // framing. Invalid or unknown records stop the walk without appending them.
 [[nodiscard]] PhysicsTaskRecordSerialization serialize_physics_task_records(
     std::span<const PhysicsTaskRecordInput> records,
     std::uint32_t initial_cursor = 0U);
+
+// Decodes the cursor-prefixed complete-record framing written above. Cursor
+// values are signed in the native reader, so a negative DWORD terminates input.
+[[nodiscard]] PhysicsTaskRecordStreamRead read_physics_task_record_stream(
+    std::span<const std::byte> bytes);
 
 } // namespace viper

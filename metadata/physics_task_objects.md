@@ -287,6 +287,17 @@ allocation sizes. Evidence:
 `0x425420`, `ev_ef89830f565cea2f11328cf87320e8939eb255ab7d432ab5de43786aadee533c`,
 and the native bytes at `0x4D4890`, observed by `read_bytes`.
 
+`read_physics_task_record_stream` decodes the same framing with bounds checks:
+each entry is a signed cursor DWORD plus one complete record. It verifies that
+each later cursor equals the previous cursor plus the resolved class advance,
+and reports truncated prefixes/headers/payloads, unknown tags, mismatches, and
+cursor values that cannot be represented by the native signed reader. A
+negative cursor is the native end-of-stream sentinel; trailing bytes after it
+are rejected. The serializer likewise refuses a cursor whose high bit would
+make the native loader stop before reading a record. This reader verifies
+record framing only; it does not perform the native allocation, factory, or
+physics-task construction.
+
 `plan_physics_track_service` projects selector dispatch, allocation size,
 constructor/vtable choices, panic behavior, and the final unconditional
 virtual `+0x14` call. For selectors 1 and 3, the initializer is a void helper

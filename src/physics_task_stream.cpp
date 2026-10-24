@@ -1,5 +1,6 @@
 #include "viper/physics_task_stream.hpp"
 
+#include <bit>
 #include <limits>
 
 namespace viper {
@@ -81,6 +82,12 @@ PhysicsTaskRecordSerialization serialize_physics_task_records(
 
     for (std::size_t index = 0U; index < records.size(); ++index) {
         const auto bytes = records[index].record_bytes;
+        if (result.final_cursor > static_cast<std::uint32_t>(
+                std::numeric_limits<std::int32_t>::max())) {
+            result.status = PhysicsTaskRecordSerializationStatus::cursor_overflow;
+            result.failed_record_index = index;
+            return result;
+        }
         if (bytes.size() < 8U) {
             result.status = PhysicsTaskRecordSerializationStatus::malformed_record_header;
             result.failed_record_index = index;
@@ -118,6 +125,91 @@ PhysicsTaskRecordSerialization serialize_physics_task_records(
         result.bytes.insert(result.bytes.end(), bytes.begin(), bytes.end());
         result.final_cursor += *advance;
     }
+    return result;
+}
+
+PhysicsTaskRecordStreamRead read_physics_task_record_stream(
+    const std::span<const std::byte> bytes) {
+    PhysicsTaskRecordStreamRead result{};
+    std::size_t input_offset = 0U;
+    std::optional<std::uint32_t> expected_cursor;
+    const auto read_u32_le = [bytes](const std::size_t offset) noexcept {
+        return std::to_integer<std::uint32_t>(bytes[offset])
+            | (std::to_integer<std::uint32_t>(bytes[offset + 1U]) << 8U)
+            | (std::to_integer<std::uint32_t>(bytes[offset + 2U]) << 16U)
+            | (std::to_integer<std::uint32_t>(bytes[offset + 3U]) << 24U);
+    };
+
+    while (input_offset < bytes.size()) {
+        if (bytes.size() - input_offset < sizeof(std::uint32_t)) {
+            result.status = PhysicsTaskRecordStreamReadStatus::incomplete_cursor;
+            result.consumed_bytes = input_offset;
+            result.failed_record_index = result.records.size();
+            return result;
+        }
+        const auto signed_cursor = std::bit_cast<std::int32_t>(
+            read_u32_le(input_offset));
+        if (signed_cursor < 0) {
+            result.status = input_offset + sizeof(std::uint32_t) == bytes.size()
+                ? PhysicsTaskRecordStreamReadStatus::end_of_stream
+                : PhysicsTaskRecordStreamReadStatus::trailing_bytes_after_end_of_stream;
+            result.consumed_bytes = input_offset + sizeof(std::uint32_t);
+            result.final_cursor = expected_cursor.value_or(0U);
+            return result;
+        }
+        const auto cursor = static_cast<std::uint32_t>(signed_cursor);
+        if (expected_cursor.has_value() && cursor != *expected_cursor) {
+            result.status = PhysicsTaskRecordStreamReadStatus::cursor_mismatch;
+            result.consumed_bytes = input_offset;
+            result.final_cursor = *expected_cursor;
+            result.failed_record_index = result.records.size();
+            return result;
+        }
+
+        const auto record_offset = input_offset + sizeof(std::uint32_t);
+        if (bytes.size() - record_offset < 8U) {
+            result.status = PhysicsTaskRecordStreamReadStatus::incomplete_record_header;
+            result.consumed_bytes = input_offset;
+            result.final_cursor = cursor;
+            result.failed_record_index = result.records.size();
+            return result;
+        }
+        const auto tag = read_u32_le(record_offset);
+        const auto record_size = read_u32_le(record_offset + 4U);
+        const auto available_record_bytes = bytes.size() - record_offset;
+        if (record_size < 8U || record_size > available_record_bytes) {
+            result.status = PhysicsTaskRecordStreamReadStatus::incomplete_record_payload;
+            result.consumed_bytes = input_offset;
+            result.final_cursor = cursor;
+            result.failed_record_index = result.records.size();
+            return result;
+        }
+        const auto advance = physics_task_stream_advance_for_tag(tag);
+        if (!advance.has_value()) {
+            result.status = PhysicsTaskRecordStreamReadStatus::unknown_record_tag;
+            result.consumed_bytes = input_offset;
+            result.final_cursor = cursor;
+            result.failed_record_index = result.records.size();
+            return result;
+        }
+        if (*advance > static_cast<std::uint32_t>(
+                std::numeric_limits<std::int32_t>::max()) - cursor) {
+            result.status = PhysicsTaskRecordStreamReadStatus::cursor_not_representable;
+            result.consumed_bytes = input_offset;
+            result.final_cursor = cursor;
+            result.failed_record_index = result.records.size();
+            return result;
+        }
+
+        result.records.push_back({tag, cursor, record_size, *advance, record_offset});
+        expected_cursor = cursor + *advance;
+        result.final_cursor = *expected_cursor;
+        input_offset = record_offset + record_size;
+    }
+    result.status = result.records.empty()
+        ? PhysicsTaskRecordStreamReadStatus::end_of_stream
+        : PhysicsTaskRecordStreamReadStatus::complete;
+    result.consumed_bytes = input_offset;
     return result;
 }
 
