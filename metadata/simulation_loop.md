@@ -1035,15 +1035,18 @@ The portable plan now also projects the filled triangle vertices and its two
 colored tip-to-base edges: center `(80, height-80)`, tip offset
 `(-sin(angle)*50, cos(angle)*50)`, and base corners offset by
 `(+/-3*cos(angle), +/-3*sin(angle))`. Colors are supplied as raw values from
-`0x4EB29C`, `0x4EB27C`, and `0x4EB33C`. Vertex coordinates use host
-long-double trigonometry and nearest rounding to approximate x87 `FSIN`/`FCOS`
-and the target `__ftol`; exact x87 results still need original-runtime comparison.
+`0x4EB29C`, `0x4EB27C`, and `0x4EB33C`. Vertex and edge coordinates use the
+observed `0x4BD1F8` conversion, which switches x87 to truncate before `FISTP`
+and restores the prior control word. This matches the conversion direction;
+host trigonometry and division still approximate x87 `FSIN`/`FCOS` and
+division, so exact coordinates need original-runtime comparison.
 `0x44A230`'s nonempty horizontal fill calls are projected as half-open scanline
 spans, clipped to nonnegative rows below the supplied renderer height. The
 binary uses two 1024-DWORD stack edge arrays; the portable plan caps projected
 rows to that capacity rather than reproducing out-of-bounds stack writes for
-larger heights. Edge intersections use host long-double division and nearest
-rounding, so Pentium FDIV emulation and exact x87 edge values remain open.
+larger heights. Edge intersections use host long-double division followed by
+the target truncating conversion; Pentium FDIV emulation and exact x87 edge
+values remain open.
 The spans preserve the fill-helper calls and also produce per-pixel write
 projections below; these plans do not mutate framebuffer memory. The pointer's
 two `0x44C260` outline edges now emit ordered `0x449E90` pixel

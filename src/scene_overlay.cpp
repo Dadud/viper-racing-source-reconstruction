@@ -1460,20 +1460,22 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                 static_cast<long double>(value);
         const auto sine = std::sin(angle);
         const auto cosine = std::cos(angle);
-        const auto round_like_ftol = [](const long double coordinate) {
-            return truncate_to_low_i32(std::nearbyint(coordinate));
+        const auto target_coordinate_conversion = [](const long double coordinate) {
+            // 0x4BD1F8 sets the x87 rounding-control bits to truncate before
+            // FISTP, then restores the caller's control word.
+            return truncate_to_low_i32(coordinate);
         };
         const auto center_x = 0x50;
         const auto center_y = observation.surface_height - 0x50;
         const auto radius = static_cast<long double>(0x32);
         result.rotating_gear_geometry = SceneDashboardGearGeometry{
             static_cast<float>(angle),
-            {center_x + round_like_ftol(-sine * radius),
-             center_y + round_like_ftol(cosine * radius)},
-            {center_x + round_like_ftol(3.0L * cosine),
-             center_y + round_like_ftol(3.0L * sine)},
-            {center_x - round_like_ftol(3.0L * cosine),
-             center_y - round_like_ftol(3.0L * sine)},
+            {center_x + target_coordinate_conversion(-sine * radius),
+             center_y + target_coordinate_conversion(cosine * radius)},
+            {center_x + target_coordinate_conversion(3.0L * cosine),
+             center_y + target_coordinate_conversion(3.0L * sine)},
+            {center_x - target_coordinate_conversion(3.0L * cosine),
+             center_y - target_coordinate_conversion(3.0L * sine)},
             observation.triangle_color_value_0x4eb29c,
             observation.first_edge_color_value_0x4eb27c,
             observation.second_edge_color_value_0x4eb33c,
@@ -1519,7 +1521,7 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                     (static_cast<long double>(end.y) - start.y);
                 const auto x = static_cast<long double>(start.x) + fraction *
                     (static_cast<long double>(end.x) - start.x);
-                crossings[crossing_count++] = round_like_ftol(x);
+                crossings[crossing_count++] = target_coordinate_conversion(x);
             }
             if (crossing_count < 2U) {
                 continue;
@@ -1568,7 +1570,7 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                 auto x = static_cast<float>(start.x);
                 for (auto y = start.y; y != end.y; y += y_step) {
                     result.rotating_gear_edge_pixels.push_back({
-                        edge_index, round_like_ftol(x), y, color});
+                        edge_index, target_coordinate_conversion(x), y, color});
                     x = static_cast<float>(x + slope);
                 }
             } else {
@@ -1577,7 +1579,7 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                 auto y = static_cast<float>(start.y);
                 for (auto x = start.x; x != end.x; x += x_step) {
                     result.rotating_gear_edge_pixels.push_back({
-                        edge_index, x, round_like_ftol(y), color});
+                        edge_index, x, target_coordinate_conversion(y), color});
                     y = static_cast<float>(y + slope);
                 }
             }

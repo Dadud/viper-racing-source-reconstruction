@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Corrected dashboard rotating-gear coordinate
+  conversion to match `0x4BD1F8`, which sets x87 truncation before `FISTP` and
+  restores the prior control word. Geometry, scanline intersections, and
+  sloped-edge pixel coordinates now truncate toward zero instead of rounding
+  to nearest; host trigonometry and division remain approximations. Release
+  build and `git diff --check` pass; no tests were run. See
+  `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Reconstructed the dashboard's
   `0x44D530` color-resource gradient for gear-label palette `0x4EB314`.
   The composer now derives the 256 packed color DWORDs from the observed
