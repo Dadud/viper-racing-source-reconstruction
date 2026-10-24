@@ -113,12 +113,21 @@ Next, the virtual callback at slot `+0x4C` receives four floats initialized to
 four-float buffer is copied to wheel subobject `+0xE0` fields starting at
 parent `+0x634`, with `0x1A4` bytes between wheels. When the signed raw DWORD at
 `+0xDE8` exceeds `0x3DCCCCCD`, buffer entries 2 and 3 are negated before the
-stores. `advance_ncar_integrator_wheel_scalars` takes the callback-mutated
-buffer as an observation, applies that pairwise sign gate, and exposes the
-four direct wheel stores. When the reconstructed spin-preprojection stage is
-enabled, each stored wheel `+0xE0` now feeds `advance_wheel_spin_preprojection`,
-which consumes its absolute value in the response and rate blend. The rest of
-the external wheel callback remains unmodeled.
+stores. Both observed class vtables that contain `0x431150` at slot `+0x08`
+point their slot `+0x4C` to `0x432170`. That routine returns unchanged if
+`+0x4F8` is zero. Otherwise it computes
+`speed(+0x234) * ((+0xD84 - +0xD90) / tan(+0xDCC * +0x500))` and proceeds only
+when the resulting float is greater than the global float at `0x4C7E2C`
+(`0x3F638E39`). Selector value 1 uses scale 0.5 for the positive response;
+other nonzero selectors use 5.0, while the negative response uses 5.0. The
+raw signed value at `+0x244` and the signed raw float bits of the delta choose
+which buffer lane receives a max update: lane 3 or 0 when `+0x244 > 0`, lane 1
+or 2 otherwise. The updated array is then copied to the four wheel `+0xE0`
+fields. `advance_ncar_integrator_wheel_scalars` now reconstructs this callback
+and applies the caller's pairwise sign gate before exposing the stores. It
+feeds each wheel value into the existing spin-response stage, which consumes
+its absolute value. Exact x87 tangent/division rounding and the optional
+Pentium math-wrapper path remain approximate.
 
 Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x431150`), `ev_561bda702abc7970b5b820be76dc22cedb78968c7da2d82ede95809777fcf6c1`
@@ -130,6 +139,9 @@ The adjacent `+0x4C` callback and four strided wheel stores are in the caller's
 same assembly evidence. `ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7`
 (`0x442530` pseudocode, including the `ABS(+0xE0)` consumption) is retained at
 [`wheel_update_value_e0.evidence.json`](wheel_update_value_e0.evidence.json).
+The routine bytes, vtable references/entries, tangent wrapper, and threshold
+constants are retained at
+[`ncar_integrator_wheel_callback.evidence.json`](ncar_integrator_wheel_callback.evidence.json).
 
 ## PCAR callback at `0x4384D0`
 

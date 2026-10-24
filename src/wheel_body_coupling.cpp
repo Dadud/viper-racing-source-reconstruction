@@ -220,8 +220,72 @@ NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
         input.value_0xde4,
         maximum,
         maximum};
-    result.callback_values = input.callback_values;
+    result.callback_values = result.seed_values;
     result.callback_0x4c_reached = true;
+
+    if (input.selector_bits_0x4f8 != 0U) {
+        result.callback_selector_nonzero = true;
+        const auto speed_squared =
+            static_cast<long double>(input.body_velocity_0x234.x) *
+                input.body_velocity_0x234.x +
+            static_cast<long double>(input.body_velocity_0x234.y) *
+                input.body_velocity_0x234.y +
+            static_cast<long double>(input.body_velocity_0x234.z) *
+                input.body_velocity_0x234.z;
+        const auto speed = std::sqrt(speed_squared);
+        result.speed_magnitude = static_cast<float>(speed);
+        const auto tangent = std::tan(
+            static_cast<long double>(input.angle_0xdcc) *
+            static_cast<long double>(input.angle_scale_0x500));
+        result.tangent_response = static_cast<float>(tangent);
+        const auto target_wide =
+            ((static_cast<long double>(input.value_0xd84) -
+              static_cast<long double>(input.value_0xd90)) / tangent) * speed;
+        result.target_response = static_cast<float>(target_wide);
+
+        constexpr float target_cutoff = std::bit_cast<float>(0x3F638E39U);
+        if (result.target_response > target_cutoff) {
+            result.response_gate_passed = true;
+            const auto scale_positive = input.selector_bits_0x4f8 == 1U
+                ? 0.5F : 5.0F;
+            constexpr float scale_negative = 5.0F;
+            const auto target_delta =
+                result.target_response - input.value_0xde4;
+            const auto update_max = [&](const std::size_t lane,
+                                        const long double candidate) {
+                const auto previous = static_cast<long double>(
+                    result.callback_values[lane]);
+                if (!(previous >= candidate)) {
+                    result.callback_values[lane] =
+                        static_cast<float>(candidate);
+                }
+            };
+
+            if (std::bit_cast<std::int32_t>(input.value_bits_0x244) > 0) {
+                if (std::bit_cast<std::int32_t>(
+                        std::bit_cast<std::uint32_t>(target_delta)) > 0) {
+                    update_max(3U,
+                        static_cast<long double>(target_delta) * scale_positive);
+                    result.adjusted_lane = 3U;
+                } else {
+                    update_max(0U,
+                        -static_cast<long double>(target_delta) * scale_negative);
+                    result.adjusted_lane = 0U;
+                }
+            } else {
+                const auto reversed_delta = -target_delta;
+                if (!(reversed_delta > 0.0F)) {
+                    update_max(1U,
+                        static_cast<long double>(target_delta) * scale_negative);
+                    result.adjusted_lane = 1U;
+                } else {
+                    update_max(2U,
+                        static_cast<long double>(reversed_delta) * scale_positive);
+                    result.adjusted_lane = 2U;
+                }
+            }
+        }
+    }
 
     constexpr std::int32_t sign_gate_bits = 0x3DCCCCCD;
     if (std::bit_cast<std::int32_t>(input.value_bits_0xde8) > sign_gate_bits) {
@@ -868,8 +932,13 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         result.integrator_signal_state,
         input.integrator_signal_input,
         result.integrator_curve_gate_state.parent_flag_0xc3c);
+    auto wheel_scalar_input = input.integrator_wheel_scalar_input;
+    wheel_scalar_input.body_velocity_0x234 =
+        kinematics_at_step_start.linear_velocity;
+    wheel_scalar_input.value_bits_0x244 = std::bit_cast<std::uint32_t>(
+        kinematics_at_step_start.angular_velocity.y);
     result.integrator_wheel_scalars = advance_ncar_integrator_wheel_scalars(
-        input.integrator_wheel_scalar_input);
+        wheel_scalar_input);
     result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;

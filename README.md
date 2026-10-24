@@ -405,9 +405,10 @@ files were present.
   `advance_ncar_integrator_signal` follows that controller with the observed
   float `+0xDDC`/byte `+0xE49` stores and the bounded/smoothed `+0xC7C` signal
   helper. `advance_ncar_integrator_wheel_scalars` applies the `+0x4C` callback's
-  observed four-value result and conditional sign reversal before the strided
-  wheel `+0xE0` writes, which feed their absolute values into the modeled wheel
-  spin response stage; virtual returns and setter targets remain explicit.
+  recovered tangent-scaled, per-lane max updates and conditional sign reversal
+  before the strided wheel `+0xE0` writes, which feed their absolute values into
+  the modeled wheel spin response stage. The tangent/x87 path remains
+  approximate.
   Exact x87 rounding and the Pentium FDIV-emulation
   branch remain under study.
 - `include/viper/timed_event_queue.hpp` and `src/timed_event_queue.cpp` model

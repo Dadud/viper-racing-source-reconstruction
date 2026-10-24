@@ -394,15 +394,26 @@ struct NcarIntegratorSignalResult {
 };
 
 struct NcarIntegratorWheelScalarInput {
+    std::uint32_t selector_bits_0x4f8{};
+    float angle_0xdcc{};
+    float angle_scale_0x500{};
+    float value_0xd84{};
+    float value_0xd90{};
+    std::uint32_t value_bits_0x244{};
+    PhysicsVector3 body_velocity_0x234{};
     float value_0xde4{};
     std::uint32_t value_bits_0xde8{};
-    // The four values after the external virtual call at vtable slot +0x4C.
-    std::array<float, 4> callback_values{};
 };
 
 struct NcarIntegratorWheelScalarResult {
     bool callback_0x4c_reached{};
+    bool callback_selector_nonzero{};
+    bool response_gate_passed{};
     bool negative_pair_gate_passed{};
+    std::uint8_t adjusted_lane{0xffU};
+    float speed_magnitude{};
+    float tangent_response{};
+    float target_response{};
     std::array<float, 4> seed_values{};
     std::array<float, 4> callback_values{};
     std::array<float, 4> wheel_values_0xe0{};
@@ -416,8 +427,8 @@ struct NcarIntegratorWheelScalarResult {
     const NcarIntegratorSignalInput& input,
     std::uint8_t copied_flag_0xc3c) noexcept;
 
-// Records the four-value callback at 0x431150 and its optional sign reversal
-// before the values are stored to the wheel subobjects' +0xE0 fields.
+// Reconstructs the shared vtable +0x4C implementation at 0x432170, then
+// applies its caller's optional sign reversal and four +0xE0 stores.
 [[nodiscard]] NcarIntegratorWheelScalarResult
 advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept;
