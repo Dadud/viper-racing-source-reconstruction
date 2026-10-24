@@ -16,6 +16,8 @@ struct SceneRendererObjectObservation {
     bool virtual_0x0c_result{};
     // Resolved vtable target for slot +0x14; zero means the class target is unknown.
     std::uint32_t virtual_0x14_target{};
+    // Timed-effects manager field at +0x118, retained as raw binary32 bits.
+    std::optional<std::uint32_t> timed_effect_start_time_bits_0x118;
 };
 
 // Builds the generic-dispatch observation for the registered wheel-resource
@@ -29,6 +31,11 @@ struct SceneRendererObjectObservation {
 // Their vtable slots +0x10 and +0x0C both return true; +0x14 targets 0x4686A0.
 [[nodiscard]] SceneRendererObjectObservation observe_scene_fixed_effect_object(
     bool pointer_present) noexcept;
+
+// Builds the timed-effects manager observation whose +0x14 target is 0x468610.
+[[nodiscard]] SceneRendererObjectObservation observe_scene_timed_effect_manager(
+    bool pointer_present,
+    std::optional<std::uint32_t> start_time_bits_0x118) noexcept;
 
 inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
 inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;
@@ -187,6 +194,7 @@ struct SceneRendererDispatchInput {
     std::uint32_t setup_viewport_origin{}; // DAT_004DC1AC
     std::int32_t screen_width{}; // DAT_00509A4C
     std::int32_t screen_height{}; // DAT_00509A2C
+    std::optional<std::int32_t> simulation_time_tick_0x508774;
     std::array<std::int32_t, 8> view_transform_cache_reference_counts{};
     std::array<std::uint32_t, 8> view_transform_cache_flags{};
     std::array<std::int32_t, 2> view_transform_hresult{}; // transformed camera, restore
@@ -198,6 +206,7 @@ struct SceneRendererDispatchInput {
 
 struct SceneRendererDispatchPlan {
     SceneRendererDispatchStatus status{SceneRendererDispatchStatus::complete};
+    bool input_complete{true};
     bool draw_path_enabled{};
     std::array<float, 12> camera_transform_after{};
     std::array<std::int32_t, 8> view_transform_cache_reference_counts_after{};

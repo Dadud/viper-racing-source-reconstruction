@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstddef>
 #include <utility>
 
@@ -19,6 +20,14 @@ SceneRendererObjectObservation observe_scene_fixed_effect_object(
     const bool pointer_present) noexcept
 {
     return {pointer_present, true, true, 0x004686A0U};
+}
+
+SceneRendererObjectObservation observe_scene_timed_effect_manager(
+    const bool pointer_present,
+    const std::optional<std::uint32_t> start_time_bits_0x118) noexcept
+{
+    return {pointer_present, true, false, 0x00468610U,
+        start_time_bits_0x118};
 }
 
 namespace {
@@ -467,12 +476,39 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                 object.virtual_0x14_target == 0x004623F0U;
             const bool is_fixed_effect_object =
                 object.virtual_0x14_target == 0x004686A0U;
-            const bool virtual_0x10_result = is_wheel_resource_manager
-                ? false : is_fixed_effect_object
-                ? true : object.virtual_0x10_result;
-            const bool virtual_0x0c_result = is_wheel_resource_manager
-                ? false : is_fixed_effect_object
-                ? true : object.virtual_0x0c_result;
+            const bool is_timed_effect_manager =
+                object.virtual_0x14_target == 0x00468610U;
+            auto virtual_0x10_result = object.virtual_0x10_result;
+            auto virtual_0x0c_result = object.virtual_0x0c_result;
+            if (is_wheel_resource_manager) {
+                virtual_0x10_result = false;
+                virtual_0x0c_result = false;
+            } else if (is_fixed_effect_object) {
+                virtual_0x10_result = true;
+                virtual_0x0c_result = true;
+            } else if (is_timed_effect_manager) {
+                virtual_0x10_result = true;
+                virtual_0x0c_result = false;
+            }
+            if (is_timed_effect_manager && input.renderer_mode > 2) {
+                if (input.simulation_time_tick_0x508774.has_value()
+                    && object.timed_effect_start_time_bits_0x118.has_value()) {
+                    const auto start_time = std::bit_cast<float>(
+                        *object.timed_effect_start_time_bits_0x118);
+                    const auto simulation_time = static_cast<double>(
+                        *input.simulation_time_tick_0x508774)
+                        * static_cast<double>(0.016F);
+                    const auto window_end = static_cast<double>(start_time) + 5.0;
+                    virtual_0x0c_result = std::isfinite(simulation_time)
+                        && std::isfinite(start_time)
+                        && simulation_time >= static_cast<double>(start_time)
+                        && simulation_time < window_end;
+                } else {
+                    // This gate controls +0x14 once the mode gate permits it;
+                    // do not substitute the caller's precomputed boolean.
+                    result.input_complete = false;
+                }
+            }
             result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
                 0U, i, 0x10U});
             const bool mode_permits_draw = !virtual_0x10_result

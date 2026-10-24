@@ -18,6 +18,16 @@
   `git diff --check` pass; no tests were run. Evidence:
   `metadata/scene_car_update.md`.
 
+- **2026-10-24 continuation:** Derived the timed-effects manager gates from
+  vtable `0x4C9528`: `+0x10` is true and `+0x0C` is true only in the native
+  five-second interval starting at object `+0x118`, measured against
+  `DAT_00508774 * 0.016`. The frame model now consumes the raw timer tick and
+  raw binary32 start-time bits, with missing required values reflected in
+  `input_complete`; the x87 clock multiplication remains approximate. The
+  Release `viper_race_scene_flow` target builds and `git diff --check` passes;
+  no tests were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
   nested texture-binding request from manager field `+0x10`, matching its
   observed `0x448E30` call and preventing a conflicting duplicate handle input.

@@ -492,6 +492,35 @@ and gate instructions `0x468670`
 `0x468690`
 `ev_e2fac5e18f8297cec9a343a3b1f74da4d1305def86e5c3f0c376a41911c6af54`.
 
+The first effects group registered by `0x468090` uses the adjacent vtable at
+`0x4C9528`. Its `+0x10` method `0x468600` returns true, `+0x0C` method
+`0x4685A0` compares the simulation clock against the instance's binary32
+`+0x118` time, and `+0x14` method `0x468610` forwards to `0x45C380`. The
+`+0x0C` gate is true for `start <= tick * 0.016 < start + 5.0`; the upper
+endpoint is exclusive because the native comparison rejects both less-than
+and equality at that boundary. `0x425790` supplies the clock as signed
+`DAT_00508774 * 0.016`; the manager constructor initially seeds `+0x118` with
+`0x49742400` (1,000,000), so a runtime value for that field is needed after
+its update path has run. `observe_scene_timed_effect_manager` carries that raw
+field state, while `SceneRendererDispatchInput` carries the raw timer tick.
+For renderer modes above 2 the generic dispatcher derives the time gate and
+marks the plan incomplete if either value is missing; lower modes cannot
+reach `+0x14` because `+0x10` is true. The multiplication is a portable
+approximation of the x87 extended-precision accessor. Evidence: vtable bytes
+`ev_dcac9944d5daeeef27d3166c19c04428416443b6529f0428a7ae6793931aa18c`,
+constructor `0x468090`
+`ev_b466aa22faf505aca957c810ba12a54714f045b5f4b12bf6b0055211483b2d98`,
+gate field read `0x4685AB`
+`ev_cc54fef7fa897297db208621683dc7a292e89f9df76bde1d762e78d1126ed10a`,
+five-second addition `0x4685C2`
+`ev_060eff6cf9c9be3b8e4ca5d8d3f70a844630568652745b185f4ccd0cac777475`,
+upper-bound compare/mask `0x4685C8/0x4685CE`
+(`ev_116bfdf04a0eac5a4113f656d3f95a2773ab3fc80d906990ca48a0f6e38d451d`,
+`ev_6539910440ccf7e43e7d8f2c4a2134ce1880e2a413a42bf834d3e965354a6e17`),
+clock accessor `0x425790`
+`ev_4394f76cfa93de76984db3bbd98bb3696a7ab8b4159da55951abcbc5f7aabaef`,
+and clock scale bytes `ev_ae685411d8cb30cbca820e08fc47fdde23ee42013aacbc4d35edfdcef58f80c7`.
+
 ### Scene-car virtual `+0x18` callout
 
 `plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached
