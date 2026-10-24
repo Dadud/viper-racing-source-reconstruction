@@ -2558,6 +2558,12 @@ SceneDashboardLapTimeResult update_scene_dashboard_lap_time(
     const SceneDashboardLapTimeObservation& observation)
 {
     SceneDashboardLapTimeResult result{};
+    const auto resource_generation_matches =
+        observation.current_resource_generation_value.has_value() &&
+                observation.lap_time_cached_generation_value.has_value()
+            ? *observation.current_resource_generation_value ==
+                *observation.lap_time_cached_generation_value
+            : observation.resource_generation_matches;
     if ((state.resource_init_mask_0x4eb484 & 0x08U) == 0) {
         state.resource_init_mask_0x4eb484 |= 0x08U;
         result.resource_registered = true;
@@ -2590,7 +2596,7 @@ SceneDashboardLapTimeResult update_scene_dashboard_lap_time(
             value_0x14, observation.time_marker, true);
         result.first_line_text = observation.resource_text_0x4eb2b4;
         result.second_line_text = result.formatted_time;
-        result.refresh_resource = !observation.resource_generation_matches;
+        result.refresh_resource = !resource_generation_matches;
         result.calls.push_back({0x00403A3F, 336, 35, 0x004CFCC0,
                                 color, 0x004EB304, 0x22});
         result.calls.push_back({0x00403A66, 342, 35, 0x004CFCC4,
@@ -2605,7 +2611,7 @@ SceneDashboardLapTimeResult update_scene_dashboard_lap_time(
         value_0x0c, observation.time_marker, false);
     result.second_line_text = result.formatted_time;
     if (result.fallback_label_drawn) {
-        result.refresh_resource = !observation.resource_generation_matches;
+        result.refresh_resource = !resource_generation_matches;
         result.calls.push_back({0x00403AB1, 336, 35, 0x004CFCC8,
                                 0x004EB488, 0x004EB304, 0x21});
     }

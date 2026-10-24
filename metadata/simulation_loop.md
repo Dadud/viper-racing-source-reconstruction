@@ -1379,7 +1379,10 @@ the low bit of the truncating conversion of `+0x0C * 8`. On fallback, the
 first row is emitted only on full redraw or prior state change, while the
 second row is formatted from record `+0x0C` through `0x425A40(..., 0)` and
 drawn on every fallback visit. A drawn label row refreshes the resource
-object when its generation differs from `0x4D3868`. The `-%03.1f` and
+object when its generation differs from `0x4D3868`. The model derives this
+comparison from optional raw cached generation `0x4EB2B8` and current
+generation `0x4D3868` at `0x403A1C`/`0x403A88`; the existing match boolean is a
+fallback when raw words are unavailable. The `-%03.1f` and
 `+%03.1f` strings belong to the following supplemental `+0x24` and `+0x1C`
 rows, not these LapTime calls. Their values and record-derived suffixes are
 modeled separately by `scene_dashboard_supplemental_time_plan` below; suffix

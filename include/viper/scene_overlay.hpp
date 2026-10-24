@@ -844,6 +844,9 @@ struct SceneDashboardLapTimeObservation {
     bool redraw_all{};
     bool redraw_from_prior_state_change{};
     bool resource_generation_matches{};
+    // Raw words compared at 0x403A1C/0x403A88 before refreshing 0x4EB2B0.
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> lap_time_cached_generation_value;
     char time_marker{};
     std::string resource_text_0x4eb2b4;
 };

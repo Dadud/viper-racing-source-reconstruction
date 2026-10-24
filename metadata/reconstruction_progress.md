@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added raw generation-word comparison for the
+  selected type-0 LapTime resource. Both positive-delta and fallback text paths
+  now derive refresh from cached DWORD `0x4EB2B8` versus current generation
+  `0x4D3868`, matching `0x403A1C`/`0x403A88`; the existing boolean remains a
+  fallback. Release build and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Added the RaceTime resource refresh projection
   for the final-time branch. On full redraw or dashboard-kind change, it now
   compares optional cached/current generation DWORDs at `0x4EB3B8` and
