@@ -15,7 +15,17 @@ per group because the record fields have not been semantically recovered.
 `GameAssets` now requires and owns this parsed resource alongside its shared,
 car, and track bundles. The parser currently does not accept the legacy
 `0x660C`-byte version-2 payload that the native loader also recognizes and
-converts.
+converts. Native `0x41B9B0` copies the legacy payload's first three groups and
+builds the remaining five groups from the first current runtime-manager record
+for each group. The manager table is populated by `0x41BB50` constructors; its
+initialized image bytes are zero, so those five records are not a static table
+that can safely be copied into the source reconstruction. Supporting legacy
+conversion requires reconstructing or providing the same initialized manager
+records. Evidence: `0x41B9B0`
+`ev_aee9eab2229a10b2a4f337b04c3c89ffe9e4411ce604729a192e7665ea99cf66`,
+`0x41BB30` `ev_f576fea3271bfdca92952c71c0fdb89423efd828a5f02ab99120fe532ffba015`,
+and `0x41BB50`
+`ev_88536434a4e9f02940f233812b02e911b5576593e57f294b8ee4fd05775efd03`.
 
 Evidence from `race.bin` (SHA-256
 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):

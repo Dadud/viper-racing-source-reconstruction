@@ -5,6 +5,10 @@
   normalization, plus a bounded ADNT v7 parser that preserves node bytes and
   checks lookup fields and payload sizing. The native ILIN checksums, redundant
   header check, legacy resource-set lookup, and runtime integration remain open.
+  Added `ai_resources_regression` for AIDR/ADNT layouts and lookup paths. The
+  Release runtime build and all 35 configured CTest cases pass, including
+  original-asset validation and track/car WARP smoke cases. These checks cover
+  asset loading and renderer startup, not race-play behavior.
 
 - **2026-10-24 AI driver resource:** Added a bounds-checked parser for the
   shipped `drivers.res` `aidriver.adr` AIDR v2 payload. It reads the eight
@@ -12,9 +16,9 @@
   group; `GameAssets` now owns this resource and reports all group counts.
   Native evidence identifies the layout as eight `0x2204`-byte groups in a
   `0x11020`-byte payload. The legacy `0x660C`-byte v2 conversion and ADNT note
-  selection remain open. The Release `viper_game` target builds successfully;
-  no runtime checks were run for this change. See
-  `metadata/ai_driver_resource.md`.
+  selection remain open. `ai_resources_regression` covers the parser bounds,
+  and `game_original_asset_validation` confirms the shipped resource loads.
+  See `metadata/ai_driver_resource.md`.
 
 - **2026-10-24 runtime Viper configuration:** `GameAssets` now parses and
   retains Viper's version-6 `viper.cf` CARF payload (138 DWORDs) through the

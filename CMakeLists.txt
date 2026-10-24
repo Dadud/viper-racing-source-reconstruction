@@ -54,6 +54,13 @@ add_library(viper_resource_bundle src/resource_bundle.cpp)
 target_include_directories(viper_resource_bundle PUBLIC include)
 target_compile_features(viper_resource_bundle PUBLIC cxx_std_20)
 
+add_library(viper_ai_resources
+    src/ai_driver_resource.cpp
+    src/ai_notes_resource.cpp
+)
+target_include_directories(viper_ai_resources PUBLIC include)
+target_compile_features(viper_ai_resources PUBLIC cxx_std_20)
+
 add_library(viper_model_resource src/model_resource.cpp)
 target_include_directories(viper_model_resource PUBLIC include)
 target_compile_features(viper_model_resource PUBLIC cxx_std_20)
@@ -184,15 +191,15 @@ target_link_libraries(viper_reconstruction PRIVATE
 target_compile_features(viper_reconstruction PRIVATE cxx_std_20)
 
 if(WIN32)
-    add_executable(viper_game src/game_main.cpp src/game_assets.cpp
-        src/ai_driver_resource.cpp src/ai_notes_resource.cpp)
+    add_executable(viper_game src/game_main.cpp src/game_assets.cpp)
     target_compile_features(viper_game PRIVATE cxx_std_20)
     target_compile_definitions(viper_game PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
     if(MSVC)
         target_compile_options(viper_game PRIVATE /W4 /permissive- /utf-8)
     endif()
     target_link_libraries(viper_game PRIVATE
-        viper_resource_bundle viper_model_resource viper_language_resource viper_terrain_model
+        viper_ai_resources viper_resource_bundle viper_model_resource
+        viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
         viper_scene_model d3d11 dxgi user32)
 endif()
@@ -248,6 +255,9 @@ if(BUILD_TESTING)
     add_executable(viper_model_resource_regression tests/model_resource_regression.cpp)
     target_link_libraries(viper_model_resource_regression PRIVATE viper_model_resource)
     add_test(NAME model_resource_regression COMMAND viper_model_resource_regression)
+    add_executable(viper_ai_resources_regression tests/ai_resources_regression.cpp)
+    target_link_libraries(viper_ai_resources_regression PRIVATE viper_ai_resources)
+    add_test(NAME ai_resources_regression COMMAND viper_ai_resources_regression)
 endif()
 
 if(MSVC)
@@ -258,6 +268,7 @@ if(MSVC)
     target_compile_options(viper_race_loop_model PRIVATE /W4 /permissive-)
     target_compile_options(viper_race_scene_flow PRIVATE /W4 /permissive-)
     target_compile_options(viper_alternate_race_mode PRIVATE /W4 /permissive-)
+    target_compile_options(viper_ai_resources PRIVATE /W4 /permissive-)
     target_compile_options(viper_vehicle_model PRIVATE /W4 /permissive-)
     target_compile_options(viper_terrain_model PRIVATE /W4 /permissive-)
     target_compile_options(viper_scene_model PRIVATE /W4 /permissive-)
