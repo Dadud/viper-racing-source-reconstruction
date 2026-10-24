@@ -494,4 +494,52 @@ AiConfiguredSetupPlan build_ai_configured_setup(
     return result;
 }
 
+SingleRaceAISetupPlan prepare_single_race_ai_setups(
+    const SingleRaceAISetupObservation& observation)
+{
+    SingleRaceAISetupPlan result{};
+    if (observation.entrants == nullptr || observation.drivers == nullptr ||
+        observation.tuning_mode > 1U ||
+        static_cast<std::size_t>(observation.driver_group) >= ai_driver_group_count) {
+        return result;
+    }
+
+    result.input_complete = true;
+    for (const auto& entrant : observation.entrants->records) {
+        if (entrant.marker_value != 1U) continue;
+        if (!entrant.word_at_0xc0.has_value()) {
+            result.input_complete = false;
+            continue;
+        }
+        const auto driver_slot = static_cast<std::size_t>(*entrant.word_at_0xc0);
+        const auto* driver = find_ai_driver_record(
+            *observation.drivers, observation.driver_group, driver_slot);
+        if (driver == nullptr) {
+            result.input_complete = false;
+            continue;
+        }
+        const auto tuning = select_ai_driver_track_tuning(
+            *driver, observation.track_index, observation.tuning_mode);
+        if (!tuning.has_value()) {
+            result.input_complete = false;
+            continue;
+        }
+
+        AiConfiguredSetupObservation configured{};
+        configured.base_setup_payload = observation.base_setup_payload;
+        configured.driver_tuning = *tuning;
+        configured.configuration_data_available =
+            observation.configuration_data_available;
+        configured.loaded_car_file = observation.loaded_car_file;
+        configured.compatibility_division_helper_enabled =
+            observation.compatibility_division_helper_enabled;
+        auto setup = build_ai_configured_setup(configured);
+        result.input_complete = result.input_complete && setup.input_complete;
+        result.ai_setups.push_back({entrant.record_index,
+            static_cast<std::uint32_t>(driver_slot), setup.input_complete,
+            std::move(setup)});
+    }
+    return result;
+}
+
 } // namespace viper

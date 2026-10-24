@@ -91,6 +91,56 @@ void test_ai_configured_setup()
         "truncated AI base setup must fail closed");
 }
 
+void test_single_race_ai_setup_selection()
+{
+    using namespace viper;
+    SingleRaceEntrantPlan entrants{};
+    entrants.records.resize(3U);
+    entrants.records[0].record_index = 0U;
+    entrants.records[0].marker_value = 0U;
+    entrants.records[1].record_index = 1U;
+    entrants.records[1].marker_value = 1U;
+    entrants.records[1].word_at_0xc0 = 2U;
+    entrants.records[2].record_index = 2U;
+    entrants.records[2].marker_value = 1U;
+    entrants.records[2].word_at_0xc0 = 6U;
+
+    AIDriverResource drivers{};
+    drivers.active_counts[static_cast<std::size_t>(AIDriverGroup::easy)] = 7U;
+    for (std::size_t slot = 0; slot < 7U; ++slot) {
+        auto& record = drivers.records[static_cast<std::size_t>(AIDriverGroup::easy)][slot];
+        write_u32_le(record, 0x20U, std::bit_cast<std::uint32_t>(1.0F));
+        write_u32_le(record, 0x6cU, std::bit_cast<std::uint32_t>(1.0F));
+        write_u32_le(record, 0x90U + 3U * 0x18U,
+            std::bit_cast<std::uint32_t>(static_cast<float>(slot + 2U)));
+        write_u32_le(record, 0x90U + 3U * 0x18U + 4U,
+            std::bit_cast<std::uint32_t>(1.0F));
+        write_u32_le(record, 0x90U + 3U * 0x18U + 0x0cU,
+            std::bit_cast<std::uint32_t>(1.0F));
+    }
+
+    std::array<std::byte, 0x8cU> base{};
+    SingleRaceAISetupObservation observation{};
+    observation.entrants = &entrants;
+    observation.drivers = &drivers;
+    observation.driver_group = AIDriverGroup::easy;
+    observation.track_index = 3U;
+    observation.tuning_mode = 0U;
+    observation.base_setup_payload = base;
+    observation.configuration_data_available = false;
+    const auto plan = prepare_single_race_ai_setups(observation);
+    require(plan.input_complete && plan.ai_setups.size() == 2U,
+        "AI setup preparation must produce records only for AI entrants");
+    require(plan.ai_setups[0].entrant_index == 1U &&
+            plan.ai_setups[0].driver_slot == 2U &&
+            std::bit_cast<float>(plan.ai_setups[0].setup.setup_words[1U]) == 4.0F,
+        "AI setup preparation must select the entrant's AIDR slot and track row");
+    require(plan.ai_setups[1].entrant_index == 2U &&
+            plan.ai_setups[1].driver_slot == 6U &&
+            std::bit_cast<float>(plan.ai_setups[1].setup.setup_words[1U]) == 8.0F,
+        "AI setup preparation must preserve each AI entrant's modulo-7 slot");
+}
+
 } // namespace
 
 int main()
@@ -145,6 +195,7 @@ int main()
                 setup.entrant_initializers[7].vehicle_record_offset_0x34_used,
             "human row setup must dispatch through 0x45EFD0 using row +0x34");
         test_ai_configured_setup();
+        test_single_race_ai_setup_selection();
         std::cout << "race participant regression checks passed\n";
         return 0;
     } catch (const std::exception& error) {

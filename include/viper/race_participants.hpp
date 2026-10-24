@@ -240,4 +240,36 @@ struct AiConfiguredSetupPlan {
 [[nodiscard]] AiConfiguredSetupPlan build_ai_configured_setup(
     const AiConfiguredSetupObservation& observation);
 
+struct SingleRaceAISetupObservation {
+    const SingleRaceEntrantPlan* entrants{};
+    const AIDriverResource* drivers{};
+    AIDriverGroup driver_group{AIDriverGroup::easy};
+    std::uint32_t track_index{};
+    // Native tuning mode is an explicit input; its relation to frontend flags
+    // has not yet been established.
+    std::uint8_t tuning_mode{};
+    std::span<const std::byte> base_setup_payload;
+    std::optional<bool> configuration_data_available;
+    std::optional<CarFilePayload> loaded_car_file;
+    std::optional<bool> compatibility_division_helper_enabled;
+};
+
+struct SingleRaceAISetupRecord {
+    std::size_t entrant_index{};
+    std::uint32_t driver_slot{};
+    bool input_complete{};
+    AiConfiguredSetupPlan setup;
+};
+
+struct SingleRaceAISetupPlan {
+    bool input_complete{};
+    std::vector<SingleRaceAISetupRecord> ai_setups;
+};
+
+// Selects the active AIDR profile slot by each AI entrant's native modulo-7
+// key and composes its setup. Profile and mode are explicit because their
+// runtime selector paths are not fully reconstructed yet.
+[[nodiscard]] SingleRaceAISetupPlan prepare_single_race_ai_setups(
+    const SingleRaceAISetupObservation& observation);
+
 } // namespace viper
