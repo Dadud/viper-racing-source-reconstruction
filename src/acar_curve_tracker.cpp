@@ -456,4 +456,61 @@ AcarCurveDistancePlan plan_acar_curve_distance(
     return plan;
 }
 
+AcarCurveLookupPlan plan_acar_curve_lookup(
+    const AcarCurveLookupObservation& observation)
+{
+    AcarCurveLookupPlan plan{};
+    plan.output_fraction_0x08 = observation.fraction_0x1064;
+    if (!observation.enabled_0x1069) {
+        return plan;
+    }
+    if (observation.descriptor_array_address_0x1054 == 0U) {
+        plan.status = AcarCurveLookupStatus::null_descriptor_fault;
+        return plan;
+    }
+    if (observation.descriptor_index_0x105c >=
+        observation.descriptor_cursor_nodes.size()) {
+        plan.status = AcarCurveLookupStatus::descriptor_capture_incomplete;
+        return plan;
+    }
+
+    const auto descriptor_offset = 0x14U +
+        observation.descriptor_index_0x105c * 0x18U;
+    plan.descriptor_node_field_address =
+        observation.descriptor_array_address_0x1054 + descriptor_offset;
+    plan.descriptor_cursor_node_address =
+        observation.descriptor_cursor_nodes[
+            observation.descriptor_index_0x105c];
+
+    AcarCurveDistanceObservation distance_observation{};
+    distance_observation.circular_list_head_address =
+        observation.circular_list_head_address_0xfe8;
+    distance_observation.cursor_node_address =
+        plan.descriptor_cursor_node_address;
+    distance_observation.fraction_0x08 = observation.fraction_0x1064;
+    distance_observation.target_x = observation.target_x;
+    distance_observation.target_y = observation.target_y;
+    distance_observation.maximum_distance = observation.maximum_distance;
+    distance_observation.fdiv_compatibility_enabled =
+        observation.fdiv_compatibility_enabled;
+    distance_observation.captured_nodes = observation.captured_nodes;
+    plan.distance_helper_called = true;
+    plan.distance_plan = plan_acar_curve_distance(distance_observation);
+    if (!plan.distance_plan->output_written) {
+        plan.status = plan.distance_plan->status ==
+                AcarCurveDistanceStatus::null_node_dereference
+            ? AcarCurveLookupStatus::null_node_dereference
+            : AcarCurveLookupStatus::seek_incomplete;
+        return plan;
+    }
+
+    plan.status = AcarCurveLookupStatus::completed;
+    plan.output_cursor_node_address =
+        plan.distance_plan->cursor_node_address;
+    plan.output_fraction_0x08 = plan.distance_plan->fraction_0x08;
+    plan.distance_along_curve = plan.distance_plan->distance_along_curve;
+    plan.callback_return_value = plan.output_cursor_node_address != 0U;
+    return plan;
+}
+
 } // namespace viper

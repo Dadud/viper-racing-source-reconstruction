@@ -568,3 +568,15 @@ fraction clamp, and the same-node backward-progress cursor clear. It returns
 missing-link/capture states instead of following arbitrary pointers. Evidence:
 `ev_44cc376596921a8b71472de9e75f93d2def8b1a228f10049dc831a15505294df` and
 `ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.
+
+`plan_acar_curve_lookup` projects the adjacent `0x42AD20` wrapper. When its
+`+0x1069` gate is set, it loads the selected descriptor's `+0x14` cursor,
+uses model fraction `+0x1064`, and calls `0x41D3A0` with the circular head at
+`+0xFE8` and the caller's target point and distance bound. It returns the
+updated cursor/fraction, distance result, and the wrapper's nonnull-cursor
+boolean. Missing descriptor captures and null descriptor/node faults remain
+distinct outcomes. The callback is modeled as a standalone projection; its
+native registration target and runtime invocation are still external inputs.
+Evidence: `0x42AD20`
+`ev_c2d39ffcfd59d893ca7728fa13e858caae86a3962e967ae6233a1450b625eccb`,
+`0x41D3A0` `ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.

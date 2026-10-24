@@ -97,4 +97,45 @@ struct AcarCurveDistancePlan {
 [[nodiscard]] AcarCurveDistancePlan plan_acar_curve_distance(
     const AcarCurveDistanceObservation& observation);
 
+struct AcarCurveLookupObservation {
+    bool enabled_0x1069{};
+    std::uint32_t descriptor_array_address_0x1054{};
+    std::uint32_t descriptor_index_0x105c{};
+    // The +0x14 DWORD from each captured 0x18-byte descriptor.
+    std::span<const std::uint32_t> descriptor_cursor_nodes;
+    std::uint32_t circular_list_head_address_0xfe8{};
+    float fraction_0x1064{};
+    float target_x{};
+    float target_y{};
+    float maximum_distance{};
+    bool fdiv_compatibility_enabled{};
+    std::span<const AcarCurveNodeObservation> captured_nodes;
+};
+
+enum class AcarCurveLookupStatus : std::uint8_t {
+    disabled,
+    null_descriptor_fault,
+    descriptor_capture_incomplete,
+    seek_incomplete,
+    null_node_dereference,
+    completed,
+};
+
+struct AcarCurveLookupPlan {
+    AcarCurveLookupStatus status{AcarCurveLookupStatus::disabled};
+    std::uint32_t descriptor_node_field_address{};
+    std::uint32_t descriptor_cursor_node_address{};
+    std::uint32_t output_cursor_node_address{};
+    float output_fraction_0x08{};
+    std::optional<float> distance_along_curve;
+    bool distance_helper_called{};
+    bool callback_return_value{};
+    std::optional<AcarCurveDistancePlan> distance_plan;
+};
+
+// Projects FUN_0042AD20: gate the callback, fetch descriptor +0x14 and model
+// fraction +0x1064, invoke 0x41D3A0, and return whether its cursor is nonnull.
+[[nodiscard]] AcarCurveLookupPlan plan_acar_curve_lookup(
+    const AcarCurveLookupObservation& observation);
+
 } // namespace viper
