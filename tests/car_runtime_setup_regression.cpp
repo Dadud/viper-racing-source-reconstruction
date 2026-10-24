@@ -163,6 +163,93 @@ int main()
                     std::span<const std::byte>(anchor_record).first(0x12bU),
                     anchor_vertices),
             "runtime records missing bytes of +0x128 must be rejected");
+
+        std::vector<std::byte> wheel_record(0x148U);
+        const auto write_float = [&wheel_record](const std::size_t offset,
+                                                  const float value) {
+            write_u32_le(wheel_record, offset, std::bit_cast<std::uint32_t>(value));
+        };
+        write_float(0x50U, 5.0F);
+        write_float(0x54U, 6.0F);
+        write_float(0x58U, 200.0F);
+        write_float(0x5cU, 25.0F);
+        write_float(0x60U, 8.0F);
+        write_float(0x64U, 9.0F);
+        write_float(0xccU, 0.1F);
+        write_float(0xd0U, 0.2F);
+        write_float(0xecU, 10.0F);
+        write_float(0xf0U, 20.0F);
+        write_float(0xf4U, 30.0F);
+        write_float(0xf8U, 40.0F);
+        write_float(0x100U, 0.3F);
+        write_float(0x104U, 0.4F);
+        write_float(0x128U, 10.0F);
+        write_float(0x130U, 5.0F);
+        write_float(0x134U, 7.0F);
+        write_float(0x138U, 2.0F);
+        write_float(0x13cU, 6.0F);
+        write_float(0x140U, 8.0F);
+        write_float(0x144U, 4.0F);
+        const std::array<float, 3> front_anchor{-0.4F, -0.254F, 3.81F};
+        const auto front_wheel = viper::initialize_ncar_wheel_core({
+            wheel_record, 0U, front_anchor, 0.5F, false});
+        const float front_base_height = 8.0F * 0.0254F;
+        const float front_track_scale = 0.1F * 175.19684F;
+        const float front_height_correction = static_cast<float>(
+            (static_cast<long double>(0.5F * 0.25F * 4.905F) -
+             static_cast<long double>(front_base_height * 2.0F) * 0.5L *
+                front_track_scale) / front_track_scale);
+        require(front_wheel.has_value() && front_wheel->front_axle &&
+                front_wheel->side_sign == -1.0F &&
+                front_wheel->selected_model_vertex == front_anchor &&
+                std::fabs(front_wheel->value_0x5c - 0.02575F) < 1.0e-6F &&
+                std::fabs(front_wheel->value_0x44 -
+                    (front_base_height * 2.0F + front_height_correction)) < 1.0e-6F &&
+                std::fabs(front_wheel->value_0x3c - front_track_scale) < 1.0e-6F &&
+                std::fabs(front_wheel->angle_0x60 - 0.17453292F) < 1.0e-6F &&
+                std::fabs(front_wheel->angle_0x64 - 0.52359876F) < 1.0e-6F &&
+                std::fabs(front_wheel->candidate_position[0] + 0.0635F) < 1.0e-6F &&
+                std::fabs(front_wheel->candidate_position[2] - 3.81F) < 1.0e-6F &&
+                std::fabs(front_wheel->position_relative_to_selected_vertex[0] -
+                    0.3365F) < 1.0e-6F,
+            "0x441C10 front-wheel position, geometry, and steering stores must be reconstructed");
+        const auto right_front_wheel = viper::initialize_ncar_wheel_core({
+            wheel_record, 1U, {0.4F, -0.254F, 3.81F}, 0.5F, false});
+        require(right_front_wheel.has_value() && right_front_wheel->front_axle &&
+                right_front_wheel->side_sign == 1.0F &&
+                std::fabs(right_front_wheel->angle_0x60 + 0.17453292F) < 1.0e-6F &&
+                std::fabs(right_front_wheel->candidate_position[0] - 0.0635F) < 1.0e-6F,
+            "right-front wheel must invert steering sign and use the positive lateral offset");
+        const auto rear_wheel = viper::initialize_ncar_wheel_core({
+            wheel_record, 2U, {-0.4F, -0.254F, -1.27F}, 0.5F, false});
+        const float rear_base_height = 9.0F * 0.0254F;
+        const float rear_track_scale = 0.2F * 175.19684F;
+        const float rear_height_correction = static_cast<float>(
+            (static_cast<long double>(0.5F * 0.75F * 4.905F) -
+             static_cast<long double>(rear_base_height * 2.0F) * 0.5L *
+                rear_track_scale) / rear_track_scale);
+        require(rear_wheel.has_value() && !rear_wheel->front_axle &&
+                rear_wheel->side_sign == -1.0F &&
+                std::fabs(rear_wheel->value_0x5c - 0.05128F) < 1.0e-6F &&
+                std::fabs(rear_wheel->value_0x44 -
+                    (rear_base_height * 2.0F + rear_height_correction)) < 1.0e-6F &&
+                std::fabs(rear_wheel->angle_0x60 - 0.34906584F) < 1.0e-6F &&
+                std::fabs(rear_wheel->angle_0x64 - 0.69813168F) < 1.0e-6F &&
+                std::fabs(rear_wheel->candidate_position[2] + 1.27F) < 1.0e-6F,
+            "0x441C10 rear-wheel setup must select the rear axle and handedness fields");
+        const auto right_rear_wheel = viper::initialize_ncar_wheel_core({
+            wheel_record, 3U, {0.4F, -0.254F, -1.27F}, 0.5F, false});
+        require(right_rear_wheel.has_value() && !right_rear_wheel->front_axle &&
+                right_rear_wheel->side_sign == 1.0F &&
+                std::fabs(right_rear_wheel->angle_0x60 + 0.34906584F) < 1.0e-6F &&
+                std::fabs(right_rear_wheel->candidate_position[0] - 0.0762F) < 1.0e-6F,
+            "right-rear wheel must select rear steering fields and positive lateral offset");
+        require(!viper::initialize_ncar_wheel_core({
+                    std::span<const std::byte>(wheel_record).first(0x147U),
+                    0U, front_anchor, 0.5F, false}) &&
+                !viper::initialize_ncar_wheel_core({
+                    wheel_record, 4U, front_anchor, 0.5F, false}),
+            "wheel core initialization must reject short records and invalid indices");
         require(!viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
                     std::span<const std::byte>(runtime_record).first(0x12fU)),
             "runtime records missing bytes of +0x12C must be rejected");

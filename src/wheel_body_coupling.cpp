@@ -302,6 +302,74 @@ select_ncar_wheel_vertex_anchors_from_runtime_record(
         read_float(body_offset), model_vertices});
 }
 
+std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
+    const NcarWheelCoreInitializationInput& input) noexcept
+{
+    if (input.wheel_index >= 4U || input.runtime_record.size() < 0x148U)
+        return std::nullopt;
+    const auto read_float = [&input](const std::size_t offset) {
+        std::uint32_t bits{};
+        for (std::size_t byte = 0; byte < sizeof(bits); ++byte) {
+            bits |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+                input.runtime_record[offset + byte])) << (byte * 8U);
+        }
+        return std::bit_cast<float>(bits);
+    };
+
+    const bool front = input.wheel_index < 2U;
+    const float side_sign = (input.wheel_index == 0U || input.wheel_index == 2U)
+        ? -1.0F : 1.0F;
+    const float width = read_float(0x58U) * 0.0254F;
+    const float ratio = read_float(0x5cU) * 0.01F;
+    const float longitudinal = front ? 1.0F - ratio : -ratio;
+    const float lateral_setup = read_float(front ? 0x50U : 0x54U);
+    const float track_scale = (front ? read_float(0xccU) : read_float(0xd0U)) *
+        175.19684F;
+    const float steering_x = -(read_float(front ? 0xecU : 0xf0U) *
+        0.017453292F * side_sign);
+    const float steering_y = -(read_float(front ? 0xf4U : 0xf8U) *
+        0.017453292F * side_sign);
+
+    const float base_height = read_float(front ? 0x60U : 0x64U) * 0.0254F;
+    const float initial_value_0x44 = base_height * 2.0F;
+    const float axle_setup = read_float(front ? 0x138U : 0x144U) * 0.0127F;
+    const float scale_setup = read_float(front ? 0x130U : 0x13cU) * 0.001F;
+    const float amount_setup = read_float(front ? 0x134U : 0x140U);
+    const float accumulated_setup = amount_setup * 0.01F * scale_setup + axle_setup;
+    const float mass_fraction = front ? ratio : 1.0F - ratio;
+    const float body_term = input.body_mass_scale_0x1f0 * mass_fraction * 4.905F;
+    const long double correction_numerator =
+        static_cast<long double>(body_term) -
+        static_cast<long double>(initial_value_0x44) * 0.5L * track_scale;
+    const float height_correction = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(correction_numerator,
+            track_scale, input.fdiv_compatibility_enabled));
+    const float value_0x44 = initial_value_0x44 + height_correction;
+    const float value_0x48 = height_correction + base_height;
+    const std::array<float, 3> candidate_position{
+        side_sign * std::fabs(lateral_setup) * 0.0254F * 0.5F,
+        -(read_float(0x128U) * 0.0254F + value_0x44),
+        width * longitudinal};
+    std::array<float, 3> relative_position{};
+    for (std::size_t axis = 0; axis < relative_position.size(); ++axis)
+        relative_position[axis] = candidate_position[axis] -
+            input.selected_model_vertex[axis];
+
+    return NcarWheelCoreInitialization{
+        input.wheel_index,
+        front,
+        side_sign,
+        candidate_position,
+        relative_position,
+        input.selected_model_vertex,
+        track_scale,
+        accumulated_setup,
+        steering_x,
+        steering_y,
+        value_0x44,
+        value_0x48};
+}
+
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept
 {

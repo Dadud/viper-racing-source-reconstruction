@@ -130,6 +130,7 @@ target_link_libraries(viper_wheel_body_coupling PUBLIC
     viper_vehicle_model
     viper_ncar_model
     viper_model_resource
+    viper_legacy_fdiv
 )
 
 add_library(viper_legacy_allocator src/legacy_allocator.cpp)

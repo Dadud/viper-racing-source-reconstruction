@@ -561,6 +561,36 @@ select_ncar_wheel_vertex_anchors_from_runtime_record(
     std::span<const std::byte> runtime_record,
     std::span<const ModelVertex> model_vertices) noexcept;
 
+struct NcarWheelCoreInitializationInput {
+    std::span<const std::byte> runtime_record;
+    std::size_t wheel_index{};
+    std::array<float, 3> selected_model_vertex{};
+    // Car-object +0x1F0, set by the observed NCAR body initializer.
+    float body_mass_scale_0x1f0{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct NcarWheelCoreInitialization {
+    std::size_t wheel_index{};
+    bool front_axle{};
+    float side_sign{};
+    std::array<float, 3> candidate_position{};
+    std::array<float, 3> position_relative_to_selected_vertex{};
+    std::array<float, 3> selected_model_vertex{};
+    float value_0x3c{};
+    float value_0x5c{};
+    float angle_0x60{};
+    float angle_0x64{};
+    float value_0x44{};
+    float value_0x48{};
+};
+
+// Reconstructs position and steering stores from wheel constructor 0x441C10.
+// Missing record fields or wheel indices outside [0, 4) yield no result.
+[[nodiscard]] std::optional<NcarWheelCoreInitialization>
+initialize_ncar_wheel_core(
+    const NcarWheelCoreInitializationInput& input) noexcept;
+
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};
     float angle_0xdcc{};

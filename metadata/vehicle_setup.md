@@ -244,6 +244,18 @@ Evidence: `0x433C00` pseudocode and body range
 `0x00433C00..0x00434A51`, dossier
 `ev_f2bb786a74070a51b02f0626e35bf0593a3b38ab0f124dd60bb1a06abe4d65dd`.
 
+`initialize_ncar_wheel_core` reconstructs the bounded, deterministic wheel
+constructor outputs that follow anchor selection: axle and side classification,
+the model-space wheel candidate and offset relative to the selected FNIM vertex,
+steering angles at `+0x60/+0x64`, and geometry values at `+0x3C/+0x5C/+0x44/+0x48`.
+Its input explicitly includes the car object's mass-like scalar at `+0x1F0` and
+the observed FDIV-compatibility flag. A short runtime record or wheel index
+outside 0..3 is rejected. The final suspension-height correction uses the
+existing VC98 compatibility division model when that flag is set. Tire loading,
+helper-owned wheel transforms and remaining `0x441C10` stores are still outside
+this core plan. Evidence: `0x441C10` pseudocode, dossier
+`ev_c5aa0c77b19958eb9c8ba45643b19d858c19899f5cfc958f00b97ab6df232f06`.
+
 ### TIRE field consumption at `0x435BF0`
 
 The tire-object initializer reads the 22-float record at `param_2 + 0x20` and
