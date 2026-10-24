@@ -500,11 +500,14 @@ struct SceneDashboardGearDisplayObservation {
     std::span<const std::uint8_t> selected_record_base_bytes;
     std::uint32_t selected_record_value_object_address{};
     std::span<const std::uint8_t> selected_record_value_object_bytes;
-    // Runtime entries addressed by [0x4CFAB4 + selector*4] for the
-    // 0x44DC70 selected-gear label call.
-    std::span<const std::uint32_t> gear_label_resource_addresses_0x4cfab4;
+    // Runtime string pointers from [0x4CFAB0 + (selector+1)*4], where slot 0
+    // is selector -1 and slot 8 is selector 7.
+    std::span<const std::uint32_t> gear_label_text_addresses_from_minus_one;
+    // Decoded C strings for the same signed-selector slots, when available.
+    std::span<const std::string_view> gear_label_texts_from_minus_one;
     std::uint32_t gear_label_font_context_value_0x4eb28c{};
     std::uint32_t gear_label_font_resource_value_0x4eb314{};
+    std::vector<std::uint16_t> gear_label_palette_0x4eb314;
     // Scalar compatibility input used only when the bounded byte views do not
     // resolve the pointer chain.
     float selected_record_value_0x34{};
@@ -589,18 +592,20 @@ struct SceneDashboardGearDisplayResult {
     bool initialized_geometry_constants{};
     std::optional<std::uint32_t> selected_record_value_bits;
     bool selected_record_value_resolved_from_bytes{};
-    std::optional<std::uint32_t> selected_gear_label_selector;
-    std::optional<std::uint32_t> selected_gear_label_resource_address;
+    std::optional<std::int32_t> selected_gear_label_selector;
+    std::optional<std::uint32_t> selected_gear_label_text_address;
+    std::optional<std::string> selected_gear_label_text;
     bool selected_gear_label_call_reached{};
     struct GearLabelCall {
-        std::uint32_t selector{};
-        std::optional<std::uint32_t> selected_resource_address;
+        std::int32_t selector{};
+        std::optional<std::uint32_t> selected_text_address;
+        std::optional<std::string> formatted_text;
         std::uint32_t text_source{};
         std::uint32_t font_context_value{};
         std::uint32_t font_resource_value{};
-        std::int32_t vertical_argument{};
-        std::uint32_t first_draw_argument{0x0cU};
-        std::uint32_t second_draw_argument{};
+        std::int32_t x{};
+        std::int32_t y{};
+        std::uint32_t format_flags{0x0cU};
     };
     std::optional<GearLabelCall> selected_gear_label_call;
     std::optional<SceneDashboardGearGeometry> rotating_gear_geometry;

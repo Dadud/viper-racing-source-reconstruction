@@ -361,6 +361,45 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
         plan.dashboard_gear_display = scene_dashboard_gear_display_plan(
             gear_observation);
+        if (observation.state0_dashboard_raster.has_value() &&
+            plan.dashboard_gear_display.selected_gear_label_call.has_value() &&
+            plan.dashboard_gear_display.selected_gear_label_call->formatted_text
+                .has_value()) {
+            const auto& gear_label =
+                *plan.dashboard_gear_display.selected_gear_label_call;
+            SceneDashboardTextCall text_call{};
+            text_call.call_site = gear_observation.mode_0x45c200 == 0
+                ? 0x00404B37U : 0x00404B9AU;
+            text_call.x = gear_label.x;
+            text_call.y = gear_label.y;
+            text_call.text_or_format_source = gear_label.text_source;
+            text_call.color_source = 0x004EB314U;
+            text_call.font_source = 0x004EB28CU;
+            text_call.format_flags = gear_label.format_flags;
+            text_call.resolved_text_argument = gear_label.formatted_text;
+            const auto layout = layout_scene_dashboard_text(
+                text_call, *gear_label.formatted_text,
+                observation.state0_dashboard_raster->layout_font);
+
+            SceneDashboardRasterObservation renderer{};
+            renderer.renderer_mode = gear_observation.renderer_mode_0x4d7a48;
+            renderer.clip_left = gear_observation.render_context.viewport_left_0x14;
+            renderer.clip_top = gear_observation.render_context.viewport_top_0x18;
+            renderer.clip_right = gear_observation.render_context.viewport_right_0x1c;
+            renderer.clip_bottom = gear_observation.render_context.viewport_bottom_0x20;
+            renderer.framebuffer_pitch_bytes =
+                gear_observation.render_context.row_pitch_0x10;
+            renderer.framebuffer_base = gear_observation.framebuffer_base_value;
+            renderer.explicit_palette = gear_observation.gear_label_palette_0x4eb314;
+            auto label_raster = raster_scene_dashboard_text(
+                layout, observation.state0_dashboard_raster->atlas_font,
+                renderer);
+            if (gear_observation.gear_label_font_resource_value_0x4eb314 != 0U &&
+                renderer.explicit_palette.empty()) {
+                label_raster.input_complete = false;
+            }
+            plan.state0_dashboard_gear_label_raster = std::move(label_raster);
+        }
         if (plan.optional_dashboard_branch_enabled &&
             gear_observation.mode_0x45c200 == 0) {
             const auto fill = std::find_if(
@@ -1123,9 +1162,17 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
             }
             break;
         case SceneDashboardGearOperationKind::draw_selected_gear_label:
-            // The 0x44DC70 call is projected, but its font and glyph raster
-            // effects are not modeled yet, so this frame is not complete.
-            complete = false;
+            if (!plan.state0_dashboard_gear_label_raster.has_value() ||
+                !plan.state0_dashboard_gear_label_raster->input_complete) {
+                complete = false;
+                break;
+            }
+            for (const auto& write :
+                 plan.state0_dashboard_gear_label_raster->pixel_writes) {
+                writes.push_back({
+                    static_cast<std::uint64_t>(write.offset_from_framebuffer_base),
+                    write.value, 0xffffffffU, write.bytes_per_pixel, false});
+            }
             break;
         case SceneDashboardGearOperationKind::draw_rotating_gear_geometry:
             if (!plan.dashboard_gear_display.rotating_gear_geometry.has_value()) {

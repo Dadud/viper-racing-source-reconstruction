@@ -132,6 +132,8 @@ struct RaceLoopSharedOverlayPlan {
     SceneDashboardCallbackGeometryPlan dashboard_callback_geometry{};
     bool dashboard_gear_display_reached{};
     SceneDashboardGearDisplayResult dashboard_gear_display{};
+    // Uses the existing 0x44DC70 layout and 0x44D0C0 atlas raster stages.
+    std::optional<SceneDashboardRasterPlan> state0_dashboard_gear_label_raster;
     std::optional<ScenePausedBannerResourceRasterPlan>
         state0_dashboard_gear_resource_raster;
     std::optional<SceneDashboardBitmapDescriptorResult>

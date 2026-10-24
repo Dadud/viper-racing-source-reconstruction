@@ -1282,24 +1282,50 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                 observation.selected_record_value_object_bytes,
                 selector_field_offset);
             selector.has_value()) {
-            result.selected_gear_label_selector = *selector;
-            if (*selector <
-                observation.gear_label_resource_addresses_0x4cfab4.size()) {
-                result.selected_gear_label_resource_address =
-                    observation.gear_label_resource_addresses_0x4cfab4[
-                        *selector];
+            const auto signed_selector = std::bit_cast<std::int32_t>(*selector);
+            result.selected_gear_label_selector = signed_selector;
+            if (signed_selector >= -1 && signed_selector <= 7) {
+                const auto slot = static_cast<std::size_t>(signed_selector + 1);
+                if (slot <
+                    observation.gear_label_text_addresses_from_minus_one.size()) {
+                    result.selected_gear_label_text_address =
+                        observation.gear_label_text_addresses_from_minus_one[slot];
+                }
+                if (slot < observation.gear_label_texts_from_minus_one.size()) {
+                    result.selected_gear_label_text =
+                        std::string(observation.gear_label_texts_from_minus_one[slot]);
+                }
+                if (signed_selector >= 1 && signed_selector <= 7) {
+                    if (!result.selected_gear_label_text_address.has_value()) {
+                        result.selected_gear_label_text_address =
+                            0x004CFE9CU +
+                            static_cast<std::uint32_t>(signed_selector - 1) * 4U;
+                    }
+                    if (!result.selected_gear_label_text.has_value()) {
+                        result.selected_gear_label_text =
+                            std::string(1, static_cast<char>('0' + signed_selector));
+                    }
+                }
             }
             if (observation.mode_0x45c200 != 0x0c) {
-                result.selected_gear_label_call =
-                    SceneDashboardGearDisplayResult::GearLabelCall{
-                        *selector,
-                        result.selected_gear_label_resource_address,
-                        0x004CFEB8U,
-                        observation.gear_label_font_context_value_0x4eb28c,
-                        observation.gear_label_font_resource_value_0x4eb314,
-                        observation.surface_height - 0x28,
-                        0x0cU,
-                        0x1eU};
+                if (!result.selected_gear_label_call.has_value()) {
+                    result.selected_gear_label_call =
+                        SceneDashboardGearDisplayResult::GearLabelCall{};
+                    result.selected_gear_label_call->selector = signed_selector;
+                }
+                auto& call = *result.selected_gear_label_call;
+                call.selected_text_address = result.selected_gear_label_text_address;
+                call.formatted_text = result.selected_gear_label_text;
+                call.text_source = observation.mode_0x45c200 == 0
+                    ? 0x004CFEB8U : 0x004CFEBCU;
+                call.font_context_value =
+                    observation.gear_label_font_context_value_0x4eb28c;
+                call.font_resource_value =
+                    observation.gear_label_font_resource_value_0x4eb314;
+                call.y = observation.surface_height -
+                    (observation.mode_0x45c200 == 0 ? 0x28 : 0x49);
+                call.format_flags = 0x0cU;
+                call.x = observation.mode_0x45c200 == 0 ? 0x1e : 0x50;
             }
         }
     }
@@ -1311,11 +1337,11 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
         const auto& call = *result.selected_gear_label_call;
         result.operations.push_back({
             SceneDashboardGearOperationKind::draw_selected_gear_label,
-            static_cast<std::int32_t>(call.first_draw_argument),
-            call.vertical_argument,
-            static_cast<std::int32_t>(call.second_draw_argument),
+            call.x,
+            call.y,
+            static_cast<std::int32_t>(call.format_flags),
             0,
-            call.selected_resource_address.value_or(0U),
+            call.selected_text_address.value_or(0U),
             call.text_source});
     };
 
@@ -1340,12 +1366,6 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
             0,
             observation.gear_resource_value_0x4eb420,
             0});
-        if (result.selected_gear_label_call.has_value()) {
-            auto& call = *result.selected_gear_label_call;
-            call.text_source = 0x004CFEBCU;
-            call.vertical_argument = observation.surface_height - 0x49;
-            call.second_draw_argument = 0x50U;
-        }
         append_gear_label_call();
         auto value = observation.selected_record_value_0x34;
         if (selected_object_resolved) {

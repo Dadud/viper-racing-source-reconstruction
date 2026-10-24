@@ -1007,16 +1007,22 @@ bytes are unavailable. The observed geometry
 parameters are phase `-0.27925268` and rate `0.00066322513` from `0x405510`
 (`ev_3f3261dd623758f3ab6ca1b038a14bcb6995ca3bdf4cd68d464c3e7051f84eae`).
 In that same nonzero/non-12 mode branch, `0x404970` reads the selected
-object's `+0x48` selector, indexes the runtime table at `0x4CFAB4`, and calls
-`0x44DC70` with text source `0x4CFEBC`, raw arguments `12` and `50`, vertical
-argument `height-73`, and the values loaded from `0x4EB28C` and `0x4EB314`.
-Mode 0 calls the same helper using text source `0x4CFEB8`, raw arguments `12`
-and `30`, and vertical argument `height-40`. The plan preserves these raw
-arguments without assigning a coordinate meaning to them. It exposes each
-call only when the bounded selected-object pointer chain resolves; the table
-entry remains optional input, and the helper's font and raster effects are
-not yet reconstructed. The raster composer consequently reports the frame as
-incomplete when this call is reached.
+object's `+0x48` selector, indexes the runtime pointer table at `0x4CFAB0`,
+and calls `0x44DC70`. The rotating branch uses text source `0x4CFEBC`, flags
+`0x0C`, x=`80`, and y=`height-73`; mode 0 uses `0x4CFEB8`, flags `0x0C`,
+x=`30`, and y=`height-40`. Both format strings are `%s` (bytes at `0x4CFEB8`,
+evidence `ev_503672f9c44fbcdd2d449430bcef3c0dc2289406010cacfafb944c4ab7caab9c`).
+The signed selector maps `-1` to the reverse string pointer, `0` to neutral,
+and `1..7` to literal digit strings at `0x4CFE9C..0x4CFEB4` (bytes evidence
+`ev_c2c13a2499a75ec341453052f9ff317b6df6e8786cf6a31bb88eb4e17af412e7`).
+Reverse and neutral text contents remain runtime inputs. When the selected
+text and state-0 font/atlas observations are supplied, the race-loop composer
+passes the string through the existing `0x44DC70` layout and `0x44D0C0` atlas
+rasterizer, preserving draw order with the mode-0 fill, RPM image, and rotating
+geometry. The `0x4EB314` palette pointer selects the explicit palette plane;
+when it is non-null, its bounded palette data is required for a complete
+raster. Missing text, palette, font, or atlas inputs keep the frame incomplete.
+Helper layout evidence is `ev_ccbcc893f64ac589352c9f038c356fbad734e92ae8b8dc4986d8e80125a54a7e`.
 The portable plan now also projects the filled triangle vertices and its two
 colored tip-to-base edges: center `(80, height-80)`, tip offset
 `(-sin(angle)*50, cos(angle)*50)`, and base corners offset by
