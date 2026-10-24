@@ -268,52 +268,18 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             plan.dashboard_core_callback.supplemental_time_branch_reached;
         plan.dashboard_supplemental_time =
             plan.dashboard_core_callback.supplemental_time;
-        if (observation.dashboard_core_callback.selected_object_type_0x18 != 0) {
-            plan.dashboard_test_track_reached = true;
-            auto test_track_observation = observation.dashboard_test_track;
-            test_track_observation.selected_record_type_0x18 =
-                observation.dashboard_core_callback.selected_object_type_0x18;
-            test_track_observation.redraw_all =
-                plan.dashboard_core_callback.position.redraw_all;
-            test_track_observation.redraw_from_prior_state_change =
-                observation.dashboard_core_callback.state
-                    .dashboard_kind_cache_0x4cf9ec != 2;
-            if (observation.dashboard_core_callback.locale_state != nullptr) {
-                bind_scene_dashboard_locale(
-                    test_track_observation,
-                    *observation.dashboard_core_callback.locale_state);
-                plan.dashboard_test_track_locale_bound = true;
-            }
-            if (dashboard_observation.language_resource != nullptr) {
-                plan.dashboard_test_track_localization =
-                    apply_scene_dashboard_test_track_localization(
-                        test_track_observation,
-                        *dashboard_observation.language_resource);
-            }
-            plan.dashboard_test_track = update_scene_dashboard_test_track(
-                plan.dashboard_core_callback.next_state,
-                test_track_observation);
-        }
-
-        for (std::size_t index = 0; index < plan.dashboard_metrics.size(); ++index) {
-            auto metric_observation = observation.dashboard_metrics[index];
-            metric_observation.slot = index == 0
-                ? SceneDashboardMetricSlot::value_0x10
-                : SceneDashboardMetricSlot::value_0x14;
-            metric_observation.selected_object_type_0x18 =
-                observation.dashboard_core_callback.selected_object_type_0x18;
-            plan.dashboard_metrics[index] = update_scene_dashboard_metric(
-                plan.dashboard_core_callback.next_state,
-                metric_observation,
-                plan.dashboard_core_callback.position.redraw_all);
-        }
-
-        plan.dashboard_auxiliary_readout_reached = true;
-        auto auxiliary_observation = observation.dashboard_auxiliary_readout;
-        auxiliary_observation.redraw_all =
-            plan.dashboard_core_callback.position.redraw_all;
-        plan.dashboard_auxiliary_readout = scene_dashboard_auxiliary_readout_plan(
-            auxiliary_observation);
+        plan.dashboard_test_track_reached =
+            plan.dashboard_core_callback.test_track_branch_reached;
+        plan.dashboard_test_track = plan.dashboard_core_callback.test_track;
+        plan.dashboard_test_track_localization =
+            plan.dashboard_core_callback.test_track_localization;
+        plan.dashboard_test_track_locale_bound =
+            plan.dashboard_core_callback.test_track_locale_bound;
+        plan.dashboard_metrics = plan.dashboard_core_callback.metrics;
+        plan.dashboard_auxiliary_readout_reached =
+            plan.dashboard_core_callback.auxiliary_readout_reached;
+        plan.dashboard_auxiliary_readout =
+            plan.dashboard_core_callback.auxiliary_readout;
 
         if (observation.state0_dashboard_raster.has_value()) {
             auto raster_observation = *observation.state0_dashboard_raster;

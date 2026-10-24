@@ -1209,6 +1209,9 @@ final-time state updates using the observed selected type and virtual `+0x40`
 result. Only the type-0/global-`+0x40`-false route continues into the modeled
 LapTime block at `0x40399A`; the composer supplies its redraw-all result and
 derives its prior-state-change input from the incoming dashboard-kind cache.
+The race-loop plan now takes its legacy TestTrack, metric, and auxiliary result
+fields directly from this composed plan; it no longer evaluates those helpers
+a second time against a separately advanced state snapshot.
 The callback may also receive a bounded byte view beginning at its ESI pointer.
 At entry ESI is the selected record pointer plus `0x138`; the projection reads
 the observed DWORD fields at ESI offsets `+0x00`, `+0x08`, `+0x0C`, `+0x10`,

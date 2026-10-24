@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Removed the race-loop's second TestTrack,
+  Best/Last metric, and auxiliary-readout evaluation pass. These outputs now
+  alias the state-0 core callback result, so caches and resource-registration
+  bits advance once and the raster text uses the same observations as the
+  callback state transition. The callback observation is the single input
+  surface for these branches.
+
 - **2026-10-24 continuation:** Connected final-race-time row lookup and
   hundredths formatting to the composed dashboard callback. It now derives the
   `0x403848` string from supplied `DAT_0050869C` rows and the selected ordinal;

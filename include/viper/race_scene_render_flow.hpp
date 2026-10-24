@@ -81,9 +81,6 @@ struct RaceLoopSharedOverlayObservation {
     std::optional<StampImage> state0_dashboard_background_image;
     std::vector<std::uint8_t> state0_bitmap_source_pixels;
     SceneDashboardCoreCallbackObservation dashboard_core_callback{};
-    SceneDashboardTestTrackObservation dashboard_test_track{};
-    std::array<SceneDashboardMetricObservation, 2> dashboard_metrics{};
-    SceneDashboardAuxiliaryReadoutObservation dashboard_auxiliary_readout{};
     SceneDashboardCallbackGeometryObservation dashboard_callback_geometry{};
     SceneDashboardGearDisplayObservation dashboard_gear_display{};
     // Decoded image for the registered 0x4EB420 resource. Populate with
@@ -120,6 +117,7 @@ struct RaceLoopSharedOverlayPlan {
     std::optional<SceneDashboardCoreCallbackRasterPlan>
         state0_dashboard_text_raster;
     bool dashboard_test_track_reached{};
+    // Aliases of the composed callback outputs, retained for existing readers.
     SceneDashboardTestTrackResult dashboard_test_track{};
     std::optional<SceneDashboardTestTrackLocalizationPlan>
         dashboard_test_track_localization;
