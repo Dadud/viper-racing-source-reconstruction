@@ -426,6 +426,9 @@ struct PhysicsTaskRecordLoadObservation {
     bool constructor_returned_object{};
     bool panic_reporter_returned{};
     bool object_virtual_0x2c_result{};
+    // Runtime inputs consumed by 0x426F20 when virtual +0x2C returns true.
+    std::optional<std::uint32_t> task_data_cursor_before;
+    std::optional<std::uint32_t> object_virtual_0x18_size;
 };
 
 enum class PhysicsTaskRecordLoadStatus {
@@ -445,6 +448,9 @@ struct PhysicsTaskRecordLoadPlan {
     bool post_construct_0x426f20_called{};
     bool output_slot_written{};
     bool returns_success{};
+    // 0x426F20 writes the old cursor to object +0x34 before advancing it.
+    std::optional<std::uint32_t> object_task_data_offset_0x34;
+    std::optional<std::uint32_t> task_data_cursor_after;
     // If set, 0x4C5EA0 would copy bytes outside the captured record span.
     bool binary_read_exceeds_payload{};
 };

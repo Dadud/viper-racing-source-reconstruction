@@ -801,6 +801,16 @@ PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
 
     plan.post_construct_0x426f20_called =
         observation.object_virtual_0x2c_result;
+    if (plan.post_construct_0x426f20_called &&
+        observation.task_data_cursor_before.has_value()) {
+        plan.object_task_data_offset_0x34 =
+            *observation.task_data_cursor_before;
+        if (observation.object_virtual_0x18_size.has_value()) {
+            plan.task_data_cursor_after =
+                *observation.task_data_cursor_before +
+                *observation.object_virtual_0x18_size;
+        }
+    }
     plan.output_slot_written = true;
     plan.returns_success = true;
     plan.status = PhysicsTaskRecordLoadStatus::object_loaded;

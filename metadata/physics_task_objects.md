@@ -350,5 +350,11 @@ a constructor returned null—without executing an unsafe dereference. A true
 virtual result triggers `0x426F20`; a non-null object is then stored and the
 reader reports success. An unknown FourCC returns from the factory only if the
 panic reporter returns; otherwise the reader never reaches the virtual call.
-Evidence: `0x4224D0`, `ev_3daf18319a2e5bb333165deb4e9ee8040b81efdb7404bcbb769d852d8969eb61`.
+When `0x426F20` runs, it first copies the current task-data cursor into the
+object's `+0x34`, calls its virtual `+0x18`, then advances the global cursor by
+that callback's returned byte count. The projection accepts the old cursor and
+callback size as optional runtime observations; it can report the object offset
+even when the returned size is unavailable. Evidence: `0x4224D0`,
+`ev_3daf18319a2e5bb333165deb4e9ee8040b81efdb7404bcbb769d852d8969eb61`, and
+`0x426F20`, `ev_01f6bab75271ba29cbd44ddd6feb3a0213b51640ad44436defd19214f505b5cd`.
 
