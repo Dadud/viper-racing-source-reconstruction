@@ -346,6 +346,31 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
             track_scale, input.fdiv_compatibility_enabled));
     const float value_0x44 = initial_value_0x44 + height_correction;
     const float value_0x48 = height_correction + base_height;
+    const float axle_piecewise_input = read_float(front ? 0xd4U : 0xd8U);
+    const float secondary_piecewise_input = read_float(front ? 0xdcU : 0xe0U);
+    const auto scaled_piecewise_input = [
+        &input](const float value, const float scale) {
+        const auto inches = divide_with_vc98_fdiv_compatibility(
+            static_cast<long double>(value), 0.0254L,
+            input.fdiv_compatibility_enabled);
+        return static_cast<float>(inches * static_cast<long double>(scale));
+    };
+    const float piecewise_param1 = scaled_piecewise_input(
+        axle_piecewise_input, 4.45F);
+    const float piecewise_param2 = scaled_piecewise_input(
+        axle_piecewise_input, 2.67F);
+    const float piecewise_param3 = scaled_piecewise_input(
+        secondary_piecewise_input, 4.45F);
+    const float piecewise_param4 = scaled_piecewise_input(
+        secondary_piecewise_input, 4.45F);
+    const float positive_slope =
+        (piecewise_param2 * 0.13333334F - piecewise_param1) * -1.1538461F;
+    const float positive_intercept =
+        (piecewise_param1 - positive_slope) * 9.84252F;
+    const float nonpositive_slope =
+        (piecewise_param4 * 0.13333334F - piecewise_param3) * -1.1538461F;
+    const float nonpositive_intercept =
+        (piecewise_param3 - nonpositive_slope) * 9.84252F;
     const std::array<float, 3> candidate_position{
         side_sign * std::fabs(lateral_setup) * 0.0254F * 0.5F,
         -(read_float(0x128U) * 0.0254F + value_0x44),
@@ -367,7 +392,11 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         steering_x,
         steering_y,
         value_0x44,
-        value_0x48};
+        value_0x48,
+        0.0F,
+        track_scale,
+        {positive_slope, positive_intercept,
+         nonpositive_slope, nonpositive_intercept}};
 }
 
 NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(

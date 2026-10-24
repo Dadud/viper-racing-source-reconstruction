@@ -583,6 +583,9 @@ struct NcarWheelCoreInitialization {
     float angle_0x64{};
     float value_0x44{};
     float value_0x48{};
+    float value_0x40{};
+    float value_0x4c{};
+    WheelPiecewiseTerms suspension_piecewise_terms{};
 };
 
 // Reconstructs position and steering stores from wheel constructor 0x441C10.

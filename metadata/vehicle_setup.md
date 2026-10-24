@@ -247,14 +247,24 @@ Evidence: `0x433C00` pseudocode and body range
 `initialize_ncar_wheel_core` reconstructs the bounded, deterministic wheel
 constructor outputs that follow anchor selection: axle and side classification,
 the model-space wheel candidate and offset relative to the selected FNIM vertex,
-steering angles at `+0x60/+0x64`, and geometry values at `+0x3C/+0x5C/+0x44/+0x48`.
+steering angles at `+0x60/+0x64`, geometry values at
+`+0x3C/+0x5C/+0x44/+0x48`, zero at `+0x40`, and a copy of `+0x3C` at `+0x4C`.
+It also selects the axle's CARF values at `+0xD4/+0xDC` (front) or
+`+0xD8/+0xE0` (rear), converts them using the constructor's `0.0254`, `4.45`,
+and `2.67` factors and explicit FDIV-compatibility input, then applies helper
+`0x440560` to reconstruct the four `WheelPiecewiseTerms` stored at wheel
+`+0x24..+0x30`. These terms feed the existing evidence-backed spring-response
+evaluator. This completes only the constructor's coefficient setup; the live
+runtime still does not populate persistent wheel histories or run the body and
+wheel update pipeline. Evidence: `0x441C10` pseudocode
+`ev_c5aa0c77b19958eb9c8ba45643b19d858c19899f5cfc958f00b97ab6df232f06` and
+`0x440560` pseudocode `ev_906c8fea850a24b83239803069e5c805da97ac274918d073c7ab9625a12ce57b`.
 Its input explicitly includes the car object's mass-like scalar at `+0x1F0` and
 the observed FDIV-compatibility flag. A short runtime record or wheel index
 outside 0..3 is rejected. The final suspension-height correction uses the
 existing VC98 compatibility division model when that flag is set. Tire loading,
 helper-owned wheel transforms and remaining `0x441C10` stores are still outside
-this core plan. Evidence: `0x441C10` pseudocode, dossier
-`ev_c5aa0c77b19958eb9c8ba45643b19d858c19899f5cfc958f00b97ab6df232f06`.
+this core plan.
 
 ### TIRE field consumption at `0x435BF0`
 

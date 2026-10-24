@@ -253,6 +253,10 @@ int main()
         write_float(0x64U, 9.0F);
         write_float(0xccU, 0.1F);
         write_float(0xd0U, 0.2F);
+        write_float(0xd4U, 0.01F);
+        write_float(0xd8U, 0.02F);
+        write_float(0xdcU, 0.03F);
+        write_float(0xe0U, 0.04F);
         write_float(0xecU, 10.0F);
         write_float(0xf0U, 20.0F);
         write_float(0xf4U, 30.0F);
@@ -306,7 +310,15 @@ int main()
                 std::fabs(front_wheel->candidate_position[0] + 0.0635F) < 1.0e-6F &&
                 std::fabs(front_wheel->candidate_position[2] - 3.81F) < 1.0e-6F &&
                 std::fabs(front_wheel->position_relative_to_selected_vertex[0] -
-                    0.3365F) < 1.0e-6F,
+                    0.3365F) < 1.0e-6F &&
+                front_wheel->value_0x40 == 0.0F &&
+                front_wheel->value_0x4c == front_track_scale &&
+                std::fabs(front_wheel->suspension_piecewise_terms.positive_slope -
+                    ((0.01F / 0.0254F * 2.67F * 0.13333334F -
+                      0.01F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F &&
+                std::fabs(front_wheel->suspension_piecewise_terms.nonpositive_slope -
+                    ((0.03F / 0.0254F * 4.45F * 0.13333334F -
+                      0.03F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F,
             "0x441C10 front-wheel position, geometry, and steering stores must be reconstructed");
         const auto right_front_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 1U, {0.4F, -0.254F, 3.81F}, 0.5F, false});
@@ -330,7 +342,13 @@ int main()
                     (rear_base_height * 2.0F + rear_height_correction)) < 1.0e-6F &&
                 std::fabs(rear_wheel->angle_0x60 - 0.34906584F) < 1.0e-6F &&
                 std::fabs(rear_wheel->angle_0x64 - 0.69813168F) < 1.0e-6F &&
-                std::fabs(rear_wheel->candidate_position[2] + 1.27F) < 1.0e-6F,
+                std::fabs(rear_wheel->candidate_position[2] + 1.27F) < 1.0e-6F &&
+                std::fabs(rear_wheel->suspension_piecewise_terms.positive_slope -
+                    ((0.02F / 0.0254F * 2.67F * 0.13333334F -
+                      0.02F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F &&
+                std::fabs(rear_wheel->suspension_piecewise_terms.nonpositive_slope -
+                    ((0.04F / 0.0254F * 4.45F * 0.13333334F -
+                      0.04F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F,
             "0x441C10 rear-wheel setup must select the rear axle and handedness fields");
         const auto right_rear_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 3U, {0.4F, -0.254F, -1.27F}, 0.5F, false});
