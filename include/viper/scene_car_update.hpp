@@ -1054,6 +1054,7 @@ struct SceneCarCalloutOperation {
     std::int32_t x{};
     std::int32_t y{};
     std::size_t text_length{};
+    std::uint32_t underlying_draw_address{};
 };
 
 struct SceneCarCalloutInput {

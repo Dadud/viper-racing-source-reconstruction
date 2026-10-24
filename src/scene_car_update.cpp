@@ -1895,7 +1895,7 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
             0x0044D710U, 0x004DCDA4U, 5, 0x140,
             std::bit_cast<std::int32_t>(x_bits),
             std::bit_cast<std::int32_t>(y_bits),
-            input.primary_text_length});
+            input.primary_text_length, 0x0044D6A0U});
     }
 
     result.operations.push_back({
@@ -1917,7 +1917,7 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
                 - static_cast<std::uint32_t>(input.secondary_record_text_length) * 4U),
             std::bit_cast<std::int32_t>(
                 std::bit_cast<std::uint32_t>(input.secondary_text_y_after_ftol) - 4U),
-            input.secondary_record_text_length});
+            input.secondary_record_text_length, 0x0044D6A0U});
     }
     return result;
 }

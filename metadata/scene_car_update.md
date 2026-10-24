@@ -481,6 +481,16 @@ The `0x44D6A0` helper replaces control bytes below space with `#` before
 dispatching glyphs to `0x44D780`; pixel rasterization is covered by the shared
 built-in-font projection.
 
+`raster_scene_car_callout` consumes the callback operation plan and sends the
+primary and secondary strings through `raster_scene_dashboard_builtin_font`
+using the shared color at `0x53F194` and renderer observation. It preserves the
+resource operation between those text segments as an ordered zero-write marker,
+so a caller can insert the separately decoded `+0x7B4` image/resource writes
+without changing text ordering. It reports a text-input mismatch when the
+provided NUL-terminated string lengths disagree with the callout's centering
+observations. Native surface ownership and resolution of the object resource
+pointer remain inputs.
+
 `plan_scene_renderer_dispatch` projects the enclosing generic render frame at
 `0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active
 draw gate is `renderer_mode > 0` with renderer state in `{0,1,2}`. When active,

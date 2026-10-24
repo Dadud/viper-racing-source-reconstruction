@@ -2017,6 +2017,51 @@ SceneDashboardBuiltinFontPlan raster_scene_dashboard_builtin_font(
     return result;
 }
 
+SceneCarCalloutRasterPlan raster_scene_car_callout(
+    const SceneCarCalloutPlan& callout,
+    const SceneCarCalloutRasterObservation& observation)
+{
+    SceneCarCalloutRasterPlan result{};
+    result.callout_status = callout.status;
+    const auto c_string_length = [](const std::string_view text) {
+        const auto terminator = text.find('\0');
+        return terminator == std::string_view::npos ? text.size() : terminator;
+    };
+    const auto raster_text = [&](const SceneCarCalloutOperation& operation,
+                                 const std::string_view text) {
+        if (c_string_length(text) != operation.text_length) {
+            result.input_complete = false;
+        }
+        const auto first_write = result.ordered_pixel_writes.size();
+        const auto font_plan = raster_scene_dashboard_builtin_font({
+            text, operation.x, operation.y,
+            observation.color_0x53f194, observation.renderer});
+        result.input_complete = result.input_complete && font_plan.input_complete;
+        result.ordered_pixel_writes.insert(result.ordered_pixel_writes.end(),
+            font_plan.pixel_writes.begin(), font_plan.pixel_writes.end());
+        result.ordered_segments.push_back({
+            operation.kind, first_write, font_plan.pixel_writes.size()});
+    };
+
+    for (const auto& operation : callout.operations) {
+        switch (operation.kind) {
+        case SceneCarCalloutOperationKind::draw_primary_text_0x4d710:
+            raster_text(operation, observation.primary_text);
+            break;
+        case SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0:
+            result.ordered_segments.push_back({
+                operation.kind, result.ordered_pixel_writes.size(), 0U});
+            break;
+        case SceneCarCalloutOperationKind::draw_secondary_text_0x4d710:
+            raster_text(operation, observation.secondary_text);
+            break;
+        default:
+            break;
+        }
+    }
+    return result;
+}
+
 SceneDashboardRasterPlan raster_scene_dashboard_text(
     const SceneDashboardTextLayout& layout,
     const SceneDashboardAtlasFontObservation& font,

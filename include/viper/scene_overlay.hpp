@@ -12,6 +12,7 @@
 #include "viper/matrix_quaternion.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/render_context.hpp"
+#include "viper/scene_car_update.hpp"
 
 namespace viper {
 
@@ -1985,6 +1986,34 @@ struct SceneDashboardBuiltinFontPlan {
 [[nodiscard]] SceneDashboardBuiltinFontPlan
 raster_scene_dashboard_builtin_font(
     const SceneDashboardBuiltinFontObservation& observation);
+
+struct SceneCarCalloutRasterObservation {
+    std::string_view primary_text;
+    std::string_view secondary_text;
+    std::uint32_t color_0x53f194{};
+    SceneDashboardRasterObservation renderer;
+};
+
+struct SceneCarCalloutRasterSegment {
+    SceneCarCalloutOperationKind source_kind{};
+    std::size_t first_pixel_write{};
+    std::size_t pixel_write_count{};
+};
+
+struct SceneCarCalloutRasterPlan {
+    SceneCarCalloutStatus callout_status{SceneCarCalloutStatus::complete};
+    bool input_complete{true};
+    std::vector<SceneTextPixelWrite> ordered_pixel_writes;
+    // Includes the secondary resource draw as a zero-write segment so callers
+    // can preserve text/resource/text order when composing that resource.
+    std::vector<SceneCarCalloutRasterSegment> ordered_segments;
+};
+
+// Rasterizes the two possible 0x44D710 callout strings through the shared
+// built-in font path, retaining the intervening 0x44D0C0 resource operation.
+[[nodiscard]] SceneCarCalloutRasterPlan raster_scene_car_callout(
+    const SceneCarCalloutPlan& callout,
+    const SceneCarCalloutRasterObservation& observation);
 
 // Models atlas clipping, transparent/literal RLE runs, palette selection,
 // and 16-bit destination addressing in 0x44D0C0/0x449D70.
