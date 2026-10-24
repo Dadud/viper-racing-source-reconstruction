@@ -662,3 +662,10 @@ distance branches. It emits optional output-pair writes and records calls to
 the two observed message-pointer addresses; the `+0xF58` route scalar and
 segment values remain captured inputs. Evidence: `0x42A6D0`
 `ev_26aea6f3796110fa9e2f49aee6d38056e2eafb7f6f3e010c0ac9daeedd56ce2e`.
+
+`plan_acar_forward_candidate_steering` projects helper `0x42B450`, the next
+direct call after `0x42B570` in callback fragment `0x42B7B0`. A valid forward
+candidate takes either the signed threshold/near-zero-auxiliary `0.9` steering
+floor or the guarded quotient-derived floor; the model preserves raw DWORD
+comparisons and the `0x4D52BC` message call. Evidence: `0x42B450`
+`ev_c87026ab2af0c0804aa374fae72a416a83460f626bb9c2adfba092b4da9287e5`.

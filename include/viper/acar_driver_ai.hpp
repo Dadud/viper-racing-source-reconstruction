@@ -174,6 +174,7 @@ enum class AcarRouteSteeringMessageCall : std::uint8_t {
     none,
     message_0x4d5288,
     message_0x4d528c,
+    message_0x4d52bc,
 };
 
 struct AcarRouteSteeringObservation {
@@ -208,6 +209,30 @@ struct AcarRouteSteeringPlan {
 // Projects route-aware output steering helper 0x42A6D0.
 [[nodiscard]] AcarRouteSteeringPlan plan_acar_route_steering(
     const AcarRouteSteeringObservation& observation) noexcept;
+
+struct AcarForwardCandidateSteeringObservation {
+    bool forward_candidate_valid_0xed0{};
+    std::uint32_t forward_candidate_value_bits_0xed4{};
+    float forward_candidate_auxiliary_0xed8{};
+    float incoming_output_0{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct AcarForwardCandidateSteeringPlan {
+    AcarRouteSteeringMessageCall message_call{
+        AcarRouteSteeringMessageCall::none};
+    std::optional<float> output_0;
+    std::optional<float> normalized_candidate;
+    bool fdiv_compatibility_path_used{};
+    bool candidate_threshold_passed{};
+    bool quotient_gate_passed{};
+    bool output_written{};
+};
+
+// Projects selected-forward-candidate steering helper 0x42B450.
+[[nodiscard]] AcarForwardCandidateSteeringPlan
+plan_acar_forward_candidate_steering(
+    const AcarForwardCandidateSteeringObservation& observation) noexcept;
 
 struct AcarComposedDriverCallbackPlan {
     AcarDriverAiPlan route_candidate_plan{};

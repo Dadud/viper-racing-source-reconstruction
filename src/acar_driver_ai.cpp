@@ -548,6 +548,62 @@ AcarRouteSteeringPlan plan_acar_route_steering(
     return plan;
 }
 
+AcarForwardCandidateSteeringPlan plan_acar_forward_candidate_steering(
+    const AcarForwardCandidateSteeringObservation& observation) noexcept
+{
+    AcarForwardCandidateSteeringPlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+    if (!observation.forward_candidate_valid_0xed0) {
+        return plan;
+    }
+
+    const auto value = std::bit_cast<std::int32_t>(
+        observation.forward_candidate_value_bits_0xed4);
+    const auto auxiliary_abs =
+        std::fabs(observation.forward_candidate_auxiliary_0xed8);
+    if (value < 0x40a482be || !(auxiliary_abs > 0.0001F)) {
+        plan.output_0 = observation.incoming_output_0 <= 0.9F
+            ? 0.9F : observation.incoming_output_0;
+        plan.output_written = true;
+        plan.message_call = AcarRouteSteeringMessageCall::message_0x4d52bc;
+        return plan;
+    }
+
+    if (value <= 0x408f0d84) {
+        return plan;
+    }
+    plan.candidate_threshold_passed = true;
+    const auto candidate = std::bit_cast<float>(
+        observation.forward_candidate_value_bits_0xed4);
+    const auto raw_negative_ratio = static_cast<float>(
+        -divide_with_vc98_fdiv_compatibility(
+            static_cast<long double>(candidate) - 4.91744L,
+            static_cast<long double>(
+                observation.forward_candidate_auxiliary_0xed8),
+            observation.fdiv_compatibility_enabled));
+    plan.normalized_candidate = raw_negative_ratio;
+    if (std::bit_cast<std::int32_t>(raw_negative_ratio) <= 0) {
+        return plan;
+    }
+    plan.quotient_gate_passed = true;
+
+    auto floor = static_cast<float>(
+        (2.5L - static_cast<long double>(raw_negative_ratio)) * 0.4L);
+    if (floor >= 0.0F) {
+        if (std::bit_cast<std::int32_t>(floor) > 0x3f800000) {
+            floor = 1.0F;
+        }
+    } else {
+        floor = 0.0F;
+    }
+    plan.output_0 = observation.incoming_output_0 <= floor
+        ? floor : observation.incoming_output_0;
+    plan.output_written = true;
+    plan.message_call = AcarRouteSteeringMessageCall::message_0x4d52bc;
+    return plan;
+}
+
 AcarComposedDriverCallbackPlan evaluate_acar_driver_callback_with_fallback(
     AcarDriverAiState& driver_state,
     AcarFallbackState& fallback_state,
