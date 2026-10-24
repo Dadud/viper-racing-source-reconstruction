@@ -45,6 +45,22 @@ GameAssets GameAssets::load(const std::filesystem::path& root)
         throw std::runtime_error("Bemidji track.bpp terrain resource is missing or unsupported");
     }
     assets.terrain_ = *terrain;
+    constexpr std::uint32_t ideal_line_type = 0x494c494eU;
+    const auto* ideal_line_entry = assets.bundle("bemidji.trk").find("track.ild", ideal_line_type);
+    if (ideal_line_entry == nullptr) {
+        throw std::runtime_error("Bemidji track.ild ideal-line resource is missing");
+    }
+    const auto ideal_line_payload = parse_ideal_line_resource(
+        ideal_line_entry->attributes,
+        assets.bundle("bemidji.trk").payload(*ideal_line_entry));
+    if (!ideal_line_payload) {
+        throw std::runtime_error("Bemidji track.ild ideal-line resource is invalid");
+    }
+    const auto normalized_ideal_line = normalize_ideal_line_resource(*ideal_line_payload, 0U);
+    if (!normalized_ideal_line) {
+        throw std::runtime_error("Bemidji track.ild could not be normalized");
+    }
+    assets.ideal_line_ = *normalized_ideal_line;
     return assets;
 }
 

@@ -3,6 +3,7 @@
 #include "viper/language_resource.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/terrain_surface.hpp"
+#include "viper/world_track_objects.hpp"
 
 #include <array>
 #include <filesystem>
@@ -19,12 +20,14 @@ public:
     [[nodiscard]] const ResourceBundle& bundle(std::string_view name) const;
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
+    [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
 
 private:
     std::filesystem::path root_;
     std::array<ResourceBundle, 5> bundles_;
     LanguageResource language_;
     TerrainSurfaceResourcePayload terrain_;
+    IdealLineTrackData ideal_line_;
 };
 
 } // namespace viper

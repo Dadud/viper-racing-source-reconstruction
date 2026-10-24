@@ -186,7 +186,8 @@ if(WIN32)
         target_compile_options(viper_game PRIVATE /W4 /permissive- /utf-8)
     endif()
     target_link_libraries(viper_game PRIVATE
-        viper_resource_bundle viper_language_resource viper_terrain_model d3d11 dxgi user32)
+        viper_resource_bundle viper_language_resource viper_terrain_model
+        viper_scene_model d3d11 dxgi user32)
 endif()
 
 include(CTest)

@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 runtime ideal-line view:** `GameAssets` parses and normalizes
+  Bemidji's 91-row `track.ild`; `viper_game` now presents its X/Z route as a
+  fitted D3D11 line strip in a clearly labeled development view. Rendering uses
+  only recovered ILIN coordinates, not invented terrain geometry. A first WARP
+  smoke attempt exposed a shader-compiler DLL lifetime crash; keeping the
+  compiler module loaded while its COM blobs live fixed it. Release build,
+  CTest, and the three-frame WARP render smoke now pass. Terrain mesh, player
+  vehicle, controls, physics loop, and complete race remain outstanding.
+
 - **2026-10-24 runtime track-data integration:** `GameAssets` now parses and
   retains Bemidji's `track.bpp` TPPB terrain using the existing terrain model;
   startup validation reports 10,431 planes and 34,712 partition nodes alongside

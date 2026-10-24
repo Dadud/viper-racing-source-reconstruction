@@ -1,12 +1,18 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <d3d11.h>
+#include <d3dcompiler.h>
 #include <dxgi.h>
 #include <wrl/client.h>
 
 #include "viper/game_assets.hpp"
 
 #include <array>
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstring>
+#include <cstddef>
 #include <filesystem>
 #include <iostream>
 #include <limits>
@@ -20,6 +26,56 @@
 namespace {
 
 using Microsoft::WRL::ComPtr;
+
+struct IdealLineVertex { float x; float y; };
+
+std::uint32_t read_u32_le(const std::byte* bytes)
+{
+    return static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[0])) |
+        (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[1])) << 8U) |
+        (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[2])) << 16U) |
+        (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[3])) << 24U);
+}
+
+std::vector<std::array<float, 2>> extract_ideal_line_points(
+    const viper::IdealLineTrackData& line)
+{
+    std::vector<std::array<float, 2>> points;
+    points.reserve(line.records.size());
+    for (const auto& record : line.records) {
+        const float x = std::bit_cast<float>(read_u32_le(record.data() + 0x04U));
+        const float z = std::bit_cast<float>(read_u32_le(record.data() + 0x08U));
+        if (!std::isfinite(x) || !std::isfinite(z))
+            throw std::runtime_error("Bemidji ideal line contains a non-finite position");
+        points.push_back({x, z});
+    }
+    if (points.size() < 2U)
+        throw std::runtime_error("Bemidji ideal line needs at least two points to display");
+    return points;
+}
+
+using D3DCompileFn = HRESULT (WINAPI *)(LPCVOID, SIZE_T, LPCSTR,
+    const D3D_SHADER_MACRO*, ID3DInclude*, LPCSTR, LPCSTR, UINT, UINT,
+    ID3DBlob**, ID3DBlob**);
+
+HRESULT compile_shader(const char* source, const char* entry, const char* target,
+                       ComPtr<ID3DBlob>& bytecode)
+{
+    // D3DCompile's ID3DBlob implementation lives in this DLL. Keep the module
+    // loaded for the process lifetime so returned blobs can safely Release.
+    static const HMODULE compiler = LoadLibraryW(L"d3dcompiler_47.dll");
+    if (!compiler) return HRESULT_FROM_WIN32(GetLastError());
+    const auto compile = reinterpret_cast<D3DCompileFn>(
+        GetProcAddress(compiler, "D3DCompile"));
+    if (!compile) return E_NOINTERFACE;
+    ComPtr<ID3DBlob> errors;
+    const HRESULT result = compile(source, std::strlen(source), "viper_ideal_line",
+        nullptr, nullptr, entry, target, D3DCOMPILE_OPTIMIZATION_LEVEL3, 0,
+        &bytecode, &errors);
+    if (FAILED(result) && errors)
+        OutputDebugStringA(static_cast<const char*>(errors->GetBufferPointer()));
+    return result;
+}
 
 struct Options {
     std::filesystem::path data_dir;
@@ -93,14 +149,22 @@ viper::GameAssets load_assets(const std::filesystem::path& root)
     std::cout << "Loaded english.lng: " << assets.language().entries.size() << " strings\n"
               << "Parsed Bemidji terrain: " << assets.terrain().planes.size() << " planes, "
               << assets.terrain().partition_nodes.size() << " partition nodes\n"
+              << "Parsed Bemidji ideal line: " << assets.ideal_line().records.size()
+              << " records\n"
               << "Required assets validated in " << assets.root().string() << '\n';
     return assets;
 }
 
 class D3DWindow {
 public:
-    bool create(HWND hwnd, bool software)
+    bool create(HWND hwnd, bool software, const viper::IdealLineTrackData& ideal_line)
     {
+        try {
+            ideal_line_points_ = extract_ideal_line_points(ideal_line);
+        } catch (const std::exception& e) {
+            OutputDebugStringA(e.what());
+            return false;
+        }
         RECT rect{};
         if (!GetClientRect(hwnd, &rect)) return false;
         width_ = static_cast<UINT>(rect.right - rect.left);
@@ -120,7 +184,7 @@ public:
             nullptr, 0, levels, static_cast<UINT>(std::size(levels)), D3D11_SDK_VERSION,
             &desc, &swap_chain_, &device_, &selected, &context_);
         if (FAILED(hr)) return false;
-        return create_target();
+        return create_target() && create_line_pipeline() && update_line_buffer();
     }
 
     bool resize(UINT width, UINT height)
@@ -131,7 +195,7 @@ public:
         if (FAILED(swap_chain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0))) return false;
         width_ = width;
         height_ = height;
-        return create_target();
+        return create_target() && update_line_buffer();
     }
 
     bool render()
@@ -143,10 +207,83 @@ public:
                                 static_cast<float>(height_), 0.0f, 1.0f};
         context_->RSSetViewports(1, &viewport);
         context_->ClearRenderTargetView(target_.Get(), color);
+        if (!line_buffer_ || ideal_line_vertex_count_ < 2U) return false;
+        const UINT stride = sizeof(IdealLineVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(line_input_layout_.Get());
+        context_->IASetVertexBuffers(0, 1, line_buffer_.GetAddressOf(), &stride, &offset);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+        context_->VSSetShader(line_vertex_shader_.Get(), nullptr, 0);
+        context_->PSSetShader(line_pixel_shader_.Get(), nullptr, 0);
+        context_->Draw(ideal_line_vertex_count_, 0);
         return SUCCEEDED(swap_chain_->Present(1, 0));
     }
 
 private:
+    bool create_line_pipeline()
+    {
+        static constexpr char vertex_source[] =
+            "struct V { float2 p : POSITION; };\n"
+            "float4 VSMain(V v) : SV_POSITION { return float4(v.p, 0.0, 1.0); }\n";
+        static constexpr char pixel_source[] =
+            "float4 PSMain() : SV_TARGET { return float4(1.0, 0.66, 0.12, 1.0); }\n";
+        ComPtr<ID3DBlob> vertex_code;
+        ComPtr<ID3DBlob> pixel_code;
+        if (FAILED(compile_shader(vertex_source, "VSMain", "vs_4_0", vertex_code)) ||
+            FAILED(compile_shader(pixel_source, "PSMain", "ps_4_0", pixel_code)))
+            return false;
+        if (FAILED(device_->CreateVertexShader(vertex_code->GetBufferPointer(),
+                vertex_code->GetBufferSize(), nullptr, &line_vertex_shader_)) ||
+            FAILED(device_->CreatePixelShader(pixel_code->GetBufferPointer(),
+                pixel_code->GetBufferSize(), nullptr, &line_pixel_shader_)))
+            return false;
+        const D3D11_INPUT_ELEMENT_DESC element{
+            "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,
+            D3D11_INPUT_PER_VERTEX_DATA, 0};
+        return SUCCEEDED(device_->CreateInputLayout(&element, 1,
+            vertex_code->GetBufferPointer(), vertex_code->GetBufferSize(), &line_input_layout_));
+    }
+
+    bool update_line_buffer()
+    {
+        if (!width_ || !height_ || ideal_line_points_.size() < 2U) return true;
+        float min_x = ideal_line_points_.front()[0];
+        float max_x = min_x;
+        float min_z = ideal_line_points_.front()[1];
+        float max_z = min_z;
+        for (const auto& point : ideal_line_points_) {
+            min_x = (std::min)(min_x, point[0]);
+            max_x = (std::max)(max_x, point[0]);
+            min_z = (std::min)(min_z, point[1]);
+            max_z = (std::max)(max_z, point[1]);
+        }
+        const float range = (std::max)(max_x - min_x, max_z - min_z);
+        if (!(range > 0.0f) || !std::isfinite(range)) return false;
+        const float pixels_per_unit = 0.88f * static_cast<float>((std::min)(width_, height_)) / range;
+        const float center_x = (min_x + max_x) * 0.5f;
+        const float center_z = (min_z + max_z) * 0.5f;
+        std::vector<IdealLineVertex> vertices;
+        vertices.reserve(ideal_line_points_.size() + 1U);
+        for (const auto& point : ideal_line_points_) {
+            vertices.push_back({
+                2.0f * (point[0] - center_x) * pixels_per_unit / static_cast<float>(width_),
+                -2.0f * (point[1] - center_z) * pixels_per_unit / static_cast<float>(height_)});
+        }
+        // The normalized ideal line carries circular next-row links. Close the visual strip.
+        vertices.push_back(vertices.front());
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(IdealLineVertex));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA data{};
+        data.pSysMem = vertices.data();
+        ComPtr<ID3D11Buffer> buffer;
+        if (FAILED(device_->CreateBuffer(&desc, &data, &buffer))) return false;
+        line_buffer_ = std::move(buffer);
+        ideal_line_vertex_count_ = static_cast<UINT>(vertices.size());
+        return true;
+    }
+
     bool create_target()
     {
         ComPtr<ID3D11Texture2D> back_buffer;
@@ -158,6 +295,12 @@ private:
     ComPtr<ID3D11DeviceContext> context_;
     ComPtr<IDXGISwapChain> swap_chain_;
     ComPtr<ID3D11RenderTargetView> target_;
+    ComPtr<ID3D11VertexShader> line_vertex_shader_;
+    ComPtr<ID3D11PixelShader> line_pixel_shader_;
+    ComPtr<ID3D11InputLayout> line_input_layout_;
+    ComPtr<ID3D11Buffer> line_buffer_;
+    std::vector<std::array<float, 2>> ideal_line_points_;
+    UINT ideal_line_vertex_count_{};
     UINT width_{};
     UINT height_{};
 };
@@ -191,7 +334,8 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
     return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-int run_window(bool software, std::optional<unsigned> smoke_frames)
+int run_window(bool software, std::optional<unsigned> smoke_frames,
+               const viper::IdealLineTrackData& ideal_line)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -205,11 +349,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames)
         return 1;
     }
     WindowState state;
-    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Runtime Foundation",
+    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Bemidji Ideal-Line Development View",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
-    if (!state.graphics.create(hwnd, software)) {
+    if (!state.graphics.create(hwnd, software, ideal_line)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
         DestroyWindow(hwnd);
@@ -253,8 +397,7 @@ int wmain(int argc, wchar_t** argv)
         if (options.help) { usage(std::cout); return 0; }
         auto assets = load_assets(options.data_dir);
         if (options.validate_assets) return 0;
-        (void)assets;
-        return run_window(options.software, options.smoke_frames);
+        return run_window(options.software, options.smoke_frames, assets.ideal_line());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;
