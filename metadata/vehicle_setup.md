@@ -330,6 +330,26 @@ Evidence `ev_fb568c133bd592fd606067f6b5921d7536ad52e13ad301ad1358df8c8efafbb4`,
 `ev_9b6c4bbcae1a3860704fcd8427642d9f5fe1d156ba33b0d64beb765650471d7b`, and
 `ev_89e24ce1c4e9e6d9eae23c9b0297e9ec22e14f1a9fa41ef37cb7e90098e895aa`.
 
+The sound-manager calls in `race.bin` resolve the previously missing engine
+resource-selection path. `0x46C410` first requests a car-specific engine setup
+resource using type code `0x45534658` (`ESFX`). If that lookup fails, it reads
+`engine.txt` and constructs up to seven `engine_<index>.sfx` slots from its
+seven-float rows. With the setup resource present, it requests `<car>_si.sfx`
+for the idle sound and `<car>_<index>_sfx` for each listed engine band,
+falling back to `engine_<index>.sfx` when the named band file is absent. Each
+sound object is made by `0x46C080`, which allocates `0x40` bytes, constructs
+the `0x46BE60` object, and rejects it if its resource handle at `+0x0C` is
+zero. The engine manager stores the number of successfully loaded slots at
+`+0xF4`; its wrapper rejects the manager when this count is zero. This
+recovers selection and lifetime gates, not the `.sfx` sample codec or audible
+playback. Evidence against shipped `GameBin/race.bin` SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`:
+`ev_95ac1d7d4a2c2f609f292ff4acb2474fdb3a8f68663b954e3c548f99976b729c`
+(`0x46C410`), `ev_c185d0a19fe0a146190bc9217ba166579a6b919f7bddeb39ea811fe23a1f9b63`
+(`0x46B9E0`), `ev_b4e45adc8ddb7cac5d7469bf678012b12680fb0af2909e81d1382275c11bca56`
+(`0x46BE60`), and `ev_ac73f4a64c8db118ba3572f6d79b8454bd109e04b0fc11041ec614055ec5e385`
+(`0x46E6A0`).
+
 The car vtable at `0x4C7F20` has `0x431150` at byte offset `+8`. The entity
 iteration in `0x45BD20` dispatches the `+8` method for each listed entity. In
 that car method, `0x431150` calls `0x442530` four times, advancing by `0x69`
