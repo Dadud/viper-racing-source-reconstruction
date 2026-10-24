@@ -390,6 +390,24 @@ int main()
                     std::span<const std::byte>(runtime_record).first(0x12fU)),
             "runtime records missing bytes of +0x12C must be rejected");
 
+        for (std::uint32_t wheel = 0U; wheel < 4U; ++wheel) {
+            const auto wheel_base = 0x554U + 0x1a4U * wheel;
+            const auto wheel_plan = viper::plan_ncar_wheel_constructor(
+                wheel_base, viper::NcarWheelConstructorObservation{});
+            const auto has_write = [&wheel_plan](const std::uint32_t offset,
+                                                  const std::uint32_t bits) {
+                return std::any_of(wheel_plan.writes.begin(), wheel_plan.writes.end(),
+                    [offset, bits](const viper::NcarObjectFieldWrite& write) {
+                        return write.offset == offset && write.value_bits == bits;
+                    });
+            };
+            require(wheel_plan.unknown_fill_offsets.empty() &&
+                    has_write(wheel_base + 0x18cU, 0x44e10000U) &&
+                    has_write(wheel_base + 0x194U, 0x43910000U) &&
+                    has_write(wheel_base + 0x150U, 0x3f800000U),
+                "each persistent player wheel slot must retain its native constructor defaults");
+        }
+
         setup.pop_back();
         const auto short_preparation =
             viper::prepare_car_file_runtime_mapping_from_setup_payload(

@@ -1465,6 +1465,12 @@ private:
 struct MaterializedNcarRuntimeState {
     std::array<float, 12> placement_transform{};
     std::array<std::array<float, 3>, 4> initial_wheel_world_positions{};
+    // The derived 0x42FF90 constructor writes 1.0 here after the base body
+    // constructor. Keep it as constructor state; the later callback/ring that
+    // can change this value is not yet connected to the session.
+    std::optional<float> constructor_field_0x50c;
+    std::array<std::optional<viper::NcarWheelConstructorPlan>, 4>
+        wheel_constructor_plans{};
     bool constructor_outputs_materialized{};
 };
 
@@ -1613,6 +1619,25 @@ struct WindowState {
             player_body_constructor_plan.reset();
             player_wheel_core_initialization.reset();
             return false;
+        }
+        // 0x42FF90 writes +0x50C = 1.0 after calling 0x43E490. Its four
+        // wheel objects occupy +0x554 + 0x1A4*i and are initialized by
+        // 0x4419A0. Retain those exact constructor projections in the player
+        // session without treating them as a live force/integration state.
+        player_runtime_state.constructor_field_0x50c = 1.0F;
+        for (std::size_t wheel = 0;
+             wheel < player_runtime_state.wheel_constructor_plans.size(); ++wheel) {
+            const auto wheel_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+            auto plan = viper::plan_ncar_wheel_constructor(
+                wheel_offset, viper::NcarWheelConstructorObservation{});
+            if (!plan.unknown_fill_offsets.empty()) {
+                player_runtime_car_record.clear();
+                player_runtime_state = {};
+                return false;
+            }
+            player_runtime_state.wheel_constructor_plans[wheel] =
+                std::move(plan);
         }
         player_wheel_anchors = player_wheel_core_initialization->anchors;
         if (!player_wheel_anchors.has_value()) {

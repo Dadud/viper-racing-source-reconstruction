@@ -462,6 +462,15 @@ both vtable assignments, the `+0x18C = 1800`, `+0x194 = 290`, reciprocal at
 with zero; compatibility mode preserves an observed helper EDX value or lists
 the affected offsets as unresolved. Evidence `ev_acb07d5cd1487043da9c665197a9902d94a44439d68a4c5285b4feeabba1255c`.
 
+The live player session now retains one constructor plan for each of those
+four absolute wheel slots and records the later derived-car-constructor store
+`+0x50C = 1.0` observed in `0x42FF90` (`ev_a3e97a69dfdfc6c057b9d575b684e30323444ffb2eb38cfff8f6fc133e7bbec8`).
+This resolves the boundary precisely: base body constructor `0x43E490` does
+not initialize `+0x50C`, while its caller `0x42FF90` does. The session keeps
+the value as constructor state only; the runtime callback/interpolation ring
+that can later alter it is not yet connected, so it is not used as live
+suspension force input.
+
 The constructor-default projection also includes the `0x440100` curve-object
 defaults and the direct tail of `0x42FF90`: root vtable, mode/default fields,
 the eight zero DWORDs beginning at unaligned `+0x48E`, and the source-record
