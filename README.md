@@ -8,18 +8,19 @@ and [reference capture protocol](metadata/reference_capture_protocol.md).
 parses the selected track's terrain and ideal line plus the selected car's
 human setup, the track bundle's AI default setup, the selected car's level-0
 indexed mesh, and Viper's AI mesh, and draws them in a top-down Direct3D
-development view. It loads the selected track's `track.obt` placement table and
-renders the selected model at the human grid slot and the native Viper model
-at other valid `obj car` start positions, with
-height sampled from terrain data and heading approximated from the nearest
-ideal-line segment. The entrant planner chooses the human grid row; in the
-fresh default eight-car setup, slot 8 is controlled. Arrow keys or WASD move
-that mesh along the ideal-line route using provisional kinematic controls.
-Forward lap crossings use the configured `GAME laps` value and show elapsed
-finish time in the title bar; Escape exits. Other grid meshes remain parked.
-This is a top-down development scene and motion prototype, not a complete race
-simulation; moving opponents, an in-scene HUD, and a results screen are not
-implemented.
+development view. It loads the selected track's `track.obt` placement table
+and renders the selected model at the human grid slot and the native Viper
+model at other valid `obj car` start positions. The human and opponents follow
+the normalized ideal-line route with provisional kinematic motion. Keyboard
+bindings can come from `options.def`; route crossings count laps, and the race
+shows an in-scene standings overlay after all entrants finish. A Win32 setup
+screen selects installed tracks and cars, and the results screen returns to
+setup. Trace capture/playback, WARP rendering smoke cases, and parser
+regressions support repeatable development checks. This remains a playable
+route-motion prototype, not a complete reconstruction: native AI, physical
+vehicle dynamics, original-matched frontend flow, career progression,
+original-compatible replays, and multiplayer remain open. See the feature
+ledger for current evidence and acceptance criteria.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell

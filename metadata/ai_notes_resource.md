@@ -33,8 +33,16 @@ of the extracted install found no loose `.dnt` or `.ili` files, and all
 `*.res` bundles under `GameData` were scanned by their RST0 indices for names
 or type tags containing `dnt`, `ili`, `note`, or `adnt`; none matched. This
 means the native `default.ili`/ADNT fallback chain cannot be satisfied from the
-available extracted install. It does not prove that other retail releases or
-user installations lack these resources.
+available extracted install. This was checked against the original installer
+media as well: the `DATA1.CAB`, `_USER1.CAB`, and `_SYS1.CAB` cabinets contain
+no loose `.ili` or `.dnt` files. Installer-extracted `drivers.res`,
+`bemidji.trk`, and `common.res` are byte-identical to the corresponding files
+in the installed game-data directory. The installer therefore confirms the
+same available resource set; it does not prove that other retail releases or
+user installations lack these resources. The `.trk` bundles still contain
+their own ILIN data, so this finding is specifically about the separate
+`default.ili`/ADNT lookup resources and is not evidence that ideal-line data is
+absent.
 
 Evidence from `race.bin` (SHA-256
 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
