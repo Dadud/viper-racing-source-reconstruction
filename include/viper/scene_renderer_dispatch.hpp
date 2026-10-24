@@ -18,6 +18,8 @@ struct SceneRendererObjectObservation {
     std::uint32_t virtual_0x14_target{};
     // Timed-effects manager field at +0x118, retained as raw binary32 bits.
     std::optional<std::uint32_t> timed_effect_start_time_bits_0x118;
+    // Smoke-effect active byte read by virtual +0x0C from instance +0x3C.
+    std::optional<std::uint8_t> smoke_active_byte_0x3c;
 };
 
 // Builds the generic-dispatch observation for the registered wheel-resource
@@ -36,6 +38,11 @@ struct SceneRendererObjectObservation {
 [[nodiscard]] SceneRendererObjectObservation observe_scene_timed_effect_manager(
     bool pointer_present,
     std::optional<std::uint32_t> start_time_bits_0x118) noexcept;
+
+// Builds an observation for one of the SmokeModel objects registered by 0x468090.
+[[nodiscard]] SceneRendererObjectObservation observe_scene_smoke_effect_object(
+    bool pointer_present,
+    std::optional<std::uint8_t> active_byte_0x3c) noexcept;
 
 inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
 inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;

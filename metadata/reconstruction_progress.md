@@ -28,6 +28,15 @@
   no tests were run. Evidence:
   `metadata/scene_car_update.md`.
 
+- **2026-10-24 continuation:** Derived the smoke-effect child gates from its
+  vtable: `+0x10` is constant true and `+0x0C` reads the raw active byte at
+  `+0x3C`, which emission sets and update/expiry paths clear. Generic dispatch
+  now uses that byte to select `0x461D10` and reports incomplete input only
+  when a missing byte could change the callback decision. The Release
+  `viper_race_scene_flow` target builds and `git diff --check` passes; no tests
+  were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
   nested texture-binding request from manager field `+0x10`, matching its
   observed `0x448E30` call and preventing a conflicting duplicate handle input.

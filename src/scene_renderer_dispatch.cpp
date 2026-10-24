@@ -30,6 +30,15 @@ SceneRendererObjectObservation observe_scene_timed_effect_manager(
         start_time_bits_0x118};
 }
 
+SceneRendererObjectObservation observe_scene_smoke_effect_object(
+    const bool pointer_present,
+    const std::optional<std::uint8_t> active_byte_0x3c) noexcept
+{
+    return {pointer_present, true,
+        active_byte_0x3c.has_value() && *active_byte_0x3c != 0U,
+        0x00461D10U, std::nullopt, active_byte_0x3c};
+}
+
 namespace {
 
 std::array<float, 12> make_scene_view_transform(
@@ -478,6 +487,8 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                 object.virtual_0x14_target == 0x004686A0U;
             const bool is_timed_effect_manager =
                 object.virtual_0x14_target == 0x00468610U;
+            const bool is_smoke_effect_object =
+                object.virtual_0x14_target == 0x00461D10U;
             auto virtual_0x10_result = object.virtual_0x10_result;
             auto virtual_0x0c_result = object.virtual_0x0c_result;
             if (is_wheel_resource_manager) {
@@ -489,6 +500,10 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
             } else if (is_timed_effect_manager) {
                 virtual_0x10_result = true;
                 virtual_0x0c_result = false;
+            } else if (is_smoke_effect_object) {
+                virtual_0x10_result = true;
+                virtual_0x0c_result = object.smoke_active_byte_0x3c.has_value()
+                    && *object.smoke_active_byte_0x3c != 0U;
             }
             if (is_timed_effect_manager && input.renderer_mode > 2) {
                 if (input.simulation_time_tick_0x508774.has_value()
@@ -508,6 +523,11 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                     // do not substitute the caller's precomputed boolean.
                     result.input_complete = false;
                 }
+            }
+            if (is_smoke_effect_object && input.renderer_mode > 2
+                && !object.smoke_active_byte_0x3c.has_value()) {
+                // The raw active byte decides whether the draw callback runs.
+                result.input_complete = false;
             }
             result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
                 0U, i, 0x10U});

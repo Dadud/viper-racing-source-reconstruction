@@ -521,6 +521,28 @@ clock accessor `0x425790`
 `ev_4394f76cfa93de76984db3bbd98bb3696a7ab8b4159da55951abcbc5f7aabaef`,
 and clock scale bytes `ev_ae685411d8cb30cbca820e08fc47fdde23ee42013aacbc4d35edfdcef58f80c7`.
 
+The 16 separately registered `SmokeModel` children from that same constructor
+use vtable `0x4C91F8`. Their `+0x10` slot (`0x461AB0`) always returns true;
+`+0x0C` (`0x461AA0`) reads the active byte at instance `+0x3C`; and `+0x14`
+targets draw callback `0x461D10`. The generic renderer therefore reaches the
+callback only in modes above 2 and when the observed active byte is nonzero.
+Constructor `0x4617A0` initializes the byte to zero, emission helper
+`0x461AC0` sets it to one, and update body `0x461C00` clears it when the
+manager gate fails or the effect lifetime expires. The renderer plan derives
+the two virtual results from the vtable and raw byte; if mode above 2 makes
+the missing byte decisive, it marks `input_complete` false rather than using a
+caller-supplied boolean. Evidence: child constructor `0x4617A0`
+`ev_1fcbdd9d5698827f33ed56b437998f5e392843451f6b8e8cac1d27446b231b58`,
+vtable bytes `ev_72b124c498cb02019e556deccfd94a90a727a69b3ca0981673c8cd6a8d005821`,
+gate instructions `0x461AA0/0x461AB0`
+(`ev_0db9f901ef5acac69f4d19afd4f7da1ef8edba08311272873bc2d049896c9c58`,
+`ev_6d61197170b245f8aa31c6266191d76f05b8ffb4189175e63004be4b4fc27220`),
+emission helper `0x461AC0`
+`ev_9d509939ffb7af7f87606397c1ed9e1e7eb001c378380eff367128b96553b858`,
+and update clears `0x461C0F/0x461D02`
+(`ev_cf83255023389ccfa23fc01cb89f26ed5693b660077e6473a2056ab71aaf0e1e`,
+`ev_775218195a45a0197a79ad568fe700daa70f570b97b89e1620c1be716dac4a69`).
+
 ### Scene-car virtual `+0x18` callout
 
 `plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached
