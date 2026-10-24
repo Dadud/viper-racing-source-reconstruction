@@ -437,6 +437,117 @@ AcarRouteFallbackPlan plan_acar_route_fallback(
     return plan;
 }
 
+AcarRouteSteeringPlan plan_acar_route_steering(
+    const AcarRouteSteeringObservation& observation) noexcept
+{
+    AcarRouteSteeringPlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+
+    if (std::bit_cast<std::int32_t>(observation.profile_threshold_0xf10) >
+        0x3ee38e39) {
+        if (!observation.current_segment_scalar_0x34.has_value() ||
+            !observation.next_segment_scalar_0x34.has_value()) {
+            plan.input_incomplete = true;
+        } else {
+            const auto fraction = static_cast<long double>(
+                observation.segment_fraction_0x1064);
+            const auto interpolated = static_cast<float>(
+                static_cast<long double>(
+                    *observation.next_segment_scalar_0x34) * fraction +
+                (1.0L - fraction) *
+                    *observation.current_segment_scalar_0x34);
+            plan.interpolated_segment_scalar = interpolated;
+            const auto normalized = static_cast<float>(
+                divide_with_vc98_fdiv_compatibility(
+                    static_cast<long double>(interpolated),
+                    static_cast<long double>(
+                        observation.profile_threshold_0xf10),
+                    observation.fdiv_compatibility_enabled));
+            plan.normalized_route_scalar = normalized;
+            plan.segment_scalar_below_two = normalized < 2.0F;
+        }
+    } else {
+        plan.segment_scalar_below_two = false;
+    }
+
+    if (plan.segment_scalar_below_two.has_value()) {
+        plan.route_drive_gate = *plan.segment_scalar_below_two &&
+            !observation.steering_gate_suppressed_0x101d;
+    }
+
+    const auto route_distance = static_cast<float>(
+        static_cast<long double>(observation.profile_threshold_0xf10) -
+        static_cast<long double>(observation.route_offset_0xf84));
+    plan.route_distance = route_distance;
+    const auto distance_gate = route_distance > 8.888889F;
+    if (observation.alternate_route_mode_0xf30 || distance_gate) {
+        plan.update_branch_active = true;
+    } else if (plan.route_drive_gate.has_value()) {
+        plan.update_branch_active = *plan.route_drive_gate &&
+            std::bit_cast<std::int32_t>(route_distance) > 0;
+    } else {
+        plan.input_incomplete = true;
+    }
+
+    if (!plan.update_branch_active.has_value()) {
+        return plan;
+    }
+    if (!*plan.update_branch_active) {
+        if (plan.segment_scalar_below_two.value_or(false) &&
+            observation.steering_gate_suppressed_0x101d) {
+            plan.message_call =
+                AcarRouteSteeringMessageCall::message_0x4d5288;
+        }
+        return plan;
+    }
+
+    if (observation.alternate_route_mode_0xf30) {
+        auto output = static_cast<float>(
+            1.0L - static_cast<long double>(route_distance) * 0.225L);
+        if (output < -1.0F) {
+            output = -1.0F;
+        } else if (output > 1.0F) {
+            output = 1.0F;
+        }
+        plan.output_0 = output;
+        plan.output_written = true;
+        if (std::bit_cast<std::uint32_t>(output) > 0x80000000U) {
+            plan.output_1 = -output;
+            plan.output_0 = 0.0F;
+            plan.early_return = true;
+        }
+        return plan;
+    }
+
+    plan.message_call = AcarRouteSteeringMessageCall::message_0x4d528c;
+    if (route_distance > 6.6666665F) {
+        if (!observation.route_reference_scalar_0xf58_plus_0x34.has_value()) {
+            plan.input_incomplete = true;
+            return plan;
+        }
+        plan.output_0 = *observation.route_reference_scalar_0xf58_plus_0x34;
+        plan.output_1 = 1.0F;
+        plan.output_written = true;
+        plan.early_return = true;
+        return plan;
+    }
+    if (!observation.route_reference_scalar_0xf58_plus_0x34.has_value()) {
+        plan.input_incomplete = true;
+        return plan;
+    }
+    const auto spread = static_cast<float>(
+        static_cast<long double>(route_distance) * 0.15L);
+    plan.output_1 = static_cast<float>(
+        static_cast<long double>(
+            *observation.route_reference_scalar_0xf58_plus_0x34) + spread);
+    plan.output_0 = static_cast<float>(
+        static_cast<long double>(
+            *observation.route_reference_scalar_0xf58_plus_0x34) - spread);
+    plan.output_written = true;
+    return plan;
+}
+
 AcarComposedDriverCallbackPlan evaluate_acar_driver_callback_with_fallback(
     AcarDriverAiState& driver_state,
     AcarFallbackState& fallback_state,

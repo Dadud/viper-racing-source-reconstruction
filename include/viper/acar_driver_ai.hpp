@@ -170,6 +170,45 @@ struct AcarRouteFallbackPlan {
     std::optional<AcarRecoveryUpdateResult> recovery_state_result;
 };
 
+enum class AcarRouteSteeringMessageCall : std::uint8_t {
+    none,
+    message_0x4d5288,
+    message_0x4d528c,
+};
+
+struct AcarRouteSteeringObservation {
+    float profile_threshold_0xf10{};
+    std::optional<float> current_segment_scalar_0x34;
+    std::optional<float> next_segment_scalar_0x34;
+    float segment_fraction_0x1064{};
+    bool fdiv_compatibility_enabled{};
+    bool steering_gate_suppressed_0x101d{};
+    bool alternate_route_mode_0xf30{};
+    float route_offset_0xf84{};
+    std::optional<float> route_reference_scalar_0xf58_plus_0x34;
+};
+
+struct AcarRouteSteeringPlan {
+    AcarRouteSteeringMessageCall message_call{
+        AcarRouteSteeringMessageCall::none};
+    std::optional<float> interpolated_segment_scalar;
+    std::optional<float> normalized_route_scalar;
+    std::optional<bool> segment_scalar_below_two;
+    std::optional<bool> route_drive_gate;
+    std::optional<bool> update_branch_active;
+    std::optional<float> route_distance;
+    std::optional<float> output_0;
+    std::optional<float> output_1;
+    bool fdiv_compatibility_path_used{};
+    bool input_incomplete{};
+    bool output_written{};
+    bool early_return{};
+};
+
+// Projects route-aware output steering helper 0x42A6D0.
+[[nodiscard]] AcarRouteSteeringPlan plan_acar_route_steering(
+    const AcarRouteSteeringObservation& observation) noexcept;
+
 struct AcarComposedDriverCallbackPlan {
     AcarDriverAiPlan route_candidate_plan{};
     bool fallback_helper_0x42b040_called{};

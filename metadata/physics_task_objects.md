@@ -653,3 +653,12 @@ composed wrapper leaves its return value unknown. Evidence: wrapper instructions
 `ev_3b2cc9e45cb543f86fab43b3b64471c22d63172c73e7e206b53b56a14aab6363`,
 `ev_d99f444141352b03eb457e8bc2f5d6c474fe1779dce6429bdabc27181fc3388`,
 and `ev_774cc7af43f607868f1e4d126f3e17c64cfb42dae3cc6e39b95c716363075025`.
+
+`plan_acar_route_steering` projects the directly called `0x42A6D0` helper
+within the constructor-registered callback at `0x42B7B0`. It interpolates the
+two selected segment `+0x34` scalars, applies the profile threshold and
+normalized-value gate, then preserves the `+0x101D`, `+0xF30`, and route
+distance branches. It emits optional output-pair writes and records calls to
+the two observed message-pointer addresses; the `+0xF58` route scalar and
+segment values remain captured inputs. Evidence: `0x42A6D0`
+`ev_26aea6f3796110fa9e2f49aee6d38056e2eafb7f6f3e010c0ac9daeedd56ce2e`.
