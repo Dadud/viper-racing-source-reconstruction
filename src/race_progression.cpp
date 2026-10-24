@@ -51,7 +51,10 @@ RouteMotionResult advance_route_motion(
         result.finished = state.race.finished;
         return result;
     }
-    delta_seconds = std::clamp(delta_seconds, 0.0F, 0.05F);
+    // Native 0x425920 passes elapsed time to 0x43B290 clamped to [0.01, 0.25].
+    // Keep the live route-driven prototype on that recovered frame cadence
+    // until its physical update replaces this provisional integrator.
+    delta_seconds = std::clamp(delta_seconds, 0.01F, 0.25F);
     advance_race_clock(state.race, delta_seconds);
     // Race setup 0x43AF60 resets +0x509358 to zero and initializes the
     // steering smoothing, gain, and response globals (+0x509428,

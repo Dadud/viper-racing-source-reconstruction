@@ -235,6 +235,10 @@ object pointers remain caller inputs. The helper updates the persistent time
 anchor before planning the timer-object call. Evidence:
 `race_loop_simulation_step.evidence.json`, `0x425920`
 `ev_6321e495464c40ba279498410a9fd3f0332edf60d35d4f263d85b292a74efa16`.
+The current Windows route-driven prototype also clamps each frame delta to
+this observed interval before updating route motion. This copies the recovered
+outer timing boundary only; it does not make the provisional route integrator
+equivalent to native `0x43B290`.
 
 The front and tail of `0x43B290` are further represented by
 `plan_race_loop_periodic_update_dispatch`, composed with the outer timer by

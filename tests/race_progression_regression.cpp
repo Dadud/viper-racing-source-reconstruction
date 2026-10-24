@@ -56,6 +56,19 @@ int main()
         const std::vector<std::array<float, 2>> square_route{
             {0.0F, 0.0F}, {10.0F, 0.0F},
             {10.0F, 10.0F}, {0.0F, 10.0F}};
+        viper::RouteMotionState minimum_delta_motion{};
+        viper::initialize_race_progression(minimum_delta_motion.race, 0U);
+        (void)viper::advance_route_motion(minimum_delta_motion, square_route,
+            false, false, false, false, 0.0F, 1U);
+        require(std::abs(minimum_delta_motion.race.elapsed_seconds - 0.01F) < 1.0e-6F,
+            "runtime race step must apply the native minimum frame delta");
+        viper::RouteMotionState maximum_delta_motion{};
+        viper::initialize_race_progression(maximum_delta_motion.race, 0U);
+        (void)viper::advance_route_motion(maximum_delta_motion, square_route,
+            false, false, false, false, 1.0F, 1U);
+        require(std::abs(maximum_delta_motion.race.elapsed_seconds - 0.25F) < 1.0e-6F,
+            "runtime race step must apply the native maximum frame delta");
+
         viper::RouteMotionState motion{};
         viper::initialize_race_progression(motion.race, 0U);
         viper::RouteMotionResult motion_result{};
