@@ -1,6 +1,6 @@
 # Project tracking
 
-Updated: 2026-10-24 (reviewed after continued NCAR/wheel reconstruction)
+Updated: 2026-10-24 (generic scene renderer dispatch reconstruction)
 
 ## Report two percentages
 
@@ -317,3 +317,4 @@ After a meaningful change:
 - **2026-10-24:** Modeled the duration-normalized integrator virtual-record gate, timeout writes, and the complete type-5 event payload encoding. Ratings unchanged; nested mesh/resource mutation and runtime validation remain open.
 
 - **2026-10-24:** Composed the known 0x430610 mesh deformation, two UV mask writes, five indexed group vertex copies, and descriptor refreshes. Confirmed the 0x450B40/0x450B20 resource descriptor layout and zero-length group behavior. Ratings unchanged because runtime mesh views and whole-game validation remain external observations.
+- **2026-10-24 continuation:** Added a bounded `0x45BEB0` scene renderer frame model with the render-state gate, camera transform, viewport/state order, and object virtual dispatch. Scene analysis remains level 2: concrete CPU flow increased, while DirectDraw submission, complete scene rendering, and original-runtime comparison remain unresolved. Overall percentages unchanged.

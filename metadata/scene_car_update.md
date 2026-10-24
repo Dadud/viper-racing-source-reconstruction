@@ -412,6 +412,36 @@ registration `0x45C2E0` `ev_f7d4a1c00acf8a61134b349e6cac89cebf193a462d77cca3b1c5
 and scene constructor `0x463920`
 `ev_761442b24e1e0ad9e1e15d7b5e33174a7144d92be40f035876d1cbada57a6f09`.
 
+`plan_scene_renderer_dispatch` projects the enclosing generic render frame at
+`0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active
+draw gate is `renderer_mode > 0` with renderer state in `{0,1,2}`. When active,
+the plan records the ordered graphics-state setup, the initial viewport call,
+camera transform install, scene-state configuration, optional camera update
+for mode greater than 1, registered-object walk, state restoration, original
+camera transform restore, and full-window viewport restore. The camera matrix
+uses the exact observed sign changes, cross-product component expressions,
+and four-unit translation derived from `0x45BEB0`; floating-point evaluation
+is a portable approximation to the original x87 path. Each observed object
+receives virtual `+0x10` then `+0x0C`; `+0x14` runs only when `+0x0C` is true
+and either `+0x10` is false or renderer mode exceeds 2. Missing list entries
+report bounded observation exhaustion. A null object stops the projection at
+the dereference point and leaves the transformed matrix unrestored, matching
+the absence of a normal return path in that case. Device calls and virtual
+return bytes remain external observations. Evidence: `0x45BEB0`
+(`ev_09fe993aef1d6fb03f1196700f493dcfc2bd60404c0a3506d8dcfb99f55ee85d`),
+render gate `0x45DAB0`
+(`ev_81401a8af9e0eeb18fec9ad96ca384d0add788c835e9bcbb944a549d8373ce7f`),
+state setup/restore `0x460210` (`ev_d209fce936e7e4639efc30f7a012a0b5598524aaeb2f8dc5fcabeeea14188f8f`)
+and `0x4602A0` (`ev_430ec4dc163b2538c19071531ec8869c41b65b0481f4e8366ec0bc1e90f11c74`),
+transform install `0x448940`
+(`ev_60be95662910eac8c520015118ac622f7657e4ccd7acabdf920d343770908e48`),
+and viewport `0x4487A0`
+(`ev_da14982bed84a04d197834f48480fcfa98f9ca954740c1beefe8fc60a21f5dd0`),
+state wrappers `0x448450` (`ev_fe4aee2684fc5e81c01de1bed3b45cce6e0e04511dee88fa929b505b1cda83c7`)
+and `0x448440` (`ev_54c964f82dd752b84a4b4f98553b21e889bdd8b817904462870823ea14567e14`),
+and mode-dependent update thunk `0x460360`
+(`ev_0cb578d5e310c6ad56d2fe4d48ec2c265d75670586589316993f1931d32335af`).
+
 ## Portable model
 
 `include/viper/scene_car_update.hpp` and `src/scene_car_update.cpp` encode the

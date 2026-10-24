@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added a bounded model of the generic render frame at
+  `0x45BEB0`: exact enable-state gate, camera-matrix rewrite/restore,
+  graphics-state and viewport call order, optional mode-dependent camera
+  update, and per-object `+0x10`/`+0x0C`/`+0x14` virtual dispatch conditions.
+  Missing object observations and null pointers stop or bound the projection;
+  graphics API effects and virtual return bytes remain external. Evidence is
+  retained in `scene_renderer_dispatch.evidence.json`.
+
 - **2026-10-24:** Composed the full `0x45BC20` scene-car dispatcher in
   `plan_scene_car_dispatcher`: profiling bracketing, sixteen local record
   initializers, 12-DWORD shared-state copy and scalar stores, parser call,

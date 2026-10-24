@@ -66,6 +66,7 @@ target_link_libraries(viper_vehicle_model PUBLIC viper_terrain_model)
 add_library(viper_scene_model
     src/entity_update_dispatch.cpp
     src/scene_car_update.cpp
+    src/scene_renderer_dispatch.cpp
     src/scene_overlay.cpp
     src/world_track_objects.cpp
 )
