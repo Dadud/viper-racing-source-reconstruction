@@ -395,6 +395,28 @@ Wrapper evidence is `ev_fd752a426d357596f80fec5d14eecf72530238d9cc9ba11a13bc177b
 and `ev_3bc4747a9027358eddde04b53dcc349045ec7c294a3eb68c08995f1f37fa069f`.
 The two wrapper dossiers are preserved in `metadata/scene_resource_draw.evidence.json`.
 
+Texture setup is projected beyond the manager's `0x448E30` call. It builds a
+3x4 identity matrix, expands it to a 4x4 identity, and installs texture
+transform state 1 through `0x450930` and `0x4576C0`. `0x4525F0` caches the
+requested texture handle and has a same-handle/dirty fast path; otherwise it
+conditionally ensures resource access (`0x454030`), checks surface
+availability (`0x4540E0`), or disables texture state through `0x458BC0` for
+handle -1. Every state-changing path ends in the shared render-state sync at
+`0x457AF0`; a same-handle clean cache returns without synchronization. The
+portable plan records those helper calls and their supplied observations,
+leaving the wide synchronization routine as an explicit external action.
+When observations are absent, the plan marks the affected texture-enable
+result unknown instead of inventing one. Evidence: `0x448E30`
+(`ev_5da79e3cff7f863d870c48566dbe08f9a3f61c0b09172eda531589958fda3697`),
+`0x4525F0` (`ev_e95b1e27ff8cfc4cac81db0ccf522627f8e97a766f2bcfdd4195ebf6388cd25b`),
+`0x450930` (`ev_6eb86044cae5f35952468bbfcb9e0b37918891d26aec828fefb87fe254972345`),
+`0x4576C0` (`ev_9e6567552ca91fff6a31de778c4eaf00b555786e24d2c02517d898dd726f0e31`),
+`0x458BC0` (`ev_3f3f2bd8815c0b4e866d99d3d2664fe6e74bbada0fe5591eae3d2a6a67145519`),
+`0x454030` (`ev_a2a6baf96c22d225e9fa69666420e0c92f37ad873f9fc5df698caa35f0640a95`),
+`0x4540E0` (`ev_cf04f42b829b5299ec30d322202c94128ff598a559bb372e0cee19e0403a5c4b`),
+and state synchronization `0x457AF0`
+(`ev_36bffbe7c16da85c8d5227529f165fda21d05a1c9de08bc856eac49d2d9d8622`).
+
 The analyzed direct callees of this scene callback do not include `0x431150`,
 so this path is established as pose, transition, and wheel-transform update.
 The separately dispatched wheel-resource rendering path is traced below.

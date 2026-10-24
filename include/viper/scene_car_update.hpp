@@ -706,10 +706,55 @@ struct SceneWheelResourceManagerDestroyPlan {
 enum class SceneWheelResourceFrameOperationKind : std::uint8_t {
     call_0x513a0,
     call_0x51610,
-    bind_texture_0x48e30,
+    bind_texture_0x448e30,
     draw_indexed_0x448ed0,
     end_batch_0x448ef0,
 };
+
+enum class SceneWheelTextureBindingActionKind : std::uint8_t {
+    ensure_resource,
+    check_surface,
+    set_render_state,
+    synchronize_render_state,
+    report_device_error,
+};
+
+struct SceneWheelTextureBindingAction {
+    SceneWheelTextureBindingActionKind kind{};
+    std::uint32_t address{};
+    std::int32_t argument_0{};
+    std::int32_t argument_1{};
+    std::int32_t result_value{};
+};
+
+enum class SceneWheelTextureBindingStatus : std::uint8_t {
+    complete,
+    resource_access_observation_missing,
+    surface_observation_missing,
+};
+
+struct SceneWheelTextureBindingObservation {
+    std::int32_t requested_handle{}; // 0x4525F0 param_1
+    std::int32_t cached_handle{}; // DAT_004DA17C
+    bool cache_dirty{}; // DAT_004DA180
+    bool force_texture_enabled{}; // DAT_004DA178
+    bool texture_enabled_before{}; // DAT_00509B3E
+    std::optional<bool> resource_access_ready; // 0x454030
+    std::optional<bool> surface_available; // 0x4540E0
+    std::int32_t set_render_state_hresult{}; // 0x458BC0, used for handle -1
+};
+
+struct SceneWheelTextureBindingPlan {
+    SceneWheelTextureBindingStatus status{SceneWheelTextureBindingStatus::complete};
+    std::int32_t cached_handle_after{};
+    bool cache_dirty_after{};
+    std::optional<bool> texture_enabled_after;
+    bool render_state_synchronization_called{};
+    std::vector<SceneWheelTextureBindingAction> actions;
+};
+
+[[nodiscard]] SceneWheelTextureBindingPlan plan_scene_wheel_texture_binding(
+    const SceneWheelTextureBindingObservation& observation);
 
 struct SceneWheelResourceFrameOperation {
     SceneWheelResourceFrameOperationKind kind{};
@@ -730,10 +775,13 @@ struct SceneWheelResourceFrameOperation {
     std::uint32_t device_wrapper{};
     std::uint32_t device_vtable_offset{};
     bool device_return_ignored{};
+    std::uint32_t texture_transform_state{};
+    std::array<std::uint32_t, 16> texture_transform_matrix_words{};
 };
 
 struct SceneWheelResourceFramePlan {
     bool reset_path{};
+    std::optional<SceneWheelTextureBindingPlan> texture_binding;
     std::vector<SceneWheelResourceFrameOperation> operations;
 };
 
@@ -743,7 +791,8 @@ struct SceneWheelResourceFramePlan {
 [[nodiscard]] SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     SceneWheelResourceAllocatorState& allocator,
     bool frame_gate_0x45c380,
-    const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations);
+    const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations,
+    const std::optional<SceneWheelTextureBindingObservation>& texture_binding = std::nullopt);
 
 struct SceneWheelResourceAllocation {
     bool allocated{};

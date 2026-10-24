@@ -1019,10 +1019,109 @@ SceneWheelResourceManagerDestroyPlan destroy_scene_wheel_resource_allocator(
     return result;
 }
 
+SceneWheelTextureBindingPlan plan_scene_wheel_texture_binding(
+    const SceneWheelTextureBindingObservation& observation)
+{
+    SceneWheelTextureBindingPlan result{};
+    result.cached_handle_after = observation.cached_handle;
+    result.cache_dirty_after = observation.cache_dirty;
+    result.texture_enabled_after = observation.texture_enabled_before;
+
+    const auto add_action = [&result](const SceneWheelTextureBindingActionKind kind,
+        const std::uint32_t address, const std::int32_t argument_0 = 0,
+        const std::int32_t argument_1 = 0, const std::int32_t result_value = 0) {
+        result.actions.push_back({kind, address, argument_0, argument_1, result_value});
+    };
+    const auto synchronize = [&]() {
+        add_action(SceneWheelTextureBindingActionKind::synchronize_render_state, 0x00457AF0U);
+        result.render_state_synchronization_called = true;
+    };
+    const auto set_texture_enabled = [&result](const bool enabled) {
+        result.texture_enabled_after = enabled;
+    };
+
+    const bool same_handle = observation.requested_handle == observation.cached_handle;
+    if (same_handle && !observation.cache_dirty) {
+        return result;
+    }
+    if (same_handle) {
+        if (observation.force_texture_enabled || observation.requested_handle != -1) {
+            if (observation.requested_handle == -1) {
+                set_texture_enabled(true);
+            } else if (!observation.surface_available.has_value()) {
+                result.status = SceneWheelTextureBindingStatus::surface_observation_missing;
+                result.texture_enabled_after.reset();
+            } else {
+                set_texture_enabled(*observation.surface_available);
+            }
+        } else {
+            set_texture_enabled(false);
+        }
+        if (observation.requested_handle != -1 && !observation.force_texture_enabled) {
+            add_action(SceneWheelTextureBindingActionKind::check_surface, 0x004540E0U,
+                observation.requested_handle, 0,
+                observation.surface_available.has_value()
+                    ? (*observation.surface_available ? 1 : 0) : -1);
+        }
+        synchronize();
+        result.cache_dirty_after = false;
+        return result;
+    }
+
+    result.cached_handle_after = observation.requested_handle;
+    if (observation.requested_handle == -1) {
+        add_action(SceneWheelTextureBindingActionKind::set_render_state, 0x00458BC0U,
+            1, 0, observation.set_render_state_hresult);
+        if (observation.set_render_state_hresult != 0) {
+            add_action(SceneWheelTextureBindingActionKind::report_device_error, 0x00452770U,
+                observation.set_render_state_hresult);
+        }
+        set_texture_enabled(observation.force_texture_enabled);
+        synchronize();
+        return result;
+    }
+
+    if (!observation.resource_access_ready.has_value()) {
+        result.status = SceneWheelTextureBindingStatus::resource_access_observation_missing;
+        result.texture_enabled_after.reset();
+        add_action(SceneWheelTextureBindingActionKind::ensure_resource, 0x00454030U,
+            observation.requested_handle);
+        synchronize();
+        return result;
+    }
+    add_action(SceneWheelTextureBindingActionKind::ensure_resource, 0x00454030U,
+        observation.requested_handle, 0, *observation.resource_access_ready ? 1 : 0);
+    if (!*observation.resource_access_ready) {
+        synchronize();
+        return result;
+    }
+    if (!observation.force_texture_enabled) {
+        if (!observation.surface_available.has_value()) {
+            result.status = SceneWheelTextureBindingStatus::surface_observation_missing;
+            result.texture_enabled_after.reset();
+            add_action(SceneWheelTextureBindingActionKind::check_surface, 0x004540E0U,
+                observation.requested_handle);
+            synchronize();
+            return result;
+        }
+        add_action(SceneWheelTextureBindingActionKind::check_surface, 0x004540E0U,
+            observation.requested_handle, 0, *observation.surface_available ? 1 : 0);
+        if (!*observation.surface_available) {
+            set_texture_enabled(false);
+            synchronize();
+            return result;
+        }
+    }
+    set_texture_enabled(true);
+    synchronize();
+    return result;
+}
+
 SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     SceneWheelResourceAllocatorState& allocator,
     const bool frame_gate_0x45c380,
-    const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations)
+    const std::array<std::uint32_t, 4>& vertex_word_0x0c_observations,
+    const std::optional<SceneWheelTextureBindingObservation>& texture_binding)
 {
     SceneWheelResourceFramePlan result{};
     if (!frame_gate_0x45c380) {
@@ -1041,8 +1140,19 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     };
     append_call(SceneWheelResourceFrameOperationKind::call_0x513a0, 8U);
     append_call(SceneWheelResourceFrameOperationKind::call_0x51610, 0x100U);
-    append_call(SceneWheelResourceFrameOperationKind::bind_texture_0x48e30,
+    append_call(SceneWheelResourceFrameOperationKind::bind_texture_0x448e30,
         std::bit_cast<std::uint32_t>(allocator.texture_handle_0x10));
+    auto& texture_bind = result.operations.back();
+    texture_bind.texture_transform_state = 1;
+    texture_bind.texture_transform_matrix_words = {
+        0x3F800000U, 0U, 0U, 0U,
+        0U, 0x3F800000U, 0U, 0U,
+        0U, 0U, 0x3F800000U, 0U,
+        0U, 0U, 0U, 0x3F800000U,
+    };
+    if (texture_binding.has_value()) {
+        result.texture_binding = plan_scene_wheel_texture_binding(*texture_binding);
+    }
 
     constexpr std::array<std::array<std::uint32_t, 2>, 4> uv_bits{{
         {0x00000000U, 0x00000000U},
