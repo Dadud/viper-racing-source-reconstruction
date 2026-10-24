@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added the RaceTime resource refresh projection
+  for the final-time branch. On full redraw or dashboard-kind change, it now
+  compares optional cached/current generation DWORDs at `0x4EB3B8` and
+  `0x4D3868`, matching `0x4037F7`-`0x403809`. The raw inputs flow through the
+  composed callback; missing words leave the result unresolved. Release build
+  and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Added the Position-resource refresh decision
   for full redraws by comparing optional raw generation DWORDs at `0x4EB480`
   and `0x4D3868`, matching `0x4036C1`/`0x4036CE`. The result remains

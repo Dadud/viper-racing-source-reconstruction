@@ -754,10 +754,14 @@ struct SceneDashboardLapResult {
 struct SceneDashboardFinalTimeObservation {
     std::int32_t selected_object_type_0x18{};
     bool global_method_0x40_result{};
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> race_time_cached_generation_value;
 };
 
 struct SceneDashboardFinalTimeResult {
     bool final_time_branch{};
+    // Whether 0x403804 calls 0x418CC0 before the RaceTime resource draw.
+    std::optional<bool> refresh_race_time_resource;
     std::uint32_t requested_dirty_rectangles{};
     std::uint8_t reached_text_call_sites{};
 };
@@ -1056,6 +1060,7 @@ struct SceneDashboardLocaleState;
 struct SceneDashboardCoreCallbackObservation {
     SceneDashboardState state{};
     SceneDashboardPositionObservation position{};
+    SceneDashboardFinalTimeObservation final_time{};
     // Optional DAT_0050869C rows used by the final-time callback branch.
     std::span<const std::uint8_t> result_time_records;
     std::size_t result_time_record_count{};

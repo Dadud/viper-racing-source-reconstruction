@@ -1778,6 +1778,12 @@ SceneDashboardFinalTimeResult update_scene_dashboard_final_time(
     }
     if (redraw_all || dashboard_kind_changed) {
         result.reached_text_call_sites |= 0x04;
+        if (observation.current_resource_generation_value.has_value() &&
+            observation.race_time_cached_generation_value.has_value()) {
+            result.refresh_race_time_resource =
+                *observation.current_resource_generation_value !=
+                *observation.race_time_cached_generation_value;
+        }
     }
     // The formatted final-time value is submitted on every visit to this path.
     result.reached_text_call_sites |= 0x80;
@@ -2269,10 +2275,11 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     result.lap = update_scene_dashboard_lap(
         result.next_state, lap_observation, result.position.redraw_all);
 
-    const SceneDashboardFinalTimeObservation final_time_observation{
-        observation.selected_object_type_0x18,
-        global_method_0x40_result,
-    };
+    auto final_time_observation = observation.final_time;
+    final_time_observation.selected_object_type_0x18 =
+        observation.selected_object_type_0x18;
+    final_time_observation.global_method_0x40_result =
+        global_method_0x40_result;
     result.final_time = update_scene_dashboard_final_time(
         result.next_state, final_time_observation, result.position.redraw_all);
     if (result.final_time.final_time_branch &&

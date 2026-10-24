@@ -1470,6 +1470,10 @@ global `+0x40` result is true. It changes dashboard kind `0x4CF9EC` to zero,
 sets redraw bit `0x80`, and requests that rectangle on a non-full redraw. The
 RaceTime resource call at `0x403820` is gated by full redraw or kind change;
 the formatted `%s` value call at `0x403848` runs on every visit to this branch.
+When the resource call is reached, the plan can derive whether its refresh
+helper is called by comparing cached generation `0x4EB3B8` with current
+generation `0x4D3868` (instructions `0x4037F7`-`0x403809`). The result remains
+unresolved if either raw DWORD was not observed.
 `scene_dashboard_time_for_ordinal` models `0x424370`: it scans the supplied
 `DAT_005086A0` count of `0x48`-byte result rows and matches ordinal byte
 `+0x41`. For each matching ordinal it updates the candidate from `+0x0C` before
