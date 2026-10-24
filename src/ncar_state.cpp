@@ -2472,6 +2472,33 @@ NcarWheelConstructorPlan plan_ncar_wheel_constructor(
     return result;
 }
 
+bool materialize_ncar_wheel_constructor(
+    NcarWheelRuntimeObjectState& destination,
+    const std::uint32_t wheel_object_offset,
+    const NcarWheelConstructorPlan& plan) noexcept
+{
+    if (!plan.unknown_fill_offsets.empty()) return false;
+    auto materialized = destination;
+    const auto object_begin = static_cast<std::uint64_t>(wheel_object_offset);
+    const auto object_end = object_begin + ncar_wheel_object_bytes;
+    for (const auto& write : plan.writes) {
+        if ((write.width_bytes != 1U && write.width_bytes != 4U) ||
+            write.offset < object_begin ||
+            static_cast<std::uint64_t>(write.offset) + write.width_bytes > object_end) {
+            return false;
+        }
+        const auto local_offset = static_cast<std::size_t>(
+            static_cast<std::uint64_t>(write.offset) - object_begin);
+        for (std::size_t byte = 0; byte < write.width_bytes; ++byte) {
+            materialized.bytes[local_offset + byte] = static_cast<std::byte>(
+                (write.value_bits >> (byte * 8U)) & 0xffU);
+            materialized.initialized_bytes[local_offset + byte] = 1U;
+        }
+    }
+    destination = materialized;
+    return true;
+}
+
 NcarSoundConstructorPlan plan_ncar_sound_constructor(
     const NcarSoundConstructorObservation& observation)
 {

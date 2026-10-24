@@ -406,7 +406,33 @@ int main()
                     has_write(wheel_base + 0x194U, 0x43910000U) &&
                     has_write(wheel_base + 0x150U, 0x3f800000U),
                 "each persistent player wheel slot must retain its native constructor defaults");
+            viper::NcarWheelRuntimeObjectState wheel_object{};
+            require(viper::materialize_ncar_wheel_constructor(
+                        wheel_object, wheel_base, wheel_plan),
+                "fully resolved ordinary wheel constructor writes must materialize");
+            const auto read_u32 = [&wheel_object](const std::size_t offset) {
+                std::uint32_t bits{};
+                for (std::size_t byte = 0; byte < 4U; ++byte) {
+                    bits |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+                        wheel_object.bytes[offset + byte])) << (byte * 8U);
+                }
+                return bits;
+            };
+            require(read_u32(0x18cU) == 0x44e10000U &&
+                    read_u32(0x194U) == 0x43910000U &&
+                    wheel_object.initialized_bytes[0x18cU] != 0U &&
+                    wheel_object.initialized_bytes[0x1a3U] == 0U,
+                "wheel storage must retain constructor bytes and distinguish unwritten bytes");
         }
+        viper::NcarWheelRuntimeObjectState untouched_wheel{};
+        const auto unresolved_wheel_plan = viper::plan_ncar_wheel_constructor(
+            0x554U, {true, std::nullopt});
+        require(!viper::materialize_ncar_wheel_constructor(
+                    untouched_wheel, 0x554U, unresolved_wheel_plan) &&
+                std::none_of(untouched_wheel.initialized_bytes.begin(),
+                    untouched_wheel.initialized_bytes.end(),
+                    [](const std::uint8_t value) { return value != 0U; }),
+            "unresolved compatibility fills must not partially materialize wheel state");
 
         setup.pop_back();
         const auto short_preparation =

@@ -1471,6 +1471,8 @@ struct MaterializedNcarRuntimeState {
     std::optional<float> constructor_field_0x50c;
     std::array<std::optional<viper::NcarWheelConstructorPlan>, 4>
         wheel_constructor_plans{};
+    std::array<viper::NcarWheelRuntimeObjectState, 4>
+        wheel_objects{};
     bool constructor_outputs_materialized{};
 };
 
@@ -1636,8 +1638,13 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
-            player_runtime_state.wheel_constructor_plans[wheel] =
-                std::move(plan);
+            if (!viper::materialize_ncar_wheel_constructor(
+                    player_runtime_state.wheel_objects[wheel], wheel_offset, plan)) {
+                player_runtime_car_record.clear();
+                player_runtime_state = {};
+                return false;
+            }
+            player_runtime_state.wheel_constructor_plans[wheel] = std::move(plan);
         }
         player_wheel_anchors = player_wheel_core_initialization->anchors;
         if (!player_wheel_anchors.has_value()) {

@@ -295,9 +295,25 @@ struct NcarWheelConstructorPlan {
     bool fdiv_compatibility_enabled{};
 };
 
+inline constexpr std::size_t ncar_wheel_object_bytes = 0x1a4U;
+
+// A byte-backed wheel object preserves which constructor bytes are known.
+// Unknown/unwritten native storage must not be mistaken for initialized zero.
+struct NcarWheelRuntimeObjectState {
+    std::array<std::byte, ncar_wheel_object_bytes> bytes{};
+    std::array<std::uint8_t, ncar_wheel_object_bytes> initialized_bytes{};
+};
+
 [[nodiscard]] NcarWheelConstructorPlan plan_ncar_wheel_constructor(
     std::uint32_t wheel_object_offset,
     const NcarWheelConstructorObservation& observation);
+
+// Applies only fully resolved plan writes within the wheel's bounded object
+// storage. The destination is unchanged on unknown fills or invalid writes.
+[[nodiscard]] bool materialize_ncar_wheel_constructor(
+    NcarWheelRuntimeObjectState& destination,
+    std::uint32_t wheel_object_offset,
+    const NcarWheelConstructorPlan& plan) noexcept;
 
 struct NcarExternalFieldWrite {
     std::uint32_t object_address{};
