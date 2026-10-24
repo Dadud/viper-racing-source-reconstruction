@@ -2,6 +2,7 @@
 
 #include "viper/legacy_fdiv.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cmath>
 
@@ -983,6 +984,192 @@ AcarThrottleTailPlan plan_acar_throttle_tail(
     return plan;
 }
 
+long double evaluate_acar_curve_profile_sample(
+    const float input,
+    const AcarCurveEvaluationObservation& observation) noexcept
+{
+    auto delayed_input = static_cast<float>(
+        static_cast<long double>(input) -
+        observation.delay_threshold_0x54);
+    if (delayed_input <= 0.0F) {
+        delayed_input = 0.0F;
+    }
+
+    float profile_value{};
+    if (observation.disable_curve_0x41 == 0U) {
+        if (input < observation.input_cutoff_0x3c) {
+            profile_value = static_cast<float>(
+                static_cast<long double>(observation.linear_gain_0x48) *
+                    input +
+                (static_cast<long double>(input) * input *
+                     observation.quadratic_gain_0x44 -
+                 static_cast<long double>(delayed_input) *
+                     observation.delay_gain_0x58) +
+                observation.constant_0x4c);
+        }
+    } else if (observation.mode_0x40 != 0U) {
+        profile_value = 80.0F;
+    }
+
+    const auto controller_response =
+        static_cast<long double>(observation.response_control_0x14) * input;
+    return static_cast<long double>(profile_value) - controller_response;
+}
+
+AcarCurveInteriorUpdatePlan plan_acar_curve_interior_update(
+    const AcarCurveInteriorUpdateObservation& observation)
+{
+    AcarCurveInteriorUpdatePlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+    if (!observation.counter_0x1c.has_value() ||
+        !observation.current_value_0x24.has_value()) {
+        plan.input_incomplete = true;
+        return plan;
+    }
+
+    auto selected_index = *observation.counter_0x1c;
+    plan.selected_index = selected_index;
+    plan.state_0x24_after = *observation.current_value_0x24;
+    if (selected_index < 1 && *observation.current_value_0x24 < 1) {
+        plan.state_write_0x24 = 1;
+        plan.state_0x24_after = 1;
+        plan.state_reset_to_one = true;
+        return plan;
+    }
+    if (*observation.current_value_0x24 != selected_index) {
+        return plan;
+    }
+
+    if (!observation.duration_0x18.has_value()) {
+        plan.input_incomplete = true;
+        plan.state_0x24_after.reset();
+        return plan;
+    }
+    constexpr float unit_duration_tolerance =
+        std::bit_cast<float>(std::uint32_t{0x34000000U});
+    if (!(std::fabs(*observation.duration_0x18) >
+          unit_duration_tolerance)) {
+        plan.state_write_0x24 = 1;
+        plan.state_0x24_after = 1;
+        plan.state_reset_to_one = true;
+        return plan;
+    }
+
+    plan.controller_update_called = true;
+    if (!observation.controller_value_0x3c_before_update.has_value()) {
+        plan.input_incomplete = true;
+        plan.state_0x24_after.reset();
+        return plan;
+    }
+    if (!observation.target_0x28.has_value() ||
+        !observation.controller_threshold_0x34_after_update.has_value()) {
+        plan.input_incomplete = true;
+        plan.state_0x24_after.reset();
+        return plan;
+    }
+    if (*observation.target_0x28 <
+        *observation.controller_threshold_0x34_after_update) {
+        plan.state_write_0x24 = 1;
+        plan.state_0x24_after = 1;
+        plan.state_reset_to_one = true;
+        return plan;
+    }
+
+    std::optional<float> ratio;
+    if (observation.target_0x28.has_value()) {
+        ratio = static_cast<float>(divide_with_vc98_fdiv_compatibility(
+            *observation.target_0x28, *observation.duration_0x18,
+            observation.fdiv_compatibility_enabled));
+        plan.interpolation_ratio = ratio;
+    }
+    if (!observation.sample_count_0x20.has_value()) {
+        plan.input_incomplete = true;
+        plan.state_0x24_after.reset();
+        return plan;
+    }
+
+    auto local_maximum = 0.0F;
+    if (*observation.sample_count_0x20 > 0) {
+        plan.curve_sample_called = true;
+        if (!observation.controller_modulation_0x38_after_update.has_value() ||
+            !observation.curve_evaluation.has_value() ||
+            !ratio.has_value()) {
+            plan.input_incomplete = true;
+            plan.state_0x24_after.reset();
+            return plan;
+        }
+
+        auto modulation =
+            *observation.controller_modulation_0x38_after_update;
+        if (std::bit_cast<std::int32_t>(modulation) > 0x3f800000) {
+            modulation = 1.0F;
+        }
+        constexpr auto five_hundred =
+            std::bit_cast<float>(std::uint32_t{0x43fa0000U});
+        constexpr auto interpolation_gain =
+            std::bit_cast<float>(std::uint32_t{0x38f6b949U});
+        const auto controller_value =
+            *observation.controller_value_0x3c_before_update;
+        const auto threshold = static_cast<float>(
+            static_cast<long double>(controller_value) - 200.0L);
+        const auto available_samples = std::min<std::size_t>(
+            static_cast<std::size_t>(*observation.sample_count_0x20),
+            observation.sample_weights_0x2c.size());
+        for (std::size_t sample_index = 0U;
+             sample_index < available_samples; ++sample_index) {
+            const auto ordinal = static_cast<std::int32_t>(sample_index + 1U);
+            auto sample_ratio = *ratio;
+            if (ordinal < *observation.counter_0x1c) {
+                const auto modulation_term = static_cast<float>(
+                    ((static_cast<long double>(modulation) * five_hundred +
+                      five_hundred) * controller_value) * interpolation_gain);
+                sample_ratio = static_cast<float>(
+                    static_cast<long double>(*ratio) + modulation_term);
+            }
+            const auto weight =
+                observation.sample_weights_0x2c[sample_index];
+            const auto sample_input = static_cast<float>(
+                static_cast<long double>(weight) * sample_ratio);
+            const auto profile_response = evaluate_acar_curve_profile_sample(
+                sample_input, *observation.curve_evaluation);
+            auto candidate = static_cast<float>(
+                profile_response * weight);
+            const auto cutoff_product =
+                static_cast<long double>(weight) * sample_ratio;
+            if (static_cast<long double>(threshold) < cutoff_product) {
+                candidate = 0.0F;
+            }
+            if (!(candidate < local_maximum)) {
+                local_maximum = candidate;
+                selected_index = ordinal;
+                plan.state_selected_from_samples = true;
+            }
+            ++plan.samples_evaluated;
+        }
+        if (available_samples != static_cast<std::size_t>(
+                *observation.sample_count_0x20)) {
+            plan.input_incomplete = true;
+            plan.state_0x24_after.reset();
+            return plan;
+        }
+    }
+    plan.maximum_candidate = local_maximum;
+    plan.selected_index = selected_index;
+
+    if (selected_index < 1) {
+        plan.state_write_0x24 = selected_index;
+        plan.state_0x24_after = selected_index;
+    } else if (!observation.controller_gate_0x68_after_update.has_value()) {
+        plan.input_incomplete = true;
+        plan.state_0x24_after.reset();
+    } else if (*observation.controller_gate_0x68_after_update == 0) {
+        plan.state_write_0x24 = selected_index;
+        plan.state_0x24_after = selected_index;
+    }
+    return plan;
+}
+
 AcarBrakeTailPlan plan_acar_brake_tail(
     const float brake_input,
     const AcarBrakeTailObservation& observation) noexcept
@@ -1185,16 +1372,25 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
         AcarBehaviorControlTailCall::helper_0x4331c0,
     };
     plan.helper_0x43fdd0_called = true;
+    auto curve_update_observation = observation.curve_interior_update;
+    curve_update_observation.fdiv_compatibility_enabled =
+        observation.geometry.fdiv_compatibility_enabled;
+    plan.curve_interior_update_plan = plan_acar_curve_interior_update(
+        curve_update_observation);
+    plan.input_incomplete = plan.input_incomplete ||
+        plan.curve_interior_update_plan->input_incomplete;
     plan.state_0xde0_after_callback =
         plan.throttle_tail_plan->throttle_output_0xde0;
     plan.state_0xde4_after_callback =
         plan.brake_tail_plan->brake_output_0xde4;
     plan.state_0xde8_after_callback = plan.tail_argument_0x4331d0;
     plan.state_0xdec_after_callback = plan.tail_argument_0x4331c0;
-    plan.state_0xd64_after_callback =
-        observation.post_0x43fdd0_state_0xcbc;
-    plan.input_incomplete = plan.input_incomplete ||
-        !observation.post_0x43fdd0_state_0xcbc.has_value();
+    if (plan.curve_interior_update_plan->state_0x24_after.has_value()) {
+        plan.state_0xd64_after_callback = std::bit_cast<std::uint32_t>(
+            *plan.curve_interior_update_plan->state_0x24_after);
+    } else {
+        plan.input_incomplete = true;
+    }
     plan.tail_reached = true;
     return plan;
 }

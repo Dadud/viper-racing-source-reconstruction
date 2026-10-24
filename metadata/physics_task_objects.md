@@ -704,8 +704,14 @@ sign-change response ramp, final `[-1,1]` clamp, and paired `+0x630/+0x7D4`
 control writes. Its profile step, incoming history/ramp/control values,
 speed, and scale are explicit observations. Evidence:
 `0x428CD0` `ev_79e703e41d739bc81a42eec4fb785446b74af8830a2245fdd8cdd4824aba92be`.
-The nested `0x43FDD0` effects remain open; the callback's subsequent `+0xD64`
-copy is modeled from an explicit post-helper `+0xCBC` observation.
+`plan_acar_curve_interior_update` now models `0x43FDD0`'s counter/duration
+gates, controller update call, target threshold, weighted curve-profile
+sampling, cutoff test, maximum-sample index selection, and `+0x24` setter
+branches. The curve evaluator composes `0x4404A0`, `0x4404D0`, and `0x43FA20`.
+The controller's virtual update effects remain explicit: its `+0x3C` pre-call
+scalar, `+0x34/+0x38/+0x68` post-call fields, and curve-evaluation object are
+observations. The callback's `+0xD64` copy now derives from the projected
+post-helper `+0xCBC` value.
 
 `plan_acar_alternate_route_throttle_limit` also reconstructs the callback's
 independent `+0xF30` write to `+0x103C`: it preserves the existing value when
@@ -738,9 +744,20 @@ setter `0x4331B0`
 `ev_1a4a9aa0de75046dcf27829d381e8b598229fc3405d356d9b5e94638c4cf9036`.
 
 The final callback state projection records the `0x433230` nested call and
-its post-call `+0xCBC` to `+0xD64` copy, then exposes the direct `0x4331D0`
-(`+0xDE8`) and `0x4331C0` (`+0xDEC`) setter writes. The unresolved interior
-effects of `0x43FDD0` remain observations. Evidence: `0x433230`
+its projected post-call `+0xCBC` to `+0xD64` copy, then exposes the direct
+`0x4331D0` (`+0xDE8`) and `0x4331C0` (`+0xDEC`) setter writes. Evidence:
+`0x43FDD0` control flow `ev_4d8a48453e61b6a2a965f1fc7ec7c6fb4219b298554983e0cd4315348e13e768`,
+`0x43FDD0` decompilation `ev_964aba4820487466022dfa73ab87641a7c534d9905358f881dd6d80e3f3a86a4`,
+state setter `0x43FAD0` `ev_abf9fc9fc3d72a945fc781d412751a3d38e5105d18e12f5aa9119a8706117828`,
+sample composition `0x4404A0` `ev_816c342b7b7dc6d866c02f2069790bc1c40379c23f8a42c1947b407d339df276`,
+profile curve `0x4404D0` `ev_f3bcca91bedd969ff58cf88c5e3240c2e1d517611124bacceb5f8afeb15e7f31`,
+and controller response `0x43FA20` `ev_2f0aa7c5db594d10edb3a139c054c7af2b17df9a9637e1b448b7d295ea86241d`.
+The normalization tolerance and loop constants are read from shipped bytes:
+`0x4C8668` `ev_4d168e34622e9df27902d273c136a4f5287c75fc82e4e9ee2de7e6f7dc091a79`,
+`0x4C866C` `ev_b914e8a64952f163ce9592da706e077d9a9d30c788b0c7c5ca0d772b2bfda775`,
+`0x4C8670` `ev_c2bb7845633ce0d23cfc67575700ccc28df91659b3c2ca8258aa3447435c0314`,
+and `0x4C8674` `ev_6a6922e410e095ab8dc62faeea07b375ceaaf93d58a81fdb9d1241446ef89947`. Existing tail evidence:
+`0x433230`
 `ev_51f1c30c2b566839dc0bbb6d5daf4fb4fb1979a1310daa219a62d820c128e613`,
 `0x4331D0` `ev_919aa381a2fd748691c9e227f220bb203f904dc92207ba40bd8a8f1a95f28c67`,
 and `0x4331C0` `ev_e1a941070e681ef12c720233800a257ac80a5e38bfc00d10325b4d9361fb308d`.

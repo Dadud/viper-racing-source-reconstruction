@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace viper {
@@ -383,6 +384,57 @@ struct AcarThrottleTailPlan {
 [[nodiscard]] AcarThrottleTailPlan plan_acar_throttle_tail(
     const AcarThrottleTailObservation& observation) noexcept;
 
+struct AcarCurveEvaluationObservation {
+    float response_control_0x14{};
+    float input_cutoff_0x3c{};
+    std::uint8_t mode_0x40{};
+    std::uint8_t disable_curve_0x41{};
+    float quadratic_gain_0x44{};
+    float linear_gain_0x48{};
+    float constant_0x4c{};
+    float delay_threshold_0x54{};
+    float delay_gain_0x58{};
+};
+
+// Projects the 0x4404A0 profile sample composed from 0x4404D0 and 0x43FA20.
+[[nodiscard]] long double evaluate_acar_curve_profile_sample(
+    float input,
+    const AcarCurveEvaluationObservation& observation) noexcept;
+
+struct AcarCurveInteriorUpdateObservation {
+    std::optional<std::int32_t> counter_0x1c;
+    std::optional<std::int32_t> current_value_0x24;
+    std::optional<float> duration_0x18;
+    std::optional<float> target_0x28;
+    std::optional<std::int32_t> sample_count_0x20;
+    std::span<const float> sample_weights_0x2c;
+    std::optional<float> controller_value_0x3c_before_update;
+    std::optional<float> controller_threshold_0x34_after_update;
+    std::optional<float> controller_modulation_0x38_after_update;
+    std::optional<std::int32_t> controller_gate_0x68_after_update;
+    std::optional<AcarCurveEvaluationObservation> curve_evaluation;
+    bool fdiv_compatibility_enabled{};
+};
+
+struct AcarCurveInteriorUpdatePlan {
+    std::optional<std::int32_t> state_0x24_after;
+    std::optional<std::int32_t> state_write_0x24;
+    std::optional<float> interpolation_ratio;
+    std::optional<float> maximum_candidate;
+    std::int32_t selected_index{};
+    std::uint32_t samples_evaluated{};
+    bool controller_update_called{};
+    bool curve_sample_called{};
+    bool state_reset_to_one{};
+    bool state_selected_from_samples{};
+    bool fdiv_compatibility_path_used{};
+    bool input_incomplete{};
+};
+
+// Projects the state transition in the 0x43FDD0 curve-profile updater.
+[[nodiscard]] AcarCurveInteriorUpdatePlan plan_acar_curve_interior_update(
+    const AcarCurveInteriorUpdateObservation& observation);
+
 struct AcarBrakeTailObservation {
     std::optional<float> motion_axis_0x50;
     std::optional<float> velocity_x_0x234;
@@ -420,11 +472,11 @@ struct AcarBehaviorControlChainObservation {
     AcarForwardCandidateSteeringObservation forward_steering{};
     AcarSteeringHistoryTailObservation steering_history{};
     AcarThrottleTailObservation throttle_tail{};
+    AcarCurveInteriorUpdateObservation curve_interior_update{};
     AcarBrakeTailObservation brake_tail{};
     std::optional<float> route_value_0xf0c;
     std::optional<float> route_scalar_0xfbc;
     std::optional<float> existing_throttle_limit_0x103c;
-    std::optional<std::uint32_t> post_0x43fdd0_state_0xcbc;
     float clamp_value_0x1018{};
     float speed_0x1020{};
 };
@@ -437,6 +489,7 @@ struct AcarBehaviorControlChainPlan {
     std::optional<AcarSteeringHistoryTailPlan> steering_history_plan;
     AcarAlternateRouteThrottlePlan alternate_route_throttle_plan{};
     std::optional<AcarThrottleTailPlan> throttle_tail_plan;
+    std::optional<AcarCurveInteriorUpdatePlan> curve_interior_update_plan;
     std::optional<AcarBrakeTailPlan> brake_tail_plan;
     std::vector<AcarBehaviorControlTailCall> tail_call_order;
     float local_output_0{};
