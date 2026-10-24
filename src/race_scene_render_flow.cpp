@@ -1,5 +1,7 @@
 #include "viper/race_scene_render_flow.hpp"
 
+#include "viper/language_resource.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <limits>
@@ -242,8 +244,13 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
     }
 
     if (plan.dashboard_core_callback_reached) {
+        auto dashboard_observation = observation.dashboard_core_callback;
+        if (dashboard_observation.language_resource == nullptr) {
+            dashboard_observation.language_resource =
+                observation.language_resource;
+        }
         plan.dashboard_core_callback = scene_dashboard_core_callback_plan(
-            observation.dashboard_core_callback);
+            dashboard_observation);
         plan.dashboard_core_text_calls = scene_dashboard_text_plan(
             plan.dashboard_core_callback.reached_text_call_site_mask);
         plan.dashboard_supplemental_time_reached =
@@ -260,6 +267,18 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             test_track_observation.redraw_from_prior_state_change =
                 observation.dashboard_core_callback.state
                     .dashboard_kind_cache_0x4cf9ec != 2;
+            if (observation.dashboard_core_callback.locale_state != nullptr) {
+                bind_scene_dashboard_locale(
+                    test_track_observation,
+                    *observation.dashboard_core_callback.locale_state);
+                plan.dashboard_test_track_locale_bound = true;
+            }
+            if (dashboard_observation.language_resource != nullptr) {
+                plan.dashboard_test_track_localization =
+                    apply_scene_dashboard_test_track_localization(
+                        test_track_observation,
+                        *dashboard_observation.language_resource);
+            }
             plan.dashboard_test_track = update_scene_dashboard_test_track(
                 plan.dashboard_core_callback.next_state,
                 test_track_observation);
@@ -755,6 +774,17 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     observation.state0_dashboard_render
                         .framebuffer_base_value);
             }
+            auto localized_text = raster_observation.localized_text;
+            if (!localized_text.has_value() &&
+                observation.language_resource != nullptr) {
+                localized_text = observation.language_resource->find(
+                    "Dashboard:PausedBanner");
+                plan.shared_paused_banner_localization_resolved =
+                    localized_text.has_value();
+            }
+            if (localized_text.has_value()) {
+                raster_observation.text.text = *localized_text;
+            }
             raster_observation.text.per_line_renderers = line_renderers;
             plan.shared_paused_banner_text_raster =
                 raster_scene_paused_banner_text(
@@ -869,8 +899,16 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     renderer = shared_stamp_renderer(std::move(renderer));
                 }
                 auto text = input.text;
-                if (input.localized_text.has_value()) {
-                    text.text = *input.localized_text;
+                auto localized_text = input.localized_text;
+                if (!localized_text.has_value() &&
+                    observation.language_resource != nullptr) {
+                    localized_text = observation.language_resource->find(
+                        "Splash:Loading");
+                    plan.shared_loading_banner_localization_resolved =
+                        localized_text.has_value();
+                }
+                if (localized_text.has_value()) {
+                    text.text = *localized_text;
                 }
                 text.per_line_renderers = line_renderers;
                 plan.shared_loading_banner_text_raster =
@@ -882,7 +920,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                         false;
                 }
                 if (text.text_pointer_nonnull &&
-                    !input.localized_text.has_value()) {
+                    !localized_text.has_value()) {
                     plan.shared_loading_banner_text_raster->input_complete =
                         false;
                 }

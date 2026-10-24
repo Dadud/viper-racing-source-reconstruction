@@ -666,11 +666,18 @@ mask/refresh/draw sequence. Its ordered operations now record registration
 The shared `0x40C930` wrapper calls `0x40C790("load.stp", handle, '\\0')`
 and then refreshes `0x4ECBFC` from `0x413BD0`; both paused and splash branches
 reach this wrapper. Splash:Loading now reuses the common banner layout and
-resource/text raster path, with separate observations for its `0x4EB258`
-object, `0x4EB25C` text handle, localized text, renderer, and optional decoded
-`Load.stp` image from `common.res`. Its batch writes follow the race-results
-branch. Function evidence:
-`ev_1bc3603c6b9b1fc608e72eb5567b7b5026aeecd394d0c8a199b697626f404516`.
+resource/text raster path. A parsed language table on the race-loop observation
+resolves `Splash:Loading` for its text raster when no explicit localized string
+was supplied; the same table is passed into the dashboard callback. The paused
+banner raster similarly resolves `Dashboard:PausedBanner` as a fallback. The
+race loop's separate TestTrack result projection also consumes the inherited
+language and locale states, so it uses the same three labels and distance
+formatting as the core callback projection.
+The shipped English table yields `LOADING...` and `PAUSED`. Renderer and
+optional decoded `Load.stp` image from `common.res` remain observations. Its
+batch writes follow the race-results branch. Function evidence:
+`ev_1bc3603c6b9b1fc608e72eb5567b7b5026aeecd394d0c8a199b697626f404516` and
+`ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`.
 
 `scene_shared_overlay_frame_plan` composes the shared post-dashboard callback
 in the recovered predicate order: pause, cheater, `0x4048E0`, `0x404900`,

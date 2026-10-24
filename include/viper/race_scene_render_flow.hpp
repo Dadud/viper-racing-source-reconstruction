@@ -40,6 +40,7 @@ struct RaceLoopState0DashboardRasterObservation {
 
 struct RaceLoopSharedPausedBannerRasterObservation {
     ScenePausedBannerTextRasterObservation text{};
+    std::optional<std::string_view> localized_text;
     SceneDashboardFontObservation layout_font{};
     // When present, this shipped STMP character map supplies the glyph index,
     // advance, and x-offset tables instead of a manually projected font.
@@ -62,6 +63,9 @@ struct RaceLoopSharedLoadingBannerRasterObservation {
 
 struct RaceLoopSharedOverlayObservation {
     std::int32_t current_callback_state{};
+    // Optional parsed .lng table used to resolve localized strings throughout
+    // this overlay frame when branch-specific text is not supplied.
+    const LanguageResource* language_resource{};
     RaceLoopActiveFrameObservation following_frame{};
     // When supplied, acquisition runs only if the following frame reaches
     // 0x447C90; its result then controls submission and post-submit callbacks.
@@ -117,6 +121,9 @@ struct RaceLoopSharedOverlayPlan {
         state0_dashboard_text_raster;
     bool dashboard_test_track_reached{};
     SceneDashboardTestTrackResult dashboard_test_track{};
+    std::optional<SceneDashboardTestTrackLocalizationPlan>
+        dashboard_test_track_localization;
+    bool dashboard_test_track_locale_bound{};
     bool dashboard_supplemental_time_reached{};
     SceneDashboardSupplementalTimeResult dashboard_supplemental_time{};
     std::array<SceneDashboardMetricResult, 2> dashboard_metrics{};
@@ -161,6 +168,7 @@ struct RaceLoopSharedOverlayPlan {
         shared_paused_banner_resource_raster;
     std::optional<ScenePausedBannerFrameRasterPlan>
         shared_paused_banner_frame_raster;
+    bool shared_paused_banner_localization_resolved{};
     std::optional<ScenePausedBannerRenderPlan> shared_loading_banner_render;
     std::optional<ScenePausedBannerTextRasterPlan>
         shared_loading_banner_text_raster;
@@ -168,6 +176,7 @@ struct RaceLoopSharedOverlayPlan {
         shared_loading_banner_resource_raster;
     std::optional<ScenePausedBannerFrameRasterPlan>
         shared_loading_banner_frame_raster;
+    bool shared_loading_banner_localization_resolved{};
 };
 
 // Resolves the statically registered race.res image used by the state-0 gear

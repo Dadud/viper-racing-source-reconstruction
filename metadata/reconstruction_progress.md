@@ -1,5 +1,20 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Propagated the race-loop's optional language and
+  locale state into its separate TestTrack projection, keeping labels and
+  distance formatting consistent with the core callback. The paused and
+  loading text raster stages now resolve `Dashboard:PausedBanner` and
+  `Splash:Loading` from that shared language table when no branch-specific
+  value was supplied. Evidence: `ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`.
+
+- **2026-10-24 continuation:** Threaded an optional parsed language table
+  through the race-loop overlay path. It now supplies `Splash:Loading` and
+  `Dashboard:PausedBanner` to their text rasterizers when branch-specific
+  localized text is absent, and becomes the fallback language source for the
+  nested state-0 dashboard callback. The shipped English strings are
+  `LOADING...` and `PAUSED`; native resource lookup and device effects remain
+  separate. Evidence: `ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`.
+
 - **2026-10-24 continuation:** Replaced the main menu's supplied stale-label
   gates with direct comparisons when language-generation data is available:
   `DAT_004D3868` versus each localized string object's cached `+0x08` word.
