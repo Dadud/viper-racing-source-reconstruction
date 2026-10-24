@@ -31,6 +31,14 @@
   Evidence and implementation notes are recorded in
   `scene_car_dispatch_correction.evidence.json` and `scene_car_update.md`.
 
+- **2026-10-24:** Added the tag 1 effect-pool callback model for `0x468450`:
+  context gating, 32-slot cursor progression, strict 0.5-second slot retention,
+  velocity scaling and three ordered random perturbations. Slot timestamps and
+  random draws remain explicit observations; the original x87 rounding is
+  approximate. Evidence: `ev_260c6486a94a1e7634d421d893fa63f67d2bea3b4bee5390d42c336909377fa6`,
+  `ev_f826a09a5e60377e67248315096dc8878299c6c63f8ce1a1dc6641a129eb912f`,
+  and `ev_878fa81da8d63d96b130a5a8c9968c52402b863cc2430660810a4bc2358dfeb2`.
+
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table
   at `0x81C`, embedded data base, and optional relocation. Added font character

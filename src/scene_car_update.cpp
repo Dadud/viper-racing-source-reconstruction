@@ -275,6 +275,64 @@ SceneCarEffectTagZeroPlan plan_scene_car_effect_tag_zero_handler(
     return result;
 }
 
+SceneCarEffectTagOnePlan plan_scene_car_effect_tag_one_handler(
+    const SceneCarEffectTagOneInput& input) noexcept
+{
+    SceneCarEffectTagOnePlan result{};
+    result.cursor_after = input.cursor_0x540b18;
+    if (!input.scene_effects_enabled_0x509b74 || !input.effect_context_enabled_0x53a4c4) {
+        result.status = SceneCarEffectTagOneStatus::context_gate_closed;
+        return result;
+    }
+    if (input.cursor_0x540b18 < 0
+        || static_cast<std::size_t>(input.cursor_0x540b18) >= scene_car_effect_tag_one_pool_size) {
+        result.status = SceneCarEffectTagOneStatus::cursor_out_of_range;
+        return result;
+    }
+    if (!input.selected_slot_time_0x18.has_value()) {
+        result.status = SceneCarEffectTagOneStatus::slot_observation_missing;
+        return result;
+    }
+
+    const float slot_time = *input.selected_slot_time_0x18;
+    if (input.now_0x45bb70 > slot_time
+        && slot_time + 0.5F > input.now_0x45bb70) {
+        result.status = SceneCarEffectTagOneStatus::active_slot_retained;
+        return result;
+    }
+
+    result.selected_slot = static_cast<std::size_t>(input.cursor_0x540b18);
+    result.cursor_after = (input.cursor_0x540b18 + 1) & 0x1f;
+    result.cursor_written = true;
+
+    const float vx = input.payload_velocity[0] * 0.5F;
+    const float vy = input.payload_velocity[1] * 0.5F
+        + std::sqrt(input.payload_velocity[0] * input.payload_velocity[0]
+            + input.payload_velocity[1] * input.payload_velocity[1]
+            + input.payload_velocity[2] * input.payload_velocity[2]) * 0.1F;
+    const float vz = input.payload_velocity[2] * 0.5F;
+    result.stored_velocity = {vx, vy, vz};
+    result.stored_origin = input.payload_origin;
+    result.stored_time = input.now_0x45bb70;
+    result.record_written = true;
+
+    constexpr float random_scale = 0.001001001F;
+    for (std::size_t draw = 0; draw < 3; ++draw) {
+        if (draw >= input.random_samples.size()) {
+            result.status = SceneCarEffectTagOneStatus::random_observation_exhausted;
+            return result;
+        }
+        const float normalized = static_cast<float>(input.random_samples[draw]) * random_scale;
+        const float perturbation = (-0.1F + 0.2F * normalized) * vx;
+        const std::size_t axis = draw == 0 ? 0 : (draw == 1 ? 2 : 1);
+        result.stored_velocity[axis] += perturbation;
+        ++result.random_samples_consumed;
+    }
+
+    result.status = SceneCarEffectTagOneStatus::generated;
+    return result;
+}
+
 SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
     const SceneCarEffectParticleGeneratorInput& input) noexcept
 {

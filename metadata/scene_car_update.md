@@ -84,6 +84,25 @@ Evidence: `0x462CF0` (`ev_87fc51588d2e71449560f2e725d0887ac52f4f6a0d86eaf3264f7f
 `0x469300` (`ev_48b9e3596cb4dfa50d1ba5991c3ebb11ac926bf35e4073d6b395ec00385f1e90`),
 and `0x469350` (`ev_1ca4fe97607c76902eab28afb2b0b7376bfe322f74243d1aa4747465b7b74e28`).
 
+The tag 1 callback at `0x468450` now has a separate bounded projection in
+`plan_scene_car_effect_tag_one_handler`. The `0x45BAE0` context gate requires
+both globals at `0x509B74` and `0x53A4C4` to be nonzero. It examines the slot
+selected by the current cursor in the 32-entry, `0x1C`-byte pool: timestamps
+at or newer than `now`, or at least 0.5 seconds old, are reusable; a slot
+with `timestamp < now < timestamp + 0.5` is retained and causes no cursor or
+record writes. On reuse, the cursor advances and wraps, velocity is scaled by
+0.5 with `0.1 * speed` added to y, the origin and current time are stored, and
+three `0x468420` draws perturb velocity in x/z/y order using the scaled x
+velocity. Missing slot-time or random observations are explicit statuses;
+x87 intermediate rounding and exact RNG values remain approximations/inputs.
+Evidence: callback bytes `0x468450..0x46859F`
+(`ev_260c6486a94a1e7634d421d893fa63f67d2bea3b4bee5390d42c336909377fa6`),
+registration bytes at `0x468270` (`ev_c35340ae650d7672fa05295f87d9d5e77cadf42dbb61f60c6a4749983fd5b494`),
+context gate `0x45BAE0` (`ev_f826a09a5e60377e67248315096dc8878299c6c63f8ce1a1dc6641a129eb912f`),
+random-range helper `0x468420` (`ev_878fa81da8d63d96b130a5a8c9968c52402b863cc2430660810a4bc2358dfeb2`),
+RNG converter `0x4193F0` (`ev_6b1334751a6337d3165d366b0c495d29963640f958a57149aa3dfa596205c872`),
+and constants at `0x4C94F0` (`ev_ab6e2845b1b14c8a15f96a8fe418220c158b4387c355ae9b1b11b0605b93df83`).
+
 Tag 0's outer effect management is also projected in
 `plan_scene_car_effect_tag_zero_handler`: `0x4692A0` compares the DWORD at
 payload `+0x18` against the `+0x04` key in all 32 slots at `0x540B70..0x540BEC`.

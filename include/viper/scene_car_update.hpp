@@ -216,6 +216,48 @@ struct SceneCarEffectTagZeroPlan {
 [[nodiscard]] SceneCarEffectTagZeroPlan plan_scene_car_effect_tag_zero_handler(
     const SceneCarEffectTagZeroInput& input) noexcept;
 
+inline constexpr std::size_t scene_car_effect_tag_one_pool_size = 32;
+enum class SceneCarEffectTagOneStatus : std::uint8_t {
+    context_gate_closed,
+    active_slot_retained,
+    generated,
+    random_observation_exhausted,
+    slot_observation_missing,
+    cursor_out_of_range,
+};
+
+struct SceneCarEffectTagOneInput {
+    // FUN_0045BAE0 requires both globals to be nonzero before emitting.
+    bool scene_effects_enabled_0x509b74{};
+    bool effect_context_enabled_0x53a4c4{};
+    std::int32_t cursor_0x540b18{};
+    std::optional<float> selected_slot_time_0x18{};
+    std::array<float, 3> payload_velocity{}; // handler payload +0x00
+    std::array<float, 3> payload_origin{}; // handler payload +0x0C
+    float now_0x45bb70{};
+    // Raw FUN_004193F0(1000) observations, in x/z/y perturbation order.
+    std::span<const std::int32_t> random_samples{};
+};
+
+struct SceneCarEffectTagOnePlan {
+    SceneCarEffectTagOneStatus status{SceneCarEffectTagOneStatus::context_gate_closed};
+    static constexpr std::int32_t returned_payload_bytes = 0x18;
+    std::int32_t cursor_after{};
+    std::size_t selected_slot{};
+    std::size_t random_samples_consumed{};
+    std::array<float, 3> stored_velocity{};
+    std::array<float, 3> stored_origin{};
+    float stored_time{};
+    bool cursor_written{};
+    bool record_written{};
+    bool x87_rounding_approximated{true};
+};
+
+// Projects the tag 1 callback at 0x468450. The 32-slot pool uses a strict
+// half-second occupancy window; RNG observations bound the velocity jitter.
+[[nodiscard]] SceneCarEffectTagOnePlan plan_scene_car_effect_tag_one_handler(
+    const SceneCarEffectTagOneInput& input) noexcept;
+
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,
     generated,
