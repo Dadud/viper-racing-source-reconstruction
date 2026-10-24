@@ -823,7 +823,12 @@ gear/banner/text effects (`ev_a058b9f23799a14959f9a4c014c5676ed3461968e94bbb8ac1
 The mode-0 gear rectangle's position and raw color come from the already
 recovered gear branch (`ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`);
 the race-loop composer now supplies the acquired context to that pixel
-projection. Rotating-gear spans/edges are still projected separately.
+projection. For nonzero, non-12 gear mode, callers can provide the decoded
+`StampImage` corresponding to the runtime `0x4EB420` resource; the composer
+rasterizes it at the observed resource coordinates, then appends the triangle
+fill and edge pixels after it. Missing image input leaves the submitted surface
+batch unapplied as incomplete, and this does not infer which bundle image maps
+to that runtime handle. Rotating-gear x87/FDIV exactness remains unvalidated.
 `scene_dashboard_viewport_plan` emits just the resulting `0x4498A0` calls,
 preserving row addresses and required bits. `scene_dashboard_render_plan`
 composes the observed order around them: on a full redraw with nonzero

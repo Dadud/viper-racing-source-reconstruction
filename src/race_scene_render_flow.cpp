@@ -216,6 +216,46 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                 plan.state0_dashboard_mode_zero_gear_fill_complete = true;
             }
         }
+        const auto gear_resource_draw = std::find_if(
+            plan.dashboard_gear_display.operations.begin(),
+            plan.dashboard_gear_display.operations.end(),
+            [](const auto& operation) {
+                return operation.kind ==
+                    SceneDashboardGearOperationKind::draw_gear_resource;
+            });
+        if (gear_resource_draw !=
+                plan.dashboard_gear_display.operations.end() &&
+            observation.state0_dashboard_gear_resource_image.has_value()) {
+            ScenePausedBannerRenderPlan image_draw_plan{};
+            image_draw_plan.reached = true;
+            ScenePausedBannerOperation image_draw{};
+            image_draw.kind =
+                ScenePausedBannerOperationKind::resource_draw_0x44d0c0;
+            image_draw.helper = 0x0044D0C0U;
+            image_draw.x = gear_resource_draw->left_or_x;
+            image_draw.y = gear_resource_draw->top_or_y;
+            image_draw.raw_mode = 0;
+            image_draw_plan.ordered_operations.push_back(image_draw);
+
+            const auto& context = gear_observation.render_context;
+            const ScenePausedBannerResourceRasterObservation image_observation{
+                true,
+                *observation.state0_dashboard_gear_resource_image,
+                {
+                    gear_observation.renderer_mode_0x4d7a48,
+                    context.viewport_left_0x14,
+                    context.viewport_top_0x18,
+                    context.viewport_right_0x1c,
+                    context.viewport_bottom_0x20,
+                    context.row_pitch_0x10,
+                    gear_observation.framebuffer_base_value,
+                    {},
+                },
+            };
+            plan.state0_dashboard_gear_resource_raster =
+                raster_scene_paused_banner_resource(
+                    image_draw_plan, image_observation);
+        }
         if (plan.optional_dashboard_branch_enabled) {
             auto render_observation = observation.state0_dashboard_render;
             if (plan.dashboard_core_callback_reached) {
@@ -658,23 +698,61 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
                               write.bytes_per_pixel, false});
         }
     }
-    const auto mode_zero_gear_fill = std::find_if(
-        plan.dashboard_gear_display.operations.begin(),
-        plan.dashboard_gear_display.operations.end(), [](const auto& operation) {
-            return operation.kind ==
-                SceneDashboardGearOperationKind::fill_mode_zero_rectangle;
-        });
-    if (complete && mode_zero_gear_fill !=
-            plan.dashboard_gear_display.operations.end()) {
-        if (!plan.state0_dashboard_mode_zero_gear_fill_complete) {
-            complete = false;
-        } else {
+    for (const auto& operation : plan.dashboard_gear_display.operations) {
+        if (!complete) {
+            break;
+        }
+        switch (operation.kind) {
+        case SceneDashboardGearOperationKind::draw_gear_resource: {
+            if (!plan.state0_dashboard_gear_resource_raster.has_value() ||
+                !plan.state0_dashboard_gear_resource_raster->draw_reached ||
+                !plan.state0_dashboard_gear_resource_raster->input_complete ||
+                !plan.state0_dashboard_gear_resource_raster->raster.input_complete) {
+                complete = false;
+                break;
+            }
+            for (const auto& write : plan.state0_dashboard_gear_resource_raster
+                                         ->raster.pixel_writes) {
+                writes.push_back({
+                    static_cast<std::uint64_t>(
+                        write.offset_from_framebuffer_base),
+                    write.value, 0xffffffffU, write.bytes_per_pixel, false});
+            }
+            break;
+        }
+        case SceneDashboardGearOperationKind::fill_mode_zero_rectangle:
+            if (!plan.state0_dashboard_mode_zero_gear_fill_complete) {
+                complete = false;
+                break;
+            }
             for (const auto& write :
                  plan.state0_dashboard_mode_zero_gear_fill_writes) {
                 writes.push_back({write.destination_offset, write.value,
                                   write.write_mask, write.bytes_per_pixel,
                                   write.preserves_existing_bits});
             }
+            break;
+        case SceneDashboardGearOperationKind::draw_rotating_gear_geometry:
+            if (!plan.dashboard_gear_display.rotating_gear_geometry.has_value()) {
+                complete = false;
+                break;
+            }
+            for (const auto& write : plan.dashboard_gear_display
+                                         .rotating_gear_triangle_fill_writes) {
+                writes.push_back({write.offset_from_framebuffer_base,
+                                  write.value, write.write_mask,
+                                  write.bytes_per_pixel,
+                                  write.preserves_existing_bits});
+            }
+            for (const auto& write : plan.dashboard_gear_display
+                                         .rotating_gear_pixel_writes) {
+                writes.push_back({write.offset_from_framebuffer_base,
+                                  write.value, 0xffffffffU,
+                                  write.bytes_per_pixel, false});
+            }
+            break;
+        default:
+            break;
         }
     }
     result.dashboard_write_plan_available = complete;

@@ -236,6 +236,8 @@ files were present.
   The state-0 dashboard's ordered `0x405100` full-surface fill and background
   bitmap writes can also be applied transactionally to a caller-owned surface
   when the race-loop submission/callback/unlock gates match the observed order.
+  The batch also handles the mode-0 gear rectangle or, when its resolved STMP
+  image is supplied, the nonzero-mode gear resource, triangle, and edge writes.
 - `metadata/frontend_dispatch.md` records the recovered routing evidence and
   remaining uncertainty.
 - `include/viper/vehicle_setup.hpp` and `src/vehicle_setup.cpp` implement the
