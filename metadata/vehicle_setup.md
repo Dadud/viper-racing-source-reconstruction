@@ -120,6 +120,31 @@ the full `.tir` grammar still need separate analysis before a full wheel model
 can be written. `--inspect-tire BUNDLE NAME` exposes the recovered label and
 numbered float values through the CLI.
 
+### Front/rear tire resource selection
+
+The wheel initializer `0x441C10` chooses suffix byte `f` for wheel indices 0
+and 1, and `r` for indices 2 and 3. It formats the selected car stem and that
+suffix as `%s%s.tir`, checks the result through `0x417A20`, and copies the
+`def_tire.tir` name into the path buffer when the selected resource is absent.
+The format and fallback strings at `0x4D5D98` are `f`, `r`, `%s%s.tir`, and
+`def_tire.tir` (read-bytes evidence
+`ev_f15b9198220e754e68c51a792a17b62d3fa62166d33a8fcc5935964e088b4056`).
+The selected path is then passed to the TIRE loader `0x435B50` by
+`0x441C10` (function evidence
+`ev_f58fb7c53b9e5301e4a52e4cf10624d8af065857ba0bac9b90aac634d649bb59`).
+
+`GameAssets` now resolves and owns four parsed tire records in that wheel
+order, preferring `<car>f.tir` / `<car>r.tir` from the selected car bundle and
+falling back to `common.res` `def_tire.tir`. Inspection of the external
+installation confirms that Exotic, Plane, Sedan, and Sports have both axle
+resources, while Viper has neither and therefore takes the verified default
+path. This supplies the existing four-wheel tire-curve composition with
+asset-backed tire definitions; it does not initialize wheel geometry or wire
+the composition into live physics. The `0x433C00` call loop increments its
+wheel ordinal from 0 through 3 and its destination by `0x1A4` each time
+(`ncar_wheel_callback_setup.evidence.json`, evidence
+`ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`).
+
 ### TIRE field consumption at `0x435BF0`
 
 The tire-object initializer reads the 22-float record at `param_2 + 0x20` and

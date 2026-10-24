@@ -12,6 +12,7 @@ namespace {
 constexpr std::array<std::string_view, 3> kSharedBundleNames{
     "common.res", "ui.res", "race.res"};
 constexpr std::uint32_t kAIDriverResourceType = 0x41494472U;
+constexpr std::uint32_t kTireResourceType = 0x54495245U;
 
 std::string normalize_asset_stem(const std::string_view value, const char* label)
 {
@@ -100,6 +101,32 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     assets.options_ = options ? std::move(*options) : GameOptions{};
     constexpr std::uint32_t car_setup_type = 0x43435330U;
     const auto& car_bundle = assets.bundle(assets.bundle_names_[3]);
+    for (std::size_t wheel_index = 0;
+         wheel_index < assets.wheel_tires_.size(); ++wheel_index) {
+        const char axle_suffix = wheel_index < 2U ? 'f' : 'r';
+        const auto tire_name = assets.car_name_ + axle_suffix + ".tir";
+        const ResourceEntry* tire_entry = car_bundle.find(
+            tire_name, kTireResourceType);
+        const ResourceBundle* tire_bundle = &car_bundle;
+        if (tire_entry == nullptr) {
+            tire_entry = common_bundle.find("def_tire.tir", kTireResourceType);
+            tire_bundle = &common_bundle;
+        }
+        if (tire_entry == nullptr) {
+            throw std::runtime_error("required tire resource is missing: " +
+                tire_name + " and common.res def_tire.tir");
+        }
+        if (tire_entry->attributes != 1U) {
+            throw std::runtime_error("tire resource " + tire_entry->name +
+                " has an unsupported version");
+        }
+        const auto tire = parse_tire_resource(tire_bundle->payload(*tire_entry));
+        if (!tire) {
+            throw std::runtime_error("tire resource " + tire_entry->name +
+                " has an unsupported payload size");
+        }
+        assets.wheel_tires_[wheel_index] = *tire;
+    }
     const auto* car_setup_entry = car_bundle.find(
         assets.car_name_ + ".ccs", car_setup_type);
     if (car_setup_entry == nullptr)

@@ -40,6 +40,8 @@ public:
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
     [[nodiscard]] const TireDefinition& default_tire() const noexcept { return default_tire_; }
+    [[nodiscard]] const std::array<TireDefinition, 4>& wheel_tires() const noexcept
+    { return wheel_tires_; }
     [[nodiscard]] const std::array<std::byte, 0x8c>& player_car_setup() const noexcept { return player_car_setup_; }
     [[nodiscard]] const GameOptions& options() const noexcept { return options_; }
     [[nodiscard]] std::size_t model_resource_count() const noexcept { return model_resource_count_; }
@@ -59,6 +61,7 @@ private:
     CarFileResourcePayloads player_car_;
     ModelResource player_model_;
     TireDefinition default_tire_;
+    std::array<TireDefinition, 4> wheel_tires_{};
     std::array<std::byte, 0x8c> player_car_setup_{};
     GameOptions options_;
     std::size_t model_resource_count_{};
