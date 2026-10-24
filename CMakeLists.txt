@@ -190,6 +190,10 @@ target_link_libraries(viper_reconstruction PRIVATE
 )
 target_compile_features(viper_reconstruction PRIVATE cxx_std_20)
 
+add_library(viper_race_progression src/race_progression.cpp)
+target_include_directories(viper_race_progression PUBLIC include)
+target_compile_features(viper_race_progression PUBLIC cxx_std_20)
+
 if(WIN32)
     add_executable(viper_game src/game_main.cpp src/game_assets.cpp)
     target_compile_features(viper_game PRIVATE cxx_std_20)
@@ -198,6 +202,7 @@ if(WIN32)
         target_compile_options(viper_game PRIVATE /W4 /permissive- /utf-8)
     endif()
     target_link_libraries(viper_game PRIVATE
+        viper_race_progression
         viper_ai_resources viper_resource_bundle viper_model_resource
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
@@ -206,6 +211,12 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_race_progression_regression
+        tests/race_progression_regression.cpp)
+    target_link_libraries(viper_race_progression_regression PRIVATE
+        viper_race_progression)
+    add_test(NAME race_progression_regression
+        COMMAND viper_race_progression_regression)
     add_executable(viper_game_options_regression tests/game_options_regression.cpp)
     target_link_libraries(viper_game_options_regression PRIVATE viper_frontend_model)
     add_test(NAME game_options_regression COMMAND viper_game_options_regression)

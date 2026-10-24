@@ -14,10 +14,12 @@ at other valid `obj car` start positions, with
 height sampled from terrain data and heading approximated from the nearest
 ideal-line segment. The entrant planner chooses the human grid row; in the
 fresh default eight-car setup, slot 8 is controlled. Arrow keys or WASD move
-that mesh along the ideal-line route using provisional kinematic controls;
-Escape exits. Other grid meshes remain parked. This is a top-down development
-scene and motion prototype, not a race simulation; moving opponents, HUD, and
-race results are not implemented.
+that mesh along the ideal-line route using provisional kinematic controls.
+Forward lap crossings use the configured `GAME laps` value and show elapsed
+finish time in the title bar; Escape exits. Other grid meshes remain parked.
+This is a top-down development scene and motion prototype, not a complete race
+simulation; moving opponents, an in-scene HUD, and a results screen are not
+implemented.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell

@@ -7,6 +7,7 @@
 
 #include "viper/game_assets.hpp"
 #include "viper/race_participants.hpp"
+#include "viper/race_progression.hpp"
 
 #include <array>
 #include <algorithm>
@@ -719,7 +720,33 @@ struct WindowState {
     // CONTROL order: steer_left, steer_right, throttle, braking.
     std::array<UINT, 4> control_keys{
         VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN};
+    HWND window{};
+    std::wstring title_base;
+    std::uint32_t target_laps{1U};
+    viper::RaceProgressionState progression{};
+    ULONGLONG last_title_update{};
     ULONGLONG last_tick{};
+
+    void refresh_title(const bool force = false)
+    {
+        if (window == nullptr) return;
+        const auto now = GetTickCount64();
+        if (!force && !progression.finished && now - last_title_update < 1000U)
+            return;
+        last_title_update = now;
+        std::wstring title = title_base;
+        if (progression.finished) {
+            const auto minutes = static_cast<unsigned>(progression.elapsed_seconds / 60.0F);
+            const auto seconds = static_cast<unsigned>(progression.elapsed_seconds) % 60U;
+            title += L" — Finished " + std::to_wstring(minutes) + L":" +
+                (seconds < 10U ? L"0" : L"") + std::to_wstring(seconds);
+        } else {
+            title += L" — Lap " +
+                std::to_wstring(progression.completed_laps + 1U) + L"/" +
+                std::to_wstring(target_laps);
+        }
+        SetWindowTextW(window, title.c_str());
+    }
 
     bool place_on_route(const float x, const float z)
     {
@@ -742,14 +769,19 @@ struct WindowState {
         const auto& b = route[(route_segment + 1U) % route.size()];
         const float yaw = std::atan2(b[0] - a[0], b[1] - a[1]);
         const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
-        return surface.query_succeeded && graphics.set_car_pose(player_car_index,
-            x, surface.sampled_position[1], z, yaw);
+        if (!surface.query_succeeded || !graphics.set_car_pose(player_car_index,
+                x, surface.sampled_position[1], z, yaw)) return false;
+        viper::initialize_race_progression(progression, route_segment);
+        refresh_title(true);
+        return true;
     }
 
     bool advance(float delta_seconds)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
+        if (progression.finished) return true;
         delta_seconds = std::clamp(delta_seconds, 0.0f, 0.05f);
+        viper::advance_race_clock(progression, delta_seconds);
         const float input = static_cast<float>(right) - static_cast<float>(left);
         steering += (input - steering) * std::min(1.0f, delta_seconds * 5.0f);
         const float drive = static_cast<float>(accelerate) - static_cast<float>(brake);
@@ -769,6 +801,9 @@ struct WindowState {
                 distance += distance > 0.0f ? -remaining : remaining;
                 route_segment = (route_segment + (forward ? 1U : route.size() - 1U)) % route.size();
                 route_fraction = forward ? 0.0f : 1.0f;
+                const bool lap_completed = viper::observe_race_route_transition(
+                    progression, route_segment, forward, target_laps);
+                if (lap_completed) refresh_title(true);
             }
         }
         const auto& a = route[route_segment];
@@ -782,8 +817,11 @@ struct WindowState {
         const float z = route_z - std::sin(tangent) * lateral;
         const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
         if (!surface.query_succeeded) { speed = 0.0f; return true; }
-        return graphics.set_car_pose(player_car_index,
-            x, surface.sampled_position[1], z, tangent + steering * 0.35f);
+        if (!graphics.set_car_pose(player_car_index,
+                x, surface.sampled_position[1], z, tangent + steering * 0.35f))
+            return false;
+        refresh_title();
+        return true;
     }
 };
 
@@ -875,6 +913,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::size_t player_car_index,
+               const std::uint32_t target_laps,
                const std::string_view track_name,
                const std::string_view car_name,
                const viper::TerrainSurfaceResourcePayload& terrain,
@@ -899,9 +938,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     state.terrain = &terrain;
     state.route = extract_ideal_line_points(ideal_line);
     state.player_car_index = player_car_index;
+    state.target_laps = std::max(1U, target_laps);
+    state.title_base = std::wstring(L"Viper Racing — ") +
+        std::wstring(track_name.begin(), track_name.end()) + L" & " +
+        std::wstring(car_name.begin(), car_name.end());
     load_keyboard_bindings(state, options);
     const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
-        " & " + std::string(car_name) + " Driving Prototype (WASD / Arrows)";
+        " & " + std::string(car_name) + " Race (WASD / Arrows)";
     const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
     if (title_length <= 0) return 1;
     std::wstring title(static_cast<std::size_t>(title_length), L'\0');
@@ -912,6 +955,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
+    state.window = hwnd;
     if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model,
             ai_model, player_car_index, track_objects)) {
         std::cerr << "Could not initialize Direct3D 11. "
@@ -1068,6 +1112,8 @@ int wmain(int argc, wchar_t** argv)
         }
         return run_window(options.software, options.smoke_frames,
             *entrants.player_record_index,
+            static_cast<std::uint32_t>(std::clamp(
+                assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
             assets.track_name(), assets.car_name(), assets.terrain(),
             assets.ideal_line(), assets.player_model(), assets.ai_model(), assets.track_objects(),
             assets.options());
