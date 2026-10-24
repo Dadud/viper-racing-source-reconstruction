@@ -72,6 +72,12 @@ struct RaceLoopSharedOverlayObservation {
     // pixel base, dimensions and pitch override the projected source fields.
     std::optional<std::vector<std::uint8_t>>
         state0_bitmap_descriptor_bytes;
+    // Optional decoded race.res::status.stp, drawn during 0x4031F0. If its
+    // frame has transparent pixels, the initial staging bytes below are needed.
+    std::optional<StampImage> state0_dashboard_background_image;
+    // Optional bytes in 0x4EB2C0 before status.stp is drawn. These are needed
+    // to resolve transparent STMP pixels when deriving the post-draw source.
+    std::vector<std::uint8_t> state0_bitmap_source_initial_pixels;
     std::vector<std::uint8_t> state0_bitmap_source_pixels;
     SceneDashboardCoreCallbackObservation dashboard_core_callback{};
     SceneDashboardTestTrackObservation dashboard_test_track{};
@@ -171,6 +177,10 @@ struct RaceLoopSharedOverlayPlan {
 // resource handle DAT_004EB420 (resource key at 0x004CFBDC: "rpm.stp").
 [[nodiscard]] std::optional<StampImage>
 parse_state0_dashboard_gear_image(const ResourceBundle& race_bundle);
+// 0x4031F0 registers status.stp and draws it at (0, 0) into the dashboard's
+// 0x4EB2C0 staging bitmap during initialization.
+[[nodiscard]] std::optional<StampImage>
+parse_state0_dashboard_background_image(const ResourceBundle& race_bundle);
 
 [[nodiscard]] std::optional<StampImage> parse_shared_centered_resource_image(
     const ResourceBundle& race_bundle);

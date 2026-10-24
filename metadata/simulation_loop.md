@@ -945,6 +945,20 @@ The registration table maps string `rpm.stp` at `0x4CFBDC` to destination
 `0x4EB420`; `parse_state0_dashboard_gear_image` resolves that exact STMP entry
 from the caller's `race.res` bundle. The extracted entry parses as a complete
 128x128, one-frame image. String evidence is recorded at `metadata/strings.md`.
+The same table registers `status.stp` into `0x4EB48C`; initialization measures
+it, allocates same-sized 640x64 contexts at `0x4EB3D0` and `0x4EB2C0`, selects
+`0x4EB2C0`, then draws the image at `(0, 0)`. `parse_state0_dashboard_background_image`
+now resolves that STMP from `race.res`, and the race-loop composer can raster it
+into source bytes for subsequent bitmap blits. The inspected `race.res` has
+SHA-256 `b07f40ef8dcba98fb7cef78c87034c9a2b47b9dcd7679aa70777c039be43d7e2`.
+The mode-4 raster path emits 40,933 palette writes for 40,960 pixels; its 27
+transparent pixels preserve pre-draw staging memory. Therefore deriving the
+full source requires either a complete raw post-draw buffer or an observed
+initial buffer for the transparent locations. The enhanced `--inspect-image`
+output reports mode-4 palette-write count and raster completeness. The original
+`race.res` remains outside this source repository. Automatic STMP-to-staging
+conversion currently supports 16-bit renderer modes 3 and 4; other modes still
+need an observed raw post-draw source buffer.
 `plan_race_setup` exposes this operation plan at its `0x4031F0` call site.
 The `0x44CFD0` registration helper requests the `STMP` type through shared
 loader `0x417CB0`; for a present resource it requires the returned metadata

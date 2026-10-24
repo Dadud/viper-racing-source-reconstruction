@@ -2,9 +2,82 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <utility>
 
 namespace viper {
+namespace {
+
+std::optional<std::vector<std::uint8_t>> raster_status_image_source_pixels(
+    const StampImage& image, const std::uint8_t renderer_mode,
+    const std::int32_t pitch_bytes,
+    const std::span<const std::uint8_t> initial_pixels)
+{
+    if (image.width <= 0 || image.height <= 0 || pitch_bytes <= 0 ||
+        (renderer_mode != 3U && renderer_mode != 4U)) {
+        return std::nullopt;
+    }
+    constexpr auto bytes_per_pixel = 2U;
+    const auto minimum_pitch = static_cast<std::uint64_t>(image.width) *
+        bytes_per_pixel;
+    const auto buffer_size = static_cast<std::uint64_t>(pitch_bytes) *
+        static_cast<std::uint64_t>(image.height);
+    const auto pixel_count = static_cast<std::uint64_t>(image.width) *
+        static_cast<std::uint64_t>(image.height);
+    if (minimum_pitch > static_cast<std::uint64_t>(pitch_bytes) ||
+        buffer_size > std::numeric_limits<std::size_t>::max() ||
+        buffer_size > static_cast<std::uint64_t>(
+            std::numeric_limits<std::ptrdiff_t>::max()) ||
+        pixel_count > std::numeric_limits<std::size_t>::max()) {
+        return std::nullopt;
+    }
+
+    SceneDashboardRasterObservation renderer{};
+    renderer.renderer_mode = renderer_mode;
+    renderer.clip_right = image.width;
+    renderer.clip_bottom = image.height;
+    renderer.framebuffer_pitch_bytes = pitch_bytes;
+    const auto raster = raster_scene_stamp_image(
+        {true, 0x0044D0C0U, 0, 0, 0}, {true, image, renderer});
+    if (!raster.draw_reached || !raster.input_complete ||
+        (initial_pixels.empty() &&
+         raster.raster.pixel_writes.size() !=
+             static_cast<std::size_t>(pixel_count)) ||
+        (!initial_pixels.empty() &&
+         initial_pixels.size() < static_cast<std::size_t>(buffer_size))) {
+        // Transparent STMP pixels preserve the staging surface's prior
+        // contents, so only a complete frame or an observed initial buffer
+        // can determine every post-draw source byte.
+        return std::nullopt;
+    }
+
+    std::vector<std::uint8_t> pixels;
+    if (initial_pixels.empty()) {
+        pixels.assign(static_cast<std::size_t>(buffer_size), 0U);
+    } else {
+        pixels.assign(initial_pixels.begin(),
+                      initial_pixels.begin() +
+                          static_cast<std::ptrdiff_t>(buffer_size));
+    }
+    for (const auto& write : raster.raster.pixel_writes) {
+        if (write.offset_from_framebuffer_base < 0 ||
+            write.bytes_per_pixel != bytes_per_pixel) {
+            return std::nullopt;
+        }
+        const auto offset = static_cast<std::uint64_t>(
+            write.offset_from_framebuffer_base);
+        if (offset > buffer_size || bytes_per_pixel > buffer_size - offset) {
+            return std::nullopt;
+        }
+        for (std::uint32_t byte = 0; byte < bytes_per_pixel; ++byte) {
+            pixels[static_cast<std::size_t>(offset + byte)] =
+                static_cast<std::uint8_t>(write.value >> (byte * 8U));
+        }
+    }
+    return pixels;
+}
+
+} // namespace
 
 std::optional<StampImage> parse_state0_dashboard_gear_image(
     const ResourceBundle& race_bundle)
@@ -15,6 +88,15 @@ std::optional<StampImage> parse_state0_dashboard_gear_image(
         return std::nullopt;
     }
     return parse_stamp_image(*payload, true);
+}
+
+std::optional<StampImage> parse_state0_dashboard_background_image(
+    const ResourceBundle& race_bundle)
+{
+    const auto payload = race_bundle.find_payload(
+        "status.stp", resource_type_code('S', 'T', 'M', 'P'));
+    return payload.has_value() ? parse_stamp_image(*payload, true)
+                               : std::nullopt;
 }
 
 std::optional<StampImage> parse_shared_centered_resource_image(
@@ -320,6 +402,31 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                         descriptor.pitch_bytes;
                 }
             }
+            auto bitmap_source_pixels =
+                observation.state0_bitmap_source_pixels;
+            auto bitmap_source_image_complete = true;
+            if (bitmap_source_pixels.empty() &&
+                observation.state0_dashboard_background_image.has_value()) {
+                const auto& image =
+                    *observation.state0_dashboard_background_image;
+                if (image.width != bitmap_blit_observation.bitmap_width ||
+                    image.height != bitmap_blit_observation.bitmap_height) {
+                    bitmap_source_image_complete = false;
+                } else {
+                    const auto rasterized_source =
+                        raster_status_image_source_pixels(
+                            image,
+                            bitmap_blit_observation.source_bitmap_mode,
+                            bitmap_blit_observation.bitmap_pitch_bytes,
+                            observation
+                                .state0_bitmap_source_initial_pixels);
+                    if (rasterized_source.has_value()) {
+                        bitmap_source_pixels = *rasterized_source;
+                    } else {
+                        bitmap_source_image_complete = false;
+                    }
+                }
+            }
             if (plan.dashboard_core_callback_reached) {
                 render_observation.dashboard_mask =
                     plan.dashboard_core_callback.next_state
@@ -391,11 +498,12 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                 projection.pixel_writes =
                     scene_dashboard_background_bitmap_pixel_writes(
                         blit_observation,
-                        observation.state0_bitmap_source_pixels);
+                        bitmap_source_pixels);
                 const auto expected_pixel_count =
                     static_cast<std::uint64_t>(std::max(0, projection.blit.width)) *
                     static_cast<std::uint64_t>(std::max(0, projection.blit.height));
                 projection.input_complete = bitmap_descriptor_complete &&
+                    bitmap_source_image_complete &&
                     (!projection.blit.transfer_happened ||
                      projection.pixel_writes.size() == expected_pixel_count);
                 plan.state0_dashboard_bitmap_projections.push_back(

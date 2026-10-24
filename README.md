@@ -502,7 +502,8 @@ conditional embedded-data fixups for `.fnt` and `.stp` resources.
 `--inspect-font` prints the 256 character lookup rows built from a font STMP
 resource; the two metric fields keep their raw offsets until their meanings
 are resolved. `--inspect-image` decodes STMP indexed-image dimensions, palette
-planes, frame rows, and bounded RLE data.
+planes, frame rows, and bounded RLE data. It also reports first-frame
+mode-4 palette-write coverage and raster completeness.
 
 ## Scope and next steps
 
