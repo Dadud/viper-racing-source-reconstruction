@@ -498,6 +498,12 @@ The separate `0x404920`/`0x4EB2FB` resource draw is composed by
 Evidence: common gate `ev_2d409f9f2cca7c8c137ba2687dc95a0170ec2fcdc3faa45f95cd0f5c3d465b94`,
 `0x4048E0` `ev_269a5ac39029a3557fa7b0d9466c7709fb45b6765cba61e7a80557d24164f597`,
 and `0x404900` `ev_aa5e142979b28027773fa22ed4c39dfc3295e6e486888ed728fa5ce7ad6a52ae`.
+`raster_scene_shared_text_effects` now takes the reached `0x44DC70` draw calls
+through the common font-layout and atlas-raster path, using a text and renderer
+observation only for each active branch. The race-loop composition invokes it
+when either draw is reached, retaining the `0x4048E0` then `0x404900` order;
+localized resource strings, font/atlas data, palettes, clipping, and surface
+addresses remain explicit inputs.
 
 `scene_shared_results_heading_plan` covers the heading work before the result
 row loops. The `0x404940` branch lazily registers `Dashboard:RaceResults`

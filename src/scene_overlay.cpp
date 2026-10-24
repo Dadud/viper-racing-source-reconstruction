@@ -3161,6 +3161,48 @@ SceneState5OverlayPlan state5_numeric_overlay_plan(
     return result;
 }
 
+SceneSharedTextEffectsRasterPlan raster_scene_shared_text_effects(
+    const SceneSharedTextEffectsPlan& plan,
+    const SceneSharedTextEffectsRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font)
+{
+    SceneSharedTextEffectsRasterPlan result{};
+    const std::array<const SceneSharedTextEffectPlan*, 2> effects{{
+        &plan.predicate_0x4048e0,
+        &plan.predicate_0x404900,
+    }};
+    for (std::size_t index = 0; index < effects.size(); ++index) {
+        const auto& effect = *effects[index];
+        if (!effect.has_text_draw) {
+            continue;
+        }
+        if (!observation.text[index].has_value()) {
+            result.input_complete = false;
+            continue;
+        }
+        const SceneDashboardTextCall call{
+            effect.draw_call_site,
+            effect.draw_x,
+            effect.draw_y,
+            effect.draw_format_source,
+            effect.draw_color_source,
+            effect.draw_font_source,
+            effect.draw_flags,
+        };
+        const auto layout = layout_scene_dashboard_text(
+            call, *observation.text[index], layout_font);
+        const auto raster = raster_scene_dashboard_text(
+            layout, atlas_font, observation.per_call_renderers[index]);
+        ++result.text_calls_rasterized;
+        result.input_complete = result.input_complete && raster.input_complete;
+        result.ordered_pixel_writes.insert(
+            result.ordered_pixel_writes.end(), raster.pixel_writes.begin(),
+            raster.pixel_writes.end());
+    }
+    return result;
+}
+
 SceneSharedResultsRasterPlan raster_scene_shared_results_rows(
     const std::span<const SceneSharedResultRowDraw> row_draws,
     const std::span<const SceneDashboardRasterObservation> per_call_renderers,

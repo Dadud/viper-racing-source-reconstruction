@@ -1630,6 +1630,26 @@ struct SceneDashboardRasterPlan {
     std::vector<SceneTextPixelWrite> pixel_writes;
 };
 
+struct SceneSharedTextEffectsRasterObservation {
+    // Slots correspond to 0x4048E0 then 0x404900; inactive branches need no text.
+    std::array<std::optional<std::string_view>, 2> text;
+    std::array<SceneDashboardRasterObservation, 2> per_call_renderers{};
+};
+
+struct SceneSharedTextEffectsRasterPlan {
+    bool input_complete{true};
+    std::size_t text_calls_rasterized{};
+    std::vector<SceneTextPixelWrite> ordered_pixel_writes;
+};
+
+// Rasterizes reached 0x4048E0/0x404900 text effects in callback order.
+[[nodiscard]] SceneSharedTextEffectsRasterPlan
+raster_scene_shared_text_effects(
+    const SceneSharedTextEffectsPlan& plan,
+    const SceneSharedTextEffectsRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font);
+
 struct SceneDashboardBuiltinFontObservation {
     std::string_view text;
     std::int32_t x{};

@@ -173,6 +173,16 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
         plan.shared_overlay = scene_shared_overlay_frame_plan(
             shared_overlay_observation);
+        const auto& text_effects = plan.shared_overlay.text_effects;
+        if (text_effects.predicate_0x4048e0.has_text_draw ||
+            text_effects.predicate_0x404900.has_text_draw) {
+            plan.shared_text_effects_raster_reached = true;
+            const auto& raster = observation.shared_text_effects_raster;
+            plan.shared_text_effects_raster =
+                raster_scene_shared_text_effects(
+                    text_effects, raster.text, raster.layout_font,
+                    raster.atlas_font);
+        }
         if (plan.shared_overlay.race_results.gates.race_results) {
             plan.shared_results_raster_reached = true;
             const auto& results = plan.shared_overlay.race_results;

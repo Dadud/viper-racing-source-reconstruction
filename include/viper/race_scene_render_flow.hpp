@@ -19,6 +19,12 @@ struct RaceLoopSharedResultsRasterObservation {
     SceneDashboardAtlasFontObservation atlas_font{};
 };
 
+struct RaceLoopSharedTextEffectsRasterObservation {
+    SceneSharedTextEffectsRasterObservation text{};
+    SceneDashboardFontObservation layout_font{};
+    SceneDashboardAtlasFontObservation atlas_font{};
+};
+
 struct RaceLoopSharedOverlayObservation {
     std::int32_t current_callback_state{};
     RaceLoopActiveFrameObservation following_frame{};
@@ -36,6 +42,7 @@ struct RaceLoopSharedOverlayObservation {
     SceneDashboardGearDisplayObservation dashboard_gear_display{};
     SceneSharedOverlayFrameObservation shared_overlay{};
     RaceLoopSharedResultsRasterObservation shared_results_raster{};
+    RaceLoopSharedTextEffectsRasterObservation shared_text_effects_raster{};
 };
 
 struct RaceLoopSharedOverlayPlan {
@@ -71,6 +78,8 @@ struct RaceLoopSharedOverlayPlan {
     bool shared_results_raster_reached{};
     SceneSharedResultsHeadingTextRasterPlan shared_results_heading_raster{};
     SceneSharedResultsRasterPlan shared_results_rows_raster{};
+    bool shared_text_effects_raster_reached{};
+    SceneSharedTextEffectsRasterPlan shared_text_effects_raster{};
     SceneSharedOverlayFramePlan shared_overlay{};
 };
 
