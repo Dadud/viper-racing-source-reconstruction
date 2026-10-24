@@ -495,6 +495,14 @@ struct SceneDashboardGearDisplayObservation {
     std::int32_t mode_0x45c200{};
     std::int32_t mode_zero_fill_argument_0x4eb27c{};
     std::uint32_t gear_resource_value_0x4eb420{};
+    // Base record returned by 0x45DFB0. 0x404970 reads the target object's
+    // pointer at record+0x134, then the gear value at target+0x34.
+    std::uint32_t selected_record_base_address{};
+    std::span<const std::uint8_t> selected_record_base_bytes;
+    std::uint32_t selected_record_value_object_address{};
+    std::span<const std::uint8_t> selected_record_value_object_bytes;
+    // Scalar compatibility input used only when the bounded byte views do not
+    // resolve the pointer chain.
     float selected_record_value_0x34{};
     std::uint32_t resource_initialization_mask_0x4eb274{};
     std::uint32_t triangle_color_value_0x4eb29c{};
@@ -575,6 +583,8 @@ struct SceneDashboardGearOperation {
 struct SceneDashboardGearDisplayResult {
     std::uint32_t newly_set_resource_bits{};
     bool initialized_geometry_constants{};
+    std::optional<std::uint32_t> selected_record_value_bits;
+    bool selected_record_value_resolved_from_bytes{};
     std::optional<SceneDashboardGearGeometry> rotating_gear_geometry;
     // Half-open scanline spans, bounded by the target's 1024-row edge arrays.
     std::vector<SceneDashboardTriangleSpan> rotating_gear_triangle_spans;

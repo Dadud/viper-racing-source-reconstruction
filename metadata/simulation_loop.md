@@ -998,7 +998,11 @@ the rectangle `(20, height-41)-(40, height-15)` with the value loaded from
 `0x4EB27C`, followed by a flush. Modes other than 0 and 12 draw the value
 loaded from `0x4EB420` at `(16, height-144)`, flush, then
 request the rotating geometry at `(80, height-80)` with size 50 and the
-selected record's `+0x34` value clamped to at least 500. The observed geometry
+value loaded through the selected record's pointer at `+0x134`, then from the
+pointed-to object's `+0x34` field, clamped to at least 500. The observation
+accepts bounded byte views for both objects and checks the pointer address
+before resolving that chain; the prior scalar remains a fallback when raw
+bytes are unavailable. The observed geometry
 parameters are phase `-0.27925268` and rate `0.00066322513` from `0x405510`
 (`ev_3f3261dd623758f3ab6ca1b038a14bcb6995ca3bdf4cd68d464c3e7051f84eae`).
 The portable plan now also projects the filled triangle vertices and its two

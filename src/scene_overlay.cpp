@@ -1278,6 +1278,39 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
             0});
         result.operations.push_back({SceneDashboardGearOperationKind::flush_text});
         auto value = observation.selected_record_value_0x34;
+        constexpr std::size_t pointer_field_offset = 0x134U;
+        constexpr std::size_t value_field_offset = 0x34U;
+        const auto read_u32 = [](const std::span<const std::uint8_t> bytes,
+                                 const std::size_t offset)
+            -> std::optional<std::uint32_t> {
+            if (offset > bytes.size() ||
+                bytes.size() - offset < sizeof(std::uint32_t)) {
+                return std::nullopt;
+            }
+            return static_cast<std::uint32_t>(bytes[offset]) |
+                (static_cast<std::uint32_t>(bytes[offset + 1U]) << 8U) |
+                (static_cast<std::uint32_t>(bytes[offset + 2U]) << 16U) |
+                (static_cast<std::uint32_t>(bytes[offset + 3U]) << 24U);
+        };
+        if (const auto target_address =
+                read_u32(observation.selected_record_base_bytes,
+                         pointer_field_offset);
+            target_address.has_value() && *target_address != 0U &&
+            *target_address ==
+                observation.selected_record_value_object_address) {
+            if (const auto value_bits =
+                    read_u32(observation.selected_record_value_object_bytes,
+                             value_field_offset);
+                value_bits.has_value()) {
+                result.selected_record_value_bits = *value_bits;
+                result.selected_record_value_resolved_from_bytes = true;
+                value = std::bit_cast<float>(*value_bits);
+            }
+        }
+        if (!result.selected_record_value_bits.has_value()) {
+            result.selected_record_value_bits =
+                std::bit_cast<std::uint32_t>(value);
+        }
         if (value < 500.0F) {
             value = 500.0F;
         }
