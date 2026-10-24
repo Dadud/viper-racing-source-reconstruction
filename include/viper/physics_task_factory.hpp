@@ -415,6 +415,50 @@ struct PhysicsTaskFactoryPlan {
     bool returns_object{};
 };
 
+struct PhysicsTaskObjectFieldWrite {
+    std::uint32_t byte_offset{};
+    std::uint32_t value{};
+};
+
+struct PhysicsStatTaskConstructorObservation {
+    std::array<std::uint32_t, 12> record_words_0x08_to_0x34{};
+    std::uint32_t collision_volume_flag_0x38{};
+    std::array<float, 3> child_center_0x3c_to_0x44{};
+    bool child_allocation_succeeded{};
+    std::optional<std::uint32_t> child_address;
+};
+
+enum class PhysicsStatTaskConstructorStatus : std::uint8_t {
+    unsupported_collision_volume,
+    child_allocation_failed,
+    child_constructed,
+};
+
+struct PhysicsStatTaskConstructorPlan {
+    PhysicsStatTaskConstructorStatus status{
+        PhysicsStatTaskConstructorStatus::unsupported_collision_volume};
+    std::vector<PhysicsTaskObjectFieldWrite> record_copy_writes;
+    std::array<float, 3> child_center{};
+    std::optional<float> child_bound_0x28;
+    std::optional<std::uint32_t> child_address;
+    std::uint32_t child_allocation_bytes{0x30U};
+    std::uint32_t child_pointer_slot_offset{0x14U};
+    std::uint32_t child_count_after{};
+    bool base_constructor_called{true};
+    bool derived_vtable_installed{true};
+    bool collision_volume_reporter_called{};
+    bool child_allocation_attempted{};
+    bool child_box_constructor_0x42d460_called{};
+    bool child_pointer_stored{};
+    bool child_count_incremented{};
+    bool constructor_returns_this{true};
+};
+
+// Projects the STAT record constructor's derived fields and single box child.
+[[nodiscard]] PhysicsStatTaskConstructorPlan
+plan_physics_stat_task_constructor(
+    const PhysicsStatTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};

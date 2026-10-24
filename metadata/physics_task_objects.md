@@ -81,6 +81,24 @@ dispatch table. Allocation success, constructor return, and whether the shared
 panic reporter returns remain explicit observations. The factory evidence is
 `0x422580` (`ev_16e9359e1fff260aa38cf33c56d1c882043ea11712c8fa31761a929ff9f41f37`).
 
+`plan_physics_stat_task_constructor` projects the derived constructor selected
+for `STAT`. After common base initialization it installs vtable `0x4C8100`
+and copies the 12 DWORDs from record offsets `+0x08..+0x34` to object offsets
+`+0x38..+0x64`. A nonzero DWORD at record `+0x38` calls the unsupported
+collision-volume reporter and returns the object before allocation. Otherwise
+it allocates `0x30` bytes for one child and calls `0x42D460` on success with
+record floats at `+0x3C`, `+0x40`, and `+0x44`; the child stores those as its
+three position fields and their maximum at `+0x28`. The parent stores the
+child pointer at `+0x14` and increments its count at `+0x24` even when child
+allocation fails (in that case it stores null). The allocation address remains
+an optional observation, and the meaning of the collision flag and `0.2`
+constructor constant is not inferred. Evidence: `0x437C60`,
+`ev_01bdfcf3294422a00cd7127b25cfba0f4fc434611917e1b2ff1d26f673977ed1`;
+common base initializer `0x4375C0`,
+`ev_1bd5688db76155c26f088bb709fc8bce8430eb03d9df862ba2786ca8ef1b6ae0`; and
+child box constructor `0x42D460`,
+`ev_e8bea9ef634610ace27b2bc375673e9184ebccd218aeb9e9e60d0c9688f83277`.
+
 ## Fixed-step update dispatch
 
 `0x421050`, reached per physics step from `0x4207C0`, iterates

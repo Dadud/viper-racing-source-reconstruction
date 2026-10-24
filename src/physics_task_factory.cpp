@@ -1,6 +1,7 @@
 #include "viper/physics_task_factory.hpp"
 #include "viper/legacy_fdiv.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -762,6 +763,50 @@ PhysicsTaskFactoryPlan plan_physics_task_object_factory(
     plan.status = constructor_returned_object
         ? PhysicsTaskFactoryStatus::constructed
         : PhysicsTaskFactoryStatus::constructor_returned_null;
+    return plan;
+}
+
+PhysicsStatTaskConstructorPlan plan_physics_stat_task_constructor(
+    const PhysicsStatTaskConstructorObservation& observation)
+{
+    PhysicsStatTaskConstructorPlan plan{};
+    plan.record_copy_writes.reserve(
+        observation.record_words_0x08_to_0x34.size());
+    for (std::size_t index = 0U;
+         index < observation.record_words_0x08_to_0x34.size(); ++index) {
+        plan.record_copy_writes.push_back({
+            0x38U + static_cast<std::uint32_t>(index * sizeof(std::uint32_t)),
+            observation.record_words_0x08_to_0x34[index]});
+    }
+
+    if (observation.collision_volume_flag_0x38 != 0U) {
+        plan.status = PhysicsStatTaskConstructorStatus::
+            unsupported_collision_volume;
+        plan.collision_volume_reporter_called = true;
+        return plan;
+    }
+
+    plan.child_allocation_attempted = true;
+    plan.child_pointer_stored = true;
+    plan.child_count_incremented = true;
+    plan.child_count_after = 1U;
+    if (!observation.child_allocation_succeeded) {
+        plan.status = PhysicsStatTaskConstructorStatus::child_allocation_failed;
+        plan.child_address = 0U;
+        return plan;
+    }
+
+    plan.status = PhysicsStatTaskConstructorStatus::child_constructed;
+    plan.child_box_constructor_0x42d460_called = true;
+    plan.child_address = observation.child_address;
+    plan.child_center = observation.child_center_0x3c_to_0x44;
+    if (std::isfinite(plan.child_center[0]) &&
+        std::isfinite(plan.child_center[1]) &&
+        std::isfinite(plan.child_center[2])) {
+        plan.child_bound_0x28 = std::max({plan.child_center[0],
+                                          plan.child_center[1],
+                                          plan.child_center[2]});
+    }
     return plan;
 }
 
