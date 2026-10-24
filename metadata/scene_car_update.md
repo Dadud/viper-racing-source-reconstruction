@@ -574,8 +574,7 @@ and records the `0x4525E0` no-op. When `0x4D9FDC` is nonzero, the alternate
 path queues each descriptor/node pair through `0x450EE0`; its native do-while
 behavior visits one row even when the signed descriptor count is nonpositive.
 The plan bounds both spans and reports missing or null binding nodes. The
-alternate queue allocator/pointer identities and the indirect backend function
-pointer targets remain explicit boundaries. Evidence: traversal
+indirect backend function pointer targets remain explicit boundaries. Evidence: traversal
 `0x44FC80` `ev_c9d9f0ad32331cd592c97d4535f98d7555b0d045309af35d166a1caf4000be2d`,
 alternate queue helper `0x450EE0`
 `ev_e2244cc17b523c18715e0ff1b1a7cad2833103234314c83d572faa804719929a`,
@@ -590,6 +589,31 @@ no-op `0x4525E0`
 `ev_1aac625083cf8a52da61e2cff422fd36705de1a4cdbe44fa12a5e523d091d79d`,
 and state synchronizer `0x457AF0`
 `ev_d30c81d210844af974abb11e55058426b5933463dc63b28adddde76086fb6e3e`.
+
+`plan_scene_renderer_deferred_enqueue` now projects the allocation and linked
+queue-head mutation performed by `0x450EE0`. Its node DWORDs are, in order, the
+binding-node pointer, descriptor-row pointer, descriptor-block pointer, and
+the prior queue head. The binding node's signed `+0x14` handle selects slot
+`handle + 1` in the table at `0x509C98`; `-1..117` maps to the 119 buckets
+drained by `0x450DA0`/`0x450E50`. The manager constructor initializes a fixed
+1,024-entry pool of 16-byte nodes. The allocator pops the free-list head,
+updates the free-list pointer and `+0x1C` outstanding count, then the enqueue
+prepends the node to the selected head. Exhaustion takes the observed
+`0x411000` panic helper when pool flag `+0x04` is set; its error path reaches
+`0x416020`'s null write. With that flag clear the allocator returns null and
+the enqueue's following stores would dereference null. Pool and queue pointers
+remain bounded observations, and invalid handles are reported instead of
+emulating the native out-of-bounds access. Evidence:
+`0x450EE0` `ev_33af3006e0733d11e2a141a3b2e3fade4031b14e8e3764db6f4f13de46cc85fe`,
+allocator `0x419830` `ev_0dc5d78cd998d9b70f89abfbb69efbb990b83a70dfc53827510fe782daaa6add`,
+pool constructor `0x419740` `ev_129fb568bde1f62e3a98b568d1e3536be2fb942c7c932b23134d1c335b16defe`,
+free-list initialization `0x4197A0` `ev_7796599588b9c9f838f259c020df81e46958109390211f8b565120fe84ed5914`,
+pool return `0x419870` `ev_1b5f360f31d2e576841b3878ab44ca1eb7c8549803ddea1ab94b423cb23c0e67`,
+queue setup `0x450D10` `ev_14fbfd92846033b6008b4849c6f88034e3ff6ff656eeffb072d3d0c3dcaa560f`,
+panic wrapper `0x411000` `ev_33e3e536e1f2727e9ac6c24e63969e9720ddc0d6590e3ad31c2ce3978cc79c58`,
+and panic termination helper `0x416020` `ev_3f91ad4ab1c6dfdb5430f89d2815a39a7229215eb91d3acba447dc346ad54faf`.
+The queue drain at `0x450DA0` and unconditional remainder drain at `0x450E50`
+are traced but still need a bounded linked-node rendering/recycling projection.
 
 ### Scene-car virtual `+0x18` callout
 

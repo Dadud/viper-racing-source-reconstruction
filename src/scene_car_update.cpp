@@ -836,6 +836,58 @@ SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
     return result;
 }
 
+SceneRendererDeferredEnqueuePlan plan_scene_renderer_deferred_enqueue(
+    const SceneRendererDeferredEnqueueInput& input) noexcept
+{
+    SceneRendererDeferredEnqueuePlan result{};
+    result.allocation_call_reached = true;
+    if (!input.allocator_present) {
+        result.status = SceneRendererDeferredEnqueueStatus::allocator_missing;
+        result.null_allocator_would_be_dereferenced = true;
+        return result;
+    }
+    if (!input.free_list_head_address.has_value()) {
+        result.status = SceneRendererDeferredEnqueueStatus::free_list_link_unobserved;
+        return result;
+    }
+    const auto free_head = *input.free_list_head_address;
+    if (free_head == 0U) {
+        result.panic_helper_0x411000_called = input.panic_on_pool_exhaustion;
+        result.panic_fatal_null_write_0x416020_reached = input.panic_on_pool_exhaustion;
+        result.null_node_would_be_dereferenced = !input.panic_on_pool_exhaustion;
+        result.status = input.panic_on_pool_exhaustion
+            ? SceneRendererDeferredEnqueueStatus::exhausted_panic_path
+            : SceneRendererDeferredEnqueueStatus::exhausted_null_dereference;
+        return result;
+    }
+    result.allocated_node_address = free_head;
+    result.active_pool_allocations_after = input.active_pool_allocations == INT32_MAX
+        ? INT32_MIN : input.active_pool_allocations + 1;
+    result.node_fields[0] = input.binding_node_address;
+    result.node_fields[1] = input.descriptor_row_address;
+    result.node_fields[2] = input.descriptor_block_address;
+    result.free_list_head_after = input.free_list_head_next_address;
+    if (!input.free_list_head_next_address.has_value()) {
+        result.status = SceneRendererDeferredEnqueueStatus::free_list_link_unobserved;
+    }
+
+    if (input.texture_handle < -1 || input.texture_handle >= 0x77) {
+        result.status = SceneRendererDeferredEnqueueStatus::invalid_queue_slot;
+        return result;
+    }
+    result.queue_slot = static_cast<std::uint32_t>(input.texture_handle + 1);
+    if (!input.queue_head_address.has_value()) {
+        if (result.status == SceneRendererDeferredEnqueueStatus::enqueued) {
+            result.status = SceneRendererDeferredEnqueueStatus::queue_head_unobserved;
+        }
+        return result;
+    }
+    result.queue_head_before = *input.queue_head_address;
+    result.node_fields[3] = *input.queue_head_address;
+    result.queue_head_after = free_head;
+    return result;
+}
+
 SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
     const SceneCarEffectParticleGeneratorInput& input) noexcept
 {

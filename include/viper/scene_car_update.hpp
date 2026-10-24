@@ -557,6 +557,51 @@ struct SceneRendererModelDrawPlan {
 [[nodiscard]] SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
     const SceneRendererModelDrawInput& input);
 
+enum class SceneRendererDeferredEnqueueStatus : std::uint8_t {
+    enqueued,
+    allocator_missing,
+    exhausted_panic_path,
+    exhausted_null_dereference,
+    invalid_queue_slot,
+    free_list_link_unobserved,
+    queue_head_unobserved,
+};
+
+struct SceneRendererDeferredEnqueueInput {
+    std::uint32_t descriptor_block_address{}; // FUN_00450EE0 param_1
+    std::uint32_t descriptor_row_address{}; // FUN_00450EE0 param_2
+    std::uint32_t binding_node_address{}; // FUN_00450EE0 param_3
+    std::int32_t texture_handle{}; // binding node +0x14; queue slot is handle + 1
+    bool allocator_present{true}; // DAT_00509ED8
+    std::optional<std::uint32_t> free_list_head_address; // pool +0x10
+    std::optional<std::uint32_t> free_list_head_next_address; // DWORD at the free-list head
+    bool panic_on_pool_exhaustion{true}; // pool +0x04
+    std::optional<std::uint32_t> queue_head_address; // (&DAT_00509C98)[texture_handle + 1]
+    std::int32_t active_pool_allocations{}; // pool +0x1C
+};
+
+struct SceneRendererDeferredEnqueuePlan {
+    SceneRendererDeferredEnqueueStatus status{SceneRendererDeferredEnqueueStatus::enqueued};
+    std::uint32_t queue_slot{};
+    bool allocation_call_reached{};
+    bool null_allocator_would_be_dereferenced{};
+    bool panic_helper_0x411000_called{};
+    bool panic_fatal_null_write_0x416020_reached{};
+    bool null_node_would_be_dereferenced{};
+    std::optional<std::uint32_t> allocated_node_address;
+    std::optional<std::uint32_t> free_list_head_after;
+    std::optional<std::uint32_t> queue_head_before;
+    std::optional<std::uint32_t> queue_head_after;
+    std::optional<std::int32_t> active_pool_allocations_after;
+    // Native node DWORDs at +0x00/+0x04/+0x08/+0x0C.
+    std::array<std::uint32_t, 4> node_fields{};
+};
+
+// Projects the allocator pop and four node stores in 0x450EE0. The pool's
+// free-list link and selected queue head are explicit memory observations.
+[[nodiscard]] SceneRendererDeferredEnqueuePlan plan_scene_renderer_deferred_enqueue(
+    const SceneRendererDeferredEnqueueInput& input) noexcept;
+
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,
     generated,

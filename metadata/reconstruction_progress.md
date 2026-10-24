@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added a bounded `0x450EE0` deferred-render
+  enqueue projection. It models the fixed 1,024-node/16-byte pool pop, the
+  active-allocation counter, all four queue-node DWORDs, the `handle + 1`
+  bucket selection, and prepend semantics. Pool exhaustion, a missing pool
+  manager, unobserved free-list links/heads, and native-invalid handle slots
+  are explicit outcomes. The 119-bucket drain and actual indirect device
+  targets remain open. Release `viper_race_scene_flow` builds through the
+  configured Visual Studio 18 MSBuild project; `git diff --check` passes. No
+  tests were run. Evidence: `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** Resolved the wheel-manager gates in the
   renderer's actual frame context. `0x460210` sets `0x4DCAE4` to 1 before the
   object walk, and the optional camera update has no reference to that global;
