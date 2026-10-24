@@ -678,3 +678,11 @@ the final response accumulation. It reuses the reconstructed directional
 candidate state; remaining per-car fields and the two float-pointer values
 are supplied observations. Evidence: `0x42B570`
 `ev_7c889b8b95e832018a5ac6d0c64f371d6077e6ee8129fd9de744f350ff258e0c`.
+
+`compose_acar_behavior_control_chain` now carries the two stack outputs
+through `0x42A6D0`, `0x42B570`, and `0x42B450` in callback order, applies the
+observed `+0x1018` comparison, and records the six subsequent helper calls
+through `0x4331C0`. The `0x42B7B0` vector/angle loop that seeds local output 0,
+the `+0x2C` argument, and the called tail helpers' effects remain explicit
+follow-up work; incomplete `0x42A6D0` inputs stop the composition before
+dependent calls.

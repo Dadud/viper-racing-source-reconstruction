@@ -715,6 +715,66 @@ AcarControlResponsePlan plan_acar_control_response(
     return plan;
 }
 
+AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
+    const AcarDriverAiState& driver_state,
+    const AcarBehaviorControlChainObservation& observation)
+{
+    AcarBehaviorControlChainPlan plan{};
+    plan.local_output_0 = observation.initial_local_output_0;
+    plan.local_output_1 = observation.initial_local_output_1;
+
+    plan.helper_0x42a6d0_called = true;
+    plan.route_steering_plan = plan_acar_route_steering(
+        observation.route_steering);
+    if (plan.route_steering_plan->output_0.has_value()) {
+        plan.local_output_0 = *plan.route_steering_plan->output_0;
+    }
+    if (plan.route_steering_plan->output_1.has_value()) {
+        plan.local_output_1 = *plan.route_steering_plan->output_1;
+    }
+    if (plan.route_steering_plan->input_incomplete &&
+        !plan.route_steering_plan->output_written) {
+        plan.input_incomplete = true;
+        return plan;
+    }
+
+    auto response_observation = observation.control_response;
+    response_observation.steering_output_0 = plan.local_output_1;
+    response_observation.accumulator_input_1 = plan.local_output_0;
+    plan.helper_0x42b570_called = true;
+    plan.control_response_plan = plan_acar_control_response(
+        driver_state, response_observation);
+    if (plan.control_response_plan->steering_output_0.has_value()) {
+        plan.local_output_1 =
+            *plan.control_response_plan->steering_output_0;
+    }
+    plan.local_output_0 =
+        plan.control_response_plan->accumulator_output_1;
+
+    auto forward_observation = observation.forward_steering;
+    forward_observation.incoming_output_0 = plan.local_output_1;
+    plan.helper_0x42b450_called = true;
+    plan.forward_steering_plan = plan_acar_forward_candidate_steering(
+        forward_observation);
+    if (plan.forward_steering_plan->output_0.has_value()) {
+        plan.local_output_1 = *plan.forward_steering_plan->output_0;
+    }
+
+    if (!(plan.local_output_1 >= observation.clamp_value_0x1018)) {
+        plan.local_output_1 = observation.clamp_value_0x1018;
+    }
+    plan.tail_call_order = {
+        AcarBehaviorControlTailCall::helper_0x428cd0,
+        AcarBehaviorControlTailCall::helper_0x428b40,
+        AcarBehaviorControlTailCall::helper_0x428e20,
+        AcarBehaviorControlTailCall::helper_0x433230,
+        AcarBehaviorControlTailCall::helper_0x4331d0,
+        AcarBehaviorControlTailCall::helper_0x4331c0,
+    };
+    plan.tail_reached = true;
+    return plan;
+}
+
 AcarComposedDriverCallbackPlan evaluate_acar_driver_callback_with_fallback(
     AcarDriverAiState& driver_state,
     AcarFallbackState& fallback_state,

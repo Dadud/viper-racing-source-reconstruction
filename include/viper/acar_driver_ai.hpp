@@ -272,6 +272,46 @@ struct AcarControlResponsePlan {
     const AcarDriverAiState& driver_state,
     const AcarControlResponseObservation& observation) noexcept;
 
+enum class AcarBehaviorControlTailCall : std::uint8_t {
+    helper_0x428cd0,
+    helper_0x428b40,
+    helper_0x428e20,
+    helper_0x433230,
+    helper_0x4331d0,
+    helper_0x4331c0,
+};
+
+struct AcarBehaviorControlChainObservation {
+    AcarRouteSteeringObservation route_steering{};
+    AcarControlResponseObservation control_response{};
+    AcarForwardCandidateSteeringObservation forward_steering{};
+    float initial_local_output_0{};
+    float initial_local_output_1{};
+    float clamp_value_0x1018{};
+    float final_argument_0x2c{};
+    float pass_through_argument_0x28{1.0F};
+};
+
+struct AcarBehaviorControlChainPlan {
+    std::optional<AcarRouteSteeringPlan> route_steering_plan;
+    std::optional<AcarControlResponsePlan> control_response_plan;
+    std::optional<AcarForwardCandidateSteeringPlan> forward_steering_plan;
+    std::vector<AcarBehaviorControlTailCall> tail_call_order;
+    float local_output_0{};
+    float local_output_1{};
+    bool helper_0x42a6d0_called{};
+    bool helper_0x42b570_called{};
+    bool helper_0x42b450_called{};
+    bool input_incomplete{};
+    bool tail_reached{};
+};
+
+// Composes the recoverable helper chain in callback fragment 0x42B7B0.
+// Geometry-loop seeds and the stack local at +0x2C remain explicit inputs.
+[[nodiscard]] AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
+    const AcarDriverAiState& driver_state,
+    const AcarBehaviorControlChainObservation& observation);
+
 struct AcarComposedDriverCallbackPlan {
     AcarDriverAiPlan route_candidate_plan{};
     bool fallback_helper_0x42b040_called{};
