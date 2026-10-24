@@ -448,11 +448,13 @@ struct PhysicsTaskRecordLoadPlan {
     bool post_construct_0x426f20_called{};
     bool output_slot_written{};
     bool returns_success{};
+    // Failed bounded reads set the stream error flag, but 0x4224D0 continues.
+    bool stream_error_flag_set{};
+    bool factory_call_attempted_after_read_error{};
+    bool factory_input_indeterminate{};
     // 0x426F20 writes the old cursor to object +0x34 before advancing it.
     std::optional<std::uint32_t> object_task_data_offset_0x34;
     std::optional<std::uint32_t> task_data_cursor_after;
-    // If set, 0x4C5EA0 would copy bytes outside the captured record span.
-    bool binary_read_exceeds_payload{};
 };
 
 struct PhysicsTaskArrayPopulationPlan {

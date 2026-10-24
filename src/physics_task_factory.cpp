@@ -777,7 +777,11 @@ PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     plan.payload_read = true;
     if (!observation.payload_complete) {
         plan.status = PhysicsTaskRecordLoadStatus::incomplete_payload;
-        plan.binary_read_exceeds_payload = true;
+        plan.stream_error_flag_set = true;
+        // 0x4C5EA0 rejects the incomplete span and sets the stream error byte,
+        // but 0x4224D0 never checks it before attempting factory dispatch.
+        plan.factory_call_attempted_after_read_error = true;
+        plan.factory_input_indeterminate = true;
         return plan;
     }
 

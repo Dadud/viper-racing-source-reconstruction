@@ -341,20 +341,29 @@ and `ev_12db4dd6bde982a7d974bfdd91c5d9b73733a59871cfc4f9eaeabf27ec84bfbd`.
 
 `plan_physics_task_record_load` models one iteration of `0x4224D0`. A negative
 record length ends the array without reading payload bytes. For a nonnegative
-length, the source projection requires a complete captured header and declared
-payload; an incomplete span is reported as `incomplete_payload` and records
-that the binary's unchecked copy would exceed the available span. On complete
-input it delegates FourCC allocation/construction to the factory model. It then
-records the binary's unconditional virtual `+0x2C` call—even if allocation or
-a constructor returned null—without executing an unsafe dereference. A true
-virtual result triggers `0x426F20`; a non-null object is then stored and the
-reader reports success. An unknown FourCC returns from the factory only if the
-panic reporter returns; otherwise the reader never reaches the virtual call.
+record length, the stream helpers bounds-check the 8-byte record header and the
+declared data copy. A failed bounded read sets the stream error byte and leaves
+the cursor unchanged; it does not copy beyond the captured span. However,
+`0x4224D0` does not inspect the error byte and continues toward factory dispatch
+with potentially uninitialized stack input. The portable projection reports
+`incomplete_payload`, the error flag, and that indeterminate factory attempt,
+then stops before simulating its consequences. On complete input it delegates
+FourCC allocation/construction to the factory model. It then records the
+binary's unconditional virtual `+0x2C` call—even if allocation or a constructor
+returned null—without executing an unsafe dereference. A true virtual result
+triggers `0x426F20`; a non-null object is then stored and the reader reports
+success. An unknown FourCC returns from the factory only if the panic reporter
+returns; otherwise the reader never reaches the virtual call.
 When `0x426F20` runs, it first copies the current task-data cursor into the
 object's `+0x34`, calls its virtual `+0x18`, then advances the global cursor by
 that callback's returned byte count. The projection accepts the old cursor and
 callback size as optional runtime observations; it can report the object offset
 even when the returned size is unavailable. Evidence: `0x4224D0`,
-`ev_3daf18319a2e5bb333165deb4e9ee8040b81efdb7404bcbb769d852d8969eb61`, and
-`0x426F20`, `ev_01f6bab75271ba29cbd44ddd6feb3a0213b51640ad44436defd19214f505b5cd`.
+`ev_3daf18319a2e5bb333165deb4e9ee8040b81efdb7404bcbb769d852d8969eb61`;
+bounded read helpers `0x4C5E10`,
+`ev_3dd8fd5732e7cf0d9fc5f647fe988c0844ab55644e80d3444d55bbc33bfa13bb`, and
+`0x4C5EA0`,
+`ev_2b7eb80d4db3779c05923323444c42dc9163c3d697bc87c890779316eb4c25fb`;
+and `0x426F20`,
+`ev_01f6bab75271ba29cbd44ddd6feb3a0213b51640ad44436defd19214f505b5cd`.
 
