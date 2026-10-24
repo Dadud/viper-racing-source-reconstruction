@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24:** Connected `raster_scene_dashboard_core_callback` to
+  `plan_race_loop_shared_overlay`. The compositor can now derive per-call
+  renderer mode and framebuffer geometry from successful context acquisition,
+  or use the state-0 render context when that branch is active; formatted text,
+  font data, and raster contexts remain caller observations. Release build and
+  `git diff --check` passed; no tests were run.
+
 - **2026-10-24:** Added `raster_scene_dashboard_core_callback`, which composes
   the state-0 dashboard callback's ordered text calls through existing font
   layout and atlas rasterization. One formatted argument and renderer context

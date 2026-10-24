@@ -114,6 +114,52 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             plan.dashboard_core_callback.position.redraw_all;
         plan.dashboard_auxiliary_readout = scene_dashboard_auxiliary_readout_plan(
             auxiliary_observation);
+
+        if (observation.state0_dashboard_raster.has_value()) {
+            auto raster_observation = *observation.state0_dashboard_raster;
+            std::vector<SceneDashboardRasterObservation> raster_contexts(
+                raster_observation.callback_text.per_call_renderers.begin(),
+                raster_observation.callback_text.per_call_renderers.end());
+            raster_observation.callback_text.per_call_renderers =
+                raster_contexts;
+            const auto apply_render_context =
+                [&](const RenderContextViewport& context,
+                    const std::uint32_t framebuffer_base) {
+                    for (auto& renderer : raster_contexts) {
+                        renderer.renderer_mode = static_cast<std::uint8_t>(
+                            observation.state0_dashboard_render
+                                .renderer_mode_0x4d7a48);
+                        renderer.clip_left = context.viewport_left_0x14;
+                        renderer.clip_top = context.viewport_top_0x18;
+                        renderer.clip_right = context.viewport_right_0x1c;
+                        renderer.clip_bottom = context.viewport_bottom_0x20;
+                        renderer.framebuffer_pitch_bytes =
+                            context.row_pitch_0x10;
+                        renderer.framebuffer_base = framebuffer_base;
+                    }
+                };
+            if (plan.render_context_acquisition.has_value() &&
+                plan.render_context_acquisition->disposition ==
+                    RenderContextAcquisitionDisposition::acquired) {
+                const auto& context =
+                    plan.render_context_acquisition->context;
+                apply_render_context(
+                    context.viewport,
+                    static_cast<std::uint32_t>(context.surface_bits_0x04));
+            } else if (plan.optional_dashboard_branch_enabled) {
+                apply_render_context(
+                    observation.state0_dashboard_render.render_context,
+                    observation.state0_dashboard_render.framebuffer_base_value);
+            }
+            raster_observation.callback_text.per_call_renderers =
+                raster_contexts;
+            plan.state0_dashboard_text_raster =
+                raster_scene_dashboard_core_callback(
+                    plan.dashboard_core_callback,
+                    raster_observation.callback_text,
+                    raster_observation.layout_font,
+                    raster_observation.atlas_font);
+        }
     }
     if (plan.dashboard_callback_geometry_reached) {
         plan.dashboard_callback_geometry = scene_dashboard_callback_geometry_plan(

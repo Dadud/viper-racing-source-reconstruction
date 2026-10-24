@@ -741,6 +741,14 @@ the standalone render plan likewise derives full redraw from the mask instead of
 accepting a separate boolean. This prevents the geometry, bitmap calls, and
 full-surface fill from using stale or contradictory redraw inputs. Instruction
 evidence is retained in `dashboard_render_dirty_mask.evidence.json`.
+When `RaceLoopSharedOverlayObservation::state0_dashboard_raster` is supplied,
+the shared race-loop plan also feeds the core callback's ordered text list
+through the layout/atlas pixel-write composer. A successful context acquisition
+overrides the per-call mode, clipping, pitch, and framebuffer base; otherwise
+the composed state-0 render context is used when that branch is active. Formatted
+arguments, font tables/palettes, and each call's raster context remain explicit
+observations, and the output reports projected writes without claiming device
+submission.
 `scene_dashboard_viewport_plan` emits just the resulting `0x4498A0` calls,
 preserving row addresses and required bits. `scene_dashboard_render_plan`
 composes the observed order around them: on a full redraw with nonzero
