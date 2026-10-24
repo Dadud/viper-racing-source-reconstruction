@@ -385,9 +385,12 @@ position triplets, use UV pairs `(0,0),(1,0),(0,1),(1,1)`, and set vertex words
 at offsets `+0x10` and `+0x14` to `0xFFFFFFFF`. The word at vertex `+0x0C` is
 not written in this block and remains a raw input observation. The index list
 is `{0,1,2,1,3,2}`. `0x448ED0` forwards the vertices, vertex count 4, indices,
-and index count 6 to the device wrapper; `0x452700` calls the device vtable
-slot `+0x78` with primitive type 4, vertex type 2, and flags 8. The portable
-frame plan preserves those raw arguments and order without submitting graphics.
+and index count 6 to `0x452700`; the device wrapper calls vtable slot `+0x78`
+with primitive type 4, vertex type 2, and flags 8. Each portable draw operation
+now records both wrapper addresses, the device vtable offset, all fixed draw
+arguments, and that the native call's return is ignored. It preserves the raw
+vertex/index data and call order; actual device execution and rasterization
+remain external.
 Wrapper evidence is `ev_fd752a426d357596f80fec5d14eecf72530238d9cc9ba11a13bc177b359cdd0d`
 and `ev_3bc4747a9027358eddde04b53dcc349045ec7c294a3eb68c08995f1f37fa069f`.
 The two wrapper dossiers are preserved in `metadata/scene_resource_draw.evidence.json`.

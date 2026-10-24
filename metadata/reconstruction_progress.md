@@ -9,6 +9,8 @@
   Expanded `0x4487A0` through its `+0x44` viewport call and `+0x30` buffer
   clearing, including the 0x2C viewport record, rect edges, raw flags, and error
   messages. Adjusted-FDIV ratio output remains an explicit observation.
+  Connected each wheel-manager indexed-draw record to `0x448ED0` → `0x452700`,
+  preserving the device vtable `+0x78` contract and ignored native return.
   Missing object observations and null pointers stop or bound the projection;
   other graphics API effects and virtual return bytes remain external. Evidence
   is retained in `scene_renderer_dispatch.evidence.json`.

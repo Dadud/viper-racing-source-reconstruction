@@ -340,8 +340,9 @@ files were present.
   transform, graphics-state setup/restore sequence, and bounded virtual-method
   dispatch over registered scene objects. Its 4x4 view-matrix installer,
   transform-cache invalidation, viewport record, buffer-clear calls, and
-  device HRESULT logging are projected; other graphics operations and
-  per-object virtual return values remain observations.
+  device HRESULT logging are projected. Wheel-manager draws preserve their
+  `0x448ED0` → `0x452700` forwarding and device vtable `+0x78` contract; actual
+  graphics execution and per-object virtual return values remain observations.
 - `include/viper/world_track_objects.hpp` and
   `src/world_track_objects.cpp` model the BATS `track.obt` table, its
   checkpoint-derived track basis/translation setup, circular spline-segment

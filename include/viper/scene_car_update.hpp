@@ -724,6 +724,12 @@ struct SceneWheelResourceFrameOperation {
     std::uint32_t vertex_count{};
     std::uint32_t index_count{};
     std::uint32_t flags{};
+    // The callback forwards through 0x448ED0 to 0x452700, whose device
+    // dispatch uses vtable offset +0x78 and ignores the native return value.
+    std::uint32_t forwarding_wrapper{};
+    std::uint32_t device_wrapper{};
+    std::uint32_t device_vtable_offset{};
+    bool device_return_ignored{};
 };
 
 struct SceneWheelResourceFramePlan {

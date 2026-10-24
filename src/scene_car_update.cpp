@@ -1066,6 +1066,10 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
         operation.vertex_count = 4;
         operation.index_count = 6;
         operation.flags = 8;
+        operation.forwarding_wrapper = 0x00448ED0U;
+        operation.device_wrapper = 0x00452700U;
+        operation.device_vtable_offset = 0x78U;
+        operation.device_return_ignored = true;
         for (std::size_t vertex = 0; vertex < 4; ++vertex) {
             for (std::size_t axis = 0; axis < 3; ++axis) {
                 operation.vertex_words[vertex][axis] =
