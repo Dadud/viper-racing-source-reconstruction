@@ -393,12 +393,35 @@ struct NcarIntegratorSignalResult {
     float paired_setter_opposite{};
 };
 
+struct NcarIntegratorWheelCallbackSetupInput {
+    // Constructor source-record fields read by 0x433C00 at +0x58, +0x5C,
+    // and +0x4B0 respectively.
+    float source_width_0x58{};
+    float source_ratio_0x5c{};
+    float source_steering_angle_0x4b0{};
+};
+
+struct NcarIntegratorWheelCallbackSetup {
+    float value_0xd84{};
+    float value_0xd90{};
+    float angle_0xdcc{};
+};
+
+// Reconstructs constructor stores in 0x433C00 from its source setup record.
+[[nodiscard]] NcarIntegratorWheelCallbackSetup
+initialize_ncar_integrator_wheel_callback_setup(
+    const NcarIntegratorWheelCallbackSetupInput& input) noexcept;
+
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};
     float angle_0xdcc{};
     float angle_scale_0x500{};
     float value_0xd84{};
     float value_0xd90{};
+    // When enabled, constructor-derived values replace the three explicit
+    // object fields above; +0x500 remains supplied by interpolated state.
+    bool derive_constructor_setup{};
+    NcarIntegratorWheelCallbackSetupInput constructor_setup{};
     std::uint32_t value_bits_0x244{};
     PhysicsVector3 body_velocity_0x234{};
     float value_0xde4{};

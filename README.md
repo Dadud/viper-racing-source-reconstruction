@@ -408,7 +408,9 @@ files were present.
   recovered tangent-scaled, per-lane max updates and conditional sign reversal
   before the strided wheel `+0xE0` writes, which feed their absolute values into
   the modeled wheel spin response stage. The tangent/x87 path remains
-  approximate.
+  approximate. Constructor-derived callback inputs can be enabled to compute
+  `+0xD84`, `+0xD90`, and `+0xDCC` from the vehicle setup record; `+0x500`
+  remains sourced from interpolated object state.
   Exact x87 rounding and the Pentium FDIV-emulation
   branch remain under study.
 - `include/viper/timed_event_queue.hpp` and `src/timed_event_queue.cpp` model

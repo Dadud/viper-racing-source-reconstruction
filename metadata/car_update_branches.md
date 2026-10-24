@@ -129,6 +129,21 @@ feeds each wheel value into the existing spin-response stage, which consumes
 its absolute value. Exact x87 tangent/division rounding and the optional
 Pentium math-wrapper path remain approximate.
 
+The callback's geometric inputs can now be initialized from the source vehicle
+setup record using the constructor stores in `0x433C00`: `width = source[0x58]
+* 0.0254`, `ratio = source[0x5C] * 0.01`, `+0xD84 = (1 - ratio) * width`,
+`+0xD90 = -(ratio * width)`, and `+0xDCC = source[0x4B0] * 0.0174`. Set
+`derive_constructor_setup` to use these formulas in the wheel callback model;
+otherwise it uses the explicit object-field observations. The `+0x500` angle
+scale remains an input from the interpolated object state, where the existing
+`0x432420` model derives it from the sampled record. The constructor dossier's
+value-flow is truncated after an omitted operation, so this records the
+observed field stores without claiming a complete vehicle-constructor model.
+Evidence is retained at
+[`ncar_wheel_callback_setup.evidence.json`](ncar_wheel_callback_setup.evidence.json)
+(`ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`,
+`0x433C00`).
+
 Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x431150`), `ev_561bda702abc7970b5b820be76dc22cedb78968c7da2d82ede95809777fcf6c1`
 (`0x43F830`), `ev_e1224f8c92d66a13ee1793d2d6ed81095204c66493ad2a6b1423e4e65cc60352`

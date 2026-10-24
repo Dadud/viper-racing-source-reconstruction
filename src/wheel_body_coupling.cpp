@@ -207,10 +207,27 @@ NcarIntegratorSignalResult advance_ncar_integrator_signal(
     return result;
 }
 
+NcarIntegratorWheelCallbackSetup
+initialize_ncar_integrator_wheel_callback_setup(
+    const NcarIntegratorWheelCallbackSetupInput& input) noexcept
+{
+    const float width = input.source_width_0x58 * 0.0254F;
+    const float ratio = input.source_ratio_0x5c * 0.01F;
+    return {
+        (1.0F - ratio) * width,
+        -(ratio * width),
+        input.source_steering_angle_0x4b0 * 0.0174F};
+}
+
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept
 {
     NcarIntegratorWheelScalarResult result{};
+    const auto constructor_setup = input.derive_constructor_setup
+        ? initialize_ncar_integrator_wheel_callback_setup(
+              input.constructor_setup)
+        : NcarIntegratorWheelCallbackSetup{
+              input.value_0xd84, input.value_0xd90, input.angle_0xdcc};
     const auto maximum = input.value_0xde4 <=
             std::bit_cast<float>(input.value_bits_0xde8)
         ? std::bit_cast<float>(input.value_bits_0xde8)
@@ -235,12 +252,13 @@ NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
         const auto speed = std::sqrt(speed_squared);
         result.speed_magnitude = static_cast<float>(speed);
         const auto tangent = std::tan(
-            static_cast<long double>(input.angle_0xdcc) *
+            static_cast<long double>(constructor_setup.angle_0xdcc) *
             static_cast<long double>(input.angle_scale_0x500));
         result.tangent_response = static_cast<float>(tangent);
         const auto target_wide =
-            ((static_cast<long double>(input.value_0xd84) -
-              static_cast<long double>(input.value_0xd90)) / tangent) * speed;
+            ((static_cast<long double>(constructor_setup.value_0xd84) -
+              static_cast<long double>(constructor_setup.value_0xd90)) /
+             tangent) * speed;
         result.target_response = static_cast<float>(target_wide);
 
         constexpr float target_cutoff = std::bit_cast<float>(0x3F638E39U);
