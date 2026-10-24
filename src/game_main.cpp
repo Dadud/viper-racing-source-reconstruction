@@ -11,6 +11,7 @@
 #include <array>
 #include <algorithm>
 #include <bit>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -681,6 +682,9 @@ struct WindowState {
     bool brake{};
     bool left{};
     bool right{};
+    // CONTROL order: steer_left, steer_right, throttle, braking.
+    std::array<UINT, 4> control_keys{
+        VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN};
     ULONGLONG last_tick{};
 
     bool place_on_route(const float x, const float z)
@@ -749,6 +753,57 @@ struct WindowState {
     }
 };
 
+std::optional<UINT> parse_keyboard_binding(const std::string_view binding)
+{
+    if (binding.empty()) return std::nullopt;
+    std::string key(binding);
+    if (key.starts_with("Key_")) key.erase(0, 4);
+    for (auto& character : key) {
+        character = static_cast<char>(std::toupper(
+            static_cast<unsigned char>(character)));
+    }
+    if (key == "LEFT") return VK_LEFT;
+    if (key == "RIGHT") return VK_RIGHT;
+    if (key == "UP") return VK_UP;
+    if (key == "DOWN") return VK_DOWN;
+    if (key == "SPACE") return VK_SPACE;
+    if (key == "RETURN" || key == "ENTER") return VK_RETURN;
+    if (key == "TAB") return VK_TAB;
+    if (key.size() == 1U &&
+        ((key[0] >= 'A' && key[0] <= 'Z') ||
+         (key[0] >= '0' && key[0] <= '9'))) {
+        return static_cast<UINT>(key[0]);
+    }
+    throw std::runtime_error("unsupported keyboard binding in options.def: " +
+        std::string(binding));
+}
+
+void load_keyboard_bindings(WindowState& state,
+                            const viper::GameOptions& options)
+{
+    constexpr std::array<std::string_view, 4> action_names{
+        "steer_left", "steer_right", "throttle", "braking"};
+    for (std::size_t index = 0; index < action_names.size(); ++index) {
+        const auto configured = options.get("CONTROL", action_names[index]);
+        if (configured) {
+            const auto key = parse_keyboard_binding(*configured);
+            state.control_keys[index] = key.value_or(
+                (std::numeric_limits<UINT>::max)());
+        }
+    }
+}
+
+void update_control_key(WindowState& state, const UINT key, const bool pressed)
+{
+    const auto matches = [&](const std::size_t index) {
+        return state.control_keys[index] == key;
+    };
+    if (matches(0U)) state.left = pressed;
+    if (matches(1U)) state.right = pressed;
+    if (matches(2U)) state.accelerate = pressed;
+    if (matches(3U)) state.brake = pressed;
+}
+
 LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
     auto* state = reinterpret_cast<WindowState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -766,18 +821,12 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
     case WM_KEYDOWN:
         if (wparam == VK_ESCAPE) { DestroyWindow(hwnd); return 0; }
         if (state && (lparam & (1LL << 30)) == 0) {
-            if (wparam == VK_UP || wparam == 'W') state->accelerate = true;
-            if (wparam == VK_DOWN || wparam == 'S') state->brake = true;
-            if (wparam == VK_LEFT || wparam == 'A') state->left = true;
-            if (wparam == VK_RIGHT || wparam == 'D') state->right = true;
+            update_control_key(*state, static_cast<UINT>(wparam), true);
         }
         return 0;
     case WM_KEYUP:
         if (state) {
-            if (wparam == VK_UP || wparam == 'W') state->accelerate = false;
-            if (wparam == VK_DOWN || wparam == 'S') state->brake = false;
-            if (wparam == VK_LEFT || wparam == 'A') state->left = false;
-            if (wparam == VK_RIGHT || wparam == 'D') state->right = false;
+            update_control_key(*state, static_cast<UINT>(wparam), false);
         }
         break;
     case WM_CLOSE:
@@ -797,7 +846,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::TerrainSurfaceResourcePayload& terrain,
                const viper::IdealLineTrackData& ideal_line,
                const viper::ModelResource& player_model,
-               const viper::TrackObjectTextTable& track_objects)
+               const viper::TrackObjectTextTable& track_objects,
+               const viper::GameOptions& options)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -814,6 +864,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     state.terrain = &terrain;
     state.route = extract_ideal_line_points(ideal_line);
     state.player_car_index = player_car_index;
+    load_keyboard_bindings(state, options);
     const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
         " & " + std::string(car_name) + " Driving Prototype (WASD / Arrows)";
     const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
@@ -940,7 +991,8 @@ int wmain(int argc, wchar_t** argv)
         return run_window(options.software, options.smoke_frames,
             *entrants.player_record_index,
             assets.track_name(), assets.car_name(), assets.terrain(),
-            assets.ideal_line(), assets.player_model(), assets.track_objects());
+            assets.ideal_line(), assets.player_model(), assets.track_objects(),
+            assets.options());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;
