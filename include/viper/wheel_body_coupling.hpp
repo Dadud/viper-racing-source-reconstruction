@@ -716,6 +716,8 @@ struct FourWheelBodyStepResult {
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};
     NcarIntegratorVelocityForceResult velocity_forces{};
+    std::vector<NcarIntegratorVirtualRecordCallbackResult>
+        integrator_virtual_record_callbacks;
     std::array<float, 4> attached_object_targets_0x38{};
     std::array<NcarAttachedObjectForceResult, 4> attached_object_forces{};
     std::optional<VehicleAnimationFrameResult> periodic_animation;

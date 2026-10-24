@@ -51,10 +51,11 @@ callback gates are still open.
 The `0x418500` locale
 initializer is now modeled, including both selected 13-DWORD tables and the
 raw sources of the metric multipliers; the target formatter's null `%s`
-substitution is also recovered. State-4 paused-banner fallback boxes and
-`0x479580` text now have observation-driven pixel-write projections; continue
-with style/resource initialization, resource-icon rendering, and device
-submission. Centered `0x404920` resource draw, cheater, two raw-flag text
+substitution is also recovered. State-4 paused-banner style descriptor 14 and
+its zero flags, `0x24` y offset, and runtime x offset are now projected;
+resource-constructor results remain inputs. Fallback boxes and `0x479580` text
+have observation-driven pixel-write projections; continue with resource-icon
+rendering and device submission. Centered `0x404920` resource draw, cheater, two raw-flag text
 draws, results heading, and result-row selection/time-format/draw paths are
 modeled. State 5's text and rotation
 math are modeled at portable precision; continue with its renderer effects and

@@ -3170,6 +3170,39 @@ SceneState5OverlayPlan state5_numeric_overlay_plan(
     return result;
 }
 
+ScenePausedBannerStyle14Plan scene_paused_banner_style14_plan(
+    const ScenePausedBannerStyle14Observation& observation) noexcept
+{
+    ScenePausedBannerStyle14Plan result{};
+    result.descriptor_words = {{
+        observation.font_name_source_0x55fe48,
+        0U,
+        0x0aU,
+        0U,
+        0x004deb0cU,
+        0x24U,
+        static_cast<std::uint32_t>(observation.global_x_offset_0x560000),
+        static_cast<std::uint32_t>(observation.global_x_offset_0x560000),
+        observation.font_name_source_0x55fe48,
+        0U,
+        0U,
+        static_cast<std::uint32_t>(observation.global_x_offset_0x560000),
+        static_cast<std::uint32_t>(observation.global_x_offset_0x560000),
+    }};
+    result.text_style = {
+        0x00479580U,
+        0,
+        0,
+        0x004d9cd4U,
+        observation.resolved_color_source_0x44d530,
+        observation.resolved_font_source_0x44da00,
+        result.descriptor_words[1],
+    };
+    result.x_offset = observation.global_x_offset_0x560000;
+    result.y_offset = 0x24;
+    return result;
+}
+
 ScenePausedBannerTextRasterPlan raster_scene_paused_banner_text(
     const ScenePausedBannerRenderPlan& banner,
     const ScenePausedBannerTextRasterObservation& observation,
@@ -3187,6 +3220,20 @@ ScenePausedBannerTextRasterPlan raster_scene_paused_banner_text(
         !observation.text_pointer_nonnull) {
         return result;
     }
+
+    const auto projected_style = observation.style14.has_value()
+        ? std::optional<ScenePausedBannerStyle14Plan>{
+            scene_paused_banner_style14_plan(*observation.style14)}
+        : std::nullopt;
+    const auto& text_style = projected_style.has_value()
+        ? projected_style->text_style
+        : observation.style;
+    const auto style_x_offset = projected_style.has_value()
+        ? projected_style->x_offset
+        : observation.style_x_offset_0x20;
+    const auto style_y_offset = projected_style.has_value()
+        ? projected_style->y_offset
+        : observation.style_y_offset_0x1c;
 
     auto text_end = observation.text.find('\0');
     if (text_end == std::string_view::npos) {
@@ -3211,7 +3258,7 @@ ScenePausedBannerTextRasterPlan raster_scene_paused_banner_text(
             static_cast<std::uint32_t>(right));
     };
     auto first_line_y = text_operation->y;
-    const auto flags = observation.style.format_flags;
+    const auto flags = text_style.format_flags;
     if ((flags & 0x10U) != 0U || (flags & 0x40U) != 0U) {
         const auto line_count = std::bit_cast<std::int32_t>(
             static_cast<std::uint32_t>(result.expected_line_count));
@@ -3236,16 +3283,16 @@ ScenePausedBannerTextRasterPlan raster_scene_paused_banner_text(
             const SceneDashboardTextCall call{
                 0x00479580U,
                 add_i32(text_operation->x,
-                        observation.style_x_offset_0x20),
+                        style_x_offset),
                 add_i32(
                     add_i32(first_line_y, std::bit_cast<std::int32_t>(
                         static_cast<std::uint32_t>(line_index) *
                         static_cast<std::uint32_t>(
                             observation.font_extent_0x44dc50))),
-                    observation.style_y_offset_0x1c),
+                    style_y_offset),
                 0x004D9CD4U,
-                observation.style.color_source,
-                observation.style.font_source,
+                text_style.color_source,
+                text_style.font_source,
                 flags,
             };
             const auto layout = layout_scene_dashboard_text(

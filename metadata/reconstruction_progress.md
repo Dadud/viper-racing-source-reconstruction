@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Recovered state-4 paused-banner style descriptor
+  14 at `0x4DE7A8` from `0x4714E0`, and the descriptor-to-runtime-row copies in
+  `0x478EE0`. Added a style projection that fixes its zero flags and `0x24`
+  vertical offset while retaining the runtime horizontal offset and resource
+  constructor results as inputs; the raster path can now consume it directly.
+  Release build and `git diff --check` pass; no tests were run. Evidence:
+  `ev_c31bccf8cd1585f16412312883af4a935afd06efb76b2e2dce000f0c50a13fa3` and
+  `ev_c0e9ebbece1ee5ea54ee6633c9354485b103ea13ea9c230158836bddca2009e6`.
+
 - **2026-10-24:** Added state-4 paused-banner text rasterization for the
   `0x479580` helper, including line splitting, style offsets, font-height
   spacing/alignment, and ordered `0x44DC70` atlas pixel writes. The race-loop

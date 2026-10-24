@@ -218,9 +218,9 @@ files were present.
   `include/viper/scene_font_8x8.hpp` and can be regenerated with
   `tools/extract_scene_font.py`. Shared state-4
   overlay gates, cheater-banner placement, paused-banner resource refresh and
-  centered/fallback layout, and line-by-line paused-banner text raster
-  projection from supplied style, localized text, font/atlas, and renderer
-  observations,
+  centered/fallback layout, a recovered style-14 descriptor and line-by-line
+  paused-banner text raster projection from supplied resource results, localized
+  text, font/atlas, and renderer observations,
   two raw-flag text setup sequences, the results heading/prompt setup, and
   results record selection, conditional formatted time values, and per-row text
   calls are modeled in `scene_overlay.cpp` with all row and heading positions

@@ -450,21 +450,31 @@ center-plus-4 location through `0x479580` with size `0x0E`. A resolved resource
 is passed to `0x44D0C0` and released through `0x44D0A0`. The lookup result,
 measured dimensions, and box colors remain raw inputs; renderer effects remain
 outside the model.
-`raster_scene_paused_banner_text` now projects the text branch of `0x479580`
+`raster_scene_paused_banner_text` projects the text branch of `0x479580`
 through the existing `0x44DC70` layout and atlas rasterizer. It splits the
-observed text at newline bytes, applies the style row's `+0x20/+0x1C` offsets,
-uses the `0x44DC50` font extent for line spacing and vertical alignment, then
-emits ordered pixel writes for each line. The style-0x0E color/font/flags and
-offsets, localized text, font tables, atlas, and renderer/palette state remain
-observations. The race-loop composer uses the acquired context when available
-and otherwise retains explicit per-line renderer contexts. Resource-icon
-rendering, style-table initialization, surface ownership, and device submission
-remain open. Evidence: `0x479580`
+observed text at newline bytes, applies style offsets, uses the `0x44DC50` font
+extent for line spacing and vertical alignment, then emits ordered pixel writes
+for each line. Style descriptor 14 (`0x4DE7A8`), selected by size `0x0E`, is now
+projected by `scene_paused_banner_style14_plan`: `0x4714E0` writes its 13
+descriptor words from constants and globals, while `0x478EE0` copies the
+descriptor flags and x/y offsets into runtime style row `0x5604D8`. This fixes
+the flags at zero, y offset at `0x24`, and x offset at the runtime value from
+`0x560000`. The localized font/color resource-constructor results, text,
+font/atlas bytes, and renderer/palette state remain observations; pass the
+style-14 observation to the rasterizer to derive the fields recovered here.
+The race-loop composer uses the acquired context when available and otherwise
+retains explicit per-line renderer contexts. Resource-icon rendering, surface
+ownership, and device submission remain open. Evidence: `0x479580`
 (`ev_8ea0d058927243f23b31fa69d01a4bcf40c15e14d826b47e3affabc9e68dfe54`),
 `0x44DDF0` (`ev_cb05306e5d275df4cc6d96917141986b444a6bad6fee1922abc2d3b120591923`),
 and style-0x0E data bytes (`ev_9606ba33e38b3270a8a3e18af26cc2a1748024c266184e2e06dacaa0bb1cf801`).
-The complete 14-record Ghidra session bundle is retained in
-`metadata/state4_paused_banner_raster.evidence.json`.
+Descriptor initialization evidence is `0x4714E0`
+(`ev_c31bccf8cd1585f16412312883af4a935afd06efb76b2e2dce000f0c50a13fa3`)
+and `0x478EE0`
+(`ev_c0e9ebbece1ee5ea54ee6633c9354485b103ea13ea9c230158836bddca2009e6`).
+The 14-record raster bundle and 16-record style-initialization bundle are
+retained in `metadata/state4_paused_banner_raster.evidence.json` and
+`metadata/state4_style14_initialization.evidence.json`.
 
 `scene_shared_paused_banner_plan` composes the shared raw-global gate,
 resource-generation refresh decision, and inner paused-banner layout. The

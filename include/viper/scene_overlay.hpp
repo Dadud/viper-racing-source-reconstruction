@@ -1626,6 +1626,22 @@ struct SceneDashboardRasterObservation {
     std::vector<std::uint16_t> explicit_palette;
 };
 
+// Style index 0x0E is descriptor 14 in the runtime table built by 0x4714E0.
+// Resource constructors still supply the two resulting handles as inputs.
+struct ScenePausedBannerStyle14Observation {
+    std::uint32_t font_name_source_0x55fe48{};
+    std::uint32_t resolved_font_source_0x44da00{};
+    std::uint32_t resolved_color_source_0x44d530{};
+    std::int32_t global_x_offset_0x560000{};
+};
+
+struct ScenePausedBannerStyle14Plan {
+    std::array<std::uint32_t, 13> descriptor_words{};
+    SceneDashboardTextCall text_style{};
+    std::int32_t x_offset{};
+    std::int32_t y_offset{};
+};
+
 struct ScenePausedBannerTextRasterObservation {
     // The 0x479580 helper skips line draws when its text pointer is null.
     bool text_pointer_nonnull{true};
@@ -1637,6 +1653,7 @@ struct ScenePausedBannerTextRasterObservation {
     std::int32_t style_y_offset_0x1c{};
     std::int32_t font_extent_0x44dc50{};
     std::span<const SceneDashboardRasterObservation> per_line_renderers;
+    std::optional<ScenePausedBannerStyle14Observation> style14;
 };
 
 struct ScenePausedBannerTextRasterPlan {
@@ -1711,6 +1728,12 @@ raster_scene_paused_banner_text(
     const ScenePausedBannerTextRasterObservation& observation,
     const SceneDashboardFontObservation& layout_font,
     const SceneDashboardAtlasFontObservation& atlas_font);
+
+// Projects the statically initialized descriptor 0x4DE7A8 and the style fields
+// copied by 0x478EE0. Resource-constructor return values remain observations.
+[[nodiscard]] ScenePausedBannerStyle14Plan
+scene_paused_banner_style14_plan(
+    const ScenePausedBannerStyle14Observation& observation) noexcept;
 
 struct SceneDashboardCoreCallbackRasterObservation {
     // One preformatted argument and renderer context for each ordered callback
