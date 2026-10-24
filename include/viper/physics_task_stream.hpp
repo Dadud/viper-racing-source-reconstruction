@@ -39,6 +39,6 @@ struct PhysicsTaskStreamPlan {
 // infer either from track.obt lines or from object allocation sizes.
 [[nodiscard]] PhysicsTaskStreamPlan plan_physics_task_stream_offsets(
     std::span<const std::uint32_t> ordered_record_tags,
-    std::uint32_t initial_cursor);
+    std::uint32_t initial_cursor = 0U);
 
 } // namespace viper

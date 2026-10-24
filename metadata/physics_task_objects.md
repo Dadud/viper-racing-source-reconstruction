@@ -254,11 +254,14 @@ lookup used by `0x4209E0`, from the table at `0x4D4890`. Car tags `RAC\0`,
 `0x34`. The `RAC\0` base tag is retained because it is present in the native
 resolver table, even though current track parsers emit only the four named car
 variants. `plan_physics_task_stream_offsets` folds these advances over an
-explicit ordered tag sequence and initial cursor, reporting an unknown tag or
-32-bit cursor overflow without fabricating later offsets. It deliberately
-does not infer serialization order or initial cursor, and the advances are
-not copied-record lengths or physics-object allocation sizes. Evidence:
+explicit ordered tag sequence. Its default initial cursor is zero, matching
+the store in `0x425420`, which `0x45B6B0` calls before `0x45C630` begins world
+record loading. The sequence order still must be supplied by the caller. The
+planner reports an unknown tag or 32-bit cursor overflow without fabricating
+later offsets. These advances are not copied-record lengths or physics-object
+allocation sizes. Evidence:
 `0x4209E0`, `ev_67d39b50699f5d1fc7b65d5a5c1ea7527718bf5891e244fcdaadc17363c3052d`,
+`0x425420`, `ev_ef89830f565cea2f11328cf87320e8939eb255ab7d432ab5de43786aadee533c`,
 and the native bytes at `0x4D4890`, observed by `read_bytes`.
 
 `plan_physics_track_service` projects selector dispatch, allocation size,
