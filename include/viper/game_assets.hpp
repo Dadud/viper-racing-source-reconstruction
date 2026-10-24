@@ -42,6 +42,7 @@ public:
     [[nodiscard]] const CarFileResourcePayloads& ai_car() const noexcept { return ai_car_; }
     [[nodiscard]] const std::optional<std::uint32_t>& track_index() const noexcept { return track_index_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
+    [[nodiscard]] const ModelResource& ai_model() const noexcept { return ai_model_; }
     [[nodiscard]] const TireDefinition& default_tire() const noexcept { return default_tire_; }
     [[nodiscard]] const std::array<TireDefinition, 4>& wheel_tires() const noexcept
     { return wheel_tires_; }
@@ -69,6 +70,7 @@ private:
     CarFileResourcePayloads ai_car_;
     std::optional<std::uint32_t> track_index_;
     ModelResource player_model_;
+    ModelResource ai_model_;
     TireDefinition default_tire_;
     std::array<TireDefinition, 4> wheel_tires_{};
     std::array<std::byte, 0x8c> player_car_setup_{};

@@ -6,17 +6,18 @@ The completion plan is tracked in [the feature ledger](metadata/completion_ledge
 and [reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
 parses the selected track's terrain and ideal line plus the selected car's
-human setup, the track bundle's AI default setup, and the car's level-0 indexed
-mesh, and draws them in a top-down Direct3D
+human setup, the track bundle's AI default setup, the selected car's level-0
+indexed mesh, and Viper's AI mesh, and draws them in a top-down Direct3D
 development view. It loads the selected track's `track.obt` placement table and
-renders a selected-model copy at each valid `obj car` start position, with
+renders the selected model at the human grid slot and the native Viper model
+at other valid `obj car` start positions, with
 height sampled from terrain data and heading approximated from the nearest
 ideal-line segment. The entrant planner chooses the human grid row; in the
 fresh default eight-car setup, slot 8 is controlled. Arrow keys or WASD move
 that mesh along the ideal-line route using provisional kinematic controls;
 Escape exits. Other grid meshes remain parked. This is a top-down development
-scene and motion prototype, not a race simulation; a 3D track scene, moving
-opponents, HUD, and race results are not implemented.
+scene and motion prototype, not a race simulation; moving opponents, HUD, and
+race results are not implemented.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell

@@ -58,6 +58,10 @@ Evidence from the shipped `race.bin` (SHA-256
 The parser's synthetic malformed-input regression runs in CTest. The local
 asset validation and three-frame WARP smoke also exercise loading and drawing
 the external Viper0 payload when the game install is present beside the repo.
+`GameAssets` separately parses `viper0.mod` from `viper.car` for AI opponents
+when the selected player vehicle is not Viper; the renderer assigns that mesh
+to non-human grid rows. This validates resource loading and scene submission,
+not native material bindings, model alignment, or opponent motion.
 
 ## Empty material labels
 

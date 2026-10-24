@@ -16,12 +16,12 @@ mesh is anchored at the first `obj car` placement in the selected track's
 heading remains an ideal-line approximation. The WARP smoke renders three
 frames and exits cleanly. The runtime still has no playable gameplay.
 The Win32 scene now displays every valid `obj car` position found in the
-selected `track.obt`, using copies of the selected player model. The existing
-entrant planner selects the human row; for the fresh eight-car setup, the human
-is slot 8. That mesh responds to arrow/WASD input and advances along the ideal
-line with provisional hand-authored speed and steering equations. Other grid
-meshes stay parked; AI, collision response, laps, race timing, and results are
-not active.
+selected `track.obt`, using the selected player model for the human row and the
+Viper model for AI rows. The existing entrant planner selects the human row;
+for the fresh eight-car setup, the human is slot 8. That mesh responds to
+arrow/WASD input and advances along the ideal line with provisional
+hand-authored speed and steering equations. Other grid meshes stay parked;
+AI, collision response, laps, race timing, and results are not active.
 This is scene and input progress, not a playable race. **Partial** means useful
 code or analysis exists, but the acceptance condition is unmet; **unverified**
 means there is not an integrated implementation with runtime evidence.
@@ -35,7 +35,7 @@ means there is not an integrated implementation with runtime evidence.
 | Physics and race simulation | Wheel/body/contact models and callback compositions are documented in `metadata/simulation_loop.md`, `metadata/physics_task_objects.md`, and `metadata/vehicle_setup.md`. `GameAssets` owns the selected setup and axle tires. Native row setup dispatch is now recorded: `0x40A5D0` reaches `0x40A620`, which calls the human/AI initializers with each row's `+0x34` block before CARF mapping; the regression covers this dispatch. The runtime's current motion remains a hand-authored route-kinematic prototype and does not call these models. | CARF-to-wheel geometry, suspension/contact state, and embedded callback effects still need evidence-backed mapping and live integration. | Start a race, drive and collide, finish, and observe coherent vehicle/track state; compare controlled inputs and selected state outputs to the original. | partial |
 | AI and opponents | `metadata/single_race_ai_config.evidence.json`, `metadata/single_race_entrant_plan.evidence.json`, and `metadata/vehicle_setup.md` document AI row dispatch and setup mutations. `GameAssets` now loads and owns the Viper AI CARF separately from the selected player car and resolves the selected track row. Startup composes setup candidates for every AIDR profile, each AI entrant's modulo-7 slot, and both tuning modes; a local Exotic/Bemidji launch produced 100 numerically complete candidate records using the base host-division setting. Profile/mode runtime selectors remain unresolved. | Candidate setups are not connected to AI vehicle construction or motion. Exact native FDIV helper selection is not verified; no opponent drives. Native fallback block acquisition and localized AI display names also remain incomplete. | A single-player race starts with configured opponents that drive to a finish; compare entrant count, order, timing, and sampled behavior. | partial |
 | Race modes and results | Race-loop and setup evidence in `metadata/single_race_setup_screen.evidence.json` and `metadata/simulation_loop.md`. | No fully playable race, mode flow, results screen, or return-to-menu integration. | Inventory the modes supported by the original game; each supported mode can be configured, started, completed, show results, and return to the frontend without a crash. Record unsupported modes and evidence rather than treating implementation presence as support. | partial |
-| Rendering and presentation | D3D11 runtime draws all three corners from Bemidji's 10,431 TPPB terrain-plane records as a top-down shaded triangle mesh and overlays the normalized ideal-line route. It parses Viper0 FNIM indices/material ranges and renders one selected-model copy for each valid `obj car` placement in `track.obt`; positions and heights come from the placement rows and TPPB, while each heading is approximated from its nearest ideal-line segment. The entrant planner chooses the moving grid row; the fresh default eight-car order selects row index 7. Release WARP rendered three frames with the grid after commit `2f753b2`; `metadata/model_resource.md`, `metadata/scene_car_update.md`, `metadata/physics_interpolated_object_update.md`, and `metadata/graphics_startup.md` document related evidence. | No camera/lighting/actual textures, HUD, frontend, moving opponents, or race results; placement heading and visual match remain unverified. | Playable scene renders track, cars, HUD, menus, and results at the supported display settings; compare captured frames under controlled conditions. | partial |
+| Rendering and presentation | D3D11 runtime draws all three corners from Bemidji's 10,431 TPPB terrain-plane records as a top-down shaded triangle mesh and overlays the normalized ideal-line route. It parses the selected vehicle FNIM for the human row and the Viper FNIM from `viper.car` for AI rows, then renders those models at valid `obj car` placements; positions/heights come from placement rows and TPPB, headings are approximated from the nearest ideal-line segment. Release WARP smoke cases cover eight tracks and five player car selections; `metadata/model_resource.md`, `metadata/scene_car_update.md`, `metadata/physics_interpolated_object_update.md`, and `metadata/graphics_startup.md` document related evidence. | No camera/lighting/actual textures, HUD, frontend, moving opponents, or race results; placement heading and visual match remain unverified. | Playable scene renders track, cars, HUD, menus, and results at the supported display settings; compare captured frames under controlled conditions. | partial |
 | Input and controls | `metadata/race_input_bindings.md` and `metadata/race_input_binding_accessors.evidence.json` contain original binding evidence. The runtime now reads `CONTROL.steer_left`, `steer_right`, `throttle`, and `braking` from `options.def` and applies supported keyboard names to the human-row prototype; missing options retain arrow-key defaults and empty values unbind an action. | No menus, controller support, settings editor, full original input-record integration, or original-validated motion model. | Keyboard and supported controller inputs operate menus and vehicle controls; rebinding and saved settings survive relaunch. | partial |
 | Audio | `trk2.sfx` is present in the external install inventory; no integrated audio implementation is documented in the source README. | No verified engine, environment, collision, menu, or music playback/mixing. | Play representative menu and race scenarios with correctly triggered audio; record synchronized output and compare to the original. | unverified |
 | Career and save data | `metadata/career_season_samples.md` documents sampled season data and progression analysis; career resource files are present externally. | No integrated career UI, race-result progression, save/load, or durable progress verification. | Start a career, complete a race, observe expected progression, quit, relaunch, and load the same state; compare save artifacts and visible progression. | partial |
@@ -129,6 +129,13 @@ gap; do not infer runtime support from static analysis or file presence.
   test confirms loading and setup composition only: profile/mode selection,
   exact FDIV helper behavior, AI construction, rendering as opponents, and AI
   movement remain incomplete. Release build and CTest passed 38/38.
+- **2026-10-24, opponent mesh selection:** `GameAssets` now parses and owns
+  `viper0.mod` from the AI Viper bundle when the selected player car is
+  different. The D3D scene uses the selected car mesh only for the human row
+  and the Viper mesh for other grid rows. All 38 release CTest cases passed,
+  including the external-asset WARP smoke matrix for all five cars and eight
+  tracks. This changes opponent appearance only; the cars remain stationary
+  and the mesh/material rendering remains provisional.
 
 ## Ownership and CI boundary
 

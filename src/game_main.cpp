@@ -287,12 +287,16 @@ public:
                 const viper::TerrainSurfaceResourcePayload& terrain,
                 const viper::IdealLineTrackData& ideal_line,
                 const viper::ModelResource& player_model,
+                const viper::ModelResource& ai_model,
+                const std::size_t player_car_index,
                 const viper::TrackObjectTextTable& track_objects)
     {
         try {
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
             extract_terrain_points(terrain);
             player_model_ = &player_model;
+            ai_model_ = &ai_model;
+            player_car_index_ = player_car_index;
             const auto spawns = car_spawns(track_objects);
             if (spawns.empty()) throw std::runtime_error("track.obt has no usable obj car start position");
             car_poses_.reserve(spawns.size());
@@ -560,14 +564,18 @@ private:
 
     bool update_car_buffer()
     {
-        if (!width_ || !height_ || player_model_ == nullptr || player_model_->vertices.empty()) return true;
+        if (!width_ || !height_ || player_model_ == nullptr || ai_model_ == nullptr ||
+            player_model_->vertices.empty() || ai_model_->vertices.empty()) return true;
         if (ideal_line_points_.size() < 2U || car_poses_.empty()) return false;
         std::vector<SurfaceVertex> vertices;
         std::vector<CarDrawGroup> groups;
-        for (const auto& pose : car_poses_) {
+        for (std::size_t car_index = 0; car_index < car_poses_.size(); ++car_index) {
+            const auto& pose = car_poses_[car_index];
+            const auto& model = car_index == player_car_index_
+                ? *player_model_ : *ai_model_;
             const float sin_yaw = std::sin(pose.yaw);
             const float cos_yaw = std::cos(pose.yaw);
-            for (const auto& model_group : player_model_->material_groups) {
+            for (const auto& model_group : model.material_groups) {
                 CarDrawGroup draw_group{};
                 draw_group.first_vertex = static_cast<UINT>(vertices.size());
                 const auto material = model_group.material_name;
@@ -580,8 +588,8 @@ private:
                             : std::array<float, 3>{0.78f, 0.20f, 0.12f};
                 for (const auto local_index : model_group.local_indices) {
                     const auto vertex_index = static_cast<std::size_t>(model_group.first_vertex) + local_index;
-                    if (vertex_index >= player_model_->vertices.size()) return false;
-                    const auto& model_vertex = player_model_->vertices[vertex_index].fields;
+                    if (vertex_index >= model.vertices.size()) return false;
+                    const auto& model_vertex = model.vertices[vertex_index].fields;
                     // FNIM stores vehicle-local XYZ; this overview projects local X/Z onto the map.
                     const float world_x = pose.x + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
                     const float world_z = pose.z - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
@@ -682,6 +690,8 @@ private:
     std::vector<std::array<float, 3>> terrain_points_;
     std::vector<std::array<float, 3>> terrain_normals_;
     const viper::ModelResource* player_model_{};
+    const viper::ModelResource* ai_model_{};
+    std::size_t player_car_index_{};
     std::vector<CarPose> car_poses_;
     std::vector<CarDrawGroup> car_draw_groups_;
     std::array<float, 4> map_bounds_{};
@@ -870,6 +880,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::TerrainSurfaceResourcePayload& terrain,
                const viper::IdealLineTrackData& ideal_line,
                const viper::ModelResource& player_model,
+               const viper::ModelResource& ai_model,
                const viper::TrackObjectTextTable& track_objects,
                const viper::GameOptions& options)
 {
@@ -902,7 +913,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
     if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model,
-            track_objects)) {
+            ai_model, player_car_index, track_objects)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
         DestroyWindow(hwnd);
@@ -1058,7 +1069,7 @@ int wmain(int argc, wchar_t** argv)
         return run_window(options.software, options.smoke_frames,
             *entrants.player_record_index,
             assets.track_name(), assets.car_name(), assets.terrain(),
-            assets.ideal_line(), assets.player_model(), assets.track_objects(),
+            assets.ideal_line(), assets.player_model(), assets.ai_model(), assets.track_objects(),
             assets.options());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';

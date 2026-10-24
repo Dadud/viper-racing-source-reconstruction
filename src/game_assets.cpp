@@ -285,6 +285,24 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     }
     if (!player_model_loaded)
         throw std::runtime_error(expected_model + " FNIM model resource is missing");
+    if (assets.car_name_ == "viper") {
+        assets.ai_model_ = assets.player_model_;
+    } else {
+        bool ai_model_loaded = false;
+        for (const auto& entry : ai_car_bundle->entries()) {
+            if (entry.type_code != ModelResource::resource_type_code ||
+                !ascii_equal_case_insensitive(entry.name, "viper0.mod")) continue;
+            const auto model = parse_model_resource(entry.attributes,
+                ai_car_bundle->payload(entry));
+            if (!model)
+                throw std::runtime_error("invalid or unsupported AI Viper FNIM model resource: " + entry.name);
+            assets.ai_model_ = *model;
+            ai_model_loaded = true;
+            break;
+        }
+        if (!ai_model_loaded)
+            throw std::runtime_error("viper0.mod AI FNIM model resource is missing");
+    }
     return assets;
 }
 
