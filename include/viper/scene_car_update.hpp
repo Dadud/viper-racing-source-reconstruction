@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace viper {
@@ -864,6 +865,7 @@ struct SceneRenderPanicForwarderPlan {
     std::uint32_t callback_address{};
     std::uint32_t panic_reporter_address{}; // 0x411000
     std::uint32_t format_pointer{};
+    std::string_view format_text;
 };
 
 // Resolves callback-table stubs that forward a static message pointer to the

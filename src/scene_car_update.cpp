@@ -1156,14 +1156,28 @@ std::optional<SceneRenderPanicForwarderPlan> plan_scene_render_panic_forwarder(
     const std::uint32_t callback_address) noexcept
 {
     std::uint32_t format_pointer{};
+    std::string_view format_text;
     switch (callback_address) {
-    case 0x00455F20U: format_pointer = 0x004DB74CU; break;
-    case 0x00455F30U: format_pointer = 0x004DB78CU; break;
-    case 0x00456210U: format_pointer = 0x004DB7C8U; break;
-    case 0x00456220U: format_pointer = 0x004DB808U; break;
+    case 0x00455F20U:
+        format_pointer = 0x004DB74CU;
+        format_text = "light_pre_nofog_someenv: no environment mapping of prelit objs";
+        break;
+    case 0x00455F30U:
+        format_pointer = 0x004DB78CU;
+        format_text = "light_pre_nofog_env: no environment mapping of prelit objs";
+        break;
+    case 0x00456210U:
+        format_pointer = 0x004DB7C8U;
+        format_text = "light_pre_fog_someenv: no environment mapping of prelit objs";
+        break;
+    case 0x00456220U:
+        format_pointer = 0x004DB808U;
+        format_text = "light_pre_fog_env: no environment mapping of prelit objs";
+        break;
     default: return std::nullopt;
     }
-    return SceneRenderPanicForwarderPlan{callback_address, 0x00411000U, format_pointer};
+    return SceneRenderPanicForwarderPlan{callback_address, 0x00411000U, format_pointer,
+        format_text};
 }
 
 SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(

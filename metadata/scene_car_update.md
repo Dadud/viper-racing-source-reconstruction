@@ -668,8 +668,13 @@ Four other second-slot callback targets are constant-argument panic
 forwarders: `0x455F20` passes `0x4DB74C`, `0x455F30` passes `0x4DB78C`,
 `0x456210` passes `0x4DB7C8`, and `0x456220` passes `0x4DB808` to
 `0x411000`. `plan_scene_render_panic_forwarder` reports this callback-to-
-reporter mapping; the strings at those data addresses and callback dispatch-
-time consequences are not inferred here. Evidence pairs show each stub's
+reporter mapping and the recovered format text: `light_pre_nofog_someenv: no
+environment mapping of prelit objs`, `light_pre_nofog_env: no environment
+mapping of prelit objs`, `light_pre_fog_someenv: no environment mapping of
+prelit objs`, and `light_pre_fog_env: no environment mapping of prelit objs`,
+respectively. Their strings are catalogued at RVAs `0xDB74C`, `0xDB78C`,
+`0xDB7C8`, and `0xDB808` in `metadata/strings.md`. Whether a selected callback
+is invoked on a given frame remains outside this mapping. Evidence pairs show each stub's
 push and call: (`ev_cbbf47451c7a9b25c55418f88cd35693e7cdced5a203431b21813aa1f2a5c80f`,
 `ev_a037d9e223d80e01116e93668c47a10a99cfa9f3318949a8b75ab73c40a0fa10`),
 (`ev_5f6b8ef2fb5a7b7f6532cecf58c8749a9d39666abdb3776a3f56ce360704a42a`,

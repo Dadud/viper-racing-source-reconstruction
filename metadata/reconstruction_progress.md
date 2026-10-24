@@ -1,5 +1,9 @@
 # Reconstruction progress
 
+- **2026-10-24:** Resolved all four panic-forwarder format strings from the
+  engine string inventory and added their text to the callback plan. They
+  report missing environment mappings for prelit objects across fog and
+  environment variants; callback execution timing remains unresolved.
 - **2026-10-24:** Mapped four callback-table panic forwarders to `0x411000`,
   preserving each static format-pointer address in a portable plan. Message
   text and indirect-dispatch timing remain unresolved; see `scene_car_update.md`.
