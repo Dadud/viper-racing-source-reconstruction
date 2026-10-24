@@ -691,7 +691,9 @@ in the recovered predicate order: pause, cheater, `0x4048E0`, `0x404900`,
 observation to each branch while keeping branch-specific measurements, data
 buffers, and cached resource generations explicit. When supplied, the shared
 current-generation DWORD feeds both pause and splash comparisons, and the
-resource-init mask feeds Splash:Loading's registration bit. The optional
+text-effect comparisons at `0x4EB430`/`0x4EB298`; cached resource DWORDs remain
+branch-specific inputs. The resource-init mask feeds Splash:Loading's
+registration bit. The optional
 dashboard body before these predicates is not part of this shared-tail plan.
 Evidence for the
 branch order and loading lifecycle is the `0x404970` instruction stream

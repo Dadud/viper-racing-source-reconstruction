@@ -3361,8 +3361,14 @@ SceneSharedTextEffectsPlan scene_shared_text_effects_plan(
     right_text.resource_object = 0x004EB428U;
     right_text.cached_resource_generation = 0x004EB430U;
     right_text.text_handle = 0x004EB42CU;
+    const auto right_generation_matches =
+        observation.current_resource_generation_value.has_value() &&
+            observation.resource_0x4eb430_cached_generation_value.has_value()
+        ? *observation.current_resource_generation_value ==
+            *observation.resource_0x4eb430_cached_generation_value
+        : observation.resource_0x4eb428_generation_matches;
     result.predicate_0x4048e0 = scene_shared_text_effect_plan(
-        right_text, observation.resource_0x4eb428_generation_matches);
+        right_text, right_generation_matches);
 
     auto left_text = observation.predicate_0x404900;
     left_text.branch = SceneSharedTextEffectBranch::predicate_0x404900;
@@ -3370,8 +3376,14 @@ SceneSharedTextEffectsPlan scene_shared_text_effects_plan(
     left_text.resource_object = 0x004EB290U;
     left_text.cached_resource_generation = 0x004EB298U;
     left_text.text_handle = 0x004EB294U;
+    const auto left_generation_matches =
+        observation.current_resource_generation_value.has_value() &&
+            observation.resource_0x4eb298_cached_generation_value.has_value()
+        ? *observation.current_resource_generation_value ==
+            *observation.resource_0x4eb298_cached_generation_value
+        : observation.resource_0x4eb290_generation_matches;
     result.predicate_0x404900 = scene_shared_text_effect_plan(
-        left_text, observation.resource_0x4eb290_generation_matches);
+        left_text, left_generation_matches);
     return result;
 }
 
@@ -3649,6 +3661,10 @@ SceneSharedOverlayFramePlan scene_shared_overlay_frame_plan(
 
     auto text_effects = observation.text_effects;
     text_effects.overlay_globals = observation.overlay_globals;
+    if (observation.current_resource_generation_value.has_value()) {
+        text_effects.current_resource_generation_value =
+            observation.current_resource_generation_value;
+    }
     result.text_effects = scene_shared_text_effects_plan(text_effects);
 
     auto centered_resource = observation.centered_resource;

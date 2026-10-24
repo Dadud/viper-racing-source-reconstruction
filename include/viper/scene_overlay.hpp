@@ -1519,8 +1519,11 @@ struct SceneSharedTextEffectsObservation {
     SceneSharedOverlayObservation overlay_globals{};
     SceneSharedTextEffectObservation predicate_0x4048e0{};
     bool resource_0x4eb428_generation_matches{};
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> resource_0x4eb430_cached_generation_value;
     SceneSharedTextEffectObservation predicate_0x404900{};
     bool resource_0x4eb290_generation_matches{};
+    std::optional<std::uint32_t> resource_0x4eb298_cached_generation_value;
 };
 
 struct SceneSharedTextEffectsPlan {

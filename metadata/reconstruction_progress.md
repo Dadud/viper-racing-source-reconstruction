@@ -6,6 +6,12 @@
   feeds Splash:Loading registration. Release build and `git diff --check`
   pass; no tests were run.
 
+- **2026-10-24 continuation:** Replaced the shared wrong-way/state text
+  branches' opaque generation matches with optional raw comparisons against
+  cached DWORDs `0x4EB430` and `0x4EB298`. The shared frame now supplies their
+  current generation from its common resource-manager observation. Release
+  build and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Connected the paused-banner branch to raw
   resource-generation DWORDs. It now derives whether `0x418CC0` runs by
   comparing cached value `0x4EB468` with current generation `0x4D3868`; the
