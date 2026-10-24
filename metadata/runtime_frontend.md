@@ -36,6 +36,13 @@ CLI replay still closes when the trace ends. This verifies repeated
 setup/race/result resource lifecycles for the route prototype, not physical
 simulation or original-game parity.
 
+Race standings display localized AI driver names from the selected
+`GAME.opponent_strength` profile in `english.lng`, aligned through the
+single-race entrant's modulo-7 driver slot. If the selected AIDR profile has no
+active driver or language key for a slot, standings use its numbered entrant
+fallback. This does not imply that the AIDR setups or native AI controller are
+connected to opponent motion.
+
 The four driving bindings now pass through the reconstructed type-1 binding
 evaluator. The Win32 adapter converts configured virtual keys to DirectInput
 scan-code selectors and records key-down/key-up events in a 256-entry digital

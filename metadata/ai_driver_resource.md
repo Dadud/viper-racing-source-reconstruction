@@ -43,6 +43,16 @@ records. Evidence: `0x41B9B0`
 and `0x41BB50`
 `ev_88536434a4e9f02940f233812b02e911b5576593e57f294b8ee4fd05775efd03`.
 
+The Win32 single-race runtime reads `GAME.opponent_strength` as the selected
+profile index and resolves the corresponding localized display names from the
+English language table using the native format `AIDriverName:<profile>:Driver<n>`.
+It only assigns a name when the chosen AIDR group marks that slot active and
+the language key exists. The 7 active Easy driver names in the shipped data
+therefore populate the 7 AI entrant rows; results use those names instead of
+placeholder slot labels. Missing names retain a numbered display fallback.
+The setup UI still does not expose difficulty selection, and this name wiring
+does not connect AIDR candidate setup records to AI vehicle behavior.
+
 Evidence from `race.bin` (SHA-256
 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
 

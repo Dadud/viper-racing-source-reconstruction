@@ -1431,6 +1431,7 @@ struct WindowState {
     const viper::TerrainSurfaceResourcePayload* terrain{};
     std::vector<std::array<float, 2>> route;
     std::size_t player_car_index{};
+    std::vector<std::string> participant_names;
     viper::RouteMotionState motion{};
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<std::array<float, 4>> pose_buffer;
@@ -1821,7 +1822,14 @@ struct WindowState {
                     standing.finish_time_seconds, 1.0F) * 100.0F);
                 results += "\n" + std::to_string(rank + 1U) + " ";
                 results += standing.player ? "YOU " : "AI ";
-                if (!standing.player) results += std::to_string(standing.participant_index + 1U) + " ";
+                if (!standing.player) {
+                    if (standing.participant_index < participant_names.size() &&
+                        !participant_names[standing.participant_index].empty()) {
+                        results += participant_names[standing.participant_index] + " ";
+                    } else {
+                        results += std::to_string(standing.participant_index + 1U) + " ";
+                    }
+                }
                 results += std::to_string(minutes) + ":" +
                     (seconds < 10U ? "0" : "") + std::to_string(seconds) + "." +
                     (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
@@ -1982,6 +1990,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::vector<TraceInputFrame>* playback_trace,
                const bool hold_results_for_frontend,
                const std::size_t player_car_index,
+               const std::vector<std::string>& participant_names,
                const std::uint32_t target_laps,
                const std::string_view track_name,
                const std::string_view car_name,
@@ -2010,6 +2019,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     }
     WindowState state;
     state.terrain = &terrain;
+    state.participant_names = participant_names;
     const auto cursor_plan =
         viper::plan_track_player_physics_cursor(track_objects, player_car_index);
     const auto serialized_stream_offset = cursor_plan.serialized_object_stream_offset;
@@ -2292,14 +2302,34 @@ int run_selected_race(const Options& options, const std::string_view track,
     report_start_grid(assets);
     if (options.validate_assets) return 0;
     const auto driver_order = viper::initialize_single_race_driver_order();
-    constexpr std::array<std::string_view, 7> ai_names{
-        "AI slot 0", "AI slot 1", "AI slot 2", "AI slot 3",
-        "AI slot 4", "AI slot 5", "AI slot 6"};
+    constexpr std::array<std::string_view, viper::ai_driver_group_count> ai_name_profiles{
+        "Easy", "Intermediate", "Hard", "Career1", "Career2", "Career3",
+        "Career4", "Career5"};
+    const auto opponent_strength = assets.options()
+        .integer("GAME", "opponent_strength").value_or(0);
+    std::array<std::string, viper::ai_driver_slots_per_group> ai_name_storage{};
+    std::array<std::string_view, viper::ai_driver_slots_per_group> ai_names{};
+    if (opponent_strength >= 0 && opponent_strength <
+            static_cast<int>(ai_name_profiles.size())) {
+        const auto group_index = static_cast<std::size_t>(opponent_strength);
+        const auto active_count = assets.ai_drivers().active_counts[group_index];
+        for (std::size_t slot = 0U; slot < ai_names.size() && slot < active_count; ++slot) {
+            const auto key = std::string("AIDriverName:") +
+                std::string(ai_name_profiles[group_index]) + ":Driver" +
+                std::to_string(slot);
+            const auto localized_name = assets.language().find(key);
+            if (localized_name.has_value()) {
+                ai_name_storage[slot] = *localized_name;
+                ai_names[slot] = ai_name_storage[slot];
+            }
+        }
+    }
     viper::SingleRaceEntrantObservation entrant_observation{};
     entrant_observation.configured_car_count = assets.options()
         .integer("GAME", "car_count").value_or(8);
     entrant_observation.driver_order_values = driver_order;
     entrant_observation.ai_names_by_slot = ai_names;
+    entrant_observation.opponent_strength_value = opponent_strength;
     entrant_observation.player_car_resource_name = assets.car_name();
     entrant_observation.resolved_player_name =
         assets.options().get("GLOBAL", "player_name");
@@ -2311,6 +2341,11 @@ int run_selected_race(const Options& options, const std::string_view track,
     std::cout << "Selected human grid slot: "
               << (*entrants.player_record_index + 1U) << " of "
               << entrants.participant_count << " (fresh single-race driver order)\n";
+    std::vector<std::string> participant_names;
+    participant_names.reserve(entrants.records.size());
+    for (const auto& record : entrants.records) {
+        participant_names.push_back(record.display_name.value_or(std::string{}));
+    }
     std::vector<viper::SingleRaceAISetupPlan> ai_setup_variants;
     if (entrants.participant_count > 1) {
         if (!assets.track_index())
@@ -2348,6 +2383,7 @@ int run_selected_race(const Options& options, const std::string_view track,
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
         options.record_trace, playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,
+        participant_names,
         static_cast<std::uint32_t>(std::clamp(
             assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
         assets.track_name(), assets.car_name(), assets.terrain(),
