@@ -68,11 +68,15 @@ Build those persistent inputs and connect them to the existing wheel/body
 compositions before replacing route motion as the rendered pose authority.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
-Its caller needs the registered object's body state at capture time for the
-NCAR sample pipeline. `0x420930` is only the registered-object lookup, not a state
-update; native ordering between integration and sampling must be established
-before wiring that pipeline into the race session. See
-`metadata/car_update_branches.md` for the corrected evidence reference.
+Native order inside NCAR callback `0x439200` is known: its timed sample/queue
+prefix and accepted-sample handling run before its conditional `0x431150`
+integrator branch. The sample therefore captures the pre-integrator state for
+that callback. `0x420930` only retrieves the registered object; the live race
+session still lacks the mutable body state the capture requires, and the
+relationship between the accepted sample window and the separate `+0xEC4`
+callback record remains unresolved. The runtime must reproduce this ordering
+once it owns that state. See `metadata/car_update_branches.md` and the NCAR
+callback evidence listed there.
 
 ### 2. Close the physical race loop: terrain, collision, damage, and finish
 
