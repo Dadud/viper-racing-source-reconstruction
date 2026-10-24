@@ -824,13 +824,14 @@ It requires the submitted frame's `0x4052D0` callback to precede the observed
 `0x447CE0` unlock, and validates all pixel destinations before writing. The
 batch preserves order across background fill/bitmap operations, gear draws,
 paused-banner operations, cheater-banner and centered-resource STMP draws, the
-two shared text effects, and race-results heading and rows. The `0x4EB350`
+two shared text effects, race-results heading and rows, and the Splash:Loading
+`load.stp` image/text or fallback-box operations. The `0x4EB350`
 cheater resource resolves to `race.res::start.stp`; its observed draw mode
 selects one of six frames. The centered `0x4EB46C` resource resolves to
 `race.res::award.stp` (261x200, one frame). Both use the common STMP RLE,
-palette, clipping, and pixel-write path. A reached splash-loading branch still
-leaves the full batch unavailable because its resource pixels are not yet
-projected; missing raster inputs likewise prevent partial surface mutation.
+palette, clipping, and pixel-write path. Reached branches with missing
+required raster inputs leave the full batch unavailable rather than partially
+mutating the surface.
 Viewport/device calls and native surface ownership remain outside this CPU
 pixel batch. The
 `0x404970` pseudocode confirms that `0x405100` precedes the wrapper's later
@@ -860,6 +861,13 @@ clipped source/destination rectangle are projected separately by
 copy/conversion helper from source and destination mode bytes, follows
 `0x4499E0`'s half-open destination clipping, and reports adjusted source and
 destination starts, transfer size, and starting addresses from the two pitches.
+When raw bytes for object `0x4EB3D0` are supplied, the descriptor parser
+derives mode byte `+0`, pixel base `+4`, dimensions `+8/+0xC`, and pitch `+0x10`
+before planning these blits. Pixel bytes at the pointed-to source remain a
+separate bounded input; the parser never dereferences the runtime pointer.
+Evidence: `0x44AFD0` `ev_1ddf480c891666aef71811f46083bed538fe92ac790e23baad5edb8ca7d84591`,
+`0x44A940` `ev_15dc08718374f9c1468e03f48e2d2dfb2fc4d73f9a78c99fe7b72f4373ea5237`,
+and `0x449D70` `ev_b6817f1a89392b1b89e45c5c880868635c9e2682258bb68eeb978a08a8145ab0`.
 `scene_dashboard_bitmap_pixel_conversion` applies the recovered value
 transforms for one source pixel on every supported route: same-mode raw copy,
 mode 4 to mode 3 masking, 16-bit modes 3/4 to mode 5 byte expansion, and mode

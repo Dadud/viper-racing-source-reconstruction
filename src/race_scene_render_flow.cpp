@@ -296,6 +296,30 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
         if (plan.optional_dashboard_branch_enabled) {
             auto render_observation = observation.state0_dashboard_render;
+            auto bitmap_blit_observation = observation.state0_bitmap_blit;
+            auto bitmap_descriptor_complete = true;
+            if (observation.state0_bitmap_descriptor_bytes.has_value()) {
+                plan.state0_bitmap_descriptor =
+                    parse_scene_dashboard_bitmap_descriptor(
+                        *observation.state0_bitmap_descriptor_bytes);
+                bitmap_descriptor_complete =
+                    plan.state0_bitmap_descriptor->input_complete;
+                if (bitmap_descriptor_complete) {
+                    const auto& descriptor = *plan.state0_bitmap_descriptor;
+                    render_observation.background_bitmap_width =
+                        descriptor.width;
+                    render_observation.background_bitmap_height =
+                        descriptor.height;
+                    bitmap_blit_observation.source_bitmap_mode =
+                        descriptor.source_mode;
+                    bitmap_blit_observation.bitmap_base_address =
+                        descriptor.pixel_base_address;
+                    bitmap_blit_observation.bitmap_width = descriptor.width;
+                    bitmap_blit_observation.bitmap_height = descriptor.height;
+                    bitmap_blit_observation.bitmap_pitch_bytes =
+                        descriptor.pitch_bytes;
+                }
+            }
             if (plan.dashboard_core_callback_reached) {
                 render_observation.dashboard_mask =
                     plan.dashboard_core_callback.next_state
@@ -333,7 +357,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     SceneDashboardRenderOperationKind::bitmap_draw_0x44afd0) {
                     continue;
                 }
-                auto blit_observation = observation.state0_bitmap_blit;
+                auto blit_observation = bitmap_blit_observation;
                 blit_observation.destination_x = operation.left;
                 blit_observation.destination_y = operation.top;
                 blit_observation.bitmap_width = operation.bitmap_width;
@@ -356,8 +380,9 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                 const auto expected_pixel_count =
                     static_cast<std::uint64_t>(std::max(0, projection.blit.width)) *
                     static_cast<std::uint64_t>(std::max(0, projection.blit.height));
-                projection.input_complete = !projection.blit.transfer_happened ||
-                    projection.pixel_writes.size() == expected_pixel_count;
+                projection.input_complete = bitmap_descriptor_complete &&
+                    (!projection.blit.transfer_happened ||
+                     projection.pixel_writes.size() == expected_pixel_count);
                 plan.state0_dashboard_bitmap_projections.push_back(
                     std::move(projection));
             }

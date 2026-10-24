@@ -454,6 +454,28 @@ std::vector<SceneDashboardViewportCall> scene_dashboard_viewport_plan(
     return calls;
 }
 
+SceneDashboardBitmapDescriptorResult parse_scene_dashboard_bitmap_descriptor(
+    const std::span<const std::uint8_t> descriptor_bytes) noexcept
+{
+    SceneDashboardBitmapDescriptorResult result{};
+    if (descriptor_bytes.size() < 0x14U) {
+        return result;
+    }
+    const auto read_u32 = [&](const std::size_t offset) {
+        return static_cast<std::uint32_t>(descriptor_bytes[offset]) |
+            (static_cast<std::uint32_t>(descriptor_bytes[offset + 1U]) << 8U) |
+            (static_cast<std::uint32_t>(descriptor_bytes[offset + 2U]) << 16U) |
+            (static_cast<std::uint32_t>(descriptor_bytes[offset + 3U]) << 24U);
+    };
+    result.input_complete = true;
+    result.source_mode = descriptor_bytes[0];
+    result.pixel_base_address = read_u32(4U);
+    result.width = std::bit_cast<std::int32_t>(read_u32(8U));
+    result.height = std::bit_cast<std::int32_t>(read_u32(0x0CU));
+    result.pitch_bytes = std::bit_cast<std::int32_t>(read_u32(0x10U));
+    return result;
+}
+
 std::vector<SceneDashboardRenderOperation> scene_dashboard_render_plan(
     const SceneDashboardRenderObservation& observation)
 {

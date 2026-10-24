@@ -229,6 +229,21 @@ struct SceneDashboardBackgroundBitmapBlitObservation {
     std::uint32_t destination_base_address{};
 };
 
+struct SceneDashboardBitmapDescriptorResult {
+    bool input_complete{};
+    std::uint8_t source_mode{};
+    std::uint32_t pixel_base_address{};
+    std::int32_t width{};
+    std::int32_t height{};
+    std::int32_t pitch_bytes{};
+};
+
+// Reads the observed 0x14-byte bitmap object fields used by 0x44AFD0/0x44A940:
+// mode at +0, pixels at +4, dimensions at +8/+0xC, and pitch at +0x10.
+[[nodiscard]] SceneDashboardBitmapDescriptorResult
+parse_scene_dashboard_bitmap_descriptor(
+    std::span<const std::uint8_t> descriptor_bytes) noexcept;
+
 struct SceneDashboardBackgroundBitmapBlitResult {
     SceneDashboardBitmapBlitPath path{
         SceneDashboardBitmapBlitPath::unsupported_format_pair};

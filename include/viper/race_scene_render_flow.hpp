@@ -68,6 +68,10 @@ struct RaceLoopSharedOverlayObservation {
     std::optional<RenderContextAcquisitionObservation> render_context_acquisition;
     SceneDashboardRenderObservation state0_dashboard_render{};
     SceneDashboardBackgroundBitmapBlitObservation state0_bitmap_blit{};
+    // Optional raw 0x4EB3D0 bitmap object bytes; when supplied, its mode,
+    // pixel base, dimensions and pitch override the projected source fields.
+    std::optional<std::vector<std::uint8_t>>
+        state0_bitmap_descriptor_bytes;
     std::vector<std::uint8_t> state0_bitmap_source_pixels;
     SceneDashboardCoreCallbackObservation dashboard_core_callback{};
     SceneDashboardTestTrackObservation dashboard_test_track{};
@@ -121,6 +125,8 @@ struct RaceLoopSharedOverlayPlan {
     SceneDashboardGearDisplayResult dashboard_gear_display{};
     std::optional<ScenePausedBannerResourceRasterPlan>
         state0_dashboard_gear_resource_raster;
+    std::optional<SceneDashboardBitmapDescriptorResult>
+        state0_bitmap_descriptor;
     std::vector<SceneDashboardRenderOperation> state0_dashboard_render_operations;
     std::optional<SceneDashboardRectangleFillProjection>
         state0_dashboard_fill_projection;
