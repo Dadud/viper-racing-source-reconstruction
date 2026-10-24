@@ -234,6 +234,19 @@ scene object's direct `+8` path still does not show a direct call to
 `0x431150`; class-specific physics callbacks perform the known wheel/body
 integration.
 
+The loader's second constructor argument is the record's byte offset in the
+physics-task stream. `0x425720` writes the current `DAT_00508784` cursor as a
+DWORD before appending the serialized record, then advances the cursor by the
+class size resolved by `0x4209E0`. `0x4224D0` reads that leading DWORD and passes
+it unchanged through the object factory. The common body base constructor
+`0x4375C0` stores it at object `+0x08`. This is separate from the car's `+0x194`
+ordinal and from the serialized record length. Reproducing a car's value
+requires reproducing all preceding serialized scene objects and their order.
+Evidence: `0x425720`
+`ev_ba7c2afe0cea1b8ac035b877fcb66094822ac8ab525d2a70a8e196e787dde737`,
+`0x4224D0` `ev_a400cb5ab86f7098dfd08c8099bbb812751892d0e3b03cc4de1165538324a68f`,
+and `0x4375C0` `ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349f68`.
+
 `plan_physics_track_service` projects selector dispatch, allocation size,
 constructor/vtable choices, panic behavior, and the final unconditional
 virtual `+0x14` call. For selectors 1 and 3, the initializer is a void helper

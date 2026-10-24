@@ -108,7 +108,7 @@ int main()
             viper::make_ncar_body_constructor_observation_from_runtime_record(
                 runtime_record, std::nullopt, false);
         require(body_observation.has_value() &&
-                !body_observation->constructor_parameter_2.has_value(),
+                !body_observation->serialized_object_stream_offset.has_value(),
             "body constructor planning must preserve the unavailable serialized argument");
         const auto body_plan = viper::plan_ncar_body_constructor(*body_observation);
         require(std::fabs(body_plan.scaled_dimensions_0x1f0_to_0x1fc[0] -
@@ -123,6 +123,22 @@ int main()
                         return write.offset == 0x08U;
                     }),
             "body dimension derivation must remain usable without inventing inherited +0x08");
+        const auto body_with_stream_offset =
+            viper::make_ncar_body_constructor_observation_from_runtime_record(
+                runtime_record, 0x12345678U, false);
+        require(body_with_stream_offset.has_value(),
+            "body constructor adapter must accept a supplied serialized stream offset");
+        const auto offset_plan = viper::plan_ncar_body_constructor(
+            *body_with_stream_offset);
+        const auto offset_write = std::find_if(
+            offset_plan.inherited_base_writes_0x4375c0.begin(),
+            offset_plan.inherited_base_writes_0x4375c0.end(),
+            [](const viper::NcarObjectFieldWrite& write) {
+                return write.offset == 0x08U;
+            });
+        require(offset_write != offset_plan.inherited_base_writes_0x4375c0.end() &&
+                offset_write->value_bits == 0x12345678U,
+            "body base constructor must preserve the serialized object stream offset at +0x08");
         const auto body_shift_write = std::find_if(
             preparation.mapping->writes.begin(), preparation.mapping->writes.end(),
             [](const viper::CarFileRuntimeFieldWrite& write) {

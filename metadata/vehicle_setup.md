@@ -378,19 +378,26 @@ existing anchors and tire response objects. It also retains the reciprocal
 dimension at `+0x200` as the exact inverse-mass input expected by the body
 kinematics model. This prepares a real constructor-derived integrator field,
 but does not invoke body integration without the remaining state and timing
-inputs. Constructor parameter 2 remains
-unset: `0x4224D0` reads it as a DWORD from the serialized object stream, passes
-it through factory `0x422580` and NCAR constructor `0x438E40`, into `0x42FF90`
-and then `0x43E490`. Since the quick-race session currently starts from a setup
-payload and CARF resources rather than that serialized object stream, the
-runtime leaves inherited base field `+0x08` unwritten in its diagnostic plan.
+inputs. Constructor parameter 2 is the byte offset of the object within the
+physics-task serialization stream. The scene writer `0x425720` first writes its
+current cursor (`DAT_00508784`) as a DWORD, appends the object's record, then
+advances that cursor by the class-specific size from `0x4209E0`. The loader
+`0x4224D0` reads that leading DWORD and passes it through factory `0x422580`
+and NCAR constructor `0x438E40`, into `0x42FF90` and `0x43E490`; the shared
+base constructor `0x4375C0` stores it at object `+0x08`. This is an absolute
+stream offset, not a CARF field, an object-size value, or the `0x1E4` runtime
+record length. The quick-race runtime does not reproduce the complete scene
+serialization order, so its planner leaves this field explicitly unknown.
 The body dimensions and wheel-core setup are independent of that field. This
 bridge initializes constructor-model outputs only; body pose, velocity,
 contact/suspension feedback, and frame integration are still absent. Evidence:
 `0x4224D0` (`ev_81a7cb19522fa8820dfbbcc77f501f03aa9f78af287883fffedd7d7a42cbe1f`),
 `0x422580` (`ev_a16dc357fb9222db3c8d920b7f06d2763b2ccbf26080048be18fffdf2233b3f2`),
 `0x438E40` (`ev_0bd9fe82807b0bc05115c9b59c839ff6169e9a8c6ac46d0b073417e6cada751c`),
-and `0x43E490` (`ev_2461f2fe9963d443377d4e7a73eb0b4ee7f92faa292cc6e6fb954ec1d360ade5`).
+`0x43E490` (`ev_2461f2fe9963d443377d4e7a73eb0b4ee7f92faa292cc6e6fb954ec1d360ade5`),
+serializer `0x425720` (`ev_ba7c2afe0cea1b8ac035b877fcb66094822ac8ab525d2a70a8e196e787dde737`),
+stream reader `0x4224D0` (`ev_a400cb5ab86f7098dfd08c8099bbb812751892d0e3b03cc4de1165538324a68f`),
+and base constructor `0x4375C0` (`ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349f68`).
 
 The base car constructor `0x42FF90` builds five resource-group vertex maps.
 Group 0 maps each vertex to its own truncated 16-bit index. For groups 1–4,

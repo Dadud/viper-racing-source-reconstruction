@@ -2064,7 +2064,7 @@ NcarVertexMapPlan plan_ncar_vertex_maps(
 std::optional<NcarBodyConstructorObservation>
 make_ncar_body_constructor_observation_from_runtime_record(
     const std::span<const std::byte> runtime_record,
-    const std::optional<std::uint32_t> constructor_parameter_2,
+    const std::optional<std::uint32_t> serialized_object_stream_offset,
     const bool fdiv_compatibility_enabled,
     const std::optional<std::uint32_t> compatibility_fill_bits) noexcept
 {
@@ -2075,7 +2075,7 @@ make_ncar_body_constructor_observation_from_runtime_record(
 
     NcarBodyConstructorObservation observation{};
     observation.source_record_word_0x00 = read_u32_le(runtime_record.data(), 0U);
-    observation.constructor_parameter_2 = constructor_parameter_2;
+    observation.serialized_object_stream_offset = serialized_object_stream_offset;
     observation.fdiv_compatibility_enabled = fdiv_compatibility_enabled;
     observation.compatibility_fill_bits = compatibility_fill_bits;
     for (std::size_t index = 0; index < observation.source_values_0x08_to_0x14.size();
@@ -2119,8 +2119,8 @@ NcarBodyConstructorPlan plan_ncar_body_constructor(
     write16(base_writes, 0x10U, 0U);
     write32(base_writes, 0x0cU, observation.source_record_word_0x00);
     write32(base_writes, 0x04U, 0U);
-    if (observation.constructor_parameter_2.has_value()) {
-        write32(base_writes, 0x08U, *observation.constructor_parameter_2);
+    if (observation.serialized_object_stream_offset.has_value()) {
+        write32(base_writes, 0x08U, *observation.serialized_object_stream_offset);
     }
     write32(base_writes, 0x3cU, 0U);
     write32(base_writes, 0x40U, 0U);

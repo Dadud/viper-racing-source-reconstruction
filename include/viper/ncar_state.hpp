@@ -230,19 +230,21 @@ struct NcarVertexMapPlan {
 struct NcarBodyConstructorObservation {
     std::array<float, 4> source_values_0x08_to_0x14{};
     std::uint32_t source_record_word_0x00{};
-    std::optional<std::uint32_t> constructor_parameter_2;
+    // Offset of this object's record in the serialized physics-task stream.
+    // The loader reads the DWORD preceding each record and passes it unchanged.
+    std::optional<std::uint32_t> serialized_object_stream_offset;
     bool fdiv_compatibility_enabled{};
     std::optional<std::uint32_t> compatibility_fill_bits;
 };
 
 // Adapts the bounded 0x1E4-byte car runtime record consumed by the shared
 // 0x43E490 body initializer. DWORDs at +0x08..+0x14 are interpreted as the
-// four constructor source floats; the second constructor argument remains an
-// explicit caller observation.
+// four constructor source floats; the stream offset remains an explicit caller
+// observation because it depends on the complete physics-task serialization.
 [[nodiscard]] std::optional<NcarBodyConstructorObservation>
 make_ncar_body_constructor_observation_from_runtime_record(
     std::span<const std::byte> runtime_record,
-    std::optional<std::uint32_t> constructor_parameter_2,
+    std::optional<std::uint32_t> serialized_object_stream_offset,
     bool fdiv_compatibility_enabled,
     std::optional<std::uint32_t> compatibility_fill_bits = std::nullopt) noexcept;
 
