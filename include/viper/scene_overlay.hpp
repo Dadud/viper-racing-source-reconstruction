@@ -845,6 +845,8 @@ struct SceneDashboardMetricResult {
 struct SceneDashboardStringTable;
 
 struct SceneDashboardSupplementalTimeObservation {
+    // Standalone helper inputs. The composed 0x4035E0 callback replaces these
+    // with the shared Position row's displayed value/count.
     std::uint32_t displayed_position{};
     std::uint32_t displayed_count{};
     std::uint32_t record_value_0x1c_bits{};

@@ -1018,8 +1018,10 @@ distance scale, and suffix remain supplied observations.
 On the type-0/global-`+0x40`-false branch, the flow also composes the
 supplemental `+0x24`/`+0x1C` rows before the paths converge at `0x403F7E`.
 Their position and count gates use the common `+0x140` Position result and
-adjusted entity count. After branch convergence, it applies both metric cache
-slots (`+0x10`, then `+0x14`) and the `0x404313` auxiliary readout in callback
+adjusted entity count; the composer overwrites both supplemental helper inputs
+with those shared values before applying its `count > 1` gate. After branch
+convergence, it applies both metric cache slots (`+0x10`, then `+0x14`) and
+the `0x404313` auxiliary readout in callback
 order for every selected type. Metric values, resource measurements, strings,
 and the auxiliary glyph advance remain supplied observations.
 The generic text plan's vector follows its descriptor-table order, not native

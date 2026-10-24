@@ -1964,8 +1964,12 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
 
     if (observation.selected_object_type_0x18 == 0 &&
         !observation.global_method_0x40_result &&
-        observation.supplemental_time.displayed_count > 1U) {
+        result.position.displayed_count > 1U) {
         auto supplemental_observation = observation.supplemental_time;
+        supplemental_observation.displayed_position =
+            result.position.displayed_position;
+        supplemental_observation.displayed_count =
+            result.position.displayed_count;
         result.supplemental_time_branch_reached = true;
         result.supplemental_time = scene_dashboard_supplemental_time_plan(
             supplemental_observation);
