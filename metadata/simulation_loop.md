@@ -663,6 +663,12 @@ its cached generation `0x4EB260` differs from `0x4D3868`, and draws handle
 mask/refresh/draw sequence. Its ordered operations now record registration
 (`0x418C90` with cleanup `0x405240`) when needed, generation refresh
 (`0x418CC0`) when stale, and the final resource draw (`0x40C930`).
+The shared `0x40C930` wrapper calls `0x40C790("load.stp", handle, '\\0')`
+and then refreshes `0x4ECBFC` from `0x413BD0`; both paused and splash branches
+reach this wrapper. Splash:Loading therefore uses the same load.stp layout path,
+but its handle-specific text and renderer observations still need to be
+composed into the state-0 pixel batch. Function evidence:
+`ev_1bc3603c6b9b1fc608e72eb5567b7b5026aeecd394d0c8a199b697626f404516`.
 
 `scene_shared_overlay_frame_plan` composes the shared post-dashboard callback
 in the recovered predicate order: pause, cheater, `0x4048E0`, `0x404900`,
