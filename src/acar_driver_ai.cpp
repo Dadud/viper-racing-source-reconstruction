@@ -715,17 +715,78 @@ AcarControlResponsePlan plan_acar_control_response(
     return plan;
 }
 
+AcarBehaviorGeometryPlan plan_acar_behavior_geometry_seed(
+    const AcarBehaviorGeometryObservation& observation) noexcept
+{
+    AcarBehaviorGeometryPlan plan{};
+    plan.fdiv_compatibility_path_used =
+        observation.fdiv_compatibility_enabled;
+
+    if (std::bit_cast<std::int32_t>(observation.vector_mode_bits_0xf80) <= 0) {
+        plan.initial_local_output_0 =
+            std::bit_cast<std::int32_t>(
+                observation.fallback_direction_bits_0xf64) > 0
+                ? 1.0F : -1.0F;
+        return plan;
+    }
+
+    plan.vector_angle_branch_reached = true;
+    auto vector_x = observation.vector_x_0xf74;
+    auto vector_y = observation.vector_y_0xf78;
+    constexpr float unit_length_tolerance =
+        std::bit_cast<float>(std::uint32_t{0x34000000U});
+    const auto initial_length = std::sqrt(
+        static_cast<long double>(vector_x) * vector_x +
+        static_cast<long double>(vector_y) * vector_y);
+    const auto unit_length_delta = std::fabs(initial_length - 1.0L);
+    if (unit_length_delta > unit_length_tolerance) {
+        plan.vector_normalization_reached = true;
+        const auto length = std::sqrt(
+            static_cast<long double>(vector_y) * vector_y +
+            static_cast<long double>(vector_x) * vector_x);
+        vector_x = static_cast<float>(divide_with_vc98_fdiv_compatibility(
+            vector_x, length, observation.fdiv_compatibility_enabled));
+        vector_y = static_cast<float>(divide_with_vc98_fdiv_compatibility(
+            vector_y, length, observation.fdiv_compatibility_enabled));
+    }
+    plan.effective_vector_x = vector_x;
+    plan.effective_vector_y = vector_y;
+
+    // The callback's comparison vector is initialized to (0, 1), then passes
+    // its own unit-length check unchanged. FPATAN therefore receives x as the
+    // signed cross product and y as the dot product.
+    const auto angle = std::atan2(static_cast<long double>(vector_x),
+                                  static_cast<long double>(vector_y));
+    plan.angle_radians = static_cast<float>(angle);
+    const auto scaled_angle = divide_with_vc98_fdiv_compatibility(
+        angle, observation.steering_scale_0xdcc,
+        observation.fdiv_compatibility_enabled) *
+        observation.steering_gain_0xf50;
+    plan.initial_local_output_0 = static_cast<float>(scaled_angle);
+    return plan;
+}
+
 AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     const AcarDriverAiState& driver_state,
     const AcarBehaviorControlChainObservation& observation)
 {
     AcarBehaviorControlChainPlan plan{};
-    plan.local_output_0 = observation.initial_local_output_0;
-    plan.local_output_1 = observation.initial_local_output_1;
+    plan.geometry_plan = plan_acar_behavior_geometry_seed(observation.geometry);
+    plan.local_output_0 = plan.geometry_plan.initial_local_output_0;
+    plan.local_output_1 = 0.0F;
+    constexpr float maximum_speed_argument = 0.6F;
+    plan.final_argument_0x2c =
+        observation.speed_0x1020 > maximum_speed_argument ||
+                std::isnan(observation.speed_0x1020)
+            ? maximum_speed_argument
+            : observation.speed_0x1020;
 
     plan.helper_0x42a6d0_called = true;
+    auto route_observation = observation.route_steering;
+    route_observation.fdiv_compatibility_enabled =
+        observation.geometry.fdiv_compatibility_enabled;
     plan.route_steering_plan = plan_acar_route_steering(
-        observation.route_steering);
+        route_observation);
     if (plan.route_steering_plan->output_0.has_value()) {
         plan.local_output_0 = *plan.route_steering_plan->output_0;
     }
@@ -753,6 +814,8 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
 
     auto forward_observation = observation.forward_steering;
     forward_observation.incoming_output_0 = plan.local_output_1;
+    forward_observation.fdiv_compatibility_enabled =
+        observation.geometry.fdiv_compatibility_enabled;
     plan.helper_0x42b450_called = true;
     plan.forward_steering_plan = plan_acar_forward_candidate_steering(
         forward_observation);
@@ -763,6 +826,9 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     if (!(plan.local_output_1 >= observation.clamp_value_0x1018)) {
         plan.local_output_1 = observation.clamp_value_0x1018;
     }
+    plan.tail_argument_0x428cd0 = plan.local_output_0;
+    plan.tail_argument_0x428e20 = plan.local_output_1;
+    plan.tail_argument_0x4331d0 = plan.final_argument_0x2c;
     plan.tail_call_order = {
         AcarBehaviorControlTailCall::helper_0x428cd0,
         AcarBehaviorControlTailCall::helper_0x428b40,

@@ -682,7 +682,19 @@ are supplied observations. Evidence: `0x42B570`
 `compose_acar_behavior_control_chain` now carries the two stack outputs
 through `0x42A6D0`, `0x42B570`, and `0x42B450` in callback order, applies the
 observed `+0x1018` comparison, and records the six subsequent helper calls
-through `0x4331C0`. The `0x42B7B0` vector/angle loop that seeds local output 0,
-the `+0x2C` argument, and the called tail helpers' effects remain explicit
-follow-up work; incomplete `0x42A6D0` inputs stop the composition before
-dependent calls.
+through `0x4331C0`. Incomplete `0x42A6D0` inputs stop the composition before
+dependent calls; tail-helper effects remain explicit follow-up work.
+
+`plan_acar_behavior_geometry_seed` now resolves that vector/angle seed from
+the `+0xF80` signed gate, `+0xF74/+0xF78` vector, the `2^-23` unit-length
+tolerance, and the x87 `atan2(cross,dot)` path against the callback's default
+`(0,1)` vector. It applies the observed `+0xDCC` divisor and `+0xF50` gain;
+when the vector gate is inactive it uses the signed `+0xF64` fallback. The
+callback composition now initializes its second output to zero and derives
+the `+0x2C` tail argument as `min(+0x1020, 0.6)`, with unordered comparison
+selecting `0.6`. Evidence: full callback bytes `0x42B7B0..0x42BB24`
+`ev_b038b8489dcad25a2edb9f7bb71e9ca7c2ece24d4467baccad8114e6913e8f93`,
+unit tolerance `0x4C7A90` `ev_07bb0849fc9a975f3b1ec585fe462b418cd0358aac9fc91e535665a288bf36e7`,
+and default-vector constant `0x4C7B60`
+`ev_8f72f892b514d0f5da81e218e0aa790a8a7879ff36567835e3177f61bba0eefe`.
+The six tail helpers' state effects remain open.

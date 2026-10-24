@@ -281,24 +281,54 @@ enum class AcarBehaviorControlTailCall : std::uint8_t {
     helper_0x4331c0,
 };
 
+struct AcarBehaviorGeometryObservation {
+    float vector_x_0xf74{};
+    float vector_y_0xf78{};
+    std::uint32_t vector_mode_bits_0xf80{};
+    std::uint32_t fallback_direction_bits_0xf64{};
+    float steering_scale_0xdcc{};
+    float steering_gain_0xf50{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct AcarBehaviorGeometryPlan {
+    float initial_local_output_0{};
+    std::optional<float> effective_vector_x;
+    std::optional<float> effective_vector_y;
+    std::optional<float> angle_radians;
+    bool vector_angle_branch_reached{};
+    bool vector_normalization_reached{};
+    bool fdiv_compatibility_path_used{};
+};
+
+// Projects the vector-angle seed and signed fallback in callback fragment
+// 0x42B7B0.
+[[nodiscard]] AcarBehaviorGeometryPlan plan_acar_behavior_geometry_seed(
+    const AcarBehaviorGeometryObservation& observation) noexcept;
+
 struct AcarBehaviorControlChainObservation {
+    AcarBehaviorGeometryObservation geometry{};
     AcarRouteSteeringObservation route_steering{};
     AcarControlResponseObservation control_response{};
     AcarForwardCandidateSteeringObservation forward_steering{};
-    float initial_local_output_0{};
-    float initial_local_output_1{};
     float clamp_value_0x1018{};
-    float final_argument_0x2c{};
-    float pass_through_argument_0x28{1.0F};
+    float speed_0x1020{};
 };
 
 struct AcarBehaviorControlChainPlan {
     std::optional<AcarRouteSteeringPlan> route_steering_plan;
     std::optional<AcarControlResponsePlan> control_response_plan;
     std::optional<AcarForwardCandidateSteeringPlan> forward_steering_plan;
+    AcarBehaviorGeometryPlan geometry_plan{};
     std::vector<AcarBehaviorControlTailCall> tail_call_order;
     float local_output_0{};
     float local_output_1{};
+    float final_argument_0x2c{};
+    float tail_argument_0x428cd0{};
+    float tail_argument_0x428b40{1.0F};
+    float tail_argument_0x428e20{};
+    float tail_argument_0x4331d0{};
+    float tail_argument_0x4331c0{1.0F};
     bool helper_0x42a6d0_called{};
     bool helper_0x42b570_called{};
     bool helper_0x42b450_called{};
