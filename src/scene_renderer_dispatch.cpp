@@ -6,6 +6,15 @@
 #include <utility>
 
 namespace viper {
+
+SceneRendererObjectObservation observe_scene_wheel_resource_manager(
+    const bool pointer_present,
+    const bool virtual_0x10_result,
+    const bool virtual_0x0c_result) noexcept
+{
+    return {pointer_present, virtual_0x10_result, virtual_0x0c_result, 0x004623F0U};
+}
+
 namespace {
 
 std::array<float, 12> make_scene_view_transform(
@@ -450,7 +459,7 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                 0U, i, 0x0cU});
             if (object.virtual_0x0c_result && mode_permits_draw) {
                 result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
-                    0U, i, 0x14U});
+                    object.virtual_0x14_target, i, 0x14U});
                 ++result.object_draw_callbacks;
             }
             ++result.objects_processed;

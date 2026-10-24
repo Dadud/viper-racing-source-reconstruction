@@ -1,5 +1,16 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Preserved a resolved object-specific render
+  callback address in generic scene dispatch and added
+  `observe_scene_wheel_resource_manager`, which carries the constructor-proven
+  `+0x14 -> 0x4623F0` target into the renderer action stream. The preceding
+  `+0x10` and `+0x0C` return values remain explicit runtime observations.
+  Evidence: manager vtable/constructor in
+  `metadata/scene_car_update.md` (`ev_1b91d34c52b1d19ee056410c599b67f72ae9ac2381bb2857090aa3ddda9ff43f`,
+  `ev_761442b24e1e0ad9e1e15d7b5e33174a7144d92be40f035876d1cbada57a6f09`).
+  Release `viper_race_scene_flow` build and `git diff --check` pass; no tests
+  were run.
+
 - **2026-10-24 continuation:** Added `plan_scene_car_wheel_frame` to compose
   the four `0x465800` wheel iterations in order: transform first, then that
   wheel's gated auxiliary update or release, carrying four independent resource

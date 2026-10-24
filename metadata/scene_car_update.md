@@ -437,6 +437,13 @@ registration `0x45C2E0` `ev_f7d4a1c00acf8a61134b349e6cac89cebf193a462d77cca3b1c5
 and scene constructor `0x463920`
 `ev_761442b24e1e0ad9e1e15d7b5e33174a7144d92be40f035876d1cbada57a6f09`.
 
+The generic render observation can now retain the resolved `+0x14` target.
+`observe_scene_wheel_resource_manager` records `0x4623F0`, while leaving the
+generic `+0x10` and `+0x0C` return values as observations; when the generic
+dispatcher reaches `+0x14`, its action carries that native target address.
+This links the renderer's object walk to the already modeled wheel-manager
+frame method without inventing behavior for the manager's earlier gates.
+
 `plan_scene_renderer_dispatch` projects the enclosing generic render frame at
 `0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active
 draw gate is `renderer_mode > 0` with renderer state in `{0,1,2}`. When active,

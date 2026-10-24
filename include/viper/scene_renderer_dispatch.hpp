@@ -14,7 +14,16 @@ struct SceneRendererObjectObservation {
     bool pointer_present{true};
     bool virtual_0x10_result{};
     bool virtual_0x0c_result{};
+    // Resolved vtable target for slot +0x14; zero means the class target is unknown.
+    std::uint32_t virtual_0x14_target{};
 };
+
+// Builds the generic-dispatch observation for the registered wheel-resource
+// manager; constructor 0x4622F0 installs 0x4623F0 at vtable slot +0x14.
+[[nodiscard]] SceneRendererObjectObservation observe_scene_wheel_resource_manager(
+    bool pointer_present,
+    bool virtual_0x10_result,
+    bool virtual_0x0c_result) noexcept;
 
 inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
 inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;
