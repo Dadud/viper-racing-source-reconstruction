@@ -282,6 +282,33 @@ struct FourWheelCollisionImpulseResult {
     std::size_t wheel_calls{};
 };
 
+struct NcarIntegratorPrefixInput {
+    // Car +0x4FC controls the first-frame child-state/velocity reset.
+    std::uint32_t state_0x4fc{};
+    bool force_gate_0xe3d{};
+    float mass_0x7c{};
+};
+
+struct NcarIntegratorPrefixResult {
+    bool initialization_reset_reached{};
+    std::uint32_t child_value_0xdec{};
+    std::uint32_t child_value_0xde4{0x3f800000U};
+    bool contact_virtual_callback_0x50_reached{};
+    bool initial_force_call_0x43e6f0_reached{};
+    PhysicsVector3 application_point{};
+    PhysicsVector3 point_velocity{};
+    PhysicsVector3 force{};
+    bool force_accumulated{};
+};
+
+// Models the pre-wheel prefix of 0x431150: conditional child/default and
+// velocity stores, followed by the contact-gated vertical force accumulator.
+[[nodiscard]] NcarIntegratorPrefixResult apply_ncar_integrator_prefix(
+    BodyIntegrationKinematicsInput& kinematics,
+    NcarForceMomentAccumulator& accumulator,
+    const NcarIntegratorPrefixInput& input,
+    const std::array<std::uint8_t, 4>& contact_bytes) noexcept;
+
 struct FourWheelBodyStepInput {
     std::array<std::uint8_t, 4> wheel_damage_flags_0x20{};
     bool wheel_update_prefix_enabled{};
@@ -318,6 +345,7 @@ struct FourWheelBodyStepInput {
     std::array<WheelRateFinalizationInput, 4> wheel_rate_finalization_inputs{};
     NcarIntegratorBookkeepingState integrator_bookkeeping_state{};
     NcarIntegratorBookkeepingInput integrator_bookkeeping_input{};
+    NcarIntegratorPrefixInput integrator_prefix_input{};
     NcarIntegratorModeForceInput mode_force_input{};
     NcarIntegratorWheelPairDifferentialInput wheel_pair_differential_input{};
     NcarIntegratorCommonForceInput common_force_input{};
@@ -380,6 +408,7 @@ struct FourWheelBodyStepResult {
     std::array<WheelConditionalTireForceResult, 4> wheel_conditional_tire_forces{};
     std::array<WheelRateFinalizationResult, 4> wheel_rate_finalization_results{};
     NcarIntegratorBookkeepingResult integrator_bookkeeping{};
+    NcarIntegratorPrefixResult integrator_prefix{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};

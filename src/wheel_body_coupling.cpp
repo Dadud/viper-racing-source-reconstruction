@@ -9,6 +9,48 @@
 
 namespace viper {
 
+NcarIntegratorPrefixResult apply_ncar_integrator_prefix(
+    BodyIntegrationKinematicsInput& kinematics,
+    NcarForceMomentAccumulator& accumulator,
+    const NcarIntegratorPrefixInput& input,
+    const std::array<std::uint8_t, 4>& contact_bytes) noexcept
+{
+    NcarIntegratorPrefixResult result{};
+    if (input.state_0x4fc == 0U) {
+        result.initialization_reset_reached = true;
+        kinematics.linear_velocity.x = 0.0F;
+        kinematics.linear_velocity.z = 0.0F;
+    }
+    if (!input.force_gate_0xe3d) {
+        return result;
+    }
+
+    const auto contact_count = std::accumulate(
+        contact_bytes.begin(), contact_bytes.end(), std::uint32_t{0});
+    result.contact_virtual_callback_0x50_reached = contact_count > 2U;
+    const auto point = transform_body_local_point({
+        {0.0F, 2.0F, 0.0F},
+        kinematics.orientation_matrix_0x0e,
+        kinematics.position});
+    result.application_point = point;
+    result.point_velocity = derive_body_point_velocity_0x43e9b0({
+        kinematics.position,
+        point,
+        kinematics.linear_velocity,
+        kinematics.angular_velocity});
+    result.force = {
+        0.0F,
+        input.mass_0x7c * result.point_velocity.y * -4.4145F,
+        0.0F};
+    result.initial_force_call_0x43e6f0_reached = true;
+    result.force_accumulated = accumulate_ncar_force_moment(
+        accumulator,
+        {result.force.x, result.force.y, result.force.z},
+        {point.x, point.y, point.z},
+        {kinematics.position.x, kinematics.position.y, kinematics.position.z});
+    return result;
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,
@@ -598,6 +640,12 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     result.wheel_tire_accumulator_states = input.wheel_tire_accumulator_states;
     result.wheel_contact_states = input.wheel_contact_states;
     result.energy_accumulator_0xe40 = input.energy_accumulator_0xe40;
+    auto kinematics_at_step_start = input.kinematics;
+    result.integrator_prefix = apply_ncar_integrator_prefix(
+        kinematics_at_step_start,
+        result.force_moment_state,
+        input.integrator_prefix_input,
+        input.mode_force_input.contact_bytes);
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;
     result.wheel_collisions.wheel_damage_flags = input.wheel_damage_flags_0x20;
@@ -656,7 +704,7 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             spin_input.previous_filter_0x17c =
                 input.wheel_tire_dynamics_states[wheel].spin_filter_0x17c;
             const auto& high_speed_axis = input.mode_force_input.body_axis_0x50;
-            const auto& linear_velocity = input.kinematics.linear_velocity;
+            const auto& linear_velocity = kinematics_at_step_start.linear_velocity;
             spin_input.high_speed_projection =
                 high_speed_axis.x * linear_velocity.x +
                 high_speed_axis.y * linear_velocity.y +
@@ -746,10 +794,10 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                 suspension_force.x, suspension_force.y, suspension_force.z};
 
             const auto point_velocity = derive_body_point_velocity_0x43e9b0({
-                input.kinematics.position,
+                kinematics_at_step_start.position,
                 result.wheel_contact_states[wheel].contact_point_0x130,
-                input.kinematics.linear_velocity,
-                input.kinematics.angular_velocity});
+                kinematics_at_step_start.linear_velocity,
+                kinematics_at_step_start.angular_velocity});
             result.wheel_point_velocities_0x43e9b0[wheel] = point_velocity;
             const auto& forward = response_vector_input.forward_basis;
             const auto& normal = response_vector_input.contact_normal;
@@ -770,8 +818,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         // These collision arguments are read from the body and wheel records
         // by 0x442530. Reuse the state already carried by the body step and
         // contact pipeline rather than requiring duplicate caller snapshots.
-        collision_input.body_center = input.kinematics.position;
-        collision_input.body_velocity = input.kinematics.linear_velocity;
+        collision_input.body_center = kinematics_at_step_start.position;
+        collision_input.body_velocity = kinematics_at_step_start.linear_velocity;
         if (input.wheel_contact_pipeline_enabled) {
             collision_input.contact_point =
                 result.wheel_contact_states[wheel].contact_point_0x130;
@@ -968,9 +1016,9 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     mode_force_input.leading_wheel_damage_bytes = {
         result.wheel_collisions.wheel_damage_flags[0],
         result.wheel_collisions.wheel_damage_flags[1]};
-    mode_force_input.angular_velocity_0x240 = input.kinematics.angular_velocity;
-    mode_force_input.linear_velocity_0x234 = input.kinematics.linear_velocity;
-    mode_force_input.body_center = input.kinematics.position;
+    mode_force_input.angular_velocity_0x240 = kinematics_at_step_start.angular_velocity;
+    mode_force_input.linear_velocity_0x234 = kinematics_at_step_start.linear_velocity;
+    mode_force_input.body_center = kinematics_at_step_start.position;
     if (input.wheel_contact_pipeline_enabled) {
         for (std::size_t wheel = 0; wheel < mode_force_input.contact_bytes.size(); ++wheel) {
             mode_force_input.contact_bytes[wheel] =
@@ -985,12 +1033,12 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         apply_ncar_integrator_wheel_pair_differentials(wheel_pair_input);
     auto common_force_input = input.common_force_input;
     common_force_input.contact_bytes = mode_force_input.contact_bytes;
-    common_force_input.body_center = input.kinematics.position;
+    common_force_input.body_center = kinematics_at_step_start.position;
     result.common_force = apply_ncar_integrator_common_force(
         result.force_moment_state, common_force_input);
     auto velocity_force_input = input.velocity_force_input;
-    velocity_force_input.velocity_vector = input.kinematics.linear_velocity;
-    velocity_force_input.body_center = input.kinematics.position;
+    velocity_force_input.velocity_vector = kinematics_at_step_start.linear_velocity;
+    velocity_force_input.body_center = kinematics_at_step_start.position;
     result.velocity_forces = apply_ncar_integrator_velocity_forces(
         result.force_moment_state, velocity_force_input);
     if (input.attached_object_force_gate_0xbe4) {
@@ -1007,7 +1055,7 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             auto object_input = input.attached_object_force_inputs[index];
             object_input.target_projection_0x38 =
                 result.attached_object_targets_0x38[index];
-            object_input.body_center = input.kinematics.position;
+            object_input.body_center = kinematics_at_step_start.position;
             result.attached_object_forces[index] = apply_ncar_attached_object_force(
                 result.force_moment_state, object_input);
         }
@@ -1023,17 +1071,17 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         } else {
             auto record_body_input = input.embedded_record_body_input;
             record_body_input.body_motion.linear_0x234 = {
-                input.kinematics.linear_velocity.x,
-                input.kinematics.linear_velocity.y,
-                input.kinematics.linear_velocity.z};
+                kinematics_at_step_start.linear_velocity.x,
+                kinematics_at_step_start.linear_velocity.y,
+                kinematics_at_step_start.linear_velocity.z};
             record_body_input.body_motion.angular_0x240 = {
-                input.kinematics.angular_velocity.x,
-                input.kinematics.angular_velocity.y,
-                input.kinematics.angular_velocity.z};
+                kinematics_at_step_start.angular_velocity.x,
+                kinematics_at_step_start.angular_velocity.y,
+                kinematics_at_step_start.angular_velocity.z};
             record_body_input.body_motion.center_0x5c = {
-                input.kinematics.position.x,
-                input.kinematics.position.y,
-                input.kinematics.position.z};
+                kinematics_at_step_start.position.x,
+                kinematics_at_step_start.position.y,
+                kinematics_at_step_start.position.z};
             result.embedded_records = update_embedded_record_contact_batch_from_terrain(
                 input.embedded_record_states,
                 input.embedded_record_local_points_0x00,
@@ -1069,7 +1117,7 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             input.virtual_record_accumulator_delta[index];
     }
 
-    auto kinematics_input = input.kinematics;
+    auto kinematics_input = kinematics_at_step_start;
     const auto& accumulated =
         result.body_tail_state.running_accumulators_0x93_to_0x98;
     kinematics_input.accumulated_linear_force = {

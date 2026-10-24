@@ -13,12 +13,20 @@ The first branch tests the object dword at `+0x4FC`. When it is zero, the
 integrator calls setter `0x4331C0` with zero (object `+0xDEC`), calls setter
 `0x4331B0` with float 1.0 (object `+0xDE4`), and clears object dwords `+0x234`
 and `+0x23C`. `apply_ncar_integrator_entry_reset` models this exact prefix;
-nonzero `+0x4FC` leaves those fields untouched. The rest of the integrator
-performs wheel updates and body-state integration and remains outside this
-offset-preserving model.
+nonzero `+0x4FC` leaves those fields untouched. In the four-wheel body-step
+composition, the same gate now clears the modeled linear-velocity X/Z
+components before later projections. The following `+0xE3D` branch transforms
+local point `(0,2,0)`, evaluates its point velocity, and accumulates the
+vertical force `+0x7C * point_velocity.y * -4.4145`. Its nested contact-byte sum
+reaches the `+0x50` virtual callback only when the sum is greater than two;
+that callback's native effects remain outside the projection.
 
 Evidence: `ev_fb7a9b21717cfb6308ed0b4ff5c8e3f5b185399be225d0fbbfbde36ee68b1217`
-(`0x431150` pseudocode).
+(`0x431150` pseudocode), `ev_4e237485e955a5ada3411b37c141b93778bcfda352b438d4c0414812405a213a`
+(`0x4331C0`), and `ev_985b150bd698d190e02732dbb8ae7b75ef0248366c9a97b122fdf5308da4f4ce`
+(`0x4331B0`). The nearby timer/control calls remain outside this prefix
+projection. The retained analysis bundle is
+[`ncar_integrator_prefix.evidence.json`](ncar_integrator_prefix.evidence.json).
 
 ## PCAR callback at `0x4384D0`
 
