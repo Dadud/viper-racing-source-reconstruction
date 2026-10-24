@@ -664,6 +664,35 @@ and row stride/counter (`ev_0d5984591da78047ccb44ce997e71f50bcf8a7f404c618d0ec8e
 `ev_323ef6a2a48884d33e80c59414813a71fa86054846f480620274109e64b7e4f2`,
 `ev_54c1397d51e32b056d00b3690a537945ba8a4f18ce889f32925825ddd3f2893b`).
 
+The primary callback `0x4569C0`, selected with secondary callback
+`0x455F40`, now uses the same bounded row planner. All modes copy the five
+source words at `+0,+4,+8,+0x18,+0x1C`; modes 0 and 1 derive a palette index
+from source `+0x0C/+0x10/+0x14`, the three `0x50D0DC/E0/E4` coefficients, and
+an x87 conversion, then write `palette[index] | DAT_0050D114` at `+0x10`.
+Mode 2 writes `0xFFFFFFFF` there without a palette lookup. All modes initialize
+`+0x14` to zero and use the same distance-fade alpha logic as `0x455F40`.
+The computed palette index and final alpha byte are caller observations, so
+index conversion and x87 last-bit behavior stay explicit. Missing palette or
+alpha observations stop the plan after the native writes already determined.
+Evidence: mode gate (`ev_9db4680ab87b06ab685ec5b946d27b2004ae1595e1005ca355787f770848977f`,
+`ev_d7f055d67db31e3cf47deecdce480f20858dae11afa069adb1c12508be1ad16b`), row
+copy and palette source/coefficient reads (`ev_e1c95883bf6ae7ee28e8b7948a1f99ee937c9539055305a4b6024d735bf705cb`,
+`ev_ccb331224ef1b924c3c6452b6835e82aee85527d41c714e8b7e370762146fa8d`,
+`ev_2f19ef52211ab8a089dc18f8b9be52da05e9b57b648dd8da184cf524a458c129`,
+`ev_86e51a69d553ad4076de81fa94dcec697548000741e888e7c3b2c1f735ba924b`,
+`ev_c782eefd4af63cf27cfbf38e41ae11c04f5b8ac9240acba3963ea9789df8e6c1`),
+palette lookup/mask/write (`ev_a40c0641e2ec0930db926b22b338fd2cee3af40d427c065be45f26e0fa44d056`,
+`ev_55c6238a657c40d69dd1b47a0c04adcf6b34d4847ba3bf586a91908162906ca2`,
+`ev_b69d5e78637fecc51cc85fba92866f288cab3ff7f7208c6d90b34cbfa4adf964`,
+`ev_ada74c40d31d008e09a54d4a70af79e752e28407c3ea6c7540c5c141141127b6`),
+mode-2 white word (`ev_de7009744cc96d4e9b24ec6c5304186adbe92ad703f7c0561b6757e68803b0a8`,
+`ev_3cd2033e7b010ee084194ebeca2ee950d5362f11a07d12ad37718aa331654a14`),
+and alpha/counter (`ev_4799b3d0c93f5a0b6b64038d723121f99beab6c284746b903114b9da4005e28a`,
+`ev_d949f7362892be769c21edf90736ae48f1b11dd8352dc45c0f4ae983a9964b15`,
+`ev_6e0198912148953d222fe003c55507c6d0c1fd05ec8facf045ae4a7e745f675e`,
+`ev_2c3a186b8dad8766d6c4878141939f9e7e423dfc6ea6d0da6e526aa3fd5a825c`,
+`ev_f78447609e79fc750a255148f553f285afe37067a98b864c0cc64010f167127a`,
+`ev_6385719af1e8b8f040648a11e5e74910aae157499b8a497f7cef486e374f1fc0`).
 Four other second-slot callback targets are constant-argument panic
 forwarders: `0x455F20` passes `0x4DB74C`, `0x455F30` passes `0x4DB78C`,
 `0x456210` passes `0x4DB7C8`, and `0x456220` passes `0x4DB808` to

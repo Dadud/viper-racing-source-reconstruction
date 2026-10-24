@@ -1082,11 +1082,12 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
     const bool alpha_fill = callback_address == 0x00455D90U;
     const bool color_mask = callback_address == 0x00455E00U;
     const bool depth_fade = callback_address == 0x00455F40U;
-    if (!alpha_fill && !color_mask && !depth_fade) {
+    const bool palette_fade = callback_address == 0x004569C0U;
+    if (!alpha_fill && !color_mask && !depth_fade && !palette_fade) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
         return result;
     }
-    if ((color_mask || depth_fade) && observation.descriptor_mode > 2U) {
+    if ((color_mask || depth_fade || palette_fade) && observation.descriptor_mode > 2U) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_descriptor_mode;
         return result;
     }
@@ -1129,15 +1130,30 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
                 (static_cast<std::uint32_t>(observation.alpha_byte_0x50d110) << 24U) |
                 0x00FFFFFFU;
             write(0x10U, alpha_color);
+        } else if (palette_fade && observation.descriptor_mode == 2U) {
+            write(0x10U, 0xFFFFFFFFU);
+        } else if (palette_fade) {
+            if (row_index >= observation.lighting_palette_indices.size()) {
+                result.status = SceneRenderScanlineConversionStatus::lighting_index_observation_exhausted;
+                return result;
+            }
+            const auto palette_index = static_cast<std::size_t>(
+                observation.lighting_palette_indices[row_index]);
+            if (palette_index >= observation.lighting_palette_words.size()) {
+                result.status = SceneRenderScanlineConversionStatus::lighting_palette_observation_exhausted;
+                return result;
+            }
+            write(0x10U, observation.lighting_palette_words[palette_index] |
+                observation.color_or_mask_0x50d114);
         } else {
             write(0x10U, source[4] | observation.color_or_mask_0x50d114);
         }
-        if (depth_fade && row_index >= observation.depth_fade_alpha_bytes.size()) {
+        if ((depth_fade || palette_fade) && row_index >= observation.depth_fade_alpha_bytes.size()) {
             write(0x14U, 0U);
             result.status = SceneRenderScanlineConversionStatus::depth_fade_result_observation_exhausted;
             return result;
         }
-        if (depth_fade) {
+        if (depth_fade || palette_fade) {
             write(0x14U, 0U);
             write(0x14U,
                 static_cast<std::uint32_t>(observation.depth_fade_alpha_bytes[row_index]) << 24U);

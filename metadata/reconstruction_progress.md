@@ -1,5 +1,10 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended the bounded callback model to primary renderer
+  callback `0x4569C0`: modes 0–1 select an observed palette index and mask the
+  selected table word; mode 2 writes opaque white. All modes share the copied
+  row fields and distance-fade alpha path. Palette conversion and exact alpha
+  remain observations because of x87 precision.
 - **2026-10-24:** Resolved all four panic-forwarder format strings from the
   engine string inventory and added their text to the callback plan. They
   report missing environment mappings for prelit objects across fog and
