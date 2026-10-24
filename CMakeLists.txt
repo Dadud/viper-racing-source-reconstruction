@@ -94,6 +94,10 @@ add_library(viper_update_curve src/update_curve.cpp)
 target_include_directories(viper_update_curve PUBLIC include)
 target_compile_features(viper_update_curve PUBLIC cxx_std_20)
 
+add_library(viper_language_resource src/language_resource.cpp)
+target_include_directories(viper_language_resource PUBLIC include)
+target_compile_features(viper_language_resource PUBLIC cxx_std_20)
+
 add_library(viper_ncar_model src/ncar_state.cpp)
 target_include_directories(viper_ncar_model PUBLIC include)
 target_compile_features(viper_ncar_model PUBLIC cxx_std_20)
@@ -166,6 +170,7 @@ target_link_libraries(viper_reconstruction PRIVATE
     viper_graphics_startup
     viper_matrix_quaternion
     viper_update_curve
+    viper_language_resource
     viper_vehicle_model
     viper_terrain_model
 )

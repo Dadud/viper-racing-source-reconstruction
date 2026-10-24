@@ -455,6 +455,9 @@ files were present.
   piecewise curve arithmetic and PCAR embedded-object candidate selection
   plus the observed curve configuration arithmetic; the selector's virtual
   getter has no observed state effect, and raw offsets are preserved.
+- `include/viper/language_resource.hpp` and `src/language_resource.cpp` parse
+  LANGRES0 language tables as bounded key/value offset pairs. The
+  `--inspect-language PATH [KEY]` command lists labels or resolves one key.
 - `include/viper/legacy_allocator.hpp` and `src/legacy_allocator.cpp` model
   the optional VxD allocation marker and fill behavior; portable execution can
   use the normal host heap instead of opening `\\.\vexed.vxd`.

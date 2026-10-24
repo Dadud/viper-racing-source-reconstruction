@@ -1,5 +1,6 @@
 #include "viper/asset_catalog.hpp"
 #include "viper/career_season.hpp"
+#include "viper/language_resource.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/race_scene_render_flow.hpp"
 #include "viper/scene_overlay.hpp"
@@ -38,6 +39,7 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-image BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-terrain BUNDLE_PATH\n"
+           << "       viper_reconstruction --inspect-language LNG_PATH [KEY]\n"
            << "       viper_reconstruction --help | --version\n\n"
            << "Asset files stay outside this source repository. Set VIPER_DATA_DIR\n"
            << "or pass --data-dir to inspect an extracted game data directory.\n";
@@ -78,6 +80,29 @@ int inspect_resource_bundle(const std::filesystem::path& path)
     std::cerr << bundle.entries().size() << " resources in " << path.string()
               << " (" << bundle.buffered_resource_count()
               << " buffered before mapped resources)\n";
+    return 0;
+}
+
+int inspect_language_resource(
+    const std::filesystem::path& path,
+    const std::optional<std::string_view> key)
+{
+    const auto language = viper::load_language_resource(path);
+    std::cout << "language\t" << language.language_name << '\n'
+              << "entry_count\t" << language.entries.size() << '\n';
+    if (key.has_value()) {
+        const auto value = language.find(*key);
+        if (!value.has_value()) {
+            std::cerr << "language key not found: " << *key << '\n';
+            return 1;
+        }
+        std::cout << "key\t" << *key << '\n'
+                  << "value\t" << *value << '\n';
+        return 0;
+    }
+    for (const auto& entry : language.entries) {
+        std::cout << entry.key << '\t' << entry.value << '\n';
+    }
     return 0;
 }
 
@@ -391,6 +416,8 @@ int main(int argc, char** argv)
         auto data_directory = data_directory_from_environment();
         bool list_assets = false;
         std::optional<std::filesystem::path> resource_bundle_path;
+        std::optional<std::filesystem::path> language_resource_path;
+        std::optional<std::string> language_key;
         std::optional<std::string> tire_resource_name;
         std::optional<std::string> season_resource_name;
         std::optional<std::string> stamp_resource_name;
@@ -418,6 +445,17 @@ int main(int argc, char** argv)
                     throw std::invalid_argument("--list-resources requires a bundle path");
                 }
                 resource_bundle_path = argv[++i];
+                continue;
+            }
+            if (argument == "--inspect-language") {
+                if (i + 1 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-language requires an LNG path");
+                }
+                language_resource_path = argv[++i];
+                if (i + 1 < argc && !std::string_view(argv[i + 1]).starts_with("--")) {
+                    language_key = argv[++i];
+                }
                 continue;
             }
             if (argument == "--inspect-tire") {
@@ -495,6 +533,16 @@ int main(int argc, char** argv)
 
         if (list_assets && resource_bundle_path) {
             throw std::invalid_argument("--list-assets and --list-resources are separate actions");
+        }
+        if (language_resource_path.has_value()) {
+            if (list_assets || resource_bundle_path.has_value()) {
+                throw std::invalid_argument(
+                    "language and resource-bundle inspection are separate actions");
+            }
+            return inspect_language_resource(*language_resource_path,
+                language_key.has_value()
+                    ? std::optional<std::string_view>(*language_key)
+                    : std::nullopt);
         }
         if (resource_bundle_path) {
             if (list_assets) {
