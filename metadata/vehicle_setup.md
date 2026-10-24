@@ -36,7 +36,15 @@ copied into that configured row or that its words have the same runtime
 meaning. The current asset loader therefore retains CCS as an opaque validated
 resource and does not use it as a CARF-mapper row. Close this bridge only with
 evidence for the row population/copy path, including the remaining row fields
-and any setup/upgrade selection behavior. Evidence: `0x45EFD0`
+and any setup/upgrade selection behavior. The single-race setup owner
+`0x45C5B0` clears its complete 0x335-DWORD object before the menu callback;
+`0x40A850` then writes marker, display name, car stem, and the words at
+`+0xC0/+0xC4` while leaving `+0x34..+0xBC` unwritten in that builder. This
+rules out that callback as the source of the mapping words, but does not rule
+out later setup mutation or a different owning row. Evidence: `0x45C5B0`
+`ev_ce5077ebc485f33b39f286697b2bcc7e5db06146f4f0a813f5c2a13eb3d47612`,
+`0x40A850` `ev_e52a864e503a5c943f75c6f007a442fd95fca2d59653187e01047142354d9bec`,
+`0x45EFD0`
 `ev_adb94e23d97afe66b379995ca90ed5ccce81d943c2e3b7d3e776824dd966026f`,
 `0x45EE40` `ev_d5349302be5d3e8df0415e2df0b15fc7f1b0bf5fe3018f4e0ba7bef8c501b36f`,
 and `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ffa06eec1a05a08317`.
