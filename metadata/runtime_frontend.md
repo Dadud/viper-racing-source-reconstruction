@@ -12,8 +12,10 @@ the assets and start the existing race session. On race results, Enter returns
 to setup; Escape exits. Closing the race window exits the app. The loaded
 `GameAssets` value owns resources through the race; returning from the race
 destroys it before the next setup selection and reload. CLI-selected car/track,
-asset validation, bounded smoke runs, audio smoke, and trace record/play modes
-bypass the interactive window so automated scenarios remain deterministic.
+asset validation, bounded smoke runs, audio smoke, and trace recording bypass
+the interactive window. `--play-trace` without explicit track/car overrides
+opens setup, then leaves results open after a finished playback so Enter can
+return to setup; explicit CLI asset selections retain bounded replay behavior.
 
 `game_frontend_launch_smoke` is a Windows CTest that launches the actual
 interactive executable, finds the setup window, posts Enter, waits for the race
@@ -22,10 +24,23 @@ proves setup-to-race asset loading and the early-exit path. It does not yet run
 a complete race through results and back to setup, verify every selector row,
 persist changed choices, or establish parity with the original menus.
 
+`game_frontend_race_lifecycle_smoke` creates a deterministic one-lap
+Viper/Bemidji throttle trace, launches through the real setup window, selects
+Viper, plays the full trace, and waits for Enter to return from standings to
+setup. It then changes to Sports, launches the second full trace session, and
+exits from setup after its results. Replay exhaustion keeps the results window
+open only when playback was started through the interactive frontend; explicit
+CLI replay still closes when the trace ends. This verifies repeated
+setup/race/result resource lifecycles for the route prototype, not physical
+simulation or original-game parity.
+
 ## Acceptance still open
 
 - Run a complete Viper/Bemidji race from the setup window, inspect standings,
   return to setup, choose another track/car, and start the second session.
+  The lifecycle smoke now covers two full trace-driven Bemidji sessions,
+  Viper-to-Sports selection, asset reload, and result returns, but no manual
+  gameplay input.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
 - Implement and retain supported settings, control rebinding, random-track

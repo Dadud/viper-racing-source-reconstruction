@@ -1737,6 +1737,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
                const std::optional<std::filesystem::path>& record_trace,
                const std::vector<TraceInputFrame>* playback_trace,
+               const bool hold_results_for_frontend,
                const std::size_t player_car_index,
                const std::uint32_t target_laps,
                const std::string_view track_name,
@@ -1871,6 +1872,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         }
         if (running && !IsIconic(hwnd)) {
             if (playback_trace != nullptr && playback_frame >= playback_trace->size()) {
+                if (hold_results_for_frontend && state.results_ready()) {
+                    playback_trace = nullptr;
+                    state.playback_active = false;
+                    state.left = state.right = state.accelerate = state.brake = false;
+                    state.last_tick = GetTickCount64();
+                    continue;
+                }
                 DestroyWindow(hwnd);
                 continue;
             }
@@ -1956,7 +1964,8 @@ void report_start_grid(const viper::GameAssets& assets)
 
 int run_selected_race(const Options& options, const std::string_view track,
                      const std::string_view car,
-                     const std::vector<TraceInputFrame>* playback_trace)
+                     const std::vector<TraceInputFrame>* playback_trace,
+                     const bool hold_results_for_frontend)
 {
     const auto config_path = options.data_dir / "options.def";
     viper::GameOptions configured_options;
@@ -2027,7 +2036,8 @@ int run_selected_race(const Options& options, const std::string_view track,
                   << " numerically complete with the current FDIV model)\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
-        options.record_trace, playback_trace, *entrants.player_record_index,
+        options.record_trace, playback_trace, hold_results_for_frontend,
+        *entrants.player_record_index,
         static_cast<std::uint32_t>(std::clamp(
             assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
         assets.track_name(), assets.car_name(), assets.terrain(),
@@ -2062,7 +2072,7 @@ int wmain(int argc, wchar_t** argv)
             : configured_car_stem(options.data_dir, configured_options);
         const bool interactive_frontend = !options.validate_assets &&
             !options.track && !options.car && !options.smoke_frames &&
-            !options.audio_smoke && !options.record_trace && !options.play_trace;
+            !options.audio_smoke && !options.record_trace;
         auto selected_track = track;
         auto selected_car = car;
         while (true) {
@@ -2076,7 +2086,8 @@ int wmain(int argc, wchar_t** argv)
                 selected_car = selection->car;
             }
             const auto result = run_selected_race(options, selected_track,
-                selected_car, playback_trace ? &*playback_trace : nullptr);
+                selected_car, playback_trace ? &*playback_trace : nullptr,
+                interactive_frontend);
             if (result != 10) return result;
             if (!interactive_frontend) return 0;
         }

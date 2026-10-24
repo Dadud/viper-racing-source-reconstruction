@@ -255,6 +255,11 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/frontend_launch_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
+            add_test(NAME game_frontend_race_lifecycle_smoke
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${CMAKE_SOURCE_DIR}/tests/frontend_race_lifecycle_smoke.ps1"
+                    -GameExe "$<TARGET_FILE:viper_game>"
+                    -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
             add_test(NAME game_trace_replay_regression
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
@@ -262,6 +267,7 @@ if(BUILD_TESTING)
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
             set_tests_properties(game_trace_replay_regression PROPERTIES TIMEOUT 120)
             set_tests_properties(game_frontend_launch_smoke PROPERTIES TIMEOUT 75)
+            set_tests_properties(game_frontend_race_lifecycle_smoke PROPERTIES TIMEOUT 180)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)
             set(VIPER_SHIPPED_CARS viper exotic plane sedan sports)

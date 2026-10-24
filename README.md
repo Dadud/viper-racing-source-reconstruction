@@ -42,11 +42,17 @@ without CLI asset overrides opens a keyboard setup window: up/down selects a
 track, left/right selects a car, and Enter loads the race. After the current
 race prototype displays results, Enter returns to setup. Escape exits. This is
 a basic runtime selector and session loop, not the original frontend or a full
-settings editor. Explicit `--track`/`--car`, validation, smoke, and trace
-commands bypass the selector. The runtime can load and validate the eight
+settings editor. Explicit `--track`/`--car`, validation, smoke, audio smoke, and
+trace-recording commands bypass the selector. `--play-trace` without explicit
+track/car overrides opens setup and keeps the replayed results available for
+return to setup. The runtime can load and validate the eight
 shipped track bundles and five shipped car bundles. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each
 shipped track and car, plus a WARP rendering smoke for each selected track/car.
+The Windows frontend lifecycle smoke also uses a deterministic full-lap trace
+to verify Viper/Bemidji results return, selection of Sports, a second race
+session, another results return, and clean shutdown. This is acceptance evidence
+for the route-kinematic lifecycle, not physical-race or original-game parity.
 
 Public CI runs without original assets. Runtime checks use an external data
 directory, also configurable through `VIPER_DATA_DIR`. On Windows, CTest adds
