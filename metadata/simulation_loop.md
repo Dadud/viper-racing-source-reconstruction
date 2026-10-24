@@ -1275,8 +1275,12 @@ prior-state-change gate from the incoming dashboard-kind cache, and continues
 the same state snapshot through its TestTrack cache/resource updates. Its
 displayed-position input remains separate: the TestTrack branch reads record
 `+0x00`, while the common Position row reads `+0x140`. The TestTrack plan's
-emitted calls remain in branch order; resource text and generation matches
-remain supplied observations.
+emitted calls remain in branch order; resource text remains a supplied
+observation. Resource refresh decisions now compare optional raw cached
+generation DWORDs at `0x4EB310` (Try), `0x4EB270` (Time), and `0x4EB288`
+(Distance) against the current generation at `0x4D3868`, matching the branch
+comparisons at `0x403D74`, `0x403E1F`, and `0x403EDE`. The prior precomputed
+match booleans remain fallbacks when either raw word is unavailable.
 When `SceneDashboardCoreCallbackObservation::language_resource` is supplied,
 the callback resolves the `TRY`, `TIME`, and `DIST` labels from the exact
 `Dashboard:TestTrack:Try`, `Dashboard:TestTrack:Time`, and
@@ -1286,8 +1290,8 @@ supplied, it binds the distance scale, decimal marker, and null suffix from the
 selected table produced by `initialize_scene_dashboard_locale`; the same
 locale state is bound into LapTime, supplemental, Best/Last, and auxiliary
 readout observations before those projections run. Otherwise those values
-remain supplied observations. Generation matches remain separate runtime
-inputs. The key addresses are confirmed at `0x4CFCF0`, `0x4CFD08`, and
+remain supplied observations. The key addresses are confirmed at
+`0x4CFCF0`, `0x4CFD08`, and
 `0x4CFD24` by string evidence
 `ev_bb72e4563d1e233a8c2f3b6161be56993c7dfde3b1f23787ed864efbfbcc396b`,
 `ev_5aa526aff8909e8c9188bc7870749404053fb90646b5b56c9c285ef804035b9a`, and

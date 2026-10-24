@@ -2619,6 +2619,23 @@ SceneDashboardTestTrackResult update_scene_dashboard_test_track(
     const SceneDashboardTestTrackObservation& observation)
 {
     SceneDashboardTestTrackResult result{};
+    const auto generation_matches = [&](
+        const std::optional<std::uint32_t> cached_value,
+        const bool fallback) {
+        return observation.current_resource_generation_value.has_value() &&
+                cached_value.has_value()
+            ? *observation.current_resource_generation_value == *cached_value
+            : fallback;
+    };
+    const auto try_generation_matches = generation_matches(
+        observation.try_resource_cached_generation_value,
+        observation.try_resource_generation_matches);
+    const auto time_generation_matches = generation_matches(
+        observation.time_resource_cached_generation_value,
+        observation.time_resource_generation_matches);
+    const auto distance_generation_matches = generation_matches(
+        observation.distance_resource_cached_generation_value,
+        observation.distance_resource_generation_matches);
     result.dashboard_kind_changed =
         state.dashboard_kind_cache_0x4cf9ec != 2;
     if (result.dashboard_kind_changed) {
@@ -2640,7 +2657,7 @@ SceneDashboardTestTrackResult update_scene_dashboard_test_track(
     result.try_label_text = observation.try_resource_text;
     if (result.try_label_drawn) {
         result.refresh_try_resource =
-            !observation.try_resource_generation_matches;
+            !try_generation_matches;
         result.calls.push_back({0x00403DA8, 266, 18, 0x004CFD4C,
                                 0x004EB314, 0x004EB2A8, 0x21});
     }
@@ -2667,7 +2684,7 @@ SceneDashboardTestTrackResult update_scene_dashboard_test_track(
         result.time_resource_label_drawn = resource_label_gate;
         if (result.time_resource_label_drawn) {
             result.refresh_time_resource =
-                !observation.time_resource_generation_matches;
+                !time_generation_matches;
             result.calls.push_back({0x00403E53, 242, 35, 0x004CFD54,
                                     0x004EB488, 0x004EB304, 0x21});
         }
@@ -2690,7 +2707,7 @@ SceneDashboardTestTrackResult update_scene_dashboard_test_track(
         result.distance_resource_label_drawn = resource_label_gate;
         if (result.distance_resource_label_drawn) {
             result.refresh_distance_resource =
-                !observation.distance_resource_generation_matches;
+                !distance_generation_matches;
             result.calls.push_back({0x00403F12, 242, 35, 0x004CFD60,
                                     0x004EB488, 0x004EB304, 0x21});
         }

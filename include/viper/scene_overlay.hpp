@@ -879,6 +879,12 @@ struct SceneDashboardTestTrackObservation {
     bool try_resource_generation_matches{};
     bool time_resource_generation_matches{};
     bool distance_resource_generation_matches{};
+    // Raw values compared by 0x403D74, 0x403E1F, and 0x403EDE. When the
+    // current and cached words are present, they override the bool fallbacks.
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> try_resource_cached_generation_value;
+    std::optional<std::uint32_t> time_resource_cached_generation_value;
+    std::optional<std::uint32_t> distance_resource_cached_generation_value;
     std::string try_resource_text;
     std::string time_resource_text;
     std::string distance_resource_text;

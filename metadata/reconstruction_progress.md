@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Replaced TestTrack's opaque resource-generation
+  match inputs with optional raw cached/current DWORDs. The branch now derives
+  refresh decisions from the exact comparisons at `0x403D74`, `0x403E1F`, and
+  `0x403EDE`; legacy booleans remain fallbacks when raw words are absent.
+  Release build and `git diff --check` pass; no tests were run. See
+  `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Connected the auxiliary numeric readout's
   centering width to the observed dashboard font's signed ASCII `'0'` advance
   (`+0x204 + 0x30*2`). The race-loop passes its layout font into the callback;
