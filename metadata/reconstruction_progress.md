@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24:** Composed the full `0x45BC20` scene-car dispatcher in
+  `plan_scene_car_dispatcher`: profiling bracketing, sixteen local record
+  initializers, 12-DWORD shared-state copy and scalar stores, parser call,
+  counted notifier callbacks with cache-update gates, and counted 14-DWORD
+  car-row copies. Supplied spans expose incomplete observations and the
+  possible over-read beyond the sixteen initialized local records. Added the
+  new caller/helper evidence to `scene_car_dispatch_correction.evidence.json`.
+
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table
   at `0x81C`, embedded data base, and optional relocation. Added font character

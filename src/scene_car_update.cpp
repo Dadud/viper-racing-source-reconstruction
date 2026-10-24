@@ -34,6 +34,76 @@ bool should_dispatch_scene_car_update(
         || force_update_0x425830;
 }
 
+SceneCarDispatcherPlan plan_scene_car_dispatcher(
+    const SceneCarDispatcherInput& input)
+{
+    SceneCarDispatcherPlan result{};
+    result.resulting_shared_globals = input.shared_words;
+    result.resulting_scalar_globals = input.scalar_globals;
+    result.resulting_byte_global = input.byte_global;
+    const auto requested_objects = input.scene_object_count > 0
+        ? static_cast<std::size_t>(input.scene_object_count)
+        : std::size_t{0};
+    const auto requested_records = input.car_record_count > 0
+        ? static_cast<std::size_t>(input.car_record_count)
+        : std::size_t{0};
+    const auto available_objects = std::min(requested_objects, input.scene_objects.size());
+    const auto available_records = std::min(requested_records, input.car_records.size());
+    result.operations.reserve(1 + scene_car_dispatch_local_record_count + 4
+        + available_objects + available_records);
+
+    const auto append = [&result](const SceneCarDispatcherOperationKind kind,
+                          const std::size_t index = 0) -> SceneCarDispatcherOperation& {
+        result.operations.push_back({});
+        auto& operation = result.operations.back();
+        operation.kind = kind;
+        operation.index = index;
+        return operation;
+    };
+
+    append(SceneCarDispatcherOperationKind::timer_begin_0x415090);
+    for (std::size_t i = 0; i < scene_car_dispatch_local_record_count; ++i) {
+        append(SceneCarDispatcherOperationKind::initialize_local_record_0x45dae0, i);
+    }
+    append(SceneCarDispatcherOperationKind::acquire_update_block_0x425880);
+    auto& globals = append(SceneCarDispatcherOperationKind::copy_shared_globals);
+    globals.shared_words = input.shared_words;
+    globals.scalar_globals = input.scalar_globals;
+    globals.byte_global = input.byte_global;
+    append(SceneCarDispatcherOperationKind::parse_update_records_0x462d90);
+
+    result.scene_object_inputs_exhausted =
+        input.scene_object_count > 0 && input.scene_objects.size() < requested_objects;
+    for (std::size_t i = 0; i < available_objects; ++i) {
+        const auto& object = input.scene_objects[i];
+        const bool dispatch = should_dispatch_scene_car_update(
+            object.incoming_field,
+            object.cached_field_0x38,
+            object.force_update_0x425830);
+        auto& operation = append(SceneCarDispatcherOperationKind::notify_scene_car_0x463530, i);
+        operation.callback_dispatched = dispatch;
+        operation.incoming_field = object.incoming_field;
+        operation.resulting_cached_field = dispatch
+            ? static_cast<std::uint32_t>(object.incoming_field)
+            : object.cached_field_0x38;
+        ++result.scene_objects_examined;
+        result.scene_callbacks_dispatched += dispatch ? 1U : 0U;
+    }
+
+    result.car_record_inputs_exhausted =
+        input.car_record_count > 0 && input.car_records.size() < requested_records;
+    result.local_car_record_overread_possible =
+        requested_records > scene_car_dispatch_local_record_count;
+    for (std::size_t i = 0; i < available_records; ++i) {
+        auto& operation = append(
+            SceneCarDispatcherOperationKind::update_car_string_record_0x45e010, i);
+        operation.record_words = input.car_records[i];
+        ++result.car_records_examined;
+    }
+    append(SceneCarDispatcherOperationKind::timer_end_0x4150a0);
+    return result;
+}
+
 SceneCarDispatchIndices select_scene_car_dispatch_indices(
     const SceneCarDispatchIndicesInput& input) noexcept
 {

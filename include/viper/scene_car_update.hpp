@@ -33,6 +33,76 @@ using SceneCarPose = std::array<float, scene_car_pose_float_count>;
     std::uint32_t cached_field_0x38,
     bool force_update_0x425830) noexcept;
 
+// Ordered operations in the outer scene-car dispatcher at 0x45BC20.
+enum class SceneCarDispatcherOperationKind : std::uint8_t {
+    timer_begin_0x415090,
+    initialize_local_record_0x45dae0,
+    acquire_update_block_0x425880,
+    copy_shared_globals,
+    parse_update_records_0x462d90,
+    notify_scene_car_0x463530,
+    update_car_string_record_0x45e010,
+    timer_end_0x4150a0,
+};
+
+struct SceneCarDispatcherObjectInput {
+    std::uint16_t incoming_field{};
+    std::uint32_t cached_field_0x38{};
+    bool force_update_0x425830{};
+};
+
+inline constexpr std::size_t scene_car_dispatch_shared_word_count = 12;
+inline constexpr std::size_t scene_car_dispatch_local_record_count = 16;
+inline constexpr std::size_t scene_car_dispatch_record_word_count = 14;
+using SceneCarDispatchSharedWords =
+    std::array<std::uint32_t, scene_car_dispatch_shared_word_count>;
+using SceneCarDispatchRecordWords =
+    std::array<std::uint32_t, scene_car_dispatch_record_word_count>;
+
+struct SceneCarDispatcherOperation {
+    SceneCarDispatcherOperationKind kind{};
+    std::size_t index{};
+    bool callback_dispatched{};
+    SceneCarDispatchSharedWords shared_words{};
+    std::array<std::uint32_t, 3> scalar_globals{};
+    std::uint8_t byte_global{};
+    SceneCarDispatchRecordWords record_words{};
+    std::uint16_t incoming_field{};
+    std::uint32_t resulting_cached_field{};
+};
+
+struct SceneCarDispatcherInput {
+    // Result fields copied by 0x45BC20 from the 0x425880 stack block.
+    SceneCarDispatchSharedWords shared_words{};
+    // Values destined for globals 0x4DC1A0, 0x53A4B4, and 0x53A4B8, in order.
+    std::array<std::uint32_t, 3> scalar_globals{};
+    std::uint8_t byte_global{};
+    // Global 0x539428 controls the notifier loop.
+    std::int32_t scene_object_count{};
+    std::span<const SceneCarDispatcherObjectInput> scene_objects{};
+    // 0x53940C controls this loop; each local input is copied as 14 dwords.
+    std::int32_t car_record_count{};
+    std::span<const SceneCarDispatchRecordWords> car_records{};
+};
+
+struct SceneCarDispatcherPlan {
+    std::vector<SceneCarDispatcherOperation> operations;
+    SceneCarDispatchSharedWords resulting_shared_globals{};
+    std::array<std::uint32_t, 3> resulting_scalar_globals{};
+    std::uint8_t resulting_byte_global{};
+    std::size_t scene_objects_examined{};
+    std::size_t scene_callbacks_dispatched{};
+    std::size_t car_records_examined{};
+    bool scene_object_inputs_exhausted{};
+    bool car_record_inputs_exhausted{};
+    bool local_car_record_overread_possible{};
+};
+
+// Projects the full call order in 0x45BC20. Binary-owned state acquired by
+// 0x425880 and indirect callback effects remain explicit inputs/operations.
+[[nodiscard]] SceneCarDispatcherPlan plan_scene_car_dispatcher(
+    const SceneCarDispatcherInput& input);
+
 struct SceneCarDistanceThreshold {
     float distance{};
     std::array<std::uint32_t, 2> opaque{};

@@ -30,6 +30,30 @@ The slot reference to `0x465800`, the false stub at `0x4668D0`, the
 `ev_f9850233a2e11181b469ce382e050cc61f2121757d46767bcb95f7bd51841373`,
 and `ev_e6da7bfaa6593e4230864899ca29fa829b312d80125fbeb59d76cf0ef8d39bc9`).
 
+The outer dispatcher at `0x45BC20` is now projected by
+`plan_scene_car_dispatcher`. Its sequence is: profiling start `0x415090`,
+sixteen identity initializers at `0x45DAE0`, update/config acquisition at
+`0x425880`, twelve DWORD global copies plus three scalar and one byte global
+stores, byte-stream callback parsing through `0x462D90`, the counted
+`0x463530` scene-object walk, the counted `0x45E010` car-record/UI-table walk,
+and profiling end `0x4150A0`. For each scene object, the plan records whether
+the incoming 16-bit field differs from the cached DWORD or the force gate is
+set; the cache changes to the zero-extended incoming value only when the
+virtual update is dispatched. Each car-record operation retains the fourteen
+DWORD copy to its `0x170`-byte global row. The supplied object and record spans
+stand in for process globals, buffers, and indirect effects; missing span
+entries are reported, and a record count above the sixteen initialized local
+records is flagged as a possible stack over-read. The UI helper callbacks and
+`0x462D90`'s registered byte handlers remain separate projections. Evidence
+for the outer function and composed helper paths is retained in
+`metadata/scene_car_dispatch_correction.evidence.json`: `0x45BC20`
+(`ev_e6da7bfaa6593e4230864899ca29fa829b312d80125fbeb59d76cf0ef8d39bc9`),
+`0x425880` (`ev_e1538069c3affc323efce9289324d0a4c3baf58dc14fb8c5d14136d491dae199`),
+`0x45E010` (`ev_33fcbe1712d658d58a0d103fa74bfff2dd6e2878295d41bc66ea4b9039eb295a`),
+`0x462D90` (`ev_2d0096969d13bd67200d3ea8d5ba62679aea1068dd3fa19b99a9481237a22225`),
+`0x463530` (`ev_f9850233a2e11181b469ce382e050cc61f2121757d46767bcb95f7bd51841373`),
+and `0x45DAE0` (`ev_fc14044ec6dbfe6acc27e9edd6f2c8a73ab86b83baca33a6e0ac959e7a68311e`).
+
 The wrapper measures the distance from object position `+0x28..+0x30` to the
 camera globals `0x509B58..0x509B60` using `0x448C10`; the following scale
 constant at `0x4D11D4` is exactly 1.0. It initializes indices `+0x510` and
