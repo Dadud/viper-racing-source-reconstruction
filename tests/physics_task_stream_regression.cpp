@@ -293,7 +293,15 @@ int main()
             viper::plan_track_player_physics_cursor(bemidji_prefix, 7U);
         require(player_cursor.status == viper::TrackPhysicsCursorStatus::complete &&
                     player_cursor.serialized_object_stream_offset == 0xAD4U &&
-                    player_cursor.preceding_car_count == 7U,
+                    player_cursor.preceding_car_count == 7U &&
+                    player_cursor.preceding_records.size() == 7U &&
+                    player_cursor.preceding_records.front().object_row == 3U &&
+                    player_cursor.preceding_records.front().car_directive_index == 0U &&
+                    player_cursor.preceding_records.front().record_tag == 0x41434152U &&
+                    player_cursor.preceding_records.front().cursor_offset == 0U &&
+                    player_cursor.preceding_records.back().object_row == 9U &&
+                    player_cursor.preceding_records.back().car_directive_index == 6U &&
+                    player_cursor.preceding_records.back().cursor_offset == 0x948U,
                 "Bemidji player cursor must fold seven preceding ACAR records to 0xAD4");
 
         const auto interleaved_object = make_track_object_table({
@@ -313,7 +321,22 @@ int main()
             viper::plan_track_player_physics_cursor(mapped_interleaving, 1U);
         require(mapped_cursor.status == viper::TrackPhysicsCursorStatus::complete &&
                     mapped_cursor.serialized_object_stream_offset == 0x1C0U &&
-                    mapped_cursor.preceding_car_count == 1U,
+                    mapped_cursor.preceding_car_count == 1U &&
+                    mapped_cursor.preceding_records.size() == 3U &&
+                    mapped_cursor.preceding_records[0].object_row == 0U &&
+                    !mapped_cursor.preceding_records[0].car_directive_index.has_value() &&
+                    mapped_cursor.preceding_records[0].record_tag == 0x4C424F57U &&
+                    mapped_cursor.preceding_records[0].cursor_offset == 0U &&
+                    mapped_cursor.preceding_records[0].cursor_advance == 0x34U &&
+                    mapped_cursor.preceding_records[1].object_row == 1U &&
+                    mapped_cursor.preceding_records[1].car_directive_index == 0U &&
+                    mapped_cursor.preceding_records[1].record_tag == 0x41434152U &&
+                    mapped_cursor.preceding_records[1].cursor_offset == 0x34U &&
+                    mapped_cursor.preceding_records[2].object_row == 2U &&
+                    !mapped_cursor.preceding_records[2].car_directive_index.has_value() &&
+                    mapped_cursor.preceding_records[2].record_tag == 0x53544154U &&
+                    mapped_cursor.preceding_records[2].cursor_offset == 0x1C0U &&
+                    mapped_cursor.preceding_records[2].cursor_advance == 0U,
                 "wobble and static rows must contribute their recovered cursor advances");
 
         const auto known_scene_objects = make_track_object_table({
@@ -323,7 +346,15 @@ int main()
             viper::plan_track_player_physics_cursor(known_scene_objects, 0U);
         require(known_scene_cursor.status ==
                     viper::TrackPhysicsCursorStatus::complete &&
-                    known_scene_cursor.serialized_object_stream_offset == 0xD0U,
+                    known_scene_cursor.serialized_object_stream_offset == 0xD0U &&
+                    known_scene_cursor.preceding_records.size() == 5U &&
+                    known_scene_cursor.preceding_records[0].record_tag == 0x4F425354U &&
+                    known_scene_cursor.preceding_records[1].record_tag == 0x4C424F57U &&
+                    known_scene_cursor.preceding_records[2].record_tag == 0x43484B50U &&
+                    known_scene_cursor.preceding_records[3].record_tag == 0x42414C4CU &&
+                    known_scene_cursor.preceding_records[4].record_tag == 0x53544154U &&
+                    known_scene_cursor.preceding_records[4].cursor_offset == 0xD0U &&
+                    known_scene_cursor.preceding_records[4].cursor_advance == 0U,
                 "known obstacle, wobble, checkpoint, ball, and static prefixes must fold safely");
 
         const auto short_car_table = make_track_object_table({

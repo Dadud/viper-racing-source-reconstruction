@@ -373,6 +373,8 @@ TrackPhysicsCursorPlan plan_track_player_physics_cursor(
     TrackPhysicsCursorPlan result{};
     result.target_car_index = player_car_index;
     std::vector<std::uint32_t> preceding_tags;
+    std::vector<std::size_t> preceding_rows;
+    std::vector<std::optional<std::size_t>> preceding_car_indices;
     std::size_t car_index = 0U;
     for (std::size_t row = 0U; row < table.line_count; ++row) {
         const auto line = track_object_text_line(table, row);
@@ -406,6 +408,7 @@ TrackPhysicsCursorPlan plan_track_player_physics_cursor(
         const std::string_view object_type(object_line.data(),
             static_cast<std::size_t>(type_end - object_line.begin()));
         std::optional<std::uint32_t> record_tag;
+        std::optional<std::size_t> preceding_car_index;
         if (equals_ascii_case_insensitive(object_type, "car")) {
             if (car_index == player_car_index) {
                 const auto stream = plan_physics_task_stream_offsets(preceding_tags, 0U);
@@ -416,11 +419,20 @@ TrackPhysicsCursorPlan plan_track_player_physics_cursor(
                 result.status = TrackPhysicsCursorStatus::complete;
                 result.serialized_object_stream_offset = stream.final_cursor;
                 result.preceding_car_count = car_index;
+                result.preceding_records.reserve(stream.records.size());
+                for (std::size_t index = 0U; index < stream.records.size(); ++index) {
+                    result.preceding_records.push_back({
+                        preceding_rows[index], preceding_car_indices[index],
+                        stream.records[index].record_tag,
+                        stream.records[index].stream_offset,
+                        stream.records[index].cursor_advance});
+                }
                 return result;
             }
             // In a single-player lineup all earlier configured cars are CPU
             // ACAR objects; this tag advances by the native 0x18C class size.
             record_tag = 0x41434152U;
+            preceding_car_index = car_index;
             ++car_index;
         } else if (equals_ascii_case_insensitive(object_type, "static")) {
             record_tag = 0x53544154U; // STAT: zero-byte task-stream advance
@@ -438,6 +450,8 @@ TrackPhysicsCursorPlan plan_track_player_physics_cursor(
             result.unsupported_object_row = row;
             return result;
         }
+        preceding_rows.push_back(row);
+        preceding_car_indices.push_back(preceding_car_index);
         preceding_tags.push_back(*record_tag);
     }
     result.status = TrackPhysicsCursorStatus::player_car_not_found;

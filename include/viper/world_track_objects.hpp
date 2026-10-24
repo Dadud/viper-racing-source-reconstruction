@@ -104,6 +104,19 @@ struct TrackPhysicsCursorPlan {
     std::optional<std::uint32_t> serialized_object_stream_offset;
     std::size_t target_car_index{};
     std::size_t preceding_car_count{};
+    struct PrecedingRecord {
+        std::size_t object_row{};
+        // Ordinal among preceding obj car directives; it is not yet joined
+        // to a resolved entrant row or verified subtype.
+        std::optional<std::size_t> car_directive_index;
+        std::uint32_t record_tag{};
+        std::uint32_t cursor_offset{};
+        std::uint32_t cursor_advance{};
+    };
+    // Modeled prefix in source-row order. This is a cursor manifest only;
+    // complete constructor record bytes and native task-load order remain
+    // separate inputs.
+    std::vector<PrecedingRecord> preceding_records;
     std::optional<std::size_t> incomplete_row;
     std::optional<std::size_t> unsupported_object_row;
 };

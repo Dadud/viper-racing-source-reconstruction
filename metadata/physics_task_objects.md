@@ -288,6 +288,16 @@ allocation sizes. Evidence:
 `0x425420`, `ev_ef89830f565cea2f11328cf87320e8939eb255ab7d432ab5de43786aadee533c`,
 and the native bytes at `0x4D4890`, observed by `read_bytes`.
 
+`TrackPhysicsCursorPlan` now retains the modeled prefix that produced its
+cursor: each preceding track-object row, its presumed task tag, cursor offset,
+advance, and car-directive ordinal where applicable. This exposes the planner's
+ordered inputs for verification instead of returning only the final cursor.
+For a single-player lineup it still classifies every prior `obj car` line as
+ACAR; exact coupling between directive processing, entrant construction, and
+native task-stream insertion order remains to be verified before these entries
+can be treated as a complete stream manifest. Constructor bytes remain
+unavailable for most entries.
+
 `read_physics_task_record_stream` decodes the same framing with bounds checks:
 each entry is a signed cursor DWORD plus one complete record. It verifies that
 each later cursor equals the previous cursor plus the resolved class advance,
