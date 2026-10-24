@@ -248,7 +248,7 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
-            set_tests_properties(game_trace_replay_regression PROPERTIES TIMEOUT 30)
+            set_tests_properties(game_trace_replay_regression PROPERTIES TIMEOUT 120)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)
             set(VIPER_SHIPPED_CARS viper exotic plane sedan sports)

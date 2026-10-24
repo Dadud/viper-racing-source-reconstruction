@@ -8,6 +8,8 @@ New-Item -ItemType Directory -Path $root | Out-Null
 $capture = Join-Path $root 'capture.csv'
 $replay = Join-Path $root 'replay.csv'
 $repeat = Join-Path $root 'repeat.csv'
+$raceTrace = Join-Path $root 'race.csv'
+$raceOutput = Join-Path $root 'race-output.csv'
 try {
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
         --smoke-frames 12 --record-trace $capture
@@ -56,8 +58,56 @@ try {
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }
     Write-Output "Trace playback reproduced $($replayedLines.Count - 1) frames exactly across two runs."
+
+    $raceLines = [System.Collections.Generic.List[string]]::new()
+    $raceLines.Add($inputLines[0])
+    $template = $inputLines[1].Split(',')
+    for ($frame = 0; $frame -lt 1800; ++$frame) {
+        $fields = [string[]]$template.Clone()
+        $fields[0] = [string]$frame
+        $fields[1] = '0'
+        $fields[2] = '0.05'
+        $fields[3] = '0'
+        $fields[4] = '0'
+        $fields[5] = '1'
+        $fields[6] = '0'
+        $raceLines.Add(($fields -join ','))
+    }
+    [System.IO.File]::WriteAllLines($raceTrace, $raceLines)
+    & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
+        --play-trace $raceTrace --record-trace $raceOutput
+    if ($LASTEXITCODE -ne 0) { throw "Full race trace playback exited with $LASTEXITCODE" }
+
+    $raceOutputLines = [System.IO.File]::ReadAllLines($raceOutput)
+    $finishFrame = -1
+    $finishElapsed = 0.0
+    for ($index = 1; $index -lt $raceOutputLines.Count; ++$index) {
+        $fields = $raceOutputLines[$index].Split(',')
+        if ($fields[12] -eq '1' -and $finishFrame -lt 0) {
+            $finishFrame = $index - 1
+            $finishElapsed = [single]::Parse($fields[1], [cultureinfo]::InvariantCulture)
+            if ($fields[11] -ne '1') { throw 'Player finish lap count differs from configured one-lap race' }
+        }
+        if ($finishFrame -ge 0 -and $index -gt ($finishFrame + 1) -and
+            [single]::Parse($fields[1], [cultureinfo]::InvariantCulture) -ne $finishElapsed) {
+            throw 'Player race clock changed after finish'
+        }
+    }
+    if ($finishFrame -lt 0) { throw 'Player did not finish a complete Viper/Bemidji lap' }
+    if ($finishElapsed -le 0) { throw 'Player finish time is not positive' }
+    $lastRaceFields = $raceOutputLines[-1].Split(',')
+    for ($car = 0; $car -lt 7; ++$car) {
+        $completedColumn = 16 + 5 * $car
+        $finishedColumn = 17 + 5 * $car
+        if ($lastRaceFields[$completedColumn] -lt 1 -or $lastRaceFields[$finishedColumn] -ne '1') {
+            $segmentColumn = 13 + 5 * $car
+            $speedColumn = 15 + 5 * $car
+            throw "Opponent $car did not reach its finish state (segment=$($lastRaceFields[$segmentColumn]), speed=$($lastRaceFields[$speedColumn]), laps=$($lastRaceFields[$completedColumn]), finished=$($lastRaceFields[$finishedColumn]))"
+        }
+    }
+    Write-Output "Viper/Bemidji route race finished in ${finishElapsed}s at frame $finishFrame; all seven provisional opponents finished."
 }
 finally {
-    Remove-Item -LiteralPath $capture, $replay, $repeat -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $capture, $replay, $repeat, $raceTrace, $raceOutput -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
 }

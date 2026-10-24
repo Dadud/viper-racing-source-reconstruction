@@ -358,6 +358,8 @@ std::string configured_car_stem(const std::filesystem::path& data_dir,
 
 class D3DWindow {
 public:
+    void set_vsync(const bool enabled) noexcept { vsync_interval_ = enabled ? 1U : 0U; }
+
     bool create(HWND hwnd, bool software,
                 const viper::TerrainSurfaceResourcePayload& terrain,
                 const viper::IdealLineTrackData& ideal_line,
@@ -462,7 +464,7 @@ public:
             for (const auto& group : car_draw_groups_)
                 if (group.vertex_count) context_->Draw(group.vertex_count, group.first_vertex);
         }
-        return SUCCEEDED(swap_chain_->Present(1, 0));
+        return SUCCEEDED(swap_chain_->Present(vsync_interval_, 0));
     }
 
     bool set_car_pose(const std::size_t car_index, const float anchor_x, const float anchor_y,
@@ -494,6 +496,11 @@ public:
     float car_yaw(const std::size_t car_index) const
     {
         return car_index < car_poses_.size() ? car_poses_[car_index].yaw : 0.0F;
+    }
+
+    float car_height(const std::size_t car_index) const
+    {
+        return car_index < car_poses_.size() ? car_poses_[car_index].y : 0.0F;
     }
 
 private:
@@ -793,6 +800,7 @@ private:
     UINT surface_vertex_count_{};
     UINT width_{};
     UINT height_{};
+    UINT vsync_interval_{1U};
 };
 
 class DirectSoundAudio {
@@ -1073,39 +1081,46 @@ struct WindowState {
         return true;
     }
 
-    bool advance(float delta_seconds)
+    bool advance(float delta_seconds, const bool update_graphics = true)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
         const auto route_result = viper::advance_route_motion(motion, route,
             left, right, accelerate, brake, delta_seconds, target_laps);
         if (route_result.lap_completed) refresh_title(true);
-        if (!route_result.valid) {
-            if (route_result.finished) audio.update(0.0F, false);
-            return route_result.finished;
+        if (!route_result.valid && !route_result.finished) return false;
+        std::optional<viper::TerrainSurfaceQueryResult> surface;
+        if (route_result.valid && update_graphics) {
+            surface = viper::sample_terrain_resource(
+                *terrain, {route_result.x, 1000.0f, route_result.z}, true);
+            if (!surface->query_succeeded) { motion.speed = 0.0f; return true; }
         }
-        const auto surface = viper::sample_terrain_resource(
-            *terrain, {route_result.x, 1000.0f, route_result.z}, true);
-        if (!surface.query_succeeded) { motion.speed = 0.0f; return true; }
-        for (std::size_t car = 0; car < graphics.car_count(); ++car) {
-            const auto position = graphics.car_position(car);
-            pose_buffer[car] = {position[0], 0.0F, position[1], graphics.car_yaw(car)};
+        if (update_graphics) {
+            for (std::size_t car = 0; car < graphics.car_count(); ++car) {
+                const auto position = graphics.car_position(car);
+                pose_buffer[car] = {position[0], graphics.car_height(car), position[1],
+                    graphics.car_yaw(car)};
+            }
+            if (route_result.valid)
+                pose_buffer[player_car_index] = {route_result.x, surface->sampled_position[1],
+                    route_result.z, route_result.yaw};
         }
-        pose_buffer[player_car_index] = {route_result.x, surface.sampled_position[1],
-            route_result.z, route_result.yaw};
         for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             auto& ai = opponent_motions[car];
             const auto ai_result = viper::advance_route_motion(ai, route, false, false,
                 true, false, delta_seconds, target_laps);
             if (!ai_result.valid) continue;
-            const auto ai_surface = viper::sample_terrain_resource(
-                *terrain, {ai_result.x, 1000.0F, ai_result.z}, true);
-            if (!ai_surface.query_succeeded) continue;
-            pose_buffer[car] = {ai_result.x, ai_surface.sampled_position[1],
-                ai_result.z, ai_result.yaw};
+            if (update_graphics) {
+                const auto ai_surface = viper::sample_terrain_resource(
+                    *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
+                if (!ai_surface.query_succeeded) continue;
+                pose_buffer[car] = {ai_result.x, ai_surface.sampled_position[1],
+                    ai_result.z, ai_result.yaw};
+            }
         }
-        if (!graphics.set_car_poses(pose_buffer)) return false;
-        audio.update(motion.speed, accelerate);
+        if (update_graphics && !graphics.set_car_poses(pose_buffer)) return false;
+        audio.update(motion.race.finished ? 0.0F : motion.speed,
+            !motion.race.finished && accelerate);
         refresh_title();
         return true;
     }
@@ -1254,6 +1269,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         DestroyWindow(hwnd);
         return 1;
     }
+    if (playback_trace != nullptr) state.graphics.set_vsync(false);
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
         std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
@@ -1277,7 +1293,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             trace << ",car" << car << "_segment,car" << car
-                  << "_fraction,car" << car << "_speed";
+                  << "_fraction,car" << car << "_speed,car" << car
+                  << "_completed_laps,car" << car << "_finished";
         }
         trace << '\n' << std::setprecision(9);
         if (!trace) {
@@ -1327,7 +1344,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             const float delta_seconds = replay != nullptr ? replay->delta_seconds :
                 state.last_tick == 0U ? 0.0F :
                     static_cast<float>(now - state.last_tick) / 1000.0F;
-            if ((replay != nullptr || state.last_tick != 0U) && !state.advance(delta_seconds)) {
+            const bool render_frame = replay == nullptr ||
+                (playback_frame % 8U) == 0U || playback_frame + 1U == playback_trace->size();
+            if ((replay != nullptr || state.last_tick != 0U) &&
+                !state.advance(delta_seconds, render_frame)) {
                 std::cerr << "Vehicle pose update failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
@@ -1344,7 +1364,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
                     if (car == player_car_index) continue;
                     const auto& ai = state.opponent_motions[car];
-                    trace << ',' << ai.route_segment << ',' << ai.route_fraction << ',' << ai.speed;
+                    trace << ',' << ai.route_segment << ',' << ai.route_fraction << ',' << ai.speed
+                          << ',' << ai.race.completed_laps << ',' << ai.race.finished;
                 }
                 trace << '\n';
                 if (!trace) {
@@ -1354,13 +1375,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 if ((trace_frame % 120U) == 0U) trace.flush();
             }
-            if (!state.graphics.render()) {
+            if (render_frame && !state.graphics.render()) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
             }
             if (replay != nullptr) ++playback_frame;
-            if (smoke_frames && ++rendered_frames >= *smoke_frames) {
+            if (render_frame && smoke_frames && ++rendered_frames >= *smoke_frames) {
                 DestroyWindow(hwnd);
                 return 0;
             }
