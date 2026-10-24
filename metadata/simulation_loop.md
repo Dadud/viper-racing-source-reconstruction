@@ -1015,9 +1015,11 @@ evidence `ev_503672f9c44fbcdd2d449430bcef3c0dc2289406010cacfafb944c4ab7caab9c`).
 The signed selector maps `-1` to the reverse string pointer, `0` to neutral,
 and `1..7` to literal digit strings at `0x4CFE9C..0x4CFEB4` (bytes evidence
 `ev_c2c13a2499a75ec341453052f9ff317b6df6e8786cf6a31bb88eb4e17af412e7`).
-Reverse and neutral text contents remain runtime inputs. When the selected
-text and state-0 font/atlas observations are supplied, the race-loop composer
-passes the string through the existing `0x44DC70` layout and `0x44D0C0` atlas
+The race-loop supplies its parsed language resource to this projection, which
+resolves the reverse and neutral keys directly; the extracted English table
+returns `R` and `N`. When the selected text and state-0 font/atlas observations
+are supplied, the race-loop composer passes the string through the existing
+`0x44DC70` layout and `0x44D0C0` atlas
 rasterizer, preserving draw order with the mode-0 fill, RPM image, and rotating
 geometry. The `0x4EB314` palette pointer selects the explicit palette plane;
 when it is non-null, its bounded palette data is required for a complete

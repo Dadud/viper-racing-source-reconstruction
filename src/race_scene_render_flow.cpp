@@ -338,6 +338,9 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         auto gear_observation = observation.dashboard_gear_display;
         gear_observation.dashboard_path_enabled =
             plan.optional_dashboard_branch_enabled;
+        if (gear_observation.language_resource == nullptr) {
+            gear_observation.language_resource = observation.language_resource;
+        }
         if (plan.render_context_acquisition.has_value() &&
             plan.render_context_acquisition->disposition ==
                 RenderContextAcquisitionDisposition::acquired) {

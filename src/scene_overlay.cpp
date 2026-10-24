@@ -1295,6 +1295,17 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                     result.selected_gear_label_text =
                         std::string(observation.gear_label_texts_from_minus_one[slot]);
                 }
+                if (!result.selected_gear_label_text.has_value() &&
+                    observation.language_resource != nullptr &&
+                    (signed_selector == -1 || signed_selector == 0)) {
+                    const auto key = signed_selector == -1
+                        ? "Dashboard:GearDisplay:ReverseGearCharacter"
+                        : "Dashboard:GearDisplay:NeutralGearCharacter";
+                    if (const auto text = observation.language_resource->find(key);
+                        text.has_value()) {
+                        result.selected_gear_label_text = std::string(*text);
+                    }
+                }
                 if (signed_selector >= 1 && signed_selector <= 7) {
                     if (!result.selected_gear_label_text_address.has_value()) {
                         result.selected_gear_label_text_address =

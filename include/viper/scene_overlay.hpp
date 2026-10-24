@@ -505,6 +505,7 @@ struct SceneDashboardGearDisplayObservation {
     std::span<const std::uint32_t> gear_label_text_addresses_from_minus_one;
     // Decoded C strings for the same signed-selector slots, when available.
     std::span<const std::string_view> gear_label_texts_from_minus_one;
+    const LanguageResource* language_resource{};
     std::uint32_t gear_label_font_context_value_0x4eb28c{};
     std::uint32_t gear_label_font_resource_value_0x4eb314{};
     std::vector<std::uint16_t> gear_label_palette_0x4eb314;
