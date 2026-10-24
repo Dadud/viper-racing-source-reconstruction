@@ -74,6 +74,16 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
                 ": " + e.what());
         }
     }
+    const auto& common_bundle = assets.bundle(assets.bundle_names_[0]);
+    constexpr std::uint32_t tire_type = 0x54495245U;
+    const auto* default_tire_entry = common_bundle.find("def_tire.tir", tire_type);
+    if (default_tire_entry == nullptr)
+        throw std::runtime_error("common.res default tire resource def_tire.tir is missing");
+    const auto parsed_default_tire = parse_tire_resource(
+        common_bundle.payload(*default_tire_entry));
+    if (!parsed_default_tire)
+        throw std::runtime_error("common.res default tire resource def_tire.tir is invalid");
+    assets.default_tire_ = *parsed_default_tire;
     const auto language_path = root / "english.lng";
     std::error_code ec;
     if (!std::filesystem::is_regular_file(language_path, ec) || ec) {

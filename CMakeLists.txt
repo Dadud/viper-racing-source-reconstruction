@@ -191,6 +191,7 @@ if(WIN32)
     endif()
     target_link_libraries(viper_game PRIVATE
         viper_resource_bundle viper_model_resource viper_language_resource viper_terrain_model
+        viper_vehicle_model
         viper_scene_model d3d11 dxgi user32)
 endif()
 

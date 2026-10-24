@@ -4,6 +4,7 @@
 #include "viper/model_resource.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/terrain_surface.hpp"
+#include "viper/vehicle_setup.hpp"
 #include "viper/world_track_objects.hpp"
 
 #include <array>
@@ -30,6 +31,7 @@ public:
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
+    [[nodiscard]] const TireDefinition& default_tire() const noexcept { return default_tire_; }
     [[nodiscard]] std::size_t model_resource_count() const noexcept { return model_resource_count_; }
 
 private:
@@ -43,6 +45,7 @@ private:
     IdealLineTrackData ideal_line_;
     CarFileResourcePayloads player_car_;
     ModelResource player_model_;
+    TireDefinition default_tire_;
     std::size_t model_resource_count_{};
 };
 

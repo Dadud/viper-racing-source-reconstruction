@@ -162,6 +162,12 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
         throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
     }
     auto assets = viper::GameAssets::load(root, track, car);
+    if (assets.default_tire().label.empty() ||
+        !std::all_of(assets.default_tire().parameters.begin(),
+            assets.default_tire().parameters.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        throw std::runtime_error("common.res default tire has an empty label or non-finite values");
+    }
     const auto car_bundle = std::string(assets.car_name()) + ".car";
     const auto track_bundle = std::string(assets.track_name()) + ".trk";
     for (const auto name : {"common.res", "ui.res", "race.res", car_bundle.c_str(), track_bundle.c_str()})
@@ -173,6 +179,7 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << " records\n"
               << "Parsed " << assets.car_name() << " CARF: version " << assets.player_car().car_file->resource_version
               << ", " << assets.player_car().car_file->raw_words.size() << " configuration words\n"
+              << "Loaded shared tire " << assets.default_tire().label << " from common.res\n"
               << "Parsed " << assets.car_name() << " level-0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
               << assets.player_model().material_groups.size() << " material groups, "
               << assets.player_model().section_counts[2] << " triangles; validated "
