@@ -28,7 +28,13 @@ a redundant header check; the exact helper semantics for these checks are not
 yet reconstructed, so the parser exposes those raw values without claiming
 full native acceptance. The new parser is not yet wired into `GameAssets`:
 the shipped extraction contains `drivers.res` but no `.dnt` sidecars, and the
-legacy game resource-set lookup path still needs integration.
+legacy game resource-set lookup path still needs integration. A fresh inventory
+of the extracted install found no loose `.dnt` or `.ili` files, and all
+`*.res` bundles under `GameData` were scanned by their RST0 indices for names
+or type tags containing `dnt`, `ili`, `note`, or `adnt`; none matched. This
+means the native `default.ili`/ADNT fallback chain cannot be satisfied from the
+available extracted install. It does not prove that other retail releases or
+user installations lack these resources.
 
 Evidence from `race.bin` (SHA-256
 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
