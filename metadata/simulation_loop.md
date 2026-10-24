@@ -1019,7 +1019,15 @@ On the type-0/global-`+0x40`-false branch, the flow also composes the
 supplemental `+0x24`/`+0x1C` rows before the paths converge at `0x403F7E`.
 Their position and count gates use the common `+0x140` Position result and
 adjusted entity count; the composer overwrites both supplemental helper inputs
-with those shared values before applying its `count > 1` gate. After branch
+with those shared values before applying its signed `count > 1` gate. The raw
+callback decrements the count as a DWORD at `0x403680`, then compares that same
+DWORD to one with `JLE` at `0x403B00`. The model preserves the decrement's
+32-bit wrap with unsigned arithmetic and bit-casts the result to `int32_t`
+before the signed comparison; a zero count decremented to `0xFFFFFFFF` therefore
+skips the native supplemental-row path. The outer race-flow composer now reuses
+the core callback's branch result rather than independently recomputing it from
+a second supplemental observation. Instruction evidence is retained in
+`dashboard_supplemental_count.evidence.json`. After branch
 convergence, it applies both metric cache slots (`+0x10`, then `+0x14`) and
 the `0x404313` auxiliary readout in callback
 order for every selected type. Metric values, resource measurements, strings,

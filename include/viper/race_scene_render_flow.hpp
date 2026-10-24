@@ -23,7 +23,6 @@ struct RaceLoopSharedOverlayObservation {
     std::vector<std::uint8_t> state0_bitmap_source_pixels;
     SceneDashboardCoreCallbackObservation dashboard_core_callback{};
     SceneDashboardTestTrackObservation dashboard_test_track{};
-    SceneDashboardSupplementalTimeObservation dashboard_supplemental_time{};
     std::array<SceneDashboardMetricObservation, 2> dashboard_metrics{};
     SceneDashboardAuxiliaryReadoutObservation dashboard_auxiliary_readout{};
     SceneDashboardCallbackGeometryObservation dashboard_callback_geometry{};

@@ -55,20 +55,11 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             observation.dashboard_core_callback);
         plan.dashboard_core_text_calls = scene_dashboard_text_plan(
             plan.dashboard_core_callback.reached_text_call_site_mask);
-        if (observation.dashboard_core_callback.selected_object_type_0x18 == 0 &&
-            !observation.dashboard_core_callback.global_method_0x40_result) {
-            plan.dashboard_supplemental_time_reached = true;
-            auto supplemental_observation =
-                observation.dashboard_supplemental_time;
-            supplemental_observation.displayed_position =
-                static_cast<std::uint32_t>(
-                    plan.dashboard_core_callback.position.displayed_position);
-            supplemental_observation.displayed_count =
-                plan.dashboard_core_callback.position.displayed_count;
-            plan.dashboard_supplemental_time =
-                scene_dashboard_supplemental_time_plan(
-                    supplemental_observation);
-        } else if (observation.dashboard_core_callback.selected_object_type_0x18 != 0) {
+        plan.dashboard_supplemental_time_reached =
+            plan.dashboard_core_callback.supplemental_time_branch_reached;
+        plan.dashboard_supplemental_time =
+            plan.dashboard_core_callback.supplemental_time;
+        if (observation.dashboard_core_callback.selected_object_type_0x18 != 0) {
             plan.dashboard_test_track_reached = true;
             auto test_track_observation = observation.dashboard_test_track;
             test_track_observation.selected_record_type_0x18 =

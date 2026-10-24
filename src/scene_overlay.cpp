@@ -1479,10 +1479,13 @@ SceneDashboardPositionResult update_scene_dashboard_position(
     const auto position = observation.record_value_0x140 > 1
         ? observation.record_value_0x140
         : 1;
-    auto count = observation.entity_count;
+    auto count_bits = observation.entity_count;
     if (observation.decrement_entity_count_0x40e6d0) {
-        --count;
+        --count_bits;
     }
+    // The native DWORD decrement wraps, but its following JLE tests the
+    // resulting bits as a signed 32-bit count.
+    const auto count = std::bit_cast<std::int32_t>(count_bits);
 
     std::uint8_t reached_calls{};
     if (redraw_all) {
@@ -1964,7 +1967,7 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
 
     if (observation.selected_object_type_0x18 == 0 &&
         !observation.global_method_0x40_result &&
-        result.position.displayed_count > 1U) {
+        result.position.displayed_count > 1) {
         auto supplemental_observation = observation.supplemental_time;
         supplemental_observation.displayed_position =
             result.position.displayed_position;

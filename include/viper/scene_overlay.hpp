@@ -629,7 +629,7 @@ struct SceneDashboardPositionObservation {
 struct SceneDashboardPositionResult {
     bool redraw_all{};
     std::int32_t displayed_position{};
-    std::uint32_t displayed_count{};
+    std::int32_t displayed_count{};
     std::uint32_t newly_registered_resource_bits{};
     std::uint8_t reached_text_call_sites{};
 };
@@ -847,8 +847,8 @@ struct SceneDashboardStringTable;
 struct SceneDashboardSupplementalTimeObservation {
     // Standalone helper inputs. The composed 0x4035E0 callback replaces these
     // with the shared Position row's displayed value/count.
-    std::uint32_t displayed_position{};
-    std::uint32_t displayed_count{};
+    std::int32_t displayed_position{};
+    std::int32_t displayed_count{};
     std::uint32_t record_value_0x1c_bits{};
     std::uint32_t record_value_0x24_bits{};
     std::string record_text_0x20_plus_5;
