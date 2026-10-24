@@ -995,9 +995,10 @@ gate from `0x404970` (`ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856
 It records one-time registration of the final-time banner and, at widths above
 639, the reverse/neutral resources and gear-geometry constants. Mode 0 emits
 the rectangle `(20, height-41)-(40, height-15)` with the value loaded from
-`0x4EB27C`, followed by a flush. Modes other than 0 and 12 draw the value
-loaded from `0x4EB420` at `(16, height-144)`, flush, then
-request the rotating geometry at `(80, height-80)` with size 50 and the
+`0x4EB27C`, then calls the selected gear-label helper. Modes other than 0 and
+12 draw the value loaded from `0x4EB420` at `(16, height-144)`, call the same
+label helper, then request the rotating geometry at `(80, height-80)` with size
+50 and the
 value loaded through the selected record's pointer at `+0x134`, then from the
 pointed-to object's `+0x34` field, clamped to at least 500. The observation
 accepts bounded byte views for both objects and checks the pointer address
@@ -1009,9 +1010,11 @@ In that same nonzero/non-12 mode branch, `0x404970` reads the selected
 object's `+0x48` selector, indexes the runtime table at `0x4CFAB4`, and calls
 `0x44DC70` with text source `0x4CFEB8`, coordinates `(12, height-40)`, raw
 arguments 30 and 12, and the values loaded from `0x4EB28C` and `0x4EB314`.
-The plan exposes this as a call projection when the bounded selected-object
-bytes are supplied; the table entry remains optional input, and the helper's
-font and raster effects are not yet reconstructed.
+The mode-0 branch makes the same call with the same selector. The plan exposes
+this as a call projection only when the bounded selected-object pointer chain
+resolves; the table entry remains optional input, and the helper's font and
+raster effects are not yet reconstructed. The raster composer consequently
+reports the frame as incomplete when this call is reached.
 The portable plan now also projects the filled triangle vertices and its two
 colored tip-to-base edges: center `(80, height-80)`, tip offset
 `(-sin(angle)*50, cos(angle)*50)`, and base corners offset by

@@ -1122,6 +1122,11 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
                                   write.preserves_existing_bits});
             }
             break;
+        case SceneDashboardGearOperationKind::draw_selected_gear_label:
+            // The 0x44DC70 call is projected, but its font and glyph raster
+            // effects are not modeled yet, so this frame is not complete.
+            complete = false;
+            break;
         case SceneDashboardGearOperationKind::draw_rotating_gear_geometry:
             if (!plan.dashboard_gear_display.rotating_gear_geometry.has_value()) {
                 complete = false;
@@ -1144,6 +1149,10 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
         default:
             break;
         }
+    }
+    if (plan.dashboard_gear_display.selected_gear_label_call_reached &&
+        !plan.dashboard_gear_display.selected_gear_label_call.has_value()) {
+        complete = false;
     }
 
     // 0x4052D0 continues into 0x404970 after the dashboard and gear. Preserve

@@ -1257,6 +1257,71 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
             SceneDashboardGearOperationKind::initialize_gear_geometry_constants});
     }
 
+    constexpr std::size_t pointer_field_offset = 0x134U;
+    constexpr std::size_t value_field_offset = 0x34U;
+    constexpr std::size_t selector_field_offset = 0x48U;
+    const auto read_u32 = [](const std::span<const std::uint8_t> bytes,
+                             const std::size_t offset)
+        -> std::optional<std::uint32_t> {
+        if (offset > bytes.size() ||
+            bytes.size() - offset < sizeof(std::uint32_t)) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint32_t>(bytes[offset]) |
+            (static_cast<std::uint32_t>(bytes[offset + 1U]) << 8U) |
+            (static_cast<std::uint32_t>(bytes[offset + 2U]) << 16U) |
+            (static_cast<std::uint32_t>(bytes[offset + 3U]) << 24U);
+    };
+    const auto target_address = read_u32(
+        observation.selected_record_base_bytes, pointer_field_offset);
+    const auto selected_object_resolved = target_address.has_value() &&
+        *target_address != 0U &&
+        *target_address == observation.selected_record_value_object_address;
+    if (selected_object_resolved) {
+        if (const auto selector = read_u32(
+                observation.selected_record_value_object_bytes,
+                selector_field_offset);
+            selector.has_value()) {
+            result.selected_gear_label_selector = *selector;
+            if (*selector <
+                observation.gear_label_resource_addresses_0x4cfab4.size()) {
+                result.selected_gear_label_resource_address =
+                    observation.gear_label_resource_addresses_0x4cfab4[
+                        *selector];
+            }
+            if (observation.mode_0x45c200 != 0x0c) {
+                result.selected_gear_label_call =
+                    SceneDashboardGearDisplayResult::GearLabelCall{
+                        *selector,
+                        result.selected_gear_label_resource_address,
+                        0x004CFEB8U,
+                        observation.gear_label_font_context_value_0x4eb28c,
+                        observation.gear_label_font_resource_value_0x4eb314,
+                        0x0c,
+                        observation.surface_height - 0x28,
+                        0x1eU,
+                        0x0cU};
+            }
+        }
+    }
+
+    const auto append_gear_label_call = [&]() {
+        if (!result.selected_gear_label_call.has_value()) {
+            return;
+        }
+        const auto& call = *result.selected_gear_label_call;
+        result.operations.push_back({
+            SceneDashboardGearOperationKind::draw_selected_gear_label,
+            call.x,
+            call.y,
+            static_cast<std::int32_t>(call.raw_width_argument),
+            static_cast<std::int32_t>(call.raw_height_argument),
+            call.selected_resource_address.value_or(0U),
+            call.text_source});
+    };
+
+    result.selected_gear_label_call_reached =
+        observation.mode_0x45c200 != 0x0c;
     if (observation.mode_0x45c200 == 0) {
         result.operations.push_back({
             SceneDashboardGearOperationKind::fill_mode_zero_rectangle,
@@ -1266,7 +1331,7 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
             observation.surface_height - 0x0f,
             static_cast<std::uint32_t>(
                 observation.mode_zero_fill_argument_0x4eb27c)});
-        result.operations.push_back({SceneDashboardGearOperationKind::flush_text});
+        append_gear_label_call();
     } else if (observation.mode_0x45c200 != 0x0c) {
         result.operations.push_back({
             SceneDashboardGearOperationKind::draw_gear_resource,
@@ -1276,51 +1341,9 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
             0,
             observation.gear_resource_value_0x4eb420,
             0});
-        result.operations.push_back({SceneDashboardGearOperationKind::flush_text});
+        append_gear_label_call();
         auto value = observation.selected_record_value_0x34;
-        constexpr std::size_t pointer_field_offset = 0x134U;
-        constexpr std::size_t value_field_offset = 0x34U;
-        const auto read_u32 = [](const std::span<const std::uint8_t> bytes,
-                                 const std::size_t offset)
-            -> std::optional<std::uint32_t> {
-            if (offset > bytes.size() ||
-                bytes.size() - offset < sizeof(std::uint32_t)) {
-                return std::nullopt;
-            }
-            return static_cast<std::uint32_t>(bytes[offset]) |
-                (static_cast<std::uint32_t>(bytes[offset + 1U]) << 8U) |
-                (static_cast<std::uint32_t>(bytes[offset + 2U]) << 16U) |
-                (static_cast<std::uint32_t>(bytes[offset + 3U]) << 24U);
-        };
-        if (const auto selector_bits =
-                read_u32(observation.selected_record_value_object_bytes,
-                         0x48U);
-            selector_bits.has_value()) {
-            result.selected_gear_label_selector = *selector_bits;
-            if (*selector_bits <
-                observation.gear_label_resource_addresses_0x4cfab4.size()) {
-                result.selected_gear_label_resource_address =
-                    observation.gear_label_resource_addresses_0x4cfab4[
-                        *selector_bits];
-            }
-            result.selected_gear_label_call =
-                SceneDashboardGearDisplayResult::GearLabelCall{
-                    *selector_bits,
-                    result.selected_gear_label_resource_address,
-                    0x004CFEB8U,
-                    observation.gear_label_font_context_value_0x4eb28c,
-                    observation.gear_label_font_resource_value_0x4eb314,
-                    0x0c,
-                    observation.surface_height - 0x28,
-                    0x1eU,
-                    0x0cU};
-        }
-        if (const auto target_address =
-                read_u32(observation.selected_record_base_bytes,
-                         pointer_field_offset);
-            target_address.has_value() && *target_address != 0U &&
-            *target_address ==
-                observation.selected_record_value_object_address) {
+        if (selected_object_resolved) {
             if (const auto value_bits =
                     read_u32(observation.selected_record_value_object_bytes,
                              value_field_offset);

@@ -483,8 +483,8 @@ enum class SceneDashboardGearOperationKind : std::uint8_t {
     register_neutral_character,
     initialize_gear_geometry_constants,
     fill_mode_zero_rectangle,
-    flush_text,
     draw_gear_resource,
+    draw_selected_gear_label,
     draw_rotating_gear_geometry,
 };
 
@@ -497,7 +497,6 @@ struct SceneDashboardGearDisplayObservation {
     std::uint32_t gear_resource_value_0x4eb420{};
     // Base record returned by 0x45DFB0. 0x404970 reads the target object's
     // pointer at record+0x134, then the gear value at target+0x34.
-    std::uint32_t selected_record_base_address{};
     std::span<const std::uint8_t> selected_record_base_bytes;
     std::uint32_t selected_record_value_object_address{};
     std::span<const std::uint8_t> selected_record_value_object_bytes;
@@ -592,6 +591,7 @@ struct SceneDashboardGearDisplayResult {
     bool selected_record_value_resolved_from_bytes{};
     std::optional<std::uint32_t> selected_gear_label_selector;
     std::optional<std::uint32_t> selected_gear_label_resource_address;
+    bool selected_gear_label_call_reached{};
     struct GearLabelCall {
         std::uint32_t selector{};
         std::optional<std::uint32_t> selected_resource_address;
