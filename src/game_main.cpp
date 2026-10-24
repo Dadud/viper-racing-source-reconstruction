@@ -1280,16 +1280,21 @@ struct WindowState {
     bool advance(float delta_seconds, const bool update_graphics = true)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
-        const auto route_result = viper::advance_route_motion(motion, route,
+        auto candidate_motion = motion;
+        const auto route_result = viper::advance_route_motion(candidate_motion, route,
             left, right, accelerate, brake, delta_seconds, target_laps);
-        if (route_result.lap_completed) refresh_title(true);
         if (!route_result.valid && !route_result.finished) return false;
         std::optional<viper::TerrainSurfaceQueryResult> surface;
-        if (route_result.valid && update_graphics) {
+        if (route_result.valid) {
             surface = viper::sample_terrain_resource(
                 *terrain, {route_result.x, 1000.0f, route_result.z}, true);
-            if (!surface->query_succeeded) { motion.speed = 0.0f; return true; }
+            if (!surface->query_succeeded) return true;
+            if (!viper::commit_route_motion_after_terrain_query(
+                    motion, candidate_motion, surface->query_succeeded)) return true;
+        } else if (route_result.finished) {
+            motion = candidate_motion;
         }
+        if (route_result.lap_completed) refresh_title(true);
         if (update_graphics) {
             for (std::size_t car = 0; car < graphics.car_count(); ++car) {
                 const auto position = graphics.car_position(car);
@@ -1303,13 +1308,16 @@ struct WindowState {
         for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             auto& ai = opponent_motions[car];
-            const auto ai_result = viper::advance_route_motion(ai, route, false, false,
+            auto candidate_ai = ai;
+            const auto ai_result = viper::advance_route_motion(candidate_ai, route, false, false,
                 true, false, delta_seconds, target_laps);
             if (!ai_result.valid) continue;
+            const auto ai_surface = viper::sample_terrain_resource(
+                *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
+            if (!ai_surface.query_succeeded ||
+                !viper::commit_route_motion_after_terrain_query(
+                    ai, candidate_ai, ai_surface.query_succeeded)) continue;
             if (update_graphics) {
-                const auto ai_surface = viper::sample_terrain_resource(
-                    *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
-                if (!ai_surface.query_succeeded) continue;
                 pose_buffer[car] = {ai_result.x, ai_surface.sampled_position[1],
                     ai_result.z, ai_result.yaw};
             }

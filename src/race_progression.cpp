@@ -123,4 +123,14 @@ RouteMotionResult advance_route_motion(
     return result;
 }
 
+bool commit_route_motion_after_terrain_query(
+    RouteMotionState& state,
+    const RouteMotionState& candidate,
+    const bool terrain_query_succeeded) noexcept
+{
+    if (!terrain_query_succeeded) return false;
+    state = candidate;
+    return true;
+}
+
 } // namespace viper

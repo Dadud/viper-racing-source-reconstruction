@@ -70,6 +70,39 @@ int main()
             false, false, false, false, 0.05F, 1U);
         require(std::abs(steering_motion.steering - 0.125F) < 1.0e-6F,
             "released digital steering must decay at the recovered native rate");
+
+        viper::RouteMotionState staged_motion{};
+        staged_motion.route_segment = 3U;
+        staged_motion.route_fraction = 0.9F;
+        staged_motion.speed = 30.0F;
+        viper::initialize_race_progression(staged_motion.race, 0U);
+        const auto committed_before_query = staged_motion;
+        auto candidate_motion = staged_motion;
+        const auto staged_result = viper::advance_route_motion(candidate_motion,
+            square_route, false, true, false, false, 0.05F, 2U);
+        require(staged_result.valid && candidate_motion.race.elapsed_seconds > 0.0F &&
+                candidate_motion.race.completed_laps == 1U,
+            "staged advancement must expose a candidate lap crossing before terrain validation");
+        require(!viper::commit_route_motion_after_terrain_query(
+                    staged_motion, candidate_motion, false) &&
+                staged_motion.route_segment == committed_before_query.route_segment &&
+                staged_motion.route_fraction == committed_before_query.route_fraction &&
+                staged_motion.steering == committed_before_query.steering &&
+                staged_motion.speed == committed_before_query.speed &&
+                staged_motion.race.elapsed_seconds ==
+                    committed_before_query.race.elapsed_seconds &&
+                staged_motion.race.completed_laps ==
+                    committed_before_query.race.completed_laps &&
+                staged_motion.race.finished == committed_before_query.race.finished,
+            "failed terrain validation must roll back all player route and race progress");
+        require(viper::commit_route_motion_after_terrain_query(
+                    staged_motion, candidate_motion, true) &&
+                staged_motion.route_fraction == candidate_motion.route_fraction &&
+                staged_motion.steering == candidate_motion.steering &&
+                staged_motion.race.elapsed_seconds ==
+                    candidate_motion.race.elapsed_seconds &&
+                staged_motion.race.completed_laps == 1U,
+            "successful terrain validation must commit the complete candidate state");
         std::cout << "race progression regression checks passed\n";
         return 0;
     } catch (const std::exception& error) {

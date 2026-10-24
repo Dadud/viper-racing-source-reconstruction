@@ -57,4 +57,11 @@ void advance_race_clock(
     float delta_seconds,
     std::uint32_t target_laps) noexcept;
 
+// Commits a staged route update only after its runtime terrain query succeeds.
+// A failed query leaves lap time, route progress, steering, and speed untouched.
+[[nodiscard]] bool commit_route_motion_after_terrain_query(
+    RouteMotionState& state,
+    const RouteMotionState& candidate,
+    bool terrain_query_succeeded) noexcept;
+
 } // namespace viper
