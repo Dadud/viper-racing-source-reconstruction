@@ -254,6 +254,7 @@ std::string configured_track_stem(const std::filesystem::path& data_dir,
     return std::string(*stem);
 }
 
+
 std::string configured_car_stem(const std::filesystem::path& data_dir,
                                 const viper::GameOptions& options)
 {
@@ -999,7 +1000,9 @@ int wmain(int argc, wchar_t** argv)
         report_start_grid(assets);
         if (options.validate_assets) return 0;
         const auto driver_order = viper::initialize_single_race_driver_order();
-        constexpr std::array<std::string_view, 7> ai_names{};
+        constexpr std::array<std::string_view, 7> ai_names{
+            "AI slot 0", "AI slot 1", "AI slot 2", "AI slot 3",
+            "AI slot 4", "AI slot 5", "AI slot 6"};
         viper::SingleRaceEntrantObservation entrant_observation{};
         entrant_observation.configured_car_count = assets.options()
             .integer("GAME", "car_count").value_or(8);
@@ -1016,6 +1019,42 @@ int wmain(int argc, wchar_t** argv)
         std::cout << "Selected human grid slot: "
                   << (*entrants.player_record_index + 1U) << " of "
                   << entrants.participant_count << " (fresh single-race driver order)\n";
+        std::vector<viper::SingleRaceAISetupPlan> ai_setup_variants;
+        if (entrants.participant_count > 1) {
+            if (!assets.track_index())
+                throw std::runtime_error("selected track has no matching tracks.tab row for AI setup");
+            ai_setup_variants.reserve(viper::ai_driver_group_count * 2U);
+            std::size_t complete_setup_records = 0;
+            for (std::size_t group = 0; group < viper::ai_driver_group_count; ++group) {
+                for (std::uint8_t mode = 0; mode <= 1U; ++mode) {
+                    viper::SingleRaceAISetupObservation ai_observation{};
+                    ai_observation.entrants = &entrants;
+                    ai_observation.drivers = &assets.ai_drivers();
+                    ai_observation.driver_group =
+                        static_cast<viper::AIDriverGroup>(group);
+                    ai_observation.track_index = *assets.track_index();
+                    ai_observation.tuning_mode = mode;
+                    ai_observation.base_setup_payload = assets.ai_vehicle_setup();
+                    ai_observation.configuration_data_available = true;
+                    ai_observation.loaded_car_file = assets.ai_car().car_file;
+                    // The helper-mode selector is not reconstructed. Use the
+                    // explicitly modeled base division path for preparation.
+                    ai_observation.compatibility_division_helper_enabled = false;
+                    auto plan = viper::prepare_single_race_ai_setups(ai_observation);
+                    complete_setup_records += static_cast<std::size_t>(std::count_if(
+                        plan.ai_setups.begin(), plan.ai_setups.end(),
+                        [](const auto& record) { return record.input_complete; }));
+                    ai_setup_variants.push_back(std::move(plan));
+                }
+            }
+            std::size_t prepared_records = 0;
+            for (const auto& variant : ai_setup_variants)
+                prepared_records += variant.ai_setups.size();
+            std::cout << "Prepared " << prepared_records
+                      << " AI setup variants across all AIDR profiles and tuning modes ("
+                      << complete_setup_records
+                      << " numerically complete with the current FDIV model)\n";
+        }
         return run_window(options.software, options.smoke_frames,
             *entrants.player_record_index,
             assets.track_name(), assets.car_name(), assets.terrain(),

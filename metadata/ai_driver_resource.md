@@ -22,7 +22,14 @@ product of row `+0` and record `+0x20` to setup word 1, passes row `+4` to
 `+0x6C`. Field meanings remain unlabeled. Evidence: `0x41A000`
 `ev_67a3cffd701fba3131c3793b441c8ae76089194d822832bebb5902ef73ac6b54`.
 `GameAssets` now requires and owns this parsed resource alongside its shared,
-car, and track bundles. The parser currently does not accept the legacy
+car, and track bundles. When the selected player car is not Viper, it also
+opens and owns `viper.car` as a separate AI vehicle bundle and parses its CARF
+without player upgrade overlays. It resolves the selected track's `tracks.tab`
+row. At runtime startup, the setup planner is invoked for all eight AIDR
+profiles and both observed tuning modes, keyed by each AI entrant's modulo-7
+slot. The current profile/mode selector, native fallback block acquisition,
+and FDIV helper mode remain unresolved; generated candidates are not yet fed
+to opponent vehicle construction. The parser currently does not accept the legacy
 `0x660C`-byte version-2 payload that the native loader also recognizes and
 converts. Native `0x41B9B0` copies the legacy payload's first three groups and
 builds the remaining five groups from the first current runtime-manager record

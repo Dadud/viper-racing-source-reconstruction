@@ -67,7 +67,7 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     assets.bundle_names_[4] = assets.track_name_ + ".trk";
     assets.bundle_names_[5] = "drivers.res";
 
-    for (std::size_t i = 0; i < assets.bundle_names_.size(); ++i) {
+    for (std::size_t i = 0; i < 6U; ++i) {
         const auto& bundle_name = assets.bundle_names_[i];
         const auto path = root / std::filesystem::path(bundle_name);
         std::error_code ec;
@@ -202,6 +202,20 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         throw std::runtime_error(assets.track_name_ +
             " track.obt world-object resource is invalid");
     assets.track_objects_ = *track_objects;
+    const auto tracks_payload = common_bundle.find_payload(
+        "tracks.tab", TrackObjectTextTable::bats_resource_type_code);
+    if (tracks_payload) {
+        const auto tracks = parse_track_object_text_table(*tracks_payload);
+        if (tracks) {
+            for (std::size_t index = 0; index < tracks->line_count; ++index) {
+                const auto name = track_object_text_line(*tracks, index, 0);
+                if (name && ascii_equal_case_insensitive(*name, assets.track_name_)) {
+                    assets.track_index_ = static_cast<std::uint32_t>(index);
+                    break;
+                }
+            }
+        }
+    }
     const auto* ai_setup_entry = track_bundle.find("aidef.ccs", car_setup_type);
     if (ai_setup_entry == nullptr)
         throw std::runtime_error(assets.track_name_ +
@@ -243,6 +257,19 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         throw std::runtime_error(assets.car_name_ +
             " CARF version 6 resource is missing or invalid");
     }
+    const ResourceBundle* ai_car_bundle = &car_bundle;
+    if (assets.car_name_ != "viper") {
+        const auto ai_car_path = root / "viper.car";
+        std::error_code ai_car_error;
+        if (!std::filesystem::is_regular_file(ai_car_path, ai_car_error) || ai_car_error)
+            throw std::runtime_error("missing required AI vehicle bundle: " + ai_car_path.string());
+        assets.bundles_[6] = ResourceBundle::open(ai_car_path);
+        assets.bundle_names_[6] = "viper.car";
+        ai_car_bundle = &assets.bundles_[6];
+    }
+    assets.ai_car_ = parse_car_file_resources(*ai_car_bundle, "viper", false);
+    if (!assets.ai_car_.car_file)
+        throw std::runtime_error("viper.car AI CARF version 6 resource is missing or invalid");
     bool player_model_loaded = false;
     const auto expected_model = assets.car_name_ + "0.mod";
     for (const auto& entry : car_bundle.entries()) {

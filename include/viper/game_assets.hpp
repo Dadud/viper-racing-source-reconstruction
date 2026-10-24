@@ -39,6 +39,8 @@ public:
     [[nodiscard]] const std::array<std::byte, 0x8c>& ai_vehicle_setup() const noexcept { return ai_vehicle_setup_; }
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
+    [[nodiscard]] const CarFileResourcePayloads& ai_car() const noexcept { return ai_car_; }
+    [[nodiscard]] const std::optional<std::uint32_t>& track_index() const noexcept { return track_index_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
     [[nodiscard]] const TireDefinition& default_tire() const noexcept { return default_tire_; }
     [[nodiscard]] const std::array<TireDefinition, 4>& wheel_tires() const noexcept
@@ -53,8 +55,8 @@ public:
 
 private:
     std::filesystem::path root_;
-    std::array<ResourceBundle, 6> bundles_;
-    std::array<std::string, 6> bundle_names_;
+    std::array<ResourceBundle, 7> bundles_;
+    std::array<std::string, 7> bundle_names_;
     std::string track_name_;
     std::string car_name_;
     LanguageResource language_;
@@ -64,6 +66,8 @@ private:
     std::array<std::byte, 0x8c> ai_vehicle_setup_{};
     IdealLineTrackData ideal_line_;
     CarFileResourcePayloads player_car_;
+    CarFileResourcePayloads ai_car_;
+    std::optional<std::uint32_t> track_index_;
     ModelResource player_model_;
     TireDefinition default_tire_;
     std::array<TireDefinition, 4> wheel_tires_{};
