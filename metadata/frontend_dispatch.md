@@ -85,6 +85,23 @@ contents, resource-manager side effects, or menu-control callback execution.
 Shipped-image evidence for the main-menu routine is
 `ev_46296befbc4dd8fa5baf76ce27d21d870878fd89e0817e31afeb7087f4d97e0e`.
 
+The same path now projects the full-screen branch of `0x472B30`. It passes
+the current display width and height, so its dimensions match and its special
+layout branch is skipped; the `-999` coordinates center the full-screen menu
+at `(0,0)`. The menu controller requests `0x464` bytes, initializes its
+geometry and state fields in `0x479E80`, and enters the first empty slot of the
+16-pointer registry at `0x560890`; exhaustion calls the shared panic path at
+`0x411000`. The default-layout auxiliary control requests `0x340` bytes and
+uses constructor type/subtype `0x1D/0x16`, then is attached before the menu
+descriptor loader runs. The helper then applies the descriptor default,
+installs callback `0x472CB0`, reads the selected value, destroys the
+controller, and restores `DAT_0055FFD8`. Allocation and resource effects,
+callback execution, and controller contents remain runtime observations. The
+interaction and controller evidence is
+`ev_99bc93fa965cf2107c888c5d121d877a50bb49c55c055436aecfc7a4ed68b7fb`,
+`ev_1ba503e7babb22fe99218dbf3d4230add731cba3e680260a7aea0fabaa654d98`, and
+`ev_9636d6bd73bf3c05920380d82ba0c6c94dc4b92b44b93c005de8502505c6c242`.
+
 ### Replay screen (`0x406950`)
 
 `plan_replay_screen` projects the replay handler's record-presence branches,

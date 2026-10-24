@@ -1,5 +1,15 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended `plan_main_menu_screen` through the full-screen
+  `0x472B30` interaction path: centered coordinates, controller allocation and
+  its 16-slot registry/panic gate, controller initialization/resource load,
+  default-layout auxiliary control, descriptor/default selection setup,
+  callback install/result read, cleanup, and shared-context restoration.
+  Memory/resource effects and callback execution remain observations. Merged
+  the three new REA records into the existing frontend evidence bundle without
+  discarding prior evidence. Release build and `git diff --check` passed; no
+  tests were run.
+
 - **2026-10-24:** Extended the main-menu model through `0x4805C0`'s stateful
   setup. `plan_main_menu_screen` records all eight one-time localized-label
   registrations, the default-name and six menu-label generation refresh gates,

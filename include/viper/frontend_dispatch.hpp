@@ -41,9 +41,43 @@ struct MainMenuScreenObservation {
     int raw_menu_result{};
 };
 
+struct MainMenuInteractionPlan {
+    // Direct helper path for the full-screen branch, with the nested
+    // controller allocation and default-layout control construction included.
+    std::array<std::uint32_t, 15> helper_call_order{
+        0x00414500U, 0x00413ce0U, 0x004799e0U, 0x00414170U,
+        0x00479e80U, 0x00449390U, 0x0044cfd0U, 0x00414170U,
+        0x004765a0U, 0x00479b30U, 0x00472130U, 0x00479e70U,
+        0x00479b40U, 0x00479da0U, 0x00479a50U};
+    std::int32_t requested_x{-999};
+    std::int32_t requested_y{-999};
+    std::int32_t resolved_x{};
+    std::int32_t resolved_y{};
+    bool menu_dimensions_match_screen{true};
+    bool alternate_layout_branch{};
+    std::uint32_t controller_allocation_size{0x464U};
+    std::uint32_t controller_initializer{0x00479e80U};
+    std::uint32_t controller_resource_loader{0x0044cfd0U};
+    std::uint32_t controller_registry_address{0x00560890U};
+    std::uint32_t controller_registry_slot_count{16U};
+    std::uint32_t registry_exhaustion_panic{0x00411000U};
+    std::uint32_t auxiliary_control_pool_allocation_size{0x340U};
+    std::uint32_t auxiliary_control_type{0x1dU};
+    std::uint32_t auxiliary_control_subtype{0x16U};
+    std::uint32_t descriptor_parser{0x00472130U};
+    std::uint32_t default_selection_setter{0x00479e70U};
+    std::uint32_t selection_callback_setter{0x00479b40U};
+    std::uint32_t selection_callback_address{0x00472cb0U};
+    std::uint32_t selection_result_getter{0x00479da0U};
+    std::uint32_t controller_cleanup{0x00479a50U};
+    std::uint32_t shared_context_global{0x0055ffd8U};
+    bool shared_context_restored{true};
+};
+
 struct MainMenuScreenPlan {
     std::vector<MainMenuLabelRegistration> registrations;
     std::vector<std::uint32_t> refreshed_resource_objects;
+    MainMenuInteractionPlan interaction;
     std::uint32_t initialized_label_mask_after{};
     std::uint32_t player_name_prepare_helper_address{0x0046b020U};
     std::uint32_t interaction_helper_address{0x00472b30U};
