@@ -468,3 +468,24 @@ bounded read helpers `0x4C5E10`,
 and `0x426F20`,
 `ev_01f6bab75271ba29cbd44ddd6feb3a0213b51640ad44436defd19214f505b5cd`.
 
+
+## OBST constructor projection
+
+`plan_physics_obstacle_task_constructor` models the derived constructor at
+`0x436860` after the shared car base constructor. It projects the derived
+vtable, timer-active byte, yaw-only basis, record position, and cached 12-DWORD
+basis/position copy. The timer value at `+0x4A8` remains an optional runtime
+observation returned by `0x425790`; the planner does not invent it.
+
+Shape selectors 0 and 1 allocate `0x40` and `0x44` bytes respectively and
+dispatch to child constructors `0x42BE10` and `0x42C400`. Both reserve one
+child slot and increment the count even when allocation fails; selector 2
+emits six 0x30-byte geometry records, increments the geometry count for each,
+then allocates a `0x40`-byte sphere child. The six records preserve the observed
+direct-write versus `0x4372C0` helper paths. An unrecognized selector creates
+no derived shape child but still completes the shared cache copy. Allocation
+addresses are supplied as observations. Evidence for the constructor:
+`ev_b4bfa4e7c97b76f2a9c1c6c76bcfbfac735c0a01b7354aac27d1afba84dc362e`;
+timer helper `0x436EB0`: `ev_79004fd497de281d1e0b97eabded5bc795dcc3133ce0e8baa7e5d88b98fd7df7`;
+geometry helper `0x4372C0`:
+`ev_29b5f991b46ddd11e833ac2abe53b20dcc50e00ef7e78739f4990b1c2a8fb142`.

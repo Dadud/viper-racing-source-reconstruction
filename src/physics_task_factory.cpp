@@ -1158,6 +1158,160 @@ PhysicsBallTaskConstructorPlan plan_physics_ball_task_constructor(
     return plan;
 }
 
+PhysicsObstacleTaskConstructorPlan plan_physics_obstacle_task_constructor(
+    const PhysicsObstacleTaskConstructorObservation& observation)
+{
+    PhysicsObstacleTaskConstructorPlan plan{};
+    plan.shape_selector = observation.shape_selector_0x34;
+    plan.child_count_after = observation.child_count_before;
+    plan.geometry_record_count_after =
+        observation.geometry_record_count_before;
+    plan.derived_vtable_installed = true;
+    plan.object_writes.push_back({0U, 0x004c8018U});
+    plan.object_writes.push_back({0x4acU, 0U});
+    plan.object_writes.push_back({0x4a8U, 0U});
+    // 0x436eb0 sets the active byte and replaces the timer value. The
+    // projection records the observed byte effect; timer output is runtime
+    // dependent and is intentionally not synthesized here.
+    plan.object_writes.push_back({0x4acU, 1U});
+    if (observation.timer_value_0x4a8.has_value()) {
+        plan.object_writes.push_back({0x4a8U,
+            *observation.timer_value_0x4a8});
+    }
+
+    constexpr float degrees_to_radians = 0.017453292F;
+    const auto radians = static_cast<long double>(observation.yaw_degrees_0x24)
+        * static_cast<long double>(degrees_to_radians);
+    const auto cosine = static_cast<float>(std::cos(radians));
+    const auto sine = static_cast<float>(std::sin(radians));
+    plan.rotated_basis = {cosine, 0.0F, -sine,
+                          0.0F, 1.0F, 0.0F,
+                          sine, 0.0F, cosine};
+    for (std::size_t index = 0U; index < plan.rotated_basis.size(); ++index) {
+        plan.object_writes.push_back({
+            0x38U + static_cast<std::uint32_t>(index * 4U),
+            std::bit_cast<std::uint32_t>(plan.rotated_basis[index])});
+    }
+    for (std::size_t axis = 0U; axis < observation.position_words_0x18.size();
+         ++axis) {
+        plan.object_writes.push_back({
+            0x5cU + static_cast<std::uint32_t>(axis * 4U),
+            observation.position_words_0x18[axis]});
+    }
+    // The constructor clears this center before it selects a shape branch.
+    plan.object_writes.push_back({0x28U, 0U});
+    plan.object_writes.push_back({0x2cU, 0U});
+    plan.object_writes.push_back({0x30U, 0U});
+
+    const auto record_scale = std::bit_cast<float>(
+        observation.record_scale_word_0x08);
+    plan.sphere_scale = static_cast<float>(
+        static_cast<long double>(record_scale) * 16.35L);
+
+    if (observation.shape_selector_0x34 == 0U
+        || observation.shape_selector_0x34 == 1U) {
+        const bool derived_shape = observation.shape_selector_0x34 == 1U;
+        plan.status = PhysicsObstacleTaskConstructorStatus::
+            child_allocation_failed;
+        plan.allocation_bytes = derived_shape ? 0x44U : 0x40U;
+        plan.child_constructor_address = derived_shape
+            ? 0x0042c400U : 0x0042be10U;
+        plan.child_slot_offset = 0x14U + observation.child_count_before * 4U;
+        plan.child_count_after = observation.child_count_before + 1U;
+        plan.child_allocation_attempted = true;
+        plan.child_pointer_stored = true;
+        plan.child_count_incremented = true;
+        if (!observation.child_allocation_succeeded) {
+            plan.object_writes.push_back({plan.child_slot_offset, 0U});
+        } else if (observation.child_address.has_value()) {
+            plan.object_writes.push_back({plan.child_slot_offset,
+                *observation.child_address});
+        }
+        plan.object_writes.push_back({0x474U, 1U});
+        plan.object_writes.push_back({0x24U, plan.child_count_after});
+        if (observation.child_allocation_succeeded) {
+            plan.status = PhysicsObstacleTaskConstructorStatus::child_constructed;
+            plan.child_address = observation.child_address;
+            plan.child_constructor_called = true;
+        } else {
+            plan.child_address = 0U;
+        }
+    } else if (observation.shape_selector_0x34 == 2U) {
+        plan.status = PhysicsObstacleTaskConstructorStatus::
+            child_allocation_failed;
+        plan.allocation_bytes = 0x40U;
+        plan.child_constructor_address = 0x0042be10U;
+        plan.child_slot_offset = 0x14U + observation.child_count_before * 4U;
+        plan.child_count_after = observation.child_count_before + 1U;
+        plan.child_allocation_attempted = true;
+        plan.child_pointer_stored = true;
+        plan.child_count_incremented = true;
+
+        const float half_x = observation.dimension_x_0x28 * -0.5F;
+        const float half_y = observation.dimension_y_0x2c * 0.5F;
+        const float half_z = observation.dimension_z_0x30 * 0.5F;
+        const std::array<std::array<float, 3>, 6> positions{{
+            {-half_x, -half_y, -half_z},
+            { half_x, -half_y, -half_z},
+            {-half_x, -half_y,  half_z},
+            { half_x, -half_y,  half_z},
+            {0.0F,     half_y, -half_z},
+            {0.0F,     half_y,  half_z}}};
+        constexpr std::array<bool, 6> helper_written{
+            false, false, true, false, true, true};
+        for (std::size_t index = 0U; index < positions.size(); ++index) {
+            PhysicsObstacleGeometryRecord record{};
+            record.object_offset = 0x6cU
+                + (observation.geometry_record_count_before
+                   + static_cast<std::uint32_t>(index)) * 0x30U;
+            // The recovered writes define words 0..10. The final DWORD in
+            // each 0x30-byte record is not written by either observed path.
+            record.known_word_mask = 0x07ffU;
+            record.initialized_by_helper_0x4372c0 = helper_written[index];
+            for (std::size_t axis = 0U; axis < 3U; ++axis) {
+                record.words[axis] =
+                    std::bit_cast<std::uint32_t>(positions[index][axis]);
+            }
+            record.words[6] = std::bit_cast<std::uint32_t>(plan.sphere_scale);
+            plan.geometry_records.push_back(record);
+        }
+        plan.geometry_record_count_after =
+            observation.geometry_record_count_before + 6U;
+        plan.geometry_count_incremented = true;
+        plan.object_writes.push_back({0x1ecU,
+            plan.geometry_record_count_after});
+        if (!observation.child_allocation_succeeded) {
+            plan.object_writes.push_back({plan.child_slot_offset, 0U});
+        } else if (observation.child_address.has_value()) {
+            plan.object_writes.push_back({plan.child_slot_offset,
+                *observation.child_address});
+        }
+        plan.object_writes.push_back({0x474U, 0U});
+        plan.object_writes.push_back({0x24U, plan.child_count_after});
+        if (observation.child_allocation_succeeded) {
+            plan.status = PhysicsObstacleTaskConstructorStatus::child_constructed;
+            plan.child_address = observation.child_address;
+            plan.child_constructor_called = true;
+        } else {
+            plan.child_address = 0U;
+        }
+    }
+
+    for (std::size_t index = 0U; index < plan.rotated_basis.size(); ++index) {
+        plan.object_writes.push_back({
+            0x478U + static_cast<std::uint32_t>(index * 4U),
+            std::bit_cast<std::uint32_t>(plan.rotated_basis[index])});
+    }
+    for (std::size_t axis = 0U; axis < observation.position_words_0x18.size();
+         ++axis) {
+        plan.object_writes.push_back({
+            0x49cU + static_cast<std::uint32_t>(axis * 4U),
+            observation.position_words_0x18[axis]});
+    }
+    plan.cached_basis_copied = true;
+    return plan;
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {

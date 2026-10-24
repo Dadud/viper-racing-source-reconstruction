@@ -640,6 +640,67 @@ struct PhysicsBallTaskConstructorPlan {
 plan_physics_ball_task_constructor(
     const PhysicsBallTaskConstructorObservation& observation);
 
+struct PhysicsObstacleTaskConstructorObservation {
+    std::uint32_t object_address{};
+    std::uint32_t record_scale_word_0x08{};
+    std::array<std::uint32_t, 3> position_words_0x18{};
+    float yaw_degrees_0x24{};
+    float dimension_x_0x28{};
+    float dimension_y_0x2c{};
+    float dimension_z_0x30{};
+    std::uint32_t shape_selector_0x34{};
+    std::uint32_t geometry_record_count_before{};
+    std::uint32_t child_count_before{};
+    std::optional<std::uint32_t> timer_value_0x4a8;
+    bool child_allocation_succeeded{};
+    std::optional<std::uint32_t> child_address;
+};
+
+enum class PhysicsObstacleTaskConstructorStatus : std::uint8_t {
+    unsupported_shape_selector,
+    child_constructed,
+    child_allocation_failed,
+};
+
+struct PhysicsObstacleGeometryRecord {
+    std::uint32_t object_offset{};
+    // Twelve DWORD slots cover the observed 0x30-byte record. Values are
+    // stored as raw bits so float fields and cleared words remain exact.
+    std::array<std::uint32_t, 12> words{};
+    std::uint16_t known_word_mask{};
+    bool initialized_by_helper_0x4372c0{};
+};
+
+struct PhysicsObstacleTaskConstructorPlan {
+    PhysicsObstacleTaskConstructorStatus status{
+        PhysicsObstacleTaskConstructorStatus::unsupported_shape_selector};
+    std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::vector<PhysicsObstacleGeometryRecord> geometry_records;
+    std::uint32_t shape_selector{};
+    std::uint32_t allocation_bytes{};
+    std::uint32_t child_constructor_address{};
+    std::uint32_t child_slot_offset{};
+    std::uint32_t child_count_after{};
+    std::uint32_t geometry_record_count_after{};
+    std::optional<std::uint32_t> child_address;
+    std::array<float, 9> rotated_basis{};
+    float sphere_scale{};
+    bool base_car_constructor_called{true};
+    bool derived_vtable_installed{};
+    bool timer_helper_0x436eb0_called{true};
+    bool child_allocation_attempted{};
+    bool child_constructor_called{};
+    bool child_pointer_stored{};
+    bool child_count_incremented{};
+    bool geometry_count_incremented{};
+    bool cached_basis_copied{};
+};
+
+// Projects the OBST selector branches, six box records, and cached basis.
+[[nodiscard]] PhysicsObstacleTaskConstructorPlan
+plan_physics_obstacle_task_constructor(
+    const PhysicsObstacleTaskConstructorObservation& observation);
+
 struct PhysicsTaskRecordLoadObservation {
     // Negative values are the end-of-records result from 0x4C5E10.
     std::int32_t record_length{};
