@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 
 namespace viper {
@@ -31,6 +32,32 @@ struct PcarScalarFields {
     float value_0xde8{};
     float value_0xdec{};
 };
+
+struct PcarConstructorControls {
+    // The constructor's default local values are enabled for these four
+    // CONTROL settings; yaw control defaults to zero.
+    bool traction_control{true};
+    bool abs_braking{true};
+    bool auto_shifting{true};
+    bool auto_clutch{true};
+    bool auto_clutch_0x534{true};
+    std::int32_t yaw_control{};
+    // 0x4330B0 writes +0x6B0 to four wheel objects; 0x4330D0 writes +0x6B8.
+    std::array<std::uint32_t, 4> wheel_traction_0x6b0{};
+    std::array<std::uint32_t, 4> wheel_abs_0x6b8{};
+    std::optional<std::uint32_t> game_mode_0x4f4;
+    bool auto_clutch_forced_by_auto_shift{};
+};
+
+// Models the settings-derived control defaults and the four-wheel direct
+// stores in PCAR constructor 0x4381E0 / setters 0x4330B0 and 0x4330D0.
+[[nodiscard]] PcarConstructorControls initialize_pcar_constructor_controls(
+    std::optional<bool> traction_control,
+    std::optional<bool> abs_braking,
+    std::optional<bool> auto_shifting,
+    std::optional<bool> auto_clutch,
+    std::optional<std::int32_t> yaw_control,
+    std::optional<std::uint32_t> game_mode_0x4f4) noexcept;
 
 struct PcarCallbackTailFields {
     std::uint8_t value_0xc3c{};

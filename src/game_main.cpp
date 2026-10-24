@@ -1512,6 +1512,7 @@ struct WindowState {
     viper::RaceLoop43B290State control_update_state{};
     viper::PcarCallbackGlobals pcar_callback_globals{};
     viper::PcarScalarFields player_pcar_control_prefix{};
+    viper::PcarConstructorControls player_pcar_constructor_controls{};
     float control_steering_smoothing{1.0F};
     float control_steering_range{1.0F};
     float control_steering_speed{1.0F};
@@ -2068,6 +2069,13 @@ std::optional<std::uint8_t> directinput_key_selector(const UINT virtual_key)
 void load_keyboard_bindings(WindowState& state,
                             const viper::GameOptions& options)
 {
+    state.player_pcar_constructor_controls =
+        viper::initialize_pcar_constructor_controls(
+            options.boolean("CONTROL", "traction_control"),
+            options.boolean("CONTROL", "abs_braking"),
+            options.boolean("CONTROL", "auto_shifting"),
+            options.boolean("CONTROL", "auto_clutch"),
+            options.integer("CONTROL", "yaw_control"), std::nullopt);
     // 0x43B030 resets these CONTROL values to 1.0, then reads saved overrides.
     state.control_steering_smoothing =
         options.real("CONTROL", "steer_sensitivity").value_or(1.0F);
@@ -2346,7 +2354,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         }
         trace << ",control_0x509358,control_0x5093f4,control_0x509320"
               << ",pcar_prefix_0xde0,pcar_prefix_0xde4"
-              << ",pcar_prefix_0xde8,pcar_prefix_0xdec";
+              << ",pcar_prefix_0xde8,pcar_prefix_0xdec"
+              << ",pcar_traction_control,pcar_abs_braking"
+              << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2448,7 +2458,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.player_pcar_control_prefix.value_0xde0
                       << ',' << state.player_pcar_control_prefix.value_0xde4
                       << ',' << state.player_pcar_control_prefix.value_0xde8
-                      << ',' << state.player_pcar_control_prefix.value_0xdec;
+                      << ',' << state.player_pcar_control_prefix.value_0xdec
+                      << ',' << state.player_pcar_constructor_controls.traction_control
+                      << ',' << state.player_pcar_constructor_controls.abs_braking
+                      << ',' << state.player_pcar_constructor_controls.auto_shifting
+                      << ',' << state.player_pcar_constructor_controls.auto_clutch_0x534
+                      << ',' << state.player_pcar_constructor_controls.yaw_control;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";

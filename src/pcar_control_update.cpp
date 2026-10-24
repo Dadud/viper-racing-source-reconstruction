@@ -55,6 +55,33 @@ void set_pcar_scalar_0xdec(PcarScalarFields& fields, const float value) noexcept
     fields.value_0xdec = value;
 }
 
+PcarConstructorControls initialize_pcar_constructor_controls(
+    const std::optional<bool> traction_control,
+    const std::optional<bool> abs_braking,
+    const std::optional<bool> auto_shifting,
+    const std::optional<bool> auto_clutch,
+    const std::optional<std::int32_t> yaw_control,
+    const std::optional<std::uint32_t> game_mode_0x4f4) noexcept
+{
+    PcarConstructorControls result{};
+    result.traction_control = traction_control.value_or(true);
+    result.abs_braking = abs_braking.value_or(true);
+    result.auto_shifting = auto_shifting.value_or(true);
+    result.auto_clutch = auto_clutch.value_or(true);
+    result.yaw_control = yaw_control.value_or(0);
+    result.game_mode_0x4f4 = game_mode_0x4f4;
+    if (result.auto_shifting) {
+        result.auto_clutch_forced_by_auto_shift = !result.auto_clutch;
+        result.auto_clutch = true;
+    }
+    result.auto_clutch_0x534 = result.auto_clutch;
+    result.wheel_traction_0x6b0.fill(
+        static_cast<std::uint32_t>(result.traction_control));
+    result.wheel_abs_0x6b8.fill(
+        static_cast<std::uint32_t>(result.abs_braking));
+    return result;
+}
+
 PcarCallbackTailResult advance_pcar_callback_tail(
     PcarCallbackTailFields& fields,
     const float value_from_0x43ba10) noexcept

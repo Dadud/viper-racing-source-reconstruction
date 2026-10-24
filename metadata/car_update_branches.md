@@ -1154,3 +1154,22 @@ for `result(0x40D270)`, matching the observed startup fallback; profile-driven
 settings and conditional PCAR callback branches are not yet integrated. The
 four projected values are appended to race traces. `pcar_control_update_regression`
 checks the scalar mapping with an explicit multiplier.
+
+### PCAR constructor control settings
+
+The live session now parses the constructor's `CONTROL` options into persistent
+PCAR control state. The binary starts traction control, ABS, auto shifting,
+auto clutch, and yaw control at `1, 1, 1, 1, 0` before reading configuration.
+`0x4381E0` forces auto clutch back on when auto shifting is enabled, then copies
+the final value to `+0x534`. It stores the game-mode helper result at `+0x4F4`
+as unresolved unless supplied. The traction/ABS setters `0x4330B0/0x4330D0`
+write each enabled flag as a DWORD into four wheel subobjects at `+0x6B0` and
+`+0x6B8` with `0x1A4` stride; the runtime retains those four exact values.
+The controls are currently session-owned initialization state; wheel-force
+response and automatic transmission behavior still need the corresponding
+native update paths before they affect motion. Evidence: `0x4381E0`
+`ev_365b74f41f3ffe8a5d0ca349ed3801a7069ccd56fe16be69203abbe524a123f4`,
+`0x4330B0` `ev_056007ebb6040c48717f042c74961338ddcb9afe2ac850531fddb6e0e1cb0d7d`,
+`0x4330D0` `ev_c98a80c4b55e307bf7ad25561ea0a1a16f2421c8c98d9bb16c18ea59177dfc7d`,
+and game-mode accessor `0x425860`
+`ev_1c3a9bf935b6573c5a7c6279f49730c305e395a1f150383e8dc332cb85662528`.
