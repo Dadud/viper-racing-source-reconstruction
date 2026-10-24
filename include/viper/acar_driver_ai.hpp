@@ -69,4 +69,18 @@ struct AcarDriverAiPlan {
     AcarDriverAiState& state,
     const AcarDriverAiObservation& observation) noexcept;
 
+struct AcarDriverCallbackPlan {
+    AcarDriverAiPlan route_candidate_plan{};
+    bool fallback_helper_0x42b040_called{};
+    bool fallback_helper_result{};
+    bool callback_return_value{};
+};
+
+// Models the registered wrapper at 0x42AD80: 0x42ADB0 runs first, and its
+// nonzero return bypasses fallback 0x42B040. The fallback's result is supplied.
+[[nodiscard]] AcarDriverCallbackPlan evaluate_acar_driver_callback(
+    AcarDriverAiState& state,
+    const AcarDriverAiObservation& observation,
+    bool fallback_helper_result) noexcept;
+
 } // namespace viper

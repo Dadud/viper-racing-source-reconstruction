@@ -569,22 +569,25 @@ missing-link/capture states instead of following arbitrary pointers. Evidence:
 `ev_44cc376596921a8b71472de9e75f93d2def8b1a228f10049dc831a15505294df` and
 `ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.
 
-`plan_acar_curve_lookup` projects the adjacent `0x42AD20` wrapper. When its
+`plan_acar_curve_lookup` projects helper `0x42AD20`, called from fallback
+route routine `0x42B040`. When its
 `+0x1069` gate is set, it loads the selected descriptor's `+0x14` cursor,
 uses model fraction `+0x1064`, and calls `0x41D3A0` with the circular head at
 `+0xFE8` and the caller's target point and distance bound. It returns the
 updated cursor/fraction, distance result, and the wrapper's nonnull-cursor
 boolean. Missing descriptor captures and null descriptor/node faults remain
-distinct outcomes. The callback is modeled as a standalone projection; its
-native registration target and runtime invocation are still external inputs.
+distinct outcomes. Its returned position distance and cursor validity are
+consumed by `0x42B040`; runtime descriptor contents remain supplied inputs.
 Evidence: `0x42AD20`
 `ev_c2d39ffcfd59d893ca7728fa13e858caae86a3962e967ae6233a1450b625eccb`,
 `0x41D3A0` `ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.
 
-`update_acar_driver_ai_candidates` models the analyzed `0x42ADB0` route-relative
-candidate routine. No direct code callers were observed; the registered
-`0x42AD80` address is a separate entry whose body/call relationship remains
-unresolved. The model applies the raw signed `+0xF10` threshold, resolves the
+`evaluate_acar_driver_callback` models the registered wrapper at `0x42AD80`:
+it invokes `0x42ADB0` first and calls `0x42B040` only when the first result is
+zero, returning success when either result is nonzero. The direct `0x42AD89`
+call confirms that `update_acar_driver_ai_candidates` models the first route
+inside this wrapper. That routine applies the raw signed `+0xF10` threshold,
+resolves the
 two route vectors through the sign-selecting `0x41F0A0`/`0x41F0E0` accessors,
 normalizes the car's XZ velocity, and uses `0x42A630`'s `(x,z) -> (z,-x)`
 rotation for lateral projection. The `0x42B320` stateful directional candidate
@@ -600,3 +603,8 @@ caller query `ev_789a3d59c544672d0999d5cb6936ed19a57c3adb71fb3275324a09e6fae3db8
 `0x41F0A0` `ev_468b3e59ecafd5890c7c64c5a7f41829f26efd1cdddfa0ab637ec81742d1f76`,
 `0x41F0E0` `ev_204234122e042862454f8ded6d9907c797f279c85edb9ac9655fcabfa2bc0701`,
 and `0x41B050` `ev_278b8fb16ac39bb1b38acaa720b2ca9490c3e235c60d947151f3c3b41f16bccf`.
+The wrapper call and branch sequence is supported by instructions `0x42AD80`
+`ev_72a01f70afb7437130321395a3591dd048be93c5f9781d0617dfde72c72292ca`,
+`0x42AD89` `ev_3b2cc9e45cb543f86fab43b3b64471c22d63172c73e7e206b53b56a14aab6363`,
+`0x42AD90` `ev_d99f444141352b03eb457e8bc2f5d6c474fe1779dce6429bdabc27181fc3388`,
+and success return at `0x42ADA5` `ev_774cc7af43f607868f1e4d126f3e17c64cfb42dae3cc6e39b95c716363075025`.

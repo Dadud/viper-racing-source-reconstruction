@@ -190,4 +190,23 @@ AcarDriverAiPlan update_acar_driver_ai_candidates(
     return plan;
 }
 
+AcarDriverCallbackPlan evaluate_acar_driver_callback(
+    AcarDriverAiState& state,
+    const AcarDriverAiObservation& observation,
+    const bool fallback_helper_result) noexcept
+{
+    AcarDriverCallbackPlan plan{};
+    plan.route_candidate_plan = update_acar_driver_ai_candidates(
+        state, observation);
+    if (plan.route_candidate_plan.return_low_byte != 0U) {
+        plan.callback_return_value = true;
+        return plan;
+    }
+
+    plan.fallback_helper_0x42b040_called = true;
+    plan.fallback_helper_result = fallback_helper_result;
+    plan.callback_return_value = fallback_helper_result;
+    return plan;
+}
+
 } // namespace viper
