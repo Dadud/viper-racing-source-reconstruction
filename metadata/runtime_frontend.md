@@ -18,11 +18,13 @@ opens setup, then leaves results open after a finished playback so Enter can
 return to setup; explicit CLI asset selections retain bounded replay behavior.
 
 `game_frontend_launch_smoke` is a Windows CTest that launches the actual
-interactive executable, finds the setup window, posts Enter, waits for the race
-window, posts Escape, and checks that the process exits with code zero. This
-proves setup-to-race asset loading and the early-exit path. It does not yet run
-a complete race through results and back to setup, verify every selector row,
-persist changed choices, or establish parity with the original menus.
+interactive executable with an isolated temporary Config directory, finds the
+setup window, posts C to open career slots and Escape to return, then posts
+Enter, waits for the race window, posts Escape, and checks that the process
+exits with code zero. This exercises slot-screen navigation and setup-to-race
+asset loading. It does not validate a real saved career, run a complete race,
+verify every selector row, persist changed choices, or establish parity with
+the original menus.
 
 `game_frontend_race_lifecycle_smoke` creates a deterministic one-lap
 Viper/Bemidji throttle trace, launches through the real setup window, selects

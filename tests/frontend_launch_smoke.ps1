@@ -49,14 +49,28 @@ function Wait-ProcessWindow([Diagnostics.Process]$Process, [string]$ClassName, [
 }
 
 $process = $null
+$configDir = Join-Path $env:TEMP ("viper-frontend-config-" + [Guid]::NewGuid().ToString('N'))
 try {
+    [void](New-Item -ItemType Directory -Path $configDir)
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --software"
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software"
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)
     $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]67, [IntPtr]::Zero)) {
+        throw 'Could not submit C to open the career slot screen'
+    }
+    Start-Sleep -Milliseconds 250
+    $process.Refresh()
+    if ($process.HasExited) { throw 'Career slot screen closed the setup process unexpectedly' }
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]27, [IntPtr]::Zero)) {
+        throw 'Could not submit Escape to return from career slots'
+    }
+    Start-Sleep -Milliseconds 250
+    $process.Refresh()
+    if ($process.HasExited) { throw 'Escape from career slots closed the app instead of returning to setup' }
     if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]13, [IntPtr]::Zero)) {
         throw 'Could not submit Enter to the setup frontend'
     }
@@ -68,12 +82,15 @@ try {
     if (-not $process.WaitForExit(15000)) { throw 'Race window did not shut down after Escape' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "viper_game exited with code $($process.ExitCode)" }
-    Write-Output 'Setup frontend accepted input, loaded the selected race session, and exited cleanly.'
+    Write-Output 'Setup opened career slots, returned to setup, loaded the selected race, and exited cleanly.'
 } catch {
     throw
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
         $process.WaitForExit()
+    }
+    if (Test-Path -LiteralPath $configDir) {
+        Remove-Item -LiteralPath $configDir -Recurse -Force
     }
 }
