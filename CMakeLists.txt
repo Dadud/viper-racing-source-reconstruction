@@ -54,6 +54,10 @@ add_library(viper_resource_bundle src/resource_bundle.cpp)
 target_include_directories(viper_resource_bundle PUBLIC include)
 target_compile_features(viper_resource_bundle PUBLIC cxx_std_20)
 
+add_library(viper_sound_resource src/sound_resource.cpp)
+target_include_directories(viper_sound_resource PUBLIC include)
+target_compile_features(viper_sound_resource PUBLIC cxx_std_20)
+
 add_library(viper_ai_resources
     src/ai_driver_resource.cpp
     src/ai_notes_resource.cpp
@@ -204,9 +208,10 @@ if(WIN32)
     target_link_libraries(viper_game PRIVATE
         viper_race_progression
         viper_ai_resources viper_resource_bundle viper_model_resource
+        viper_sound_resource
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
-        viper_scene_model viper_race_setup_model d3d11 dxgi user32)
+        viper_scene_model viper_race_setup_model d3d11 dxgi dsound user32)
 endif()
 
 include(CTest)
@@ -287,6 +292,15 @@ if(BUILD_TESTING)
         viper_vehicle_model)
     add_test(NAME human_car_setup_regression
         COMMAND viper_human_car_setup_regression)
+    add_executable(viper_sound_resource_regression
+        tests/sound_resource_regression.cpp)
+    target_link_libraries(viper_sound_resource_regression PRIVATE
+        viper_sound_resource viper_resource_bundle)
+    add_test(NAME sound_resource_regression COMMAND viper_sound_resource_regression)
+    if(WIN32 AND EXISTS "${VIPER_EXTERNAL_DATA_DIR}/common.res")
+        add_test(NAME sound_resource_shipped_data
+            COMMAND viper_sound_resource_regression "${VIPER_EXTERNAL_DATA_DIR}")
+    endif()
 endif()
 
 if(MSVC)

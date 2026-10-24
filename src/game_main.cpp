@@ -1,5 +1,7 @@
 #include <Windows.h>
 #include <shellapi.h>
+#include <mmsystem.h>
+#include <dsound.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
@@ -8,6 +10,7 @@
 #include "viper/game_assets.hpp"
 #include "viper/race_participants.hpp"
 #include "viper/race_progression.hpp"
+#include "viper/sound_resource.hpp"
 
 #include <array>
 #include <algorithm>
@@ -20,6 +23,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -91,13 +95,14 @@ struct Options {
     bool validate_assets{};
     bool help{};
     bool software{};
+    bool audio_smoke{};
     std::optional<unsigned> smoke_frames;
 };
 
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--software] [--help]\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
 }
 
@@ -121,6 +126,8 @@ Options parse_options(const int argc, wchar_t** argv)
             options.validate_assets = true;
         } else if (arg == L"--software") {
             options.software = true;
+        } else if (arg == L"--smoke-audio") {
+            options.audio_smoke = true;
         } else if (arg == L"--smoke-frames") {
             if (++i >= argc) throw std::runtime_error("--smoke-frames requires a positive frame count");
             unsigned frames{};
@@ -704,7 +711,175 @@ private:
     UINT height_{};
 };
 
+class DirectSoundAudio {
+public:
+    bool initialize(HWND window, const viper::ResourceBundle& car_bundle,
+                    const std::string_view car_name)
+    {
+        if (FAILED(DirectSoundCreate(nullptr, &device_, nullptr)) ||
+            FAILED(device_->SetCooperativeLevel(window, DSSCL_PRIORITY))) {
+            return false;
+        }
+
+        WAVEFORMATEX primary_format{};
+        primary_format.wFormatTag = WAVE_FORMAT_PCM;
+        primary_format.nChannels = 2;
+        primary_format.nSamplesPerSec = 44100;
+        primary_format.wBitsPerSample = 16;
+        primary_format.nBlockAlign = 4;
+        primary_format.nAvgBytesPerSec = 176400;
+        DSBUFFERDESC primary_desc{};
+        primary_desc.dwSize = sizeof(primary_desc);
+        primary_desc.dwFlags = DSBCAPS_PRIMARYBUFFER;
+        if (FAILED(device_->CreateSoundBuffer(&primary_desc, &primary_, nullptr)) ||
+            FAILED(primary_->SetFormat(&primary_format))) {
+            primary_.Reset();
+            return false;
+        }
+
+        const std::string stem(car_name);
+        if (!load_sound(car_bundle, stem + "i.sfx", true)) return false;
+        for (unsigned band = 0U; band < 3U; ++band) {
+            const auto specific = stem + std::to_string(band) + ".sfx";
+            if (!load_sound(car_bundle, specific, false)) {
+                const auto fallback = "engine" + std::to_string(band) + ".sfx";
+                static_cast<void>(load_sound(car_bundle, fallback, false));
+            }
+        }
+        if (sounds_.size() < 2U) return false;
+
+        for (auto& sound : sounds_) {
+            if (FAILED(sound.buffer->SetVolume(DSBVOLUME_MIN)) ||
+                FAILED(sound.buffer->SetCurrentPosition(0U)) ||
+                FAILED(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING))) {
+                return false;
+            }
+        }
+        idle_index_ = 0U;
+        static_cast<void>(sounds_[idle_index_].buffer->SetVolume(-850));
+        initialized_ = true;
+        return true;
+    }
+
+    void update(const float speed, const bool accelerating) noexcept
+    {
+        if (!initialized_ || sounds_.empty()) return;
+        const auto absolute_speed = std::abs(speed);
+        std::size_t desired = idle_index_;
+        // Temporary player-only band selection; the native ESFX threshold
+        // records are known but are not parsed by this runtime yet.
+        if (accelerating || absolute_speed > 0.5F) {
+            const auto band = absolute_speed < 12.0F ? 0U :
+                absolute_speed < 25.0F ? 1U : 2U;
+            if (const auto found = band_indices_.find(band);
+                found != band_indices_.end()) {
+                desired = found->second;
+            } else if (!band_indices_.empty()) {
+                desired = band_indices_.rbegin()->second;
+            }
+        }
+
+        const float pitch = 1.0F + std::clamp(absolute_speed / 38.0F, 0.0F, 1.0F) * 0.45F;
+        const auto frequency = static_cast<DWORD>(std::clamp(
+            std::lround(static_cast<double>(sounds_[desired].sample_rate) * pitch),
+            static_cast<long>(DSBFREQUENCY_MIN), static_cast<long>(DSBFREQUENCY_MAX)));
+        for (std::size_t index = 0; index < sounds_.size(); ++index) {
+            const LONG volume = index == desired ? -850 : DSBVOLUME_MIN;
+            static_cast<void>(sounds_[index].buffer->SetVolume(volume));
+            if (index == desired)
+                static_cast<void>(sounds_[index].buffer->SetFrequency(frequency));
+        }
+    }
+
+    [[nodiscard]] std::size_t sound_count() const noexcept
+    {
+        return sounds_.size();
+    }
+
+    ~DirectSoundAudio()
+    {
+        for (auto& sound : sounds_) {
+            if (sound.buffer) static_cast<void>(sound.buffer->Stop());
+        }
+    }
+
+private:
+    struct Sound {
+        ComPtr<IDirectSoundBuffer> buffer;
+        DWORD sample_rate{};
+    };
+
+    bool load_sound(const viper::ResourceBundle& bundle,
+                    const std::string& name, const bool idle)
+    {
+        constexpr auto sfx0 = viper::resource_type_code('S', 'F', 'X', '0');
+        const auto* entry = bundle.find(name, sfx0);
+        if (entry == nullptr) return false;
+        const auto pcm = viper::parse_pcm_sfx0_resource(bundle.payload(*entry));
+        if (!pcm || pcm->pcm_data.empty() ||
+            pcm->pcm_data.size() > std::numeric_limits<DWORD>::max()) {
+            return false;
+        }
+
+        WAVEFORMATEX format{};
+        format.wFormatTag = WAVE_FORMAT_PCM;
+        format.nChannels = pcm->channels;
+        format.nSamplesPerSec = pcm->sample_rate;
+        format.wBitsPerSample = pcm->bits_per_sample;
+        format.nBlockAlign = pcm->block_align;
+        format.nAvgBytesPerSec = pcm->average_bytes_per_second;
+        DSBUFFERDESC desc{};
+        desc.dwSize = sizeof(desc);
+        desc.dwFlags = DSBCAPS_CTRLVOLUME | DSBCAPS_CTRLFREQUENCY |
+            DSBCAPS_GLOBALFOCUS;
+        desc.dwBufferBytes = static_cast<DWORD>(pcm->pcm_data.size());
+        desc.lpwfxFormat = &format;
+
+        Sound sound{};
+        if (FAILED(device_->CreateSoundBuffer(&desc, &sound.buffer, nullptr)))
+            return false;
+        void* first_region = nullptr;
+        void* second_region = nullptr;
+        DWORD first_bytes = 0U;
+        DWORD second_bytes = 0U;
+        if (FAILED(sound.buffer->Lock(0U, desc.dwBufferBytes, &first_region,
+                &first_bytes, &second_region, &second_bytes, 0U))) {
+            return false;
+        }
+        std::memcpy(first_region, pcm->pcm_data.data(), first_bytes);
+        if (second_bytes != 0U)
+            std::memcpy(second_region, pcm->pcm_data.data() + first_bytes,
+                second_bytes);
+        if (FAILED(sound.buffer->Unlock(first_region, first_bytes,
+                second_region, second_bytes))) {
+            return false;
+        }
+        sound.sample_rate = pcm->sample_rate;
+        const auto index = sounds_.size();
+        sounds_.push_back(std::move(sound));
+        if (idle) idle_index_ = index;
+        else band_indices_[band_from_name(name)] = index;
+        return true;
+    }
+
+    static unsigned band_from_name(const std::string_view name) noexcept
+    {
+        for (auto it = name.rbegin(); it != name.rend(); ++it) {
+            if (*it >= '0' && *it <= '2') return static_cast<unsigned>(*it - '0');
+        }
+        return 0U;
+    }
+
+    ComPtr<IDirectSound> device_;
+    ComPtr<IDirectSoundBuffer> primary_;
+    std::vector<Sound> sounds_;
+    std::map<unsigned, std::size_t> band_indices_;
+    std::size_t idle_index_{};
+    bool initialized_{};
+};
+
 struct WindowState {
+    DirectSoundAudio audio;
     D3DWindow graphics;
     const viper::TerrainSurfaceResourcePayload* terrain{};
     std::vector<std::array<float, 2>> route;
@@ -782,7 +957,10 @@ struct WindowState {
         const auto route_result = viper::advance_route_motion(motion, route,
             left, right, accelerate, brake, delta_seconds, target_laps);
         if (route_result.lap_completed) refresh_title(true);
-        if (!route_result.valid) return route_result.finished;
+        if (!route_result.valid) {
+            if (route_result.finished) audio.update(0.0F, false);
+            return route_result.finished;
+        }
         const auto surface = viper::sample_terrain_resource(
             *terrain, {route_result.x, 1000.0f, route_result.z}, true);
         if (!surface.query_succeeded) { motion.speed = 0.0f; return true; }
@@ -790,6 +968,7 @@ struct WindowState {
                 route_result.x, surface.sampled_position[1], route_result.z,
                 route_result.yaw))
             return false;
+        audio.update(motion.speed, accelerate);
         refresh_title();
         return true;
     }
@@ -882,6 +1061,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 }
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
+               const bool smoke_audio,
                const std::size_t player_car_index,
                const std::uint32_t target_laps,
                const std::string_view track_name,
@@ -891,6 +1071,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::ModelResource& player_model,
                const viper::ModelResource& ai_model,
                const viper::TrackObjectTextTable& track_objects,
+               const viper::ResourceBundle& car_bundle,
                const viper::GameOptions& options)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -938,6 +1119,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
         DestroyWindow(hwnd);
         return 1;
+    }
+    if ((!smoke_frames || smoke_audio) &&
+        !state.audio.initialize(hwnd, car_bundle, car_name)) {
+        std::cerr << "DirectSound initialization or engine sample loading failed; "
+                     "running without audio.\n";
+    } else if (!smoke_frames || smoke_audio) {
+        std::cout << "DirectSound initialized with " << state.audio.sound_count()
+                  << " parsed SFX0 PCM engine resources.\n";
     }
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     MSG msg{};
@@ -1080,12 +1269,13 @@ int wmain(int argc, wchar_t** argv)
                       << complete_setup_records
                       << " numerically complete with the current FDIV model)\n";
         }
-        return run_window(options.software, options.smoke_frames,
+        return run_window(options.software, options.smoke_frames, options.audio_smoke,
             *entrants.player_record_index,
             static_cast<std::uint32_t>(std::clamp(
                 assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
             assets.track_name(), assets.car_name(), assets.terrain(),
             assets.ideal_line(), assets.player_model(), assets.ai_model(), assets.track_objects(),
+            assets.bundle(std::string(assets.car_name()) + ".car"),
             assets.options());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';

@@ -19,6 +19,24 @@ The game sound-manager path is documented in
 [`vehicle_setup.md`](vehicle_setup.md): `race.bin` requests `ESFX` resources
 and selects engine sample names from the selected car's setup, with an
 `engine.txt` fallback. The executable imports `DirectSoundCreate`, but this
-does not yet identify resource decoding, buffer format, playback callbacks,
-or the runtime mixing graph. No decoded audio or audio playback has been
-verified in the reconstruction.
+does not identify the separate `trk2.sfx` decoder or full native mixing graph.
+
+## Car bundle `SFX0` entries
+
+Car bundles use a different `SFX0` resource type (`0x53465830`) for the PCM
+engine samples selected by the `ESFX` setup resource. Their 20-byte prefix is
+observed as a DWORD sample-data byte count followed by PCM tag, channels, sample
+rate, average byte rate, block alignment, and bits per sample. The declared
+sample data immediately follows the prefix. All remaining bytes are retained
+as opaque tail data; the five shipped car bundles have 4,098 such bytes per
+`SFX0` resource. The reader in `include/viper/sound_resource.hpp` checks the
+format and bounds but does not assign meaning to this tail. Its regression
+reads all shipped car bundles using external assets.
+
+The Win32 runtime loads the selected car's idle and numbered samples into
+DirectSound PCM buffers and loops them. It uses provisional speed/throttle
+selection and pitch scaling; it does not yet consume the native `ESFX` band
+parameters. `--smoke-audio --smoke-frames 30` initializes the DirectSound
+device and exercises buffer creation/play calls. The smoke run does not capture
+speaker output or compare timing and pitch against the original. The separate
+top-level `trk2.sfx` file's `MGI!` payload remains unparsed.

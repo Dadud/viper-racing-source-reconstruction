@@ -332,11 +332,13 @@ Evidence `ev_fb568c133bd592fd606067f6b5921d7536ad52e13ad301ad1358df8c8efafbb4`,
 
 The sound-manager calls in `race.bin` resolve the previously missing engine
 resource-selection path. `0x46C410` first requests a car-specific engine setup
-resource using type code `0x45534658` (`ESFX`). If that lookup fails, it reads
-`engine.txt` and constructs up to seven `engine_<index>.sfx` slots from its
-seven-float rows. With the setup resource present, it requests `<car>_si.sfx`
-for the idle sound and `<car>_<index>_sfx` for each listed engine band,
-falling back to `engine_<index>.sfx` when the named band file is absent. Each
+resource using type code `0x45534658` (`ESFX`) and name `%se.ens` (for example,
+`vipere.ens`). If that lookup fails, it reads `engine.txt` and constructs up
+to seven `engine%d.sfx` slots from its seven-float rows. With the setup
+resource present, it requests `%si.sfx` for the idle sound (for example,
+`viperi.sfx`) and `%s%d.sfx` for each listed engine band (for example,
+`viper0.sfx`), falling back to `engine%d.sfx` when the named band file is
+absent. Each
 sound object is made by `0x46C080`, which allocates `0x40` bytes, constructs
 the `0x46BE60` object, and rejects it if its resource handle at `+0x0C` is
 zero. The engine manager stores the number of successfully loaded slots at
@@ -349,6 +351,22 @@ playback. Evidence against shipped `GameBin/race.bin` SHA-256
 (`0x46B9E0`), `ev_b4e45adc8ddb7cac5d7469bf678012b12680fb0af2909e81d1382275c11bca56`
 (`0x46BE60`), and `ev_ac73f4a64c8db118ba3572f6d79b8454bd109e04b0fc11041ec614055ec5e385`
 (`0x46E6A0`).
+
+The selected player car's `SFX0` (`0x53465830`) entries contain a 20-byte
+header: sample byte count, PCM format tag, channel count, sample rate, average
+byte rate, block alignment, and bits per sample. `parse_pcm_sfx0_resource`
+accepts only consistent integer PCM headers and returns the declared sample
+span separately from remaining opaque bytes. Every `SFX0` entry in the five
+shipped car bundles passes the check; each has a 4,098-byte opaque tail.
+`viper.car` is tied to SHA-256
+`840AE64A76DAB82D81CDCDD91547664CCAC25FD265A21220CAC4F43A4F8D175A`. The
+current Win32 runtime creates DirectSound PCM buffers for the selected car's
+idle and available numbered engine samples, loops them, selects a sample band
+using provisional speed/throttle thresholds, and changes pitch with speed.
+The `vipere.ens` seven-float setup values are not yet parsed or used by the
+runtime. DirectSound startup and buffer-play calls succeeded in a 30-frame
+Viper/Bemidji audio smoke run; audible output, native band mixing, other sound
+classes, and original-versus-reconstruction capture remain unverified.
 
 The car vtable at `0x4C7F20` has `0x431150` at byte offset `+8`. The entity
 iteration in `0x45BD20` dispatches the `+8` method for each listed entity. In
