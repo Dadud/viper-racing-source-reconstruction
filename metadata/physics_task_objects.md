@@ -29,6 +29,26 @@ object pointer is null. After the record array is loaded, `0x420480` invokes
 virtual `+0x0C` on the selected service object. This service object is separate
 from entries created by the later `0x422580` record factory.
 
+The `0x420480` callsite gets this pointer from `0x45C2C0`, whose body calls
+`0x45C270` (a one-instruction `RET`) and returns `&DAT_0053B17C`. The loaded
+image has 64 zero bytes at `0x53B17C..0x53B1BB`, so the selector at
+`0x53B194` is zero in that image. The address has one direct read reference,
+at `0x45D9E2`; no direct store reference was found. This supports selector 0
+as the initial value for the unmodified image, but does not establish the
+runtime value after possible indirect writes or external configuration. The
+checkpoint parser at `0x45D950` also reads `0x53B194` as a nonzero/zero gate;
+it routes nonzero to `checkpt1.mod` object creation and zero to direct
+checkpoint registration. Evidence: `0x420480`
+`ev_b3969ce0ed7661c09bc1c4b6c36050333512037ece3893fdfadd017abdb7146f`,
+`0x45C2C0` `ev_ca0884b64d4548bff8d6219dc665401342d4cd1ec98fbeb98f786962d6a0c71a`,
+`0x45C270` `ev_ec36da9553ac764a0b44b729da46baf10d3517d5e3e66d261cc897327136dfca`,
+`0x45D950` `ev_ab55f8e4f7c5ea92fb027cd8511e93de40b12f39448f9c864954b4d6384f697d`,
+and image bytes `ev_f51e0d331c83886c2106979a08931ff88b0d78e00750b51833c78743e8a52320`.
+The direct-reference query IDs are `ev_43a650d41912a222fb848e398a66cd6c4211b6116b89b57dd3766736547a7895`
+for `0x53B194` and `ev_c607999ce4132d70fefbe5f5a19dbba1452a1954d3bfd4a5c7e710e48dfcef1e`
+for the returned base `0x53B17C`. The 19-record session bundle is
+`metadata/physics_track_selector_source.evidence.json`.
+
 The selector-1 and selector-3 vtables share the observed status methods documented in
 `frontend_dispatch.md`: `+8` stores the mode byte as 3, `+0x0C` checks whether
 fields `+0x44`, `+0x48`, and `+0x4C` are nonzero, and `+0x14` clears fields
