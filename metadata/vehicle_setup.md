@@ -29,19 +29,23 @@ participant row. `0x45EFD0` calls `0x45EE40`, which constructs a per-user
 external install has the bundled `.ccs` entries but no `.csu` setup files.
 
 Separately, the CARF mapper at `0x45E4B0` reads 35 DWORDs (0x8C bytes) from
-configured race row `+0x34`; row bytes `+0xC0..+0xC7` remain outside those
-reads. The matching 0x8C lengths make the CCS payload a plausible source for
-those 35 values, but the recovered calls do not establish that the payload is
-copied into that configured row or that its words have the same runtime
-meaning. The current asset loader therefore retains CCS as an opaque validated
-resource and does not use it as a CARF-mapper row. Close this bridge only with
-evidence for the row population/copy path, including the remaining row fields
-and any setup/upgrade selection behavior. The single-race setup owner
+its second argument. In the garage path, `0x48AC20` first calls `0x45EFD0` to
+load the active `.csu`/CCS bytes into `DAT_005620B8`, then calls `0x45EC20`
+with that buffer as its second argument. `0x45EC20` forwards the same pointer
+to `0x45E4B0`; this confirms that the first 0x8C bytes of the active setup
+payload are the mapper's 35 words in this path. The new
+`prepare_car_file_runtime_mapping_from_setup_payload` adapter consumes that
+bounded payload directly. UPGS selection flags and FDIV mode remain explicit
+inputs. This does not establish how the separate single-race configured row
+gets its `+0x34..+0xBC` words. The single-race setup owner
 `0x45C5B0` clears its complete 0x335-DWORD object before the menu callback;
 `0x40A850` then writes marker, display name, car stem, and the words at
 `+0xC0/+0xC4` while leaving `+0x34..+0xBC` unwritten in that builder. This
-rules out that callback as the source of the mapping words, but does not rule
-out later setup mutation or a different owning row. Evidence: `0x45C5B0`
+rules out that callback as the source of the single-race row's mapping words,
+but does not rule out later setup mutation or a different owning row. Evidence:
+`0x48AC20` `ev_65957331b5b8c2fc010ff52677e05f3e445d64945de3207032abafa50a4a4a81`,
+`0x45EC20` `ev_d180d832414b860ca1b05f8b253f39249f194104a7d5658e5205575f73d68958`,
+`0x45C5B0`
 `ev_ce5077ebc485f33b39f286697b2bcc7e5db06146f4f0a813f5c2a13eb3d47612`,
 `0x40A850` `ev_e52a864e503a5c943f75c6f007a442fd95fca2d59653187e01047142354d9bec`,
 `0x45EFD0`

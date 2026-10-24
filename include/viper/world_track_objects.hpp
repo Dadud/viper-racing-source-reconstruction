@@ -616,6 +616,18 @@ prepare_car_file_runtime_mapping_from_configured_row(
     bool upgrade_overlay_requested,
     bool pentium_fdiv_correction_enabled);
 
+// The garage path passes the active 0x8C-byte CCS/CSU setup buffer directly
+// as the 35-word configuration source to 0x45EC20/0x45E4B0. This adapter
+// consumes that buffer without fabricating the surrounding 0xC8 participant
+// row. Upgrade selection and FDIV mode remain explicit observations.
+[[nodiscard]] CarFileRuntimePreparation
+prepare_car_file_runtime_mapping_from_setup_payload(
+    const CarFileResourcePayloads& resources,
+    std::span<const std::byte> setup_payload,
+    std::span<const std::uint8_t> upgrade_selection_flags,
+    bool upgrade_overlay_requested,
+    bool pentium_fdiv_correction_enabled);
+
 // Composes the CARF mapper, normalized name, subtype header/final size stores,
 // and the 0x45CAE0 placement transform onto caller-owned runtime-record
 // storage. Unmapped record bytes retain their caller-provided values.

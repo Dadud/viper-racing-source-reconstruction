@@ -92,6 +92,14 @@ gap; do not infer runtime support from static analysis or file presence.
   the runtime's provisional kinematics. The evidence and limitations are in
   `metadata/vehicle_setup.md`. Windows Release target `viper_game` built
   successfully; CTest was not run.
+- **2026-10-24, setup-to-CARF adapter:** Native call evidence from the garage
+  path shows the active first 0x8C bytes loaded from `.csu`/CCS flow directly
+  into `0x45E4B0` as its 35 setup words. Added a bounded resource-preparation
+  entry point for that buffer and a regression case for all 35 words and
+  short-input rejection. The single-race participant row source, UPGS flags,
+  and FDIV mode remain open; this does not claim gameplay physics integration.
+  Evidence is in `metadata/vehicle_setup.md`. Windows Release build succeeded
+  and full configured CTest passed 37/37, including the new regression.
 
 ## Ownership and CI boundary
 

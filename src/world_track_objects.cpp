@@ -1504,6 +1504,34 @@ CarFileRuntimePreparation prepare_car_file_runtime_mapping_from_configured_row(
     return prepare_car_file_runtime_mapping(observation);
 }
 
+CarFileRuntimePreparation prepare_car_file_runtime_mapping_from_setup_payload(
+    const CarFileResourcePayloads& resources,
+    const std::span<const std::byte> setup_payload,
+    const std::span<const std::uint8_t> upgrade_selection_flags,
+    const bool upgrade_overlay_requested,
+    const bool pentium_fdiv_correction_enabled)
+{
+    constexpr auto required_size =
+        CarFileRuntimeMappingObservation::configuration_word_count *
+        sizeof(std::uint32_t);
+    if (setup_payload.size() < required_size) {
+        return {};
+    }
+
+    CarFileRuntimePreparationObservation observation{};
+    observation.resources = &resources;
+    for (std::size_t index = 0;
+         index < observation.configuration_words.size(); ++index) {
+        observation.configuration_words[index] = read_u32_le(
+            setup_payload, index * sizeof(std::uint32_t));
+    }
+    observation.upgrade_selection_flags = upgrade_selection_flags;
+    observation.upgrade_overlay_requested = upgrade_overlay_requested;
+    observation.pentium_fdiv_correction_enabled =
+        pentium_fdiv_correction_enabled;
+    return prepare_car_file_runtime_mapping(observation);
+}
+
 bool apply_car_track_runtime_record(
     const std::span<std::byte> runtime_record,
     const CarFileRuntimePreparation& preparation,
