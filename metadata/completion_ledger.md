@@ -205,4 +205,4 @@ repository unless their redistribution rights are established. A public build
 must not require those assets; asset-dependent runtime acceptance is run
 locally against a separately supplied installation.
 
-- **2026-10-24, race HUD:** Added a Win32 overlay for lap, elapsed time, route-model speed, and the finished state. The build succeeds; WARP runtime verification is pending. This is race presentation progress, not a standings/results screen or a validated gameplay HUD.
+- **2026-10-24, race HUD:** Added a Win32 overlay for lap, elapsed time, route-model speed, and the finished state. The Release build and all 43 CTest cases pass. A live WARP window capture shows the HUD and Bemidji D3D scene in the same frame after removing a GDI/DXGI white-screen regression. This remains a first-pass HUD, not a standings/results screen or original-game visual match.

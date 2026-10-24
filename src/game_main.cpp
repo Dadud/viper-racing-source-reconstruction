@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 
 #include "viper/game_assets.hpp"
+#include "viper/scene_font_8x8.hpp"
 #include "viper/race_participants.hpp"
 #include "viper/race_progression.hpp"
 #include "viper/sound_resource.hpp"
@@ -423,7 +424,7 @@ public:
         return create_target() && update_surface_buffer() && update_car_buffer() && update_line_buffer();
     }
 
-    bool render()
+    bool render(const std::string_view hud_text)
     {
         if (!target_ || !context_ || !swap_chain_) return false;
         constexpr float color[]{0.035f, 0.055f, 0.075f, 1.0f};
@@ -464,6 +465,7 @@ public:
             for (const auto& group : car_draw_groups_)
                 if (group.vertex_count) context_->Draw(group.vertex_count, group.first_vertex);
         }
+        if (!draw_hud(hud_text)) return false;
         return SUCCEEDED(swap_chain_->Present(vsync_interval_, 0));
     }
 
@@ -504,6 +506,82 @@ public:
     }
 
 private:
+    bool draw_hud(const std::string_view text)
+    {
+        if (!device_ || !context_ || !hud_buffer_ || width_ == 0U || height_ == 0U)
+            return false;
+        std::vector<SurfaceVertex> vertices;
+        vertices.reserve(12000U);
+        const auto append_rectangle = [this, &vertices](const float left,
+            const float top, const float right, const float bottom,
+            const std::array<float, 3>& color) {
+            const auto x0 = 2.0F * left / static_cast<float>(width_) - 1.0F;
+            const auto x1 = 2.0F * right / static_cast<float>(width_) - 1.0F;
+            const auto y0 = 1.0F - 2.0F * top / static_cast<float>(height_);
+            const auto y1 = 1.0F - 2.0F * bottom / static_cast<float>(height_);
+            vertices.insert(vertices.end(), {{x0, y0, color[0], color[1], color[2]},
+                {x1, y0, color[0], color[1], color[2]},
+                {x1, y1, color[0], color[1], color[2]},
+                {x0, y0, color[0], color[1], color[2]},
+                {x1, y1, color[0], color[1], color[2]},
+                {x0, y1, color[0], color[1], color[2]}});
+        };
+        constexpr float panel_x = 18.0F;
+        constexpr float panel_y = 18.0F;
+        constexpr float scale = 2.0F;
+        constexpr float advance = 18.0F;
+        constexpr float line_height = 22.0F;
+        append_rectangle(panel_x, panel_y, panel_x + 290.0F, panel_y + 108.0F,
+            {0.035F, 0.060F, 0.080F});
+        float x = panel_x + 8.0F;
+        float y = panel_y + 6.0F;
+        for (const auto raw_character : text) {
+            if (raw_character == '\n') {
+                x = panel_x + 8.0F;
+                y += line_height;
+                continue;
+            }
+            const auto character = static_cast<unsigned char>(raw_character);
+            if (character < 0x20U || character >= 0x80U) continue;
+            const auto& glyph = viper::detail::scene_font_8x8[
+                static_cast<std::size_t>(character - 0x20U)];
+            for (std::size_t row = 0; row < glyph.size(); ++row) {
+                const auto row_bits = glyph[row];
+                for (std::size_t column = 0; column < 8U;) {
+                    if ((row_bits & (std::uint8_t{1} << column)) == 0U) {
+                        ++column;
+                        continue;
+                    }
+                    const auto run_start = column;
+                    while (column < 8U &&
+                        (row_bits & (std::uint8_t{1} << column)) != 0U) ++column;
+                    append_rectangle(x + static_cast<float>(run_start) * scale,
+                        y + static_cast<float>(row) * scale,
+                        x + static_cast<float>(column) * scale,
+                        y + static_cast<float>(row + 1U) * scale,
+                        {0.94F, 0.96F, 0.98F});
+                }
+            }
+            x += advance;
+        }
+        constexpr std::size_t max_vertices = 65536U;
+        if (vertices.size() > max_vertices) return false;
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if (FAILED(context_->Map(hud_buffer_.Get(), 0U,
+                D3D11_MAP_WRITE_DISCARD, 0U, &mapped))) return false;
+        std::memcpy(mapped.pData, vertices.data(), vertices.size() * sizeof(SurfaceVertex));
+        context_->Unmap(hud_buffer_.Get(), 0U);
+        const UINT stride = sizeof(SurfaceVertex);
+        constexpr UINT offset = 0U;
+        context_->IASetInputLayout(surface_input_layout_.Get());
+        context_->IASetVertexBuffers(0U, 1U, hud_buffer_.GetAddressOf(), &stride, &offset);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0U);
+        context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0U);
+        context_->Draw(static_cast<UINT>(vertices.size()), 0U);
+        return true;
+    }
+
     void extract_terrain_points(const viper::TerrainSurfaceResourcePayload& terrain)
     {
         if (terrain.planes.empty())
@@ -588,7 +666,14 @@ private:
         raster.FillMode = D3D11_FILL_SOLID;
         raster.CullMode = D3D11_CULL_NONE;
         raster.DepthClipEnable = TRUE;
-        return SUCCEEDED(device_->CreateRasterizerState(&raster, &surface_rasterizer_));
+        if (FAILED(device_->CreateRasterizerState(&raster, &surface_rasterizer_)))
+            return false;
+        D3D11_BUFFER_DESC hud_desc{};
+        hud_desc.ByteWidth = 65536U * sizeof(SurfaceVertex);
+        hud_desc.Usage = D3D11_USAGE_DYNAMIC;
+        hud_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        hud_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        return SUCCEEDED(device_->CreateBuffer(&hud_desc, nullptr, &hud_buffer_));
     }
 
     bool update_surface_buffer()
@@ -780,6 +865,7 @@ private:
     ComPtr<ID3D11InputLayout> surface_input_layout_;
     ComPtr<ID3D11RasterizerState> surface_rasterizer_;
     ComPtr<ID3D11Buffer> surface_buffer_;
+    ComPtr<ID3D11Buffer> hud_buffer_;
     ComPtr<ID3D11Buffer> car_buffer_;
     ComPtr<ID3D11VertexShader> line_vertex_shader_;
     ComPtr<ID3D11PixelShader> line_pixel_shader_;
@@ -1125,40 +1211,22 @@ struct WindowState {
         return true;
     }
 
-    void draw_hud() const
+    std::string hud_text() const
     {
-        if (window == nullptr) return;
-        HDC dc = GetDC(window);
-        if (dc == nullptr) return;
-        SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, RGB(245, 248, 250));
-        RECT panel{18, 18, 318, 126};
-        HBRUSH panel_brush = CreateSolidBrush(RGB(14, 24, 32));
-        if (panel_brush != nullptr) {
-            FillRect(dc, &panel, panel_brush);
-            DeleteObject(panel_brush);
-        }
         const auto minutes = static_cast<unsigned>(motion.race.elapsed_seconds / 60.0F);
         const auto seconds = static_cast<unsigned>(motion.race.elapsed_seconds) % 60U;
         const auto hundredths = static_cast<unsigned>(
             std::fmod(std::max(0.0F, motion.race.elapsed_seconds), 1.0F) * 100.0F);
-        std::wstring status = L"LAP " +
-            std::to_wstring(std::min(target_laps,
-                motion.race.completed_laps + (motion.race.finished ? 0U : 1U)));
-        status += L" / " + std::to_wstring(target_laps);
-        status += L"\nTIME " + std::to_wstring(minutes) + L":" +
-            (seconds < 10U ? L"0" : L"") + std::to_wstring(seconds) + L"." +
-            (hundredths < 10U ? L"0" : L"") + std::to_wstring(hundredths);
-        status += L"\nSPEED " + std::to_wstring(static_cast<int>(
-            std::lround(std::abs(motion.speed) * 3.6F))) + L" km/h";
-        DrawTextW(dc, status.c_str(), -1, &panel, DT_LEFT | DT_TOP | DT_NOPREFIX);
-        if (motion.race.finished) {
-            RECT result{18, 138, 318, 178};
-            SetTextColor(dc, RGB(255, 214, 80));
-            DrawTextW(dc, L"RACE FINISHED", -1, &result,
-                DT_LEFT | DT_TOP | DT_NOPREFIX);
-        }
-        ReleaseDC(window, dc);
+        std::string status = "LAP " + std::to_string(std::min(target_laps,
+            motion.race.completed_laps + (motion.race.finished ? 0U : 1U))) +
+            " / " + std::to_string(target_laps);
+        status += "\nTIME " + std::to_string(minutes) + ":" +
+            (seconds < 10U ? "0" : "") + std::to_string(seconds) + "." +
+            (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
+        status += "\nSPEED " + std::to_string(static_cast<int>(
+            std::lround(std::abs(motion.speed) * 3.6F))) + " KM/H";
+        if (motion.race.finished) status += "\nRACE FINISHED";
+        return status;
     }
 };
 
@@ -1411,12 +1479,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 if ((trace_frame % 120U) == 0U) trace.flush();
             }
-            if (render_frame && !state.graphics.render()) {
+            if (render_frame && !state.graphics.render(state.hud_text())) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
             }
-            if (render_frame) state.draw_hud();
             if (replay != nullptr) ++playback_frame;
             if (render_frame && smoke_frames && ++rendered_frames >= *smoke_frames) {
                 DestroyWindow(hwnd);
