@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added state-4 paused-banner text rasterization for the
+  `0x479580` helper, including line splitting, style offsets, font-height
+  spacing/alignment, and ordered `0x44DC70` atlas pixel writes. The race-loop
+  composer applies the acquired viewport/base when available. Style/localized
+  text/font/atlas inputs remain explicit; Release build and `git diff --check`
+  passed; no tests were run.
+
 - **2026-10-24:** Added the two ordered `0x404890` suppression-predicate calls
   to the state-0 `0x4052E0` callback geometry operation trace. The plan now
   exposes the exact result-byte/`0x4EB1E8` gate and records both call sites,

@@ -3170,6 +3170,107 @@ SceneState5OverlayPlan state5_numeric_overlay_plan(
     return result;
 }
 
+ScenePausedBannerTextRasterPlan raster_scene_paused_banner_text(
+    const ScenePausedBannerRenderPlan& banner,
+    const ScenePausedBannerTextRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font)
+{
+    ScenePausedBannerTextRasterPlan result{};
+    const auto text_operation = std::find_if(
+        banner.ordered_operations.begin(), banner.ordered_operations.end(),
+        [](const ScenePausedBannerOperation& operation) {
+            return operation.kind ==
+                ScenePausedBannerOperationKind::text_draw_0x479580;
+        });
+    if (text_operation == banner.ordered_operations.end() ||
+        !observation.text_pointer_nonnull) {
+        return result;
+    }
+
+    auto text_end = observation.text.find('\0');
+    if (text_end == std::string_view::npos) {
+        text_end = observation.text.size();
+    }
+    const auto text = observation.text.substr(0, text_end);
+    result.expected_line_count = 1U + static_cast<std::size_t>(
+        std::count(text.begin(), text.end(), '\n'));
+    result.input_complete =
+        observation.per_line_renderers.size() == result.expected_line_count;
+
+    const auto add_i32 = [](const std::int32_t left,
+                            const std::int32_t right) noexcept {
+        return std::bit_cast<std::int32_t>(
+            static_cast<std::uint32_t>(left) +
+            static_cast<std::uint32_t>(right));
+    };
+    const auto sub_i32 = [](const std::int32_t left,
+                            const std::int32_t right) noexcept {
+        return std::bit_cast<std::int32_t>(
+            static_cast<std::uint32_t>(left) -
+            static_cast<std::uint32_t>(right));
+    };
+    auto first_line_y = text_operation->y;
+    const auto flags = observation.style.format_flags;
+    if ((flags & 0x10U) != 0U || (flags & 0x40U) != 0U) {
+        const auto line_count = std::bit_cast<std::int32_t>(
+            static_cast<std::uint32_t>(result.expected_line_count));
+        const auto line_delta = sub_i32(1, line_count);
+        const auto total_delta = std::bit_cast<std::int32_t>(
+            static_cast<std::uint32_t>(line_delta) *
+            static_cast<std::uint32_t>(observation.font_extent_0x44dc50));
+        first_line_y = add_i32(first_line_y, total_delta / 2);
+    }
+
+    auto line_begin = std::size_t{0};
+    for (std::size_t line_index = 0;
+         line_index < result.expected_line_count; ++line_index) {
+        const auto newline = text.find('\n', line_begin);
+        const auto line_end = newline == std::string_view::npos
+            ? text.size()
+            : newline;
+        const auto line = text.substr(line_begin, line_end - line_begin);
+        if (line.size() > 0xffU) {
+            result.input_complete = false;
+        } else if (line_index < observation.per_line_renderers.size()) {
+            const SceneDashboardTextCall call{
+                0x00479580U,
+                add_i32(text_operation->x,
+                        observation.style_x_offset_0x20),
+                add_i32(
+                    add_i32(first_line_y, std::bit_cast<std::int32_t>(
+                        static_cast<std::uint32_t>(line_index) *
+                        static_cast<std::uint32_t>(
+                            observation.font_extent_0x44dc50))),
+                    observation.style_y_offset_0x1c),
+                0x004D9CD4U,
+                observation.style.color_source,
+                observation.style.font_source,
+                flags,
+            };
+            const auto layout = layout_scene_dashboard_text(
+                call, line, layout_font);
+            const auto raster = raster_scene_dashboard_text(
+                layout, atlas_font,
+                observation.per_line_renderers[line_index]);
+            ++result.text_calls_rasterized;
+            result.input_complete = result.input_complete &&
+                raster.input_complete;
+            result.ordered_pixel_writes.insert(
+                result.ordered_pixel_writes.end(),
+                raster.pixel_writes.begin(), raster.pixel_writes.end());
+        }
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        line_begin = newline + 1U;
+    }
+    if (result.text_calls_rasterized != result.expected_line_count) {
+        result.input_complete = false;
+    }
+    return result;
+}
+
 SceneSharedTextEffectsRasterPlan raster_scene_shared_text_effects(
     const SceneSharedTextEffectsPlan& plan,
     const SceneSharedTextEffectsRasterObservation& observation,

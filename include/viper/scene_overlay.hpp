@@ -1626,6 +1626,26 @@ struct SceneDashboardRasterObservation {
     std::vector<std::uint16_t> explicit_palette;
 };
 
+struct ScenePausedBannerTextRasterObservation {
+    // The 0x479580 helper skips line draws when its text pointer is null.
+    bool text_pointer_nonnull{true};
+    std::string_view text;
+    // Style-0x0E table values remain observations because their runtime
+    // initialization is not established by the shipped data bytes.
+    SceneDashboardTextCall style{};
+    std::int32_t style_x_offset_0x20{};
+    std::int32_t style_y_offset_0x1c{};
+    std::int32_t font_extent_0x44dc50{};
+    std::span<const SceneDashboardRasterObservation> per_line_renderers;
+};
+
+struct ScenePausedBannerTextRasterPlan {
+    bool input_complete{true};
+    std::size_t expected_line_count{};
+    std::size_t text_calls_rasterized{};
+    std::vector<SceneTextPixelWrite> ordered_pixel_writes;
+};
+
 struct SceneDashboardRasterPlan {
     bool input_complete{true};
     std::size_t glyphs_considered{};
@@ -1681,6 +1701,16 @@ raster_scene_dashboard_builtin_font(
     const SceneDashboardTextLayout& layout,
     const SceneDashboardAtlasFontObservation& font,
     const SceneDashboardRasterObservation& renderer);
+
+// Rasterizes the line calls performed by the paused banner's 0x479580 helper.
+// Style-table offsets, font height, localized text, and line renderer state
+// remain explicit observations.
+[[nodiscard]] ScenePausedBannerTextRasterPlan
+raster_scene_paused_banner_text(
+    const ScenePausedBannerRenderPlan& banner,
+    const ScenePausedBannerTextRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font);
 
 struct SceneDashboardCoreCallbackRasterObservation {
     // One preformatted argument and renderer context for each ordered callback

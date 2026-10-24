@@ -31,6 +31,12 @@ struct RaceLoopState0DashboardRasterObservation {
     SceneDashboardAtlasFontObservation atlas_font{};
 };
 
+struct RaceLoopSharedPausedBannerRasterObservation {
+    ScenePausedBannerTextRasterObservation text{};
+    SceneDashboardFontObservation layout_font{};
+    SceneDashboardAtlasFontObservation atlas_font{};
+};
+
 struct RaceLoopSharedOverlayObservation {
     std::int32_t current_callback_state{};
     RaceLoopActiveFrameObservation following_frame{};
@@ -50,6 +56,8 @@ struct RaceLoopSharedOverlayObservation {
     SceneSharedOverlayFrameObservation shared_overlay{};
     RaceLoopSharedResultsRasterObservation shared_results_raster{};
     RaceLoopSharedTextEffectsRasterObservation shared_text_effects_raster{};
+    std::optional<RaceLoopSharedPausedBannerRasterObservation>
+        shared_paused_banner_raster;
     std::optional<RaceLoopState0DashboardRasterObservation>
         state0_dashboard_raster;
 };
@@ -94,6 +102,8 @@ struct RaceLoopSharedOverlayPlan {
     bool shared_text_effects_raster_reached{};
     SceneSharedTextEffectsRasterPlan shared_text_effects_raster{};
     SceneSharedOverlayFramePlan shared_overlay{};
+    std::optional<ScenePausedBannerTextRasterPlan>
+        shared_paused_banner_text_raster;
 };
 
 // Carries the event-0x31 state change through callback dispatch and, when a

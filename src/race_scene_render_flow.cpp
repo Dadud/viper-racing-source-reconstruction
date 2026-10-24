@@ -240,6 +240,59 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
         plan.shared_overlay = scene_shared_overlay_frame_plan(
             shared_overlay_observation);
+        if (observation.shared_paused_banner_raster.has_value() &&
+            plan.shared_overlay.paused_banner.inner_render.draws_text_handle) {
+            auto raster_observation =
+                *observation.shared_paused_banner_raster;
+            std::vector<SceneDashboardRasterObservation> line_renderers(
+                raster_observation.text.per_line_renderers.begin(),
+                raster_observation.text.per_line_renderers.end());
+            const auto apply_context = [&](
+                const RenderContextViewport& context,
+                const std::uint8_t renderer_mode,
+                const std::uint32_t framebuffer_base) {
+                for (auto& renderer : line_renderers) {
+                    renderer.renderer_mode = renderer_mode;
+                    renderer.clip_left = context.viewport_left_0x14;
+                    renderer.clip_top = context.viewport_top_0x18;
+                    renderer.clip_right = context.viewport_right_0x1c;
+                    renderer.clip_bottom = context.viewport_bottom_0x20;
+                    renderer.framebuffer_pitch_bytes = context.row_pitch_0x10;
+                    renderer.framebuffer_base = framebuffer_base;
+                }
+            };
+            if (plan.render_context_acquisition.has_value() &&
+                plan.render_context_acquisition->disposition ==
+                    RenderContextAcquisitionDisposition::acquired) {
+                const auto& context =
+                    plan.render_context_acquisition->context;
+                const auto renderer_mode =
+                    plan.optional_dashboard_branch_enabled
+                    ? static_cast<std::uint8_t>(
+                        observation.state0_dashboard_render
+                            .renderer_mode_0x4d7a48)
+                    : shared_overlay_observation.renderer_mode_0x4d7a48;
+                apply_context(
+                    context.viewport,
+                    renderer_mode,
+                    static_cast<std::uint32_t>(context.surface_bits_0x04));
+            } else if (plan.optional_dashboard_branch_enabled) {
+                apply_context(
+                    observation.state0_dashboard_render.render_context,
+                    static_cast<std::uint8_t>(
+                        observation.state0_dashboard_render
+                            .renderer_mode_0x4d7a48),
+                    observation.state0_dashboard_render
+                        .framebuffer_base_value);
+            }
+            raster_observation.text.per_line_renderers = line_renderers;
+            plan.shared_paused_banner_text_raster =
+                raster_scene_paused_banner_text(
+                    plan.shared_overlay.paused_banner.inner_render,
+                    raster_observation.text,
+                    raster_observation.layout_font,
+                    raster_observation.atlas_font);
+        }
         const auto& text_effects = plan.shared_overlay.text_effects;
         if (text_effects.predicate_0x4048e0.has_text_draw ||
             text_effects.predicate_0x404900.has_text_draw) {
