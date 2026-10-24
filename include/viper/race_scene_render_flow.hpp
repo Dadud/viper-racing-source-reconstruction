@@ -192,6 +192,9 @@ struct RaceLoopSharedOverlayPlan {
 // resource handle DAT_004EB420 (resource key at 0x004CFBDC: "rpm.stp").
 [[nodiscard]] std::optional<StampImage>
 parse_state0_dashboard_gear_image(const ResourceBundle& race_bundle);
+// Resolves the scene-car constructor's `thought.stp` resource stored at +0x7B4.
+[[nodiscard]] std::optional<StampImage>
+parse_scene_car_callout_image(const ResourceBundle& race_bundle);
 // 0x4031F0 registers status.stp and draws it at (0, 0) into the dashboard's
 // 0x4EB2C0 staging bitmap during initialization.
 [[nodiscard]] std::optional<StampImage>

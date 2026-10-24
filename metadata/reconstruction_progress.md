@@ -1,12 +1,13 @@
 # Reconstruction progress
 
 - **2026-10-24 continuation:** Connected scene-car callout text operations to
-  the existing built-in-font rasterizer. The new raster plan emits ordered
-  clipped pixel writes for primary/secondary text and retains the intervening
-  `0x44D0C0` resource draw as a zero-write ordering marker; it flags mismatched
-  NUL-terminated text lengths. Actual resolution of the object's `+0x7B4`
-  resource and surface ownership remain outside this pass. Release
-  `viper_race_scene_flow` build and `git diff --check` pass; no tests were run.
+  the existing built-in-font and STMP rasterizers. Constructor `0x463920`
+  identifies the `+0x7B4` image as `thought.stp`; a bundle resolver now decodes
+  it, and the ordered raster plan inserts its frame-0 pixel writes between the
+  two strings. The shipped resource decodes as a complete 55x45 image with 445
+  palette writes. Native pointer success and surface ownership remain inputs.
+  Release `viper_race_scene_flow` build and `git diff --check` pass; no tests
+  were run.
 
 - **2026-10-24 continuation:** Expanded the scene-car callout plan through the
   actual built-in-font text wrapper: primary and secondary x origins now apply

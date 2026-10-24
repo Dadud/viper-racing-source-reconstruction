@@ -81,6 +81,15 @@ std::optional<StampImage> parse_state0_dashboard_gear_image(
     return parse_stamp_image(*payload, true);
 }
 
+std::optional<StampImage> parse_scene_car_callout_image(
+    const ResourceBundle& race_bundle)
+{
+    const auto payload = race_bundle.find_payload(
+        "thought.stp", resource_type_code('S', 'T', 'M', 'P'));
+    return payload.has_value() ? parse_stamp_image(*payload, true)
+                               : std::nullopt;
+}
+
 std::optional<StampImage> parse_state0_dashboard_background_image(
     const ResourceBundle& race_bundle)
 {

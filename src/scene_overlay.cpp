@@ -2048,10 +2048,32 @@ SceneCarCalloutRasterPlan raster_scene_car_callout(
         case SceneCarCalloutOperationKind::draw_primary_text_0x4d710:
             raster_text(operation, observation.primary_text);
             break;
-        case SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0:
+        case SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0: {
+            const auto first_write = result.ordered_pixel_writes.size();
+            if (!observation.secondary_resource_pointer_nonnull.has_value()) {
+                result.input_complete = false;
+            } else if (*observation.secondary_resource_pointer_nonnull) {
+                if (observation.secondary_resource_image == nullptr) {
+                    result.input_complete = false;
+                } else {
+                    const auto image_plan = raster_scene_stamp_image(
+                        {true, operation.address, operation.x, operation.y,
+                         operation.frame_index},
+                        {true, *observation.secondary_resource_image,
+                         observation.renderer});
+                    result.input_complete = result.input_complete
+                        && image_plan.input_complete;
+                    result.ordered_pixel_writes.insert(
+                        result.ordered_pixel_writes.end(),
+                        image_plan.raster.pixel_writes.begin(),
+                        image_plan.raster.pixel_writes.end());
+                }
+            }
             result.ordered_segments.push_back({
-                operation.kind, result.ordered_pixel_writes.size(), 0U});
+                operation.kind, first_write,
+                result.ordered_pixel_writes.size() - first_write});
             break;
+        }
         case SceneCarCalloutOperationKind::draw_secondary_text_0x4d710:
             raster_text(operation, observation.secondary_text);
             break;

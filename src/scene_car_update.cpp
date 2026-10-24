@@ -1907,8 +1907,8 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
         result.operations.push_back({
             SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0,
             0x0044D0C0U, 0U, 0x7B4, 0,
-            input.secondary_text_x_after_ftol,
-            input.secondary_text_y_after_ftol});
+            input.secondary_resource_x_after_ftol,
+            input.secondary_resource_y_after_ftol});
         result.operations.push_back({
             SceneCarCalloutOperationKind::draw_secondary_text_0x4d710,
             0x0044D710U, 0x0053F194U, 0x32, 0,

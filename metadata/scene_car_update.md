@@ -483,13 +483,21 @@ built-in-font projection.
 
 `raster_scene_car_callout` consumes the callback operation plan and sends the
 primary and secondary strings through `raster_scene_dashboard_builtin_font`
-using the shared color at `0x53F194` and renderer observation. It preserves the
-resource operation between those text segments as an ordered zero-write marker,
-so a caller can insert the separately decoded `+0x7B4` image/resource writes
-without changing text ordering. It reports a text-input mismatch when the
-provided NUL-terminated string lengths disagree with the callout's centering
-observations. Native surface ownership and resolution of the object resource
-pointer remain inputs.
+using the shared color at `0x53F194` and renderer observation. Constructor
+`0x463920` loads the STMP resource `thought.stp` through `0x44CFD0` and stores
+its pointer at object `+0x7B4`; destructor `0x463C90` releases it through
+`0x44D0A0`. `parse_scene_car_callout_image` now resolves that resource from a
+caller-owned `ResourceBundle`, and the raster plan decodes frame 0 through
+`raster_scene_stamp_image` between the two text segments when the pointer and
+image are observed. On the shipped `race.res`, `thought.stp` is a complete
+55x45, single-frame image producing 445 palette-pixel writes in both inspected
+renderer modes. It reports mismatched NUL-terminated text lengths or missing
+image data rather than silently treating the branch as rendered. Native
+surface ownership and constructor resource-pointer success remain inputs.
+Evidence: constructor `ev_3d36327c6db8aa39bef1e99f31d9e286bd657c7d16d95295605c813b8a46b2a3`,
+destructor `ev_f73b4d9052d98fd990e4a7d4ae0ee6ba739ff38cbe0403521b83290f560d9da0`,
+STMP loader `ev_25f5d3dba9d9afd575d728381bfefcd986686965da53e256242d359ad0a4e67c`,
+and `--inspect-image race.res thought.stp`.
 
 `plan_scene_renderer_dispatch` projects the enclosing generic render frame at
 `0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active

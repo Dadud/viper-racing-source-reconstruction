@@ -1992,6 +1992,8 @@ struct SceneCarCalloutRasterObservation {
     std::string_view secondary_text;
     std::uint32_t color_0x53f194{};
     SceneDashboardRasterObservation renderer;
+    std::optional<bool> secondary_resource_pointer_nonnull;
+    const StampImage* secondary_resource_image{};
 };
 
 struct SceneCarCalloutRasterSegment {
@@ -2004,13 +2006,12 @@ struct SceneCarCalloutRasterPlan {
     SceneCarCalloutStatus callout_status{SceneCarCalloutStatus::complete};
     bool input_complete{true};
     std::vector<SceneTextPixelWrite> ordered_pixel_writes;
-    // Includes the secondary resource draw as a zero-write segment so callers
-    // can preserve text/resource/text order when composing that resource.
+    // Includes the secondary resource pixels between the two text segments.
     std::vector<SceneCarCalloutRasterSegment> ordered_segments;
 };
 
-// Rasterizes the two possible 0x44D710 callout strings through the shared
-// built-in font path, retaining the intervening 0x44D0C0 resource operation.
+// Rasterizes callout strings and the `thought.stp` 0x44D0C0 image through the
+// shared built-in-font and STMP image paths, preserving callback draw order.
 [[nodiscard]] SceneCarCalloutRasterPlan raster_scene_car_callout(
     const SceneCarCalloutPlan& callout,
     const SceneCarCalloutRasterObservation& observation);
