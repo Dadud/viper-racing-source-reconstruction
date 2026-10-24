@@ -17,6 +17,7 @@
 #include "viper/physics_task_stream.hpp"
 #include "viper/world_track_objects.hpp"
 #include "viper/career_file_store.hpp"
+#include "viper/pcar_control_update.hpp"
 
 #include <array>
 #include <algorithm>
@@ -1506,9 +1507,11 @@ struct WindowState {
     // The native binding evaluator consumes a post-poll device snapshot. The
     // Win32 adapter records key events into its digital-button observation.
     std::array<std::uint8_t, 256> keyboard_button_states{};
-    std::array<viper::RaceInputBinding, 4> control_bindings{{
+    std::array<viper::RaceInputBinding, viper::race_loop_binding_slot_count> control_bindings{{
         {1U, 0xcbU}, {1U, 0xcdU}, {1U, 0xc8U}, {1U, 0xd0U}}};
     viper::RaceLoop43B290State control_update_state{};
+    viper::PcarCallbackGlobals pcar_callback_globals{};
+    viper::PcarScalarFields player_pcar_control_prefix{};
     float control_steering_smoothing{1.0F};
     float control_steering_range{1.0F};
     float control_steering_speed{1.0F};
@@ -1923,6 +1926,39 @@ struct WindowState {
         last_control_update = viper::update_race_loop_43b290(
             control_update_state, observation);
 
+        // The native PCAR callback begins by projecting these four shared
+        // input globals into the object's scalar fields. The secondary
+        // profile multiplier is currently held at the observed startup
+        // default; its settings source is not part of this runtime yet.
+        pcar_callback_globals.value_0x509320 =
+            control_update_state.analog_0x509320.value;
+        pcar_callback_globals.value_0x509344 =
+            control_update_state.controls.difference_0x509344;
+        pcar_callback_globals.value_0x509340 =
+            control_update_state.controls.difference_0x509340;
+        pcar_callback_globals.value_0x5093b8 =
+            control_update_state.controls.value_0x5093b8;
+        pcar_callback_globals.value_0x509358 =
+            control_update_state.steering.value_0x509358;
+        pcar_callback_globals.value_0x5093f4 =
+            control_update_state.analog_0x5093f4.value;
+        pcar_callback_globals.value_0x5093c8 =
+            control_update_state.controls.value_0x5093c8;
+        pcar_callback_globals.value_0x5093bc = static_cast<std::uint32_t>(
+            control_update_state.controls.counter_0x5093bc);
+        pcar_callback_globals.gate_0x509360 =
+            control_update_state.controls.flag_0x509360 != 0U;
+        pcar_callback_globals.gate_0x5093cc =
+            control_update_state.controls.flag_0x5093cc != 0U;
+        pcar_callback_globals.gate_0x5093f0 =
+            control_update_state.controls.flag_0x5093f0 != 0U;
+        pcar_callback_globals.gate_0x5093f8 =
+            control_update_state.controls.flag_0x5093f8 != 0U;
+        pcar_callback_globals.gate_0x509420 =
+            control_update_state.controls.flag_0x509420 != 0U;
+        viper::update_pcar_callback_scalar_prefix(
+            player_pcar_control_prefix, pcar_callback_globals, 1.0F);
+
         // The current route motion model accepts digital inputs. Preserve the
         // recovered analog values in session state and trace; this threshold
         // is only the adapter into that provisional route API.
@@ -2054,21 +2090,25 @@ void load_keyboard_bindings(WindowState& state,
     state.control_game_pad =
         options.boolean("CONTROL", "game_pad").value_or(false);
 
-    constexpr std::array<std::string_view, 4> action_names{
-        "steer_left", "steer_right", "throttle", "braking"};
-    for (std::size_t index = 0; index < action_names.size(); ++index) {
-        const auto configured = options.get("CONTROL", action_names[index]);
+    constexpr std::array<std::pair<std::string_view, std::size_t>, 13> action_slots{{
+        {"steer_left", 0U}, {"steer_right", 1U}, {"throttle", 2U},
+        {"braking", 3U}, {"e_brake", 4U}, {"reverse", 5U},
+        {"clutch", 6U}, {"airlift", 9U}, {"look_left", 10U},
+        {"look_right", 11U}, {"look_back", 12U}, {"downshift", 13U},
+        {"upshift", 14U}}};
+    for (const auto& [action_name, slot] : action_slots) {
+        const auto configured = options.get("CONTROL", action_name);
         if (configured) {
             const auto key = parse_keyboard_binding(*configured);
             if (!key) {
-                state.control_bindings[index] = {};
+                state.control_bindings[slot] = {};
                 continue;
             }
             const auto selector = directinput_key_selector(*key);
             if (!selector)
                 throw std::runtime_error("could not map keyboard binding to a DirectInput scan code: " +
                     std::string(*configured));
-            state.control_bindings[index] = {1U, *selector};
+            state.control_bindings[slot] = {1U, *selector};
         }
     }
 }
@@ -2304,7 +2344,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_normal_x,wheel" << wheel << "_normal_y,wheel" << wheel
                   << "_normal_z";
         }
-        trace << ",control_0x509358,control_0x5093f4,control_0x509320";
+        trace << ",control_0x509358,control_0x5093f4,control_0x509320"
+              << ",pcar_prefix_0xde0,pcar_prefix_0xde4"
+              << ",pcar_prefix_0xde8,pcar_prefix_0xdec";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2402,7 +2444,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 trace << ',' << state.control_update_state.steering.value_0x509358
                       << ',' << state.control_update_state.analog_0x5093f4.value
-                      << ',' << state.control_update_state.analog_0x509320.value;
+                      << ',' << state.control_update_state.analog_0x509320.value
+                      << ',' << state.player_pcar_control_prefix.value_0xde0
+                      << ',' << state.player_pcar_control_prefix.value_0xde4
+                      << ',' << state.player_pcar_control_prefix.value_0xde8
+                      << ',' << state.player_pcar_control_prefix.value_0xdec;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";

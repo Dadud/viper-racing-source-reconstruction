@@ -98,6 +98,19 @@ void set_pcar_callback_globals_0x43b880(PcarCallbackGlobals& globals,
     globals.value_0x5093a4 = value_0x5093a4;
 }
 
+void update_pcar_callback_scalar_prefix(
+    PcarScalarFields& fields,
+    const PcarCallbackGlobals& globals,
+    const float value_from_0x40d270) noexcept
+{
+    set_pcar_scalar_0xde0(fields,
+        globals.value_0x5093f4 * value_from_0x40d270);
+    set_pcar_scalar_0xde4(fields, globals.value_0x509320);
+    set_pcar_scalar_0xde8(fields, globals.value_0x5093b8);
+    set_pcar_scalar_0xdec(fields,
+        pcar_callback_value_0x43b950(globals.value_0x5093c8));
+}
+
 float pcar_global_scale_0x43b8c0(const float input,
                                  const float global_0x509358,
                                  const bool square_magnitude_0x5093fc) noexcept

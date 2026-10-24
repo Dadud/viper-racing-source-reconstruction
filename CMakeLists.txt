@@ -224,6 +224,7 @@ if(WIN32)
     target_link_libraries(viper_game PRIVATE
         viper_race_progression
         viper_race_loop_model
+        viper_pcar_model
         viper_ai_resources viper_resource_bundle viper_model_resource
         viper_sound_resource
         viper_language_resource viper_terrain_model
@@ -234,6 +235,11 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_pcar_control_regression
+        tests/pcar_control_update_regression.cpp)
+    target_link_libraries(viper_pcar_control_regression PRIVATE viper_pcar_model)
+    add_test(NAME pcar_control_update_regression
+        COMMAND viper_pcar_control_regression)
     add_executable(viper_race_progression_regression
         tests/race_progression_regression.cpp)
     target_link_libraries(viper_race_progression_regression PRIVATE

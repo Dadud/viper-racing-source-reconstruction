@@ -69,6 +69,7 @@ struct PcarCallbackGlobals {
     float value_0x509320{};
     float value_0x509344{};
     float value_0x509340{};
+    float value_0x5093b8{};
     float value_0x509358{};
     float value_0x5093f4{};
     float value_0x5093c8{};
@@ -88,6 +89,13 @@ void set_pcar_callback_globals_0x43b880(PcarCallbackGlobals& globals,
                                          std::uint32_t value_0x509384,
                                          std::uint32_t value_0x509388,
                                          std::uint32_t value_0x5093a4) noexcept;
+
+// Projects the initial scalar setter sequence in the 0x4384D0 callback.
+// Later state-dependent callback branches may overwrite +0xDE0/+0xDE4.
+void update_pcar_callback_scalar_prefix(
+    PcarScalarFields& fields,
+    const PcarCallbackGlobals& globals,
+    float value_from_0x40d270) noexcept;
 
 // Models 0x43B8C0, including its signed comparison of the input's raw bits.
 float pcar_global_scale_0x43b8c0(float input,
