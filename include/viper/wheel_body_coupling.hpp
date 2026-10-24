@@ -509,10 +509,10 @@ struct NcarIntegratorSignalResult {
 
 struct NcarIntegratorWheelCallbackSetupInput {
     // Constructor source-record fields read by 0x433C00 at +0x58, +0x5C,
-    // and +0x4B0 respectively.
+    // and +0x12C respectively.
     float source_width_0x58{};
     float source_ratio_0x5c{};
-    float source_steering_angle_0x4b0{};
+    float source_value_0x12c{};
 };
 
 struct NcarIntegratorWheelCallbackSetup {
@@ -526,13 +526,11 @@ struct NcarIntegratorWheelCallbackSetup {
 initialize_ncar_integrator_wheel_callback_setup(
     const NcarIntegratorWheelCallbackSetupInput& input) noexcept;
 
-// Reads the mapped width and ratio at runtime-record +0x58/+0x5C. The
-// steering angle belongs to vehicle state (+0x4B0) and remains explicit.
+// Reads the three mapped source values at runtime-record +0x58/+0x5C/+0x12C.
 // Returns no result when either mapped field falls outside the input record.
 [[nodiscard]] std::optional<NcarIntegratorWheelCallbackSetup>
 initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
-    std::span<const std::byte> runtime_record,
-    float source_steering_angle_0x4b0) noexcept;
+    std::span<const std::byte> runtime_record) noexcept;
 
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};

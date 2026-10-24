@@ -42,6 +42,8 @@ int main()
             words[index] = 0x3f000000U + static_cast<std::uint32_t>(index);
             write_u32_le(setup, index * sizeof(std::uint32_t), words[index]);
         }
+        words[0x22U] = std::bit_cast<std::uint32_t>(1.0F);
+        write_u32_le(setup, 0x22U * sizeof(std::uint32_t), words[0x22U]);
 
         viper::CarFileResourcePayloads resources{};
         viper::CarFilePayload car_file{};
@@ -49,6 +51,7 @@ int main()
         car_file.raw_words.fill(0x3f800000U);
         car_file.raw_words[12U] = std::bit_cast<std::uint32_t>(200.0F);
         car_file.raw_words[13U] = std::bit_cast<std::uint32_t>(25.0F);
+        car_file.raw_words[0x67U] = std::bit_cast<std::uint32_t>(10.0F);
         // A zero setup-count discriminator selects the configured setup words.
         car_file.raw_words[0x3aU] = 0U;
         resources.car_file = car_file;
@@ -74,15 +77,15 @@ int main()
             "prepared CARF mapping must apply to the bounded runtime record");
         const auto callback_setup =
             viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
-                runtime_record, 10.0F);
+                runtime_record);
         require(callback_setup.has_value() &&
                 std::fabs(callback_setup->value_0xd84 - 3.81F) < 1.0e-5F &&
                 std::fabs(callback_setup->value_0xd90 + 1.27F) < 1.0e-5F &&
                 std::fabs(callback_setup->angle_0xdcc - 0.174F) < 1.0e-5F,
-            "mapped CARF width/ratio must reach the exact paired callback offsets while steering stays explicit");
+            "mapped CARF width/ratio/value must reach the exact constructor callback fields");
         require(!viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
-                    std::span<const std::byte>(runtime_record).first(0x5fU), 10.0F),
-            "runtime records missing all bytes of +0x5C must be rejected");
+                    std::span<const std::byte>(runtime_record).first(0x12fU)),
+            "runtime records missing bytes of +0x12C must be rejected");
 
         setup.pop_back();
         const auto short_preparation =

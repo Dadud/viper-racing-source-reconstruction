@@ -218,17 +218,17 @@ initialize_ncar_integrator_wheel_callback_setup(
     return {
         (1.0F - ratio) * width,
         -(ratio * width),
-        input.source_steering_angle_0x4b0 * 0.0174F};
+        input.source_value_0x12c * 0.0174F};
 }
 
 std::optional<NcarIntegratorWheelCallbackSetup>
 initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
-    const std::span<const std::byte> runtime_record,
-    const float source_steering_angle_0x4b0) noexcept
+    const std::span<const std::byte> runtime_record) noexcept
 {
     constexpr std::size_t width_offset = 0x58U;
     constexpr std::size_t ratio_offset = 0x5cU;
-    constexpr std::size_t required_size = ratio_offset + sizeof(std::uint32_t);
+    constexpr std::size_t value_offset = 0x12cU;
+    constexpr std::size_t required_size = value_offset + sizeof(std::uint32_t);
     if (runtime_record.size() < required_size) return std::nullopt;
 
     const auto read_u32_le = [&runtime_record](const std::size_t offset) {
@@ -243,7 +243,7 @@ initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
     const NcarIntegratorWheelCallbackSetupInput input{
         std::bit_cast<float>(read_u32_le(width_offset)),
         std::bit_cast<float>(read_u32_le(ratio_offset)),
-        source_steering_angle_0x4b0};
+        std::bit_cast<float>(read_u32_le(value_offset))};
     return initialize_ncar_integrator_wheel_callback_setup(input);
 }
 

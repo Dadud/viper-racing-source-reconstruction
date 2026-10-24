@@ -186,13 +186,14 @@ wheel ordinal from 0 through 3 and its destination by `0x1A4` each time
 The CARF mapper `0x45E4B0` writes raw CARF words 12 and 13 at runtime-record
 offsets `+0x58` and `+0x5C`. The `0x433C00` initializer reads those as width
 and ratio and stores `+0xD84 = (1 - ratio * 0.01) * width * 0.0254` and
-`+0xD90 = -(ratio * 0.01 * width * 0.0254)`. The implementation now exposes
-`initialize_ncar_integrator_wheel_callback_setup_from_runtime_record`, which
-reads those two little-endian floats from a bounded runtime record and accepts
-the steering angle separately. A regression composes the CARF mapper and this
-adapter for a synthetic 200/25 width-ratio pair. This establishes the native
-left/right scalar pair only: record `+0x128` and the remaining 3D wheel
-placement inputs are still unresolved.
+`+0xD90 = -(ratio * 0.01 * width * 0.0254)`. The mapper also writes runtime
+record `+0x12C` from CARF word `0x67` times setup word `0x22`; the constructor
+stores this value multiplied by `0.0174` at `+0xDCC`. The implementation now
+exposes `initialize_ncar_integrator_wheel_callback_setup_from_runtime_record`,
+which reads all three little-endian inputs from a bounded runtime record. A
+regression composes the CARF mapper and this adapter for synthetic source
+values. This establishes these three constructor scalars only: record `+0x128`
+and the remaining 3D wheel placement inputs are still unresolved.
 Evidence: mapper `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ffa06eec1a05a08317`;
 constructor `0x433C00` `ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`.
 
