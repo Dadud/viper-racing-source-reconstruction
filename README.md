@@ -338,8 +338,10 @@ files were present.
 - `include/viper/scene_renderer_dispatch.hpp` and
   `src/scene_renderer_dispatch.cpp` model the `0x45BEB0` render gate, camera
   transform, graphics-state setup/restore sequence, and bounded virtual-method
-  dispatch over registered scene objects. Graphics device operations and
-  per-object virtual return values remain observations.
+  dispatch over registered scene objects. Its 4x4 view-matrix installer,
+  transform-cache invalidation and device HRESULT logging are projected;
+  other graphics device operations and per-object virtual return values remain
+  observations.
 - `include/viper/world_track_objects.hpp` and
   `src/world_track_objects.cpp` model the BATS `track.obt` table, its
   checkpoint-derived track basis/translation setup, circular spline-segment

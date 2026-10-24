@@ -442,6 +442,24 @@ and `0x448440` (`ev_54c964f82dd752b84a4b4f98553b21e889bdd8b817904462870823ea1456
 and mode-dependent update thunk `0x460360`
 (`ev_0cb578d5e310c6ad56d2fe4d48ec2c265d75670586589316993f1931d32335af`).
 
+The `0x448940` transform install is now followed through its device wrapper.
+`0x454CA0` captures the transform's position and right-axis triples, clears
+eight cached flags, and decrements each positive cache reference count.
+`0x4576E0` selects transform state 2; `0x458C20` forwards that state and the
+constructed 4x4 view matrix to device vtable offset `+0x68`. A nonzero HRESULT
+calls the logger with `SetTransform` and the error value. The scene dispatcher
+projects both the camera-relative view install and its original-matrix restore,
+including separate HRESULT observations and cache effects. Matrix contents
+follow the recovered row/column arrangement and position dot products; x87
+rounding remains a possible last-bit difference. Evidence: `0x454CA0`
+(`ev_534bd4dcc4c2e026f2da74702aca13f8cab84dfaba5e00a7986c2fc791bda683`),
+transform-state wrapper `0x4576E0`
+(`ev_4d69b0169b5f39b3d49a5fdbc67e846506deb88a2526bc65b0d4268bf136a914`),
+device setter `0x458C20`
+(`ev_7314a537d80dfad61c4893f146b1a7856a6ffafc67b9ba58cb787ecf70b763ea`),
+and error logger `0x452770`
+(`ev_ce89dcbcb43d460ff14a562e8771dd78dd13d069bc274061800da0423b1d44e8`).
+
 ## Portable model
 
 `include/viper/scene_car_update.hpp` and `src/scene_car_update.cpp` encode the

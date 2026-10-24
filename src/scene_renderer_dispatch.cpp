@@ -31,6 +31,26 @@ std::array<float, 12> make_scene_view_transform(
     return result;
 }
 
+std::array<float, 16> make_device_view_matrix(
+    const std::array<float, 12>& transform) noexcept
+{
+    return {
+        transform[0], transform[3], transform[6], 0.0F,
+        transform[1], transform[4], transform[7], 0.0F,
+        transform[2], transform[5], transform[8], 0.0F,
+        static_cast<float>(-(static_cast<double>(transform[0]) * transform[9]
+            + static_cast<double>(transform[1]) * transform[10]
+            + static_cast<double>(transform[2]) * transform[11])),
+        static_cast<float>(-(static_cast<double>(transform[3]) * transform[9]
+            + static_cast<double>(transform[4]) * transform[10]
+            + static_cast<double>(transform[5]) * transform[11])),
+        static_cast<float>(-(static_cast<double>(transform[6]) * transform[9]
+            + static_cast<double>(transform[7]) * transform[10]
+            + static_cast<double>(transform[8]) * transform[11])),
+        1.0F,
+    };
+}
+
 } // namespace
 
 SceneRendererDispatchPlan plan_scene_renderer_dispatch(
@@ -38,6 +58,9 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
 {
     SceneRendererDispatchPlan result{};
     result.camera_transform_after = input.camera_transform;
+    result.view_transform_cache_reference_counts_after =
+        input.view_transform_cache_reference_counts;
+    result.view_transform_cache_flags_after = input.view_transform_cache_flags;
     result.actions.push_back({SceneRendererDispatchActionKind::profiling_begin,
         0x00415090U, 0U, 0U,
         {static_cast<std::int32_t>(input.profiling_context), 0, 0, 0, 0}, {}});
@@ -57,6 +80,35 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
         result.camera_transform_after = view_transform;
         result.actions.push_back({SceneRendererDispatchActionKind::view_transform_set,
             0x00448940U, 0U, 0U, {}, view_transform});
+        const auto append_transform_install = [&](const std::array<float, 12>& transform,
+                                                  const std::int32_t hresult) {
+            result.cached_camera_position = {transform[9], transform[10], transform[11]};
+            result.cached_camera_right = {transform[6], transform[7], transform[8]};
+            result.actions.push_back({SceneRendererDispatchActionKind::transform_cache_invalidate,
+                0x00454CA0U, 0U, 0U, {}, transform});
+            for (std::size_t i = 0; i < result.view_transform_cache_reference_counts_after.size(); ++i) {
+                if (result.view_transform_cache_reference_counts_after[i] > 0) {
+                    --result.view_transform_cache_reference_counts_after[i];
+                }
+                result.view_transform_cache_flags_after[i] = 0;
+            }
+            const auto matrix = make_device_view_matrix(transform);
+            const auto matrix_index = result.view_matrices_installed;
+            if (matrix_index < result.installed_view_matrices.size()) {
+                result.installed_view_matrices[matrix_index] = matrix;
+            }
+            ++result.view_matrices_installed;
+            result.actions.push_back({SceneRendererDispatchActionKind::device_transform_state_dispatch,
+                0x004576E0U, 0U, 0U, {2, 0, 0, 0, 0}, transform, matrix});
+            result.actions.push_back({SceneRendererDispatchActionKind::device_view_transform_set,
+                0x00458C20U, 0U, 0U, {2, hresult, 0, 0, 0}, transform, matrix});
+            if (hresult != 0) {
+                result.actions.push_back({SceneRendererDispatchActionKind::device_error_report,
+                    0x00452770U, 0U, 0U, {hresult, 0, 0, 0, 0}, {}, {}, "SetTransform"});
+                ++result.view_transform_error_reports;
+            }
+        };
+        append_transform_install(view_transform, input.view_transform_hresult[0]);
         result.actions.push_back({SceneRendererDispatchActionKind::scene_state_configure,
             0x00460210U});
         if (input.renderer_mode > 1) {
@@ -97,6 +149,7 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                 0x004602A0U});
             result.actions.push_back({SceneRendererDispatchActionKind::view_transform_set,
                 0x00448940U, 0U, 0U, {}, input.camera_transform});
+            append_transform_install(input.camera_transform, input.view_transform_hresult[1]);
             result.camera_transform_after = input.camera_transform;
             result.actions.push_back({SceneRendererDispatchActionKind::viewport_restore,
                 0x004487A0U, 0U, 0U,
