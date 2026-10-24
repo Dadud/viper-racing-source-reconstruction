@@ -827,9 +827,9 @@ AcarAlternateRouteThrottlePlan plan_acar_alternate_route_throttle_limit(
     const AcarAlternateRouteThrottleObservation& observation) noexcept
 {
     AcarAlternateRouteThrottlePlan plan{};
-    plan.effective_throttle_limit_0x103c =
-        observation.existing_throttle_limit_0x103c;
     if (!observation.alternate_route_mode_0xf30) {
+        plan.effective_throttle_limit_0x103c =
+            observation.existing_throttle_limit_0x103c;
         plan.input_incomplete =
             !observation.existing_throttle_limit_0x103c.has_value();
         return plan;
@@ -866,6 +866,120 @@ AcarAlternateRouteThrottlePlan plan_acar_alternate_route_throttle_limit(
             route_term_a + 1.0L + route_term_b);
     }
     plan.throttle_limit_written = true;
+    return plan;
+}
+
+AcarThrottleTailPlan plan_acar_throttle_tail(
+    const AcarThrottleTailObservation& observation) noexcept
+{
+    AcarThrottleTailPlan plan{};
+    std::optional<float> initial_throttle;
+    bool initial_throttle_incomplete = false;
+    if (observation.profile_throttle_0xf58_plus_0x1c.has_value()) {
+        const auto profile_throttle =
+            *observation.profile_throttle_0xf58_plus_0x1c;
+        const auto throttle_bits = std::bit_cast<std::uint32_t>(
+            profile_throttle);
+        if (throttle_bits >= 0x80000001U) {
+            initial_throttle = 0.0F;
+        } else if (observation.throttle_limit_0x103c.has_value()) {
+            initial_throttle =
+                *observation.throttle_limit_0x103c < profile_throttle
+                    ? *observation.throttle_limit_0x103c
+                    : profile_throttle;
+        } else {
+            initial_throttle_incomplete = true;
+        }
+    } else {
+        initial_throttle_incomplete = true;
+    }
+
+    bool any_water_contact = false;
+    bool all_water_contacts_known = true;
+    for (const auto& contact : observation.water_cut_wheel_contacts) {
+        if (!contact.has_value()) {
+            all_water_contacts_known = false;
+        } else if (*contact) {
+            any_water_contact = true;
+        }
+    }
+
+    if (any_water_contact) {
+        plan.water_gate_passed = true;
+        plan.message_calls[plan.message_call_count++] =
+            AcarThrottleTailMessageCall::water_cut;
+        plan.throttle_before_offground = 0.0F;
+    } else if (all_water_contacts_known) {
+        plan.water_gate_passed = false;
+        plan.throttle_before_offground = initial_throttle;
+        plan.input_incomplete = plan.input_incomplete ||
+            initial_throttle_incomplete;
+    } else {
+        plan.input_incomplete = true;
+        if (initial_throttle == 0.0F) {
+            plan.throttle_before_offground = 0.0F;
+        } else if (initial_throttle_incomplete) {
+            plan.input_incomplete = true;
+        }
+    }
+
+    if (!observation.contact_helper_result_0x89c.has_value()) {
+        plan.input_incomplete = true;
+    } else if (*observation.contact_helper_result_0x89c) {
+        plan.second_contact_helper_called = false;
+        plan.offground_gate_passed = true;
+    } else {
+        plan.second_contact_helper_called = true;
+        if (!observation.contact_helper_result_0xa40.has_value()) {
+            plan.input_incomplete = true;
+        } else {
+            plan.offground_gate_passed =
+                *observation.contact_helper_result_0xa40;
+        }
+    }
+
+    std::optional<float> throttle_after_offground =
+        plan.throttle_before_offground;
+    if (plan.offground_gate_passed == true) {
+        plan.message_calls[plan.message_call_count++] =
+            AcarThrottleTailMessageCall::offground_cut;
+        if (!observation.fade_state_0xfe0.has_value()) {
+            plan.input_incomplete = true;
+        } else {
+            plan.fade_state_0xfe0 = static_cast<float>(
+                static_cast<long double>(*observation.fade_state_0xfe0) +
+                0.03L);
+        }
+        if (!throttle_after_offground.has_value()) {
+            plan.input_incomplete = true;
+        } else if (observation.fade_state_0xfe0.has_value()) {
+            throttle_after_offground = static_cast<float>(
+                static_cast<long double>(*throttle_after_offground) -
+                *observation.fade_state_0xfe0);
+        } else {
+            throttle_after_offground.reset();
+        }
+    } else if (plan.offground_gate_passed == false) {
+        plan.fade_state_0xfe0 = 0.0F;
+    } else {
+        plan.input_incomplete = true;
+        throttle_after_offground.reset();
+    }
+
+    if (throttle_after_offground.has_value()) {
+        const auto value = *throttle_after_offground;
+        const auto bits = std::bit_cast<std::uint32_t>(value);
+        if (bits < 0x80000001U) {
+            plan.throttle_output_0xde0 =
+                std::bit_cast<std::int32_t>(value) > 0x3f800000
+                    ? 1.0F : value;
+        } else {
+            plan.throttle_output_0xde0 = 0.0F;
+        }
+    }
+    if (!plan.throttle_output_0xde0.has_value()) {
+        plan.input_incomplete = true;
+    }
     return plan;
 }
 
@@ -941,6 +1055,12 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
         observation.geometry.fdiv_compatibility_enabled;
     plan.steering_history_plan = plan_acar_steering_history_tail(
         plan.local_output_0, steering_history_observation);
+    auto throttle_observation = observation.throttle_tail;
+    throttle_observation.throttle_limit_0x103c =
+        plan.alternate_route_throttle_plan.effective_throttle_limit_0x103c;
+    plan.throttle_tail_plan = plan_acar_throttle_tail(throttle_observation);
+    plan.input_incomplete = plan.input_incomplete ||
+        plan.throttle_tail_plan->input_incomplete;
     plan.tail_argument_0x428cd0 = plan.local_output_0;
     plan.tail_argument_0x428e20 = plan.local_output_1;
     plan.tail_argument_0x4331d0 = plan.final_argument_0x2c;

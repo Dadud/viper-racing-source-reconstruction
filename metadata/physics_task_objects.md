@@ -704,8 +704,8 @@ sign-change response ramp, final `[-1,1]` clamp, and paired `+0x630/+0x7D4`
 control writes. Its profile step, incoming history/ramp/control values,
 speed, and scale are explicit observations. Evidence:
 `0x428CD0` `ev_79e703e41d739bc81a42eec4fb785446b74af8830a2245fdd8cdd4824aba92be`.
-Effects of the later brake/throttle setters and the nested `0x43FDD0` work
-called from `0x433230` remain open.
+The later brake helper and nested `0x43FDD0` work called from `0x433230`
+remain open.
 
 `plan_acar_alternate_route_throttle_limit` also reconstructs the callback's
 independent `+0xF30` write to `+0x103C`: it preserves the existing value when
@@ -714,3 +714,16 @@ linear route-delta branches. The composed callback retains the true call flow
 when route-helper observations are missing, carrying unchanged local values
 forward and marking the plan incomplete instead of stopping execution.
 Evidence: callback bytes `ev_b038b8489dcad25a2edb9f7bb71e9ca7c2ece24d4467baccad8114e6913e8f93`.
+
+`plan_acar_throttle_tail` now models `0x428B40`'s profile throttle and
+`+0x103C` cap, four water-contact results, ordered water/off-ground messages,
+the short-circuit `+0x89C` then `+0xA40` contact helpers, `+0xFE0` fade update,
+and the final raw-bit throttle clamp stored through `0x4331A0` at `+0xDE0`.
+Missing observations leave dependent values unknown while preserving known
+state writes and gates. Evidence: `0x428B40`
+`ev_97535e027e4934c7964ae7432be9a318e111016853cc0f6e5ab53e67af111570`,
+four-contact aggregator `0x428CA0`
+`ev_a881e4cced14ce4b8b4e6b95773528cf93f7c918f0993b8c8bac2a622d916068`,
+contact predicate `0x428C90`
+`ev_9caeb9c8a4f871bd2e82f0538d0b9a355ab35fc78a70370ed091fdaf8af557b2`, and
+setter `0x4331A0` `ev_4e59e75710114fdaaf0e5efbd82f79122611a72256a329e7f11e688c94985138`.
