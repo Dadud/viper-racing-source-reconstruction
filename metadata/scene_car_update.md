@@ -425,16 +425,17 @@ The analyzed direct callees of this scene callback do not include `0x431150`,
 so this path is established as pose, transition, and wheel-transform update.
 The separately dispatched wheel-resource rendering path is traced below.
 
-The manager frame method is reached through the generic scene-object dispatch
-loop. Constructor `0x463920` creates each wheel manager with `0x4622F0` and
-registers the resulting pointer through `0x45C2E0`. That registration appends
-the object to the global list at `0x539430` and increments its count at
-`0x53A4C0`. Renderer `0x45BEB0` walks that list; for each object it calls
-virtual slot `+0x10`, checks the global mode gate, calls slot `+0x0C`, then
-calls slot `+0x14` when both conditions permit. Since this manager's vtable
-slot `+0x14` is `0x4623F0`, this connects construction, registration, and
-frame rendering. The manager's frame gate at `0x45C380` still provides its
-internal reset-versus-draw branch. The full vtable at `0x4C9270` resolves
+The manager is registered in the generic scene-object list, but its frame
+method is not reached on the known `0x45BEB0` dispatch path. Constructor
+`0x463920` creates each wheel manager with `0x4622F0` and registers the
+resulting pointer through `0x45C2E0`. That registration appends the object to
+the global list at `0x539430` and increments its count at `0x53A4C0`. Renderer
+`0x45BEB0` walks that list; for each object it calls virtual slot `+0x10`,
+checks the global mode gate, calls slot `+0x0C`, then calls slot `+0x14` when
+both conditions permit. The manager's vtable slot `+0x14` is `0x4623F0`, but
+the preceding gates suppress it in this frame. The manager's frame gate at
+`0x45C380` still describes its internal reset-versus-draw branch if reached
+through another path. The full vtable at `0x4C9270` resolves
 `+0x10` to `0x462A70` (`xor al,al; ret`), so that result is always false;
 `+0x0C` targets `0x462580`, which calls `0x460310` to read the low byte of
 `0x4DCAE4` and returns true only when that byte is zero. The class-specific
@@ -449,6 +450,16 @@ pointer presence external for these slots. Evidence: vtable bytes
 `ev_85b8caf9d861f32ac091e2f4d411ff95521ac11291ca9588c2f7b2ec22b9d306`,
 `ev_e565d9c019094860acf2e927577dd2aa426d61c60ef911c88532e9476605a123`,
 and getter `0x460310` `ev_ff7b97e52ece9f4a58cbcbabed54bb77b03e3a2dc2abfaf640f1942bb23dff5e`.
+The dispatcher calls `0x460210` before this loop; that helper unconditionally
+writes `1` to `0x4DCAE4` at `0x46028F`. The intervening optional
+`0x463110` camera update calls `0x467790`; that body has no reference to
+`0x4DCAE4`, and the global's direct references include no write in this path.
+Therefore the manager's `+0x0C` returns false in this renderer frame and its
+`+0x14` callback is skipped. Evidence: `0x460210`
+`ev_efb8250e17c135e75a6708aefb6fdb73d89f779305fd73592fc6f71dc4c9178e`,
+write at `0x46028F` `ev_bd867d8465ef5288edc64679e8289f6b362eeee587a159a85d2c55f5a214bcd0`,
+and camera update wrapper `0x463110`
+`ev_954519837ed71481d12b14677b6225c58f3eb665ed8b09632fb6bb98d358fdc1`.
 Evidence: manager vtable `+0x14`
 `ev_1b91d34c52b1d19ee056410c599b67f72ae9ac2381bb2857090aa3ddda9ff43f`,
 dispatcher `0x45BEB0` `ev_1ffdfd37f67d2227d0d9e780f4db2f1b5a10c67c802e855cc30aa7dc09a7342e`,
@@ -458,11 +469,13 @@ and scene constructor `0x463920`
 
 The generic render observation retains the resolved `+0x14` target.
 `observe_scene_wheel_resource_manager` records `0x4623F0` and derives the
-manager's `+0x10`/`+0x0C` return values; other classes' generic `+0x10` and
-`+0x0C` results remain observations. When the dispatcher reaches `+0x14`, its
-action carries that native target address.
-This links the renderer's object walk to the already modeled wheel-manager
-frame method without inventing behavior for the manager's earlier gates.
+manager's `+0x10`/`+0x0C` return values for a supplied global-byte state; other
+classes' generic `+0x10` and `+0x0C` results remain observations. In the
+`0x45BEB0` plan, the manager is identified by its `+0x14` target and its gate
+results are recomputed from the frame's known `0x4DCAE4 == 1` state, so the
+action stream records `+0x10` and `+0x0C` but no `+0x14` call. This keeps the
+manager method model available while accurately representing the established
+generic frame path.
 
 ### Scene-car virtual `+0x18` callout
 

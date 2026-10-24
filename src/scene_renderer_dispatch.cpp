@@ -451,13 +451,25 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
                 result.status = SceneRendererDispatchStatus::null_object_pointer;
                 break;
             }
+            // This dispatcher calls 0x460210 before the object walk. That
+            // helper unconditionally stores 1 to DAT_004DCAE4, and the
+            // optional camera update has no reference to that global. The
+            // wheel manager's vtable target therefore returns false from
+            // +0x0C for this frame, regardless of a separately observed
+            // pre-frame gate byte.
+            const bool is_wheel_resource_manager =
+                object.virtual_0x14_target == 0x004623F0U;
+            const bool virtual_0x10_result = is_wheel_resource_manager
+                ? false : object.virtual_0x10_result;
+            const bool virtual_0x0c_result = is_wheel_resource_manager
+                ? false : object.virtual_0x0c_result;
             result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
                 0U, i, 0x10U});
-            const bool mode_permits_draw = !object.virtual_0x10_result
+            const bool mode_permits_draw = !virtual_0x10_result
                 || input.renderer_mode > 2;
             result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
                 0U, i, 0x0cU});
-            if (object.virtual_0x0c_result && mode_permits_draw) {
+            if (virtual_0x0c_result && mode_permits_draw) {
                 result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
                     object.virtual_0x14_target, i, 0x14U});
                 ++result.object_draw_callbacks;

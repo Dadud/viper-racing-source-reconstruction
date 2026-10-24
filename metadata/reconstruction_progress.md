@@ -1,11 +1,13 @@
 # Reconstruction progress
 
-- **2026-10-24 continuation:** Completed the wheel-manager's two pre-draw
-  virtual gates in the generic scene dispatcher. Vtable `+0x10` is a false
-  stub; `+0x0C` is derived from the zero/nonzero state of `0x4DCAE4` through
-  its getter/normalizer. The manager observer now needs only pointer presence
-  and that raw gate byte to derive both outcomes. Release build and
-  `git diff --check` pass; no tests were run. Evidence:
+- **2026-10-24 continuation:** Resolved the wheel-manager gates in the
+  renderer's actual frame context. `0x460210` sets `0x4DCAE4` to 1 before the
+  object walk, and the optional camera update has no reference to that global;
+  thus manager `+0x0C` returns false and its `+0x14` frame method is skipped.
+  Generic dispatch now derives this result from the manager's resolved vtable
+  target. The standalone observer still models the class gate for arbitrary
+  raw-byte states. The Release `viper_race_scene_flow` target builds and
+  `git diff --check` passes; no tests were run. Evidence:
   `metadata/scene_car_update.md`.
 
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
