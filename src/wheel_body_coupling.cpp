@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <limits>
 #include <numeric>
 
 namespace viper {
@@ -491,9 +492,65 @@ apply_ncar_integrator_virtual_record_callback(
     result.timeout_state_written = true;
     result.timeout_start_time_written = input.current_time_0x425790;
 
-    // 0x4273C0 receives an event header and a 14-byte payload here; the exact
-    // byte construction is not yet resolved, so preserve it as an open effect.
-    result.event_payload_bytes_resolved = false;
+    const PhysicsVector3 body_local_offset{
+        input.body_local_offset_0x28[0], input.body_local_offset_0x28[1],
+        input.body_local_offset_0x28[2]};
+    const PhysicsVector3 body_center{
+        input.body_center_0x5c[0], input.body_center_0x5c[1],
+        input.body_center_0x5c[2]};
+    const auto world_reference = transform_body_local_point(
+        {body_local_offset, input.body_orientation_matrix_0x38, body_center});
+    const PhysicsVector3 relative_position{
+        input.record.second_vector.x - world_reference.x,
+        input.record.second_vector.y - world_reference.y,
+        input.record.second_vector.z - world_reference.z};
+    result.event_local_position = transform_body_angular_accumulator(
+        relative_position, input.body_orientation_matrix_0x38);
+    result.event_local_force = transform_body_angular_accumulator(
+        input.record.normalized_first_vector,
+        input.body_orientation_matrix_0x38);
+
+    const auto ftol = [](const long double value) noexcept {
+        const auto rounded = std::nearbyint(value);
+        if (!std::isfinite(rounded) ||
+            rounded < static_cast<long double>(
+                          std::numeric_limits<std::int32_t>::min()) ||
+            rounded > static_cast<long double>(
+                          std::numeric_limits<std::int32_t>::max())) {
+            return std::numeric_limits<std::int32_t>::min();
+        }
+        return static_cast<std::int32_t>(rounded);
+    };
+    const auto packed_position = [&](const float value) noexcept {
+        return static_cast<std::uint8_t>(
+            static_cast<std::uint32_t>(ftol(
+                divide_with_vc98_fdiv_compatibility(
+                    static_cast<long double>(value), 10.0L,
+                    input.fdiv_compatibility_enabled))) >> 8U);
+    };
+    const auto packed_force = [&](const float value) noexcept {
+        return static_cast<std::uint16_t>(ftol(
+            divide_with_vc98_fdiv_compatibility(
+                static_cast<long double>(value), 30000.0L,
+                input.fdiv_compatibility_enabled)));
+    };
+    result.event_payload[0] = packed_position(result.event_local_position.x);
+    result.event_payload[1] = packed_position(result.event_local_position.y);
+    result.event_payload[2] = packed_position(result.event_local_position.z);
+    for (std::size_t axis = 0; axis < 3U; ++axis) {
+        const auto force_component = axis == 0U
+            ? result.event_local_force.x
+            : axis == 1U ? result.event_local_force.y
+                         : result.event_local_force.z;
+        const auto packed = packed_force(force_component);
+        const auto offset = 3U + axis * 2U;
+        result.event_payload[offset] = static_cast<std::uint8_t>(packed);
+        result.event_payload[offset + 1U] =
+            static_cast<std::uint8_t>(packed >> 8U);
+    }
+    result.event_payload[13] = static_cast<std::uint8_t>(
+        input.vehicle_ordinal_0x510);
+    result.event_payload_bytes_resolved = true;
     result.secondary_virtual_call_reached = true;
     return result;
 }
@@ -1464,7 +1521,13 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     for (const auto& record : result.force_collection.virtual_record_calls.calls) {
         const NcarIntegratorVirtualRecordCallbackInput callback_input{
             record,
+            input.post_body_input.body_local_offset_0x28,
+            kinematics_at_step_start.orientation_matrix_0x0e,
+            {kinematics_at_step_start.position.x,
+             kinematics_at_step_start.position.y,
+             kinematics_at_step_start.position.z},
             input.post_body_input.global_update_gate_0x425870,
+            input.post_body_input.fdiv_compatibility_enabled,
             input.post_body_input.current_time_0x425790,
             input.post_body_input.vehicle_ordinal_0x510};
         result.integrator_virtual_record_callbacks.push_back(

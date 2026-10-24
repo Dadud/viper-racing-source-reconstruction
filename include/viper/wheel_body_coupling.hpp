@@ -186,7 +186,11 @@ struct NcarPostBodyState {
 
 struct NcarIntegratorVirtualRecordCallbackInput {
     BodyIntegrationVirtualRecordCall record{};
+    std::array<float, 3> body_local_offset_0x28{};
+    std::array<float, 9> body_orientation_matrix_0x38{};
+    std::array<float, 3> body_center_0x5c{};
     bool global_update_gate_0x425870{};
+    bool fdiv_compatibility_enabled{};
     float current_time_0x425790{};
     std::uint32_t vehicle_ordinal_0x510{};
 };
@@ -202,6 +206,9 @@ struct NcarIntegratorVirtualRecordCallbackResult {
     std::uint8_t event_type{5};
     std::uint8_t event_payload_size{0x0e};
     bool event_payload_bytes_resolved{};
+    std::array<std::uint8_t, 14> event_payload{};
+    PhysicsVector3 event_local_position{};
+    PhysicsVector3 event_local_force{};
     bool secondary_virtual_call_reached{};
     std::uint32_t secondary_virtual_wrapper{0x00427E00};
     std::uint32_t secondary_virtual_target{0x00430610};
@@ -217,6 +224,8 @@ struct NcarPostBodyInput {
     // 0xD88 vector transformed by the post-0x43ECE0 orientation matrix. The
     // optional derivation is enabled by the composed four-wheel body step.
     std::array<float, 3> source_vector_0xd88{};
+    // Car/body local point at +0x28 used by the integrator impact event.
+    std::array<float, 3> body_local_offset_0x28{};
     std::array<float, 9> orientation_matrix_0x38{};
     bool derive_vector_0x382{};
     // Used when deriving is disabled, preserving direct helper-level callers.
@@ -231,6 +240,7 @@ struct NcarPostBodyInput {
     std::array<std::uint32_t, 4> wear_value_bits{};
     float current_time_0x425790{};
     bool global_update_gate_0x425870{};
+    bool fdiv_compatibility_enabled{};
     std::array<NcarResetResourceGroupInput, 5> timeout_resource_groups{};
     std::uint32_t vehicle_ordinal_0x510{};
 };

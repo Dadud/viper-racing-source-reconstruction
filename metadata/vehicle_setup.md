@@ -840,8 +840,17 @@ checks global gate `0x425870`, then compares the normalized first vector's
 squared magnitude strictly against `550069.4`; on success it sets `+0x48C` and
 `+0x488` from `0x425790`, builds a type-5, 14-byte event through `0x4273C0`,
 and reaches the secondary virtual wrapper `0x427E00` / target `0x430610`.
-The event payload bytes and the target's mesh/resource response remain
-unresolved. Evidence bundle: `metadata/ncar_integrator_virtual_record.evidence.json`.
+The type-5 payload is now encoded: bytes 0-2 hold the three local-position
+coordinates divided by 10, converted with x87 `__ftol`, then shifted right by
+8; bytes 3-8 hold the three transformed force coordinates divided by 30000
+and stored as little-endian 16-bit values; bytes 9-12 are zero; byte 13 is the
+vehicle ordinal. The conversion values, body transform, and compatibility
+divider are represented in `apply_ncar_integrator_virtual_record_callback`.
+The target's mesh/resource response remains unresolved. Evidence:
+`0x430BF0` `ev_87738c6e1979745e751f9357b19ee919aadf3b5e649373d76b826a4db0238731`,
+event enqueue `0x4273C0` `ev_4b5569385e553dacbb0ddc508b7d9467e3208f081cc0b277ac6b27ad9a05d436`,
+and nested handler `0x430610` `ev_1d43c9b43216ba441eb9a29e9156ce92b767363305dda9c9f0449178b15faca5`.
+Evidence bundle: `metadata/ncar_integrator_virtual_record.evidence.json`.
 
 The embedded-record helper `0x4473D0` transforms its stored point through
 `0x437BA0`, which multiplies the local point by the basis at body `+0x38..+0x58`
