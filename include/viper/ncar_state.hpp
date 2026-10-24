@@ -231,6 +231,17 @@ struct NcarBodyConstructorObservation {
     std::optional<std::uint32_t> compatibility_fill_bits;
 };
 
+// Adapts the bounded 0x1E4-byte car runtime record consumed by the shared
+// 0x43E490 body initializer. DWORDs at +0x08..+0x14 are interpreted as the
+// four constructor source floats; the second constructor argument remains an
+// explicit caller observation.
+[[nodiscard]] std::optional<NcarBodyConstructorObservation>
+make_ncar_body_constructor_observation_from_runtime_record(
+    std::span<const std::byte> runtime_record,
+    std::uint32_t constructor_parameter_2,
+    bool fdiv_compatibility_enabled,
+    std::optional<std::uint32_t> compatibility_fill_bits = std::nullopt) noexcept;
+
 struct NcarBodyConstructorPlan {
     std::uint32_t vtable_address{0x004c85e0U};
     std::uint8_t cleared_byte_0x474{};

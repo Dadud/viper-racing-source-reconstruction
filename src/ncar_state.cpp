@@ -2045,6 +2045,31 @@ NcarVertexMapPlan plan_ncar_vertex_maps(
     return result;
 }
 
+std::optional<NcarBodyConstructorObservation>
+make_ncar_body_constructor_observation_from_runtime_record(
+    const std::span<const std::byte> runtime_record,
+    const std::uint32_t constructor_parameter_2,
+    const bool fdiv_compatibility_enabled,
+    const std::optional<std::uint32_t> compatibility_fill_bits) noexcept
+{
+    constexpr std::size_t required_size = 0x1e4U;
+    if (runtime_record.size() < required_size) {
+        return std::nullopt;
+    }
+
+    NcarBodyConstructorObservation observation{};
+    observation.source_record_word_0x00 = read_u32_le(runtime_record.data(), 0U);
+    observation.constructor_parameter_2 = constructor_parameter_2;
+    observation.fdiv_compatibility_enabled = fdiv_compatibility_enabled;
+    observation.compatibility_fill_bits = compatibility_fill_bits;
+    for (std::size_t index = 0; index < observation.source_values_0x08_to_0x14.size();
+         ++index) {
+        observation.source_values_0x08_to_0x14[index] = std::bit_cast<float>(
+            read_u32_le(runtime_record.data(), 0x08U + index * sizeof(std::uint32_t)));
+    }
+    return observation;
+}
+
 NcarBodyConstructorPlan plan_ncar_body_constructor(
     const NcarBodyConstructorObservation& observation)
 {

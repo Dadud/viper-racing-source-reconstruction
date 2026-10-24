@@ -192,6 +192,20 @@ Evidence `ev_5ad16d1080f575ad747c1bcdb26a9b322b07a5d7407c79517ec899d09c08d4fa`,
 `ev_aca9b2f651bc44518c585436809f7442545c9924c8390f910def2f7422fb5ec3`, and
 `ev_52c84de9710ca279934fee09bd5d66de457cd35450593accf6789cb90ebecf58`.
 
+The shared PCAR constructor chain corroborates the source layout: `0x42FF90`
+calls `0x43E490` with the same source-record pointer and constructor argument,
+and its derived PCAR constructor `0x4381E0` calls `0x43DFB0`, which reaches
+`0x42FF90`. The body initializer reads source DWORDs `+0x08..+0x14`, so
+`make_ncar_body_constructor_observation_from_runtime_record` now adapts those
+four floats and the source word at `+0x00` from a bounded runtime record. The
+second constructor argument remains caller supplied. This adapter does not
+instantiate the PCAR object or imply that runtime physics is initialized; the
+remaining constructor resources, callback wiring, and persistent body state
+still need to be connected. Evidence: `0x4381E0`
+(`ev_a6fffec1a3d0d9b9d8808f8e4c74b4a5becf32bd64dc6d925d28250c80f84b28`),
+`0x43DFB0` (`ev_e7d523e8b77f8fc1d8059a4b99b406d1d2e609dc2341e5e700baf34d4440f375`),
+and `0x43E490` (`ev_429bba68149b6bd6316a116c77c7c0781a4d72f95fa6f80312b519ed161ce3b3`).
+
 The base car constructor `0x42FF90` builds five resource-group vertex maps.
 Group 0 maps each vertex to its own truncated 16-bit index. For groups 1–4,
 each vertex maps to the nearest group-0 vertex by squared XYZ distance; the

@@ -83,6 +83,15 @@ gap; do not infer runtime support from static analysis or file presence.
   and limits are in `metadata/frontend_dispatch.md`; this still does not
   verify interactive driving, AI motion, race completion, or comparison with
   the original.
+- **2026-10-24, PCAR constructor adapter:** Revisited the shipped `race.bin`
+  constructor chain with Ghidra evidence and added a bounded adapter from the
+  0x1E4-byte car runtime record into the existing shared body-constructor
+  observation. The source word and four floats at `+0x08..+0x14` are now read
+  directly; the second constructor argument stays explicit. This narrows the
+  record-to-body gap but does not instantiate a simulation object or change
+  the runtime's provisional kinematics. The evidence and limitations are in
+  `metadata/vehicle_setup.md`. Windows Release target `viper_game` built
+  successfully; CTest was not run.
 
 ## Ownership and CI boundary
 
