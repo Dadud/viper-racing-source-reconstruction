@@ -66,9 +66,16 @@ payload offset, `0x462D90` scans every registered entry in order and invokes
 every handler whose tag matches the current byte, passing the bytes after the
 tag. No match stops parsing. Otherwise the last matching handler's return
 controls the cursor: `-1` stops; any other value advances by that value plus
-one. The portable plan records each callback/result and guards missing payload
-or callback observations; actual handler side effects and out-of-bounds reads
-are not fabricated. Evidence: `0x462CF0` (`ev_87fc51588d2e71449560f2e725d0887ac52f4f6a0d86eaf3264f7f853b5c2d05`),
+one. The three recovered callbacks always return fixed payload sizes:
+`0x468290` returns `0x24`, `0x468450` returns `0x18`, and `0x4692A0` returns
+`0x1C`; the parser now supplies those values directly, while other callback
+returns remain explicit inputs. It records each callback/result and guards
+missing payload or callback observations; other handler side effects and
+out-of-bounds reads are not fabricated. Evidence for the fixed return sizes is
+in the byte-range observations `ev_6f17bfce0c93058dae6edb87749a6a003cc769d78d31a62aa52d1fc04af5afbf`,
+`ev_39ffb4a0bad9a4cf4e9bc22dccdb8a25a343e831ea5a0b6639c6597bc1c7086f`, and
+`ev_c924832e2207c9f88dace42f6fb0d9e4d8cad232dfb40f54a137d7d09f5e78d9`.
+Evidence: `0x462CF0` (`ev_87fc51588d2e71449560f2e725d0887ac52f4f6a0d86eaf3264f7f853b5c2d05`),
 `0x462D00` (`ev_27eaa986b6a64fe0b410e9978355b330863059004d75665dbb84e16d4425f4d4`),
 `0x462D30` (`ev_f2f4431afc3ee1da42fbe1f5bd88a52924b1b52d718f67fb98cf133d0635885a`),
 `0x462D90` (`ev_2d0096969d13bd67200d3ea8d5ba62679aea1068dd3fa19b99a9481237a22225`),
@@ -76,6 +83,19 @@ are not fabricated. Evidence: `0x462CF0` (`ev_87fc51588d2e71449560f2e725d0887ac5
 `0x468270` (`ev_de0ec7660bac9a8b0e9493281c0c521b099e40ef0ff3b1994920e08e1a341b64`),
 `0x469300` (`ev_48b9e3596cb4dfa50d1ba5991c3ebb11ac926bf35e4073d6b395ec00385f1e90`),
 and `0x469350` (`ev_1ca4fe97607c76902eab28afb2b0b7376bfe322f74243d1aa4747465b7b74e28`).
+
+Tag 0's outer effect management is also projected in
+`plan_scene_car_effect_tag_zero_handler`: `0x4692A0` compares the DWORD at
+payload `+0x18` against the `+0x04` key in all 32 slots at `0x540B70..0x540BEC`.
+Any match suppresses generation but does not stop the scan. With no match, the
+global cursor increments and wraps with `& 31`; the selected slot then enters
+`0x468AF0`. Null pool entries and an absent selected object are reported as
+faults, while an incomplete 32-entry observation is kept distinct. The
+particle generator's detailed geometry remains a separate reconstruction
+slice. Evidence: `0x4692A0` byte range
+(`ev_c924832e2207c9f88dace42f6fb0d9e4d8cad232dfb40f54a137d7d09f5e78d9`) and
+generator `0x468AF0`
+(`ev_fdf72c8842997f85c97fed158fae93ba441b5016c07baf6bd8ccb813475b0a18`).
 
 The wrapper measures the distance from object position `+0x28..+0x30` to the
 camera globals `0x509B58..0x509B60` using `0x448C10`; the following scale

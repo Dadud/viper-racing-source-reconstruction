@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -125,6 +126,10 @@ struct SceneCarByteHandlerRegistration {
 scene_car_handlers_registered_by_scene_context() noexcept;
 [[nodiscard]] SceneCarByteHandlerRegistration
 scene_car_handler_registered_by_effect_context() noexcept;
+// The three discovered native callbacks return fixed payload sizes on every
+// observed branch; unknown handlers require a supplied callback observation.
+[[nodiscard]] std::optional<std::int32_t>
+scene_car_byte_handler_payload_bytes(std::uint32_t callback_address) noexcept;
 void reset_scene_car_byte_handler_registry(SceneCarByteHandlerRegistry& registry) noexcept;
 void register_scene_car_byte_handler(
     SceneCarByteHandlerRegistry& registry,
@@ -153,6 +158,7 @@ struct SceneCarByteCallbackOperation {
     std::uint32_t callback_address{};
     std::uint8_t tag{};
     std::int32_t returned_payload_bytes{};
+    bool payload_length_recovered{};
 };
 
 struct SceneCarByteParserInput {
@@ -174,6 +180,41 @@ struct SceneCarByteParserPlan {
 // callback return values supply each observed payload length or -1 sentinel.
 [[nodiscard]] SceneCarByteParserPlan plan_scene_car_byte_parser(
     const SceneCarByteParserInput& input);
+
+inline constexpr std::size_t scene_car_effect_tag_zero_pool_size = 32;
+enum class SceneCarEffectTagZeroStatus : std::uint8_t {
+    duplicate_suppressed,
+    generator_dispatched,
+    pool_observation_exhausted,
+    null_pool_entry_fault,
+    selected_slot_observation_missing,
+    selected_slot_null_fault,
+};
+
+struct SceneCarEffectTagZeroInput {
+    // Value at each allocated effect object +0x04; null models a null pointer
+    // in the 32-slot global array (whose shipped scan has no null check).
+    std::span<const std::optional<std::uint32_t>> existing_effect_keys{};
+    std::uint32_t payload_key_0x18{};
+    std::int32_t cursor_0x540bf0{};
+    std::optional<bool> selected_slot_nonnull;
+};
+
+struct SceneCarEffectTagZeroPlan {
+    SceneCarEffectTagZeroStatus status{SceneCarEffectTagZeroStatus::pool_observation_exhausted};
+    std::array<bool, scene_car_effect_tag_zero_pool_size> key_matches{};
+    std::size_t entries_compared{};
+    std::size_t selected_slot{};
+    std::int32_t cursor_after{};
+    bool cursor_written{};
+    bool generator_0x468af0_called{};
+    std::optional<std::int32_t> returned_payload_bytes;
+};
+
+// Projects tag 0 handler 0x4692A0's duplicate scan and 32-slot effect cursor.
+// Particle generation by 0x468AF0 remains its own model boundary.
+[[nodiscard]] SceneCarEffectTagZeroPlan plan_scene_car_effect_tag_zero_handler(
+    const SceneCarEffectTagZeroInput& input) noexcept;
 
 struct SceneCarDistanceThreshold {
     float distance{};

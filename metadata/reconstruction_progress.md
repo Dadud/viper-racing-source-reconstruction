@@ -16,6 +16,17 @@
   from the effects-context tag-0 handler; handler bodies remain explicit
   external effects.
 
+- **2026-10-24:** Decoded the fixed return sizes of the three registered
+  scene byte handlers from their shipped instruction ranges: tag 2 consumes
+  `0x24`, tag 1 consumes `0x18`, and tag 0 consumes `0x1C`. The parser now
+  applies these recovered lengths automatically, leaving only unknown handler
+  return values to caller observations.
+
+- **2026-10-24:** Projected tag 0's effect deduplication and pool selection in
+  `plan_scene_car_effect_tag_zero_handler`: full 32-slot key scan, duplicate
+  suppression, wrapped cursor update, generator dispatch, and bounded reports
+  for incomplete/null slots. The particle generator's geometry remains open.
+
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table
   at `0x81C`, embedded data base, and optional relocation. Added font character

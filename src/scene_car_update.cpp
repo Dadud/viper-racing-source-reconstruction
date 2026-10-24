@@ -115,6 +115,17 @@ SceneCarByteHandlerRegistration scene_car_handler_registered_by_effect_context()
     return {0x004692A0U, 0U};
 }
 
+std::optional<std::int32_t> scene_car_byte_handler_payload_bytes(
+    const std::uint32_t callback_address) noexcept
+{
+    switch (callback_address) {
+    case 0x00468290U: return 0x24;
+    case 0x00468450U: return 0x18;
+    case 0x004692A0U: return 0x1c;
+    default: return std::nullopt;
+    }
+}
+
 void reset_scene_car_byte_handler_registry(SceneCarByteHandlerRegistry& registry) noexcept
 {
     registry.entries.clear();
@@ -172,15 +183,21 @@ SceneCarByteParserPlan plan_scene_car_byte_parser(const SceneCarByteParserInput&
             const auto& handler = input.registry->entries[index];
             if (handler.tag != tag) continue;
             matched = true;
-            if (result.callback_results_consumed >= input.callback_results.size()) {
-                result.status = SceneCarByteParserStatus::callback_result_input_exhausted;
-                result.cursor_after = cursor;
-                return result;
+            const auto recovered_length =
+                scene_car_byte_handler_payload_bytes(handler.callback_address);
+            if (recovered_length.has_value()) {
+                last_result = *recovered_length;
+            } else {
+                if (result.callback_results_consumed >= input.callback_results.size()) {
+                    result.status = SceneCarByteParserStatus::callback_result_input_exhausted;
+                    result.cursor_after = cursor;
+                    return result;
+                }
+                last_result = input.callback_results[result.callback_results_consumed++];
             }
-            last_result = input.callback_results[result.callback_results_consumed++];
             result.callbacks.push_back({
                 static_cast<std::size_t>(cursor), index, handler.callback_address,
-                tag, last_result});
+                tag, last_result, recovered_length.has_value()});
         }
 
         if (!matched) {
@@ -205,6 +222,56 @@ SceneCarByteParserPlan plan_scene_car_byte_parser(const SceneCarByteParserInput&
     }
 
     result.cursor_after = cursor;
+    return result;
+}
+
+SceneCarEffectTagZeroPlan plan_scene_car_effect_tag_zero_handler(
+    const SceneCarEffectTagZeroInput& input) noexcept
+{
+    SceneCarEffectTagZeroPlan result{};
+    result.cursor_after = input.cursor_0x540bf0;
+    const auto available = std::min(
+        scene_car_effect_tag_zero_pool_size, input.existing_effect_keys.size());
+    for (std::size_t i = 0; i < available; ++i) {
+        if (!input.existing_effect_keys[i].has_value()) {
+            result.status = SceneCarEffectTagZeroStatus::null_pool_entry_fault;
+            return result;
+        }
+        result.key_matches[i] = *input.existing_effect_keys[i] == input.payload_key_0x18;
+        ++result.entries_compared;
+    }
+    if (available < scene_car_effect_tag_zero_pool_size) {
+        result.status = SceneCarEffectTagZeroStatus::pool_observation_exhausted;
+        return result;
+    }
+
+    const bool duplicate = std::any_of(
+        result.key_matches.begin(), result.key_matches.end(), [](const bool matched) {
+            return matched;
+        });
+    if (duplicate) {
+        result.status = SceneCarEffectTagZeroStatus::duplicate_suppressed;
+        result.returned_payload_bytes = 0x1c;
+        return result;
+    }
+
+    const auto cursor_bits = std::bit_cast<std::uint32_t>(input.cursor_0x540bf0);
+    const auto incremented_cursor = cursor_bits + 1U;
+    result.selected_slot = static_cast<std::size_t>(incremented_cursor & 0x1fU);
+    result.cursor_after = std::bit_cast<std::int32_t>(incremented_cursor & 0x1fU);
+    result.cursor_written = true;
+    if (!input.selected_slot_nonnull.has_value()) {
+        result.status = SceneCarEffectTagZeroStatus::selected_slot_observation_missing;
+        return result;
+    }
+    if (!*input.selected_slot_nonnull) {
+        result.status = SceneCarEffectTagZeroStatus::selected_slot_null_fault;
+        return result;
+    }
+
+    result.status = SceneCarEffectTagZeroStatus::generator_dispatched;
+    result.generator_0x468af0_called = true;
+    result.returned_payload_bytes = 0x1c;
     return result;
 }
 
