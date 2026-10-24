@@ -14,6 +14,7 @@
 #include "viper/race_progression.hpp"
 #include "viper/sound_resource.hpp"
 #include "viper/wheel_body_coupling.hpp"
+#include "viper/physics_task_stream.hpp"
 #include "viper/world_track_objects.hpp"
 #include "viper/career_file_store.hpp"
 
@@ -668,6 +669,7 @@ public:
             track_basis.basis = {1.0F, 0.0F, 0.0F,
                 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F};
             car_poses_.reserve(spawns.size());
+            car_placement_plans_.reserve(spawns.size());
             std::size_t spline_placements = 0U;
             std::size_t default_placements = 0U;
             for (std::size_t index = 0; index < spawns.size(); ++index) {
@@ -711,6 +713,7 @@ public:
                         viper::CarTrackLineDisposition::construction_ready)
                     throw std::runtime_error("track.obt car placement plan is incomplete");
                 const auto& transform = placement.transform;
+                car_placement_plans_.push_back(placement);
                 const float yaw = std::atan2(transform[6], transform[0]);
                 car_poses_.push_back({transform[9], transform[10], transform[11], yaw});
                 if (placement.placement_route ==
@@ -837,6 +840,13 @@ public:
     {
         if (car_index >= car_poses_.size()) return {};
         return {car_poses_[car_index].x, car_poses_[car_index].z};
+    }
+
+    const viper::CarTrackConstructionPlan* car_placement_plan(
+        const std::size_t car_index) const noexcept
+    {
+        return car_index < car_placement_plans_.size()
+            ? &car_placement_plans_[car_index] : nullptr;
     }
 
     float car_yaw(const std::size_t car_index) const
@@ -1235,6 +1245,7 @@ private:
     const viper::ModelResource* ai_model_{};
     std::size_t player_car_index_{};
     std::vector<CarPose> car_poses_;
+    std::vector<viper::CarTrackConstructionPlan> car_placement_plans_;
     std::vector<CarDrawGroup> car_draw_groups_;
     std::array<float, 4> map_bounds_{};
     float min_height_{};
@@ -1423,11 +1434,12 @@ struct WindowState {
     viper::RouteMotionState motion{};
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<std::array<float, 4>> pose_buffer;
-    // Base setup-derived native constructor inputs retained for the session.
-    // Wheel anchors currently feed live terrain/contact observations; route
-    // motion remains the visible pose authority until the missing simulation
-    // inputs are reconstructed.
+    // Setup- and track-placement-derived PCAR record inputs retained for the
+    // session. Its framed entry is prepared at the recovered logical cursor,
+    // but the complete ordered world stream and fixed-step ring are not yet
+    // connected. Route motion remains the visible pose authority.
     std::vector<std::byte> player_runtime_car_record;
+    std::optional<viper::PhysicsTaskRecordSerialization> player_task_record_frame;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
@@ -1463,7 +1475,9 @@ struct WindowState {
         const std::span<const std::byte> player_setup,
         const std::span<const viper::ModelVertex> model_vertices,
         const std::array<viper::TireDefinition, 4>& tire_definitions,
-        const std::optional<std::uint32_t> serialized_stream_offset)
+        const std::optional<std::uint32_t> serialized_stream_offset,
+        const viper::CarTrackConstructionPlan& construction,
+        const std::string_view model_name)
     {
         bool host_fdiv_compatibility = false;
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
@@ -1476,11 +1490,26 @@ struct WindowState {
                 car_resources, player_setup, {}, false, host_fdiv_compatibility);
         if (!preparation.input_complete || !preparation.mapping.has_value())
             return false;
+        if (!serialized_stream_offset.has_value()) return false;
+        const auto name_plan = viper::plan_car_file_model_name(model_name);
+        if (!name_plan.input_complete || name_plan.local_stack_copy_overflow ||
+            name_plan.runtime_record_copy_overflow) return false;
         player_runtime_car_record.assign(
             viper::CarFileRuntimeMapping::runtime_record_size, std::byte{0});
-        if (!viper::apply_car_file_runtime_mapping(
-                player_runtime_car_record, *preparation.mapping)) {
+        if (!viper::apply_car_track_runtime_record(player_runtime_car_record,
+                preparation, name_plan, construction)) {
             player_runtime_car_record.clear();
+            return false;
+        }
+        const std::array<viper::PhysicsTaskRecordInput, 1> record_input{{
+            {player_runtime_car_record}}};
+        player_task_record_frame = viper::serialize_physics_task_records(
+            record_input, *serialized_stream_offset);
+        if (player_task_record_frame->status !=
+                viper::PhysicsTaskRecordSerializationStatus::complete ||
+            player_task_record_frame->records.size() != 1U) {
+            player_runtime_car_record.clear();
+            player_task_record_frame.reset();
             return false;
         }
         const auto body_observation =
@@ -1965,21 +1994,6 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     const auto cursor_plan =
         viper::plan_track_player_physics_cursor(track_objects, player_car_index);
     const auto serialized_stream_offset = cursor_plan.serialized_object_stream_offset;
-    if (!state.initialize_player_constructor_inputs(player_car_resources,
-            player_car_setup, player_model.vertices, wheel_tires,
-            serialized_stream_offset)) {
-        std::cerr << "Could not prepare base CARF wheel constructor inputs from the active setup.\n";
-        return 1;
-    }
-    std::cout << "Prepared session-owned base CARF constructor inputs: mapped record, "
-              << "body dimension scale "
-              << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
-              << " at +0x1F0, "
-              << "inverse mass " << *state.player_body_inverse_mass_0x200
-              << " at +0x200, "
-              << state.player_wheel_anchors->vertex_indices.size()
-              << " FNIM anchors and four wheel core setups, plus four axle-selected "
-              << "tire response objects. ";
     if (serialized_stream_offset.has_value()) {
         std::cout << "Inherited constructor argument 2 uses track-derived physics "
                   << "stream offset 0x" << std::hex << *serialized_stream_offset
@@ -2043,6 +2057,24 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         DestroyWindow(hwnd);
         return 1;
     }
+    const auto* player_placement =
+        state.graphics.car_placement_plan(player_car_index);
+    if (player_placement == nullptr ||
+        !state.initialize_player_constructor_inputs(player_car_resources,
+            player_car_setup, player_model.vertices, wheel_tires,
+            serialized_stream_offset, *player_placement, car_name)) {
+        std::cerr << "Could not prepare the mapped PCAR record and wheel constructor inputs.\n";
+        DestroyWindow(hwnd);
+        return 1;
+    }
+    std::cout << "Prepared the session PCAR record from the active CARF setup and native "
+              << "placement plan: " << state.player_runtime_car_record.size()
+              << " bytes, framed at physics-task cursor 0x" << std::hex
+              << state.player_task_record_frame->records[0].cursor_offset << std::dec
+              << "; derived body scale "
+              << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
+              << ", inverse mass " << *state.player_body_inverse_mass_0x200
+              << ", four wheel anchors/core setups and axle-selected tire responses.\n";
     if (playback_trace != nullptr) state.graphics.set_vsync(false);
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {

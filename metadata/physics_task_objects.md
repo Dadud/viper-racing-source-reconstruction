@@ -260,6 +260,16 @@ preceding serialized scene objects and their order. Evidence: `0x425720`
 `0x4C5EA0` `ev_9a1f997e3b908607dae43afa668ece3568e421066b13fac06394076a2509e1a1`,
 and `0x4375C0` `ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349f68`.
 
+The live session now retains the exact placement plan used for the rendered
+grid and combines it with the selected player's setup through
+`apply_car_track_runtime_record`. This produces the mapped PCAR header, model
+basename, CARF fields, and placement transform. The runtime frames this one
+complete record at the track-derived logical cursor and retains the serialized
+entry alongside its constructor inputs. This is a per-player record producer
+slice: the record entry is not yet consumed by the physics loader, preceding
+world records are not assembled into the same buffer, and the fixed-step
+11-byte interpolation ring is still absent.
+
 `src/physics_task_stream.cpp` now models the exact tag-to-cursor-advance
 lookup used by `0x4209E0`, from the table at `0x4D4890`. Car tags `RAC\0`,
 `PCAR`, `ACAR`, and `NCAR` advance by `0x18C`; `GCAR` advances by `0x190`;
