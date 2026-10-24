@@ -104,6 +104,22 @@ int main()
         require(viper::apply_car_file_runtime_mapping(
                     runtime_record, *preparation.mapping),
             "prepared CARF mapping must apply to the bounded runtime record");
+        const auto body_observation =
+            viper::make_ncar_body_constructor_observation_from_runtime_record(
+                runtime_record, std::nullopt, false);
+        require(body_observation.has_value() &&
+                !body_observation->constructor_parameter_2.has_value(),
+            "body constructor planning must preserve the unavailable serialized argument");
+        const auto body_plan = viper::plan_ncar_body_constructor(*body_observation);
+        require(std::fabs(body_plan.scaled_dimensions_0x1f0_to_0x1fc[0] -
+                    body_observation->source_values_0x08_to_0x14[0] * 0.4545F) <
+                    1.0e-6F &&
+                std::none_of(body_plan.inherited_base_writes_0x4375c0.begin(),
+                    body_plan.inherited_base_writes_0x4375c0.end(),
+                    [](const viper::NcarObjectFieldWrite& write) {
+                        return write.offset == 0x08U;
+                    }),
+            "body dimension derivation must remain usable without inventing inherited +0x08");
         const auto body_shift_write = std::find_if(
             preparation.mapping->writes.begin(), preparation.mapping->writes.end(),
             [](const viper::CarFileRuntimeFieldWrite& write) {

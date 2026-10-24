@@ -230,7 +230,7 @@ struct NcarVertexMapPlan {
 struct NcarBodyConstructorObservation {
     std::array<float, 4> source_values_0x08_to_0x14{};
     std::uint32_t source_record_word_0x00{};
-    std::uint32_t constructor_parameter_2{};
+    std::optional<std::uint32_t> constructor_parameter_2;
     bool fdiv_compatibility_enabled{};
     std::optional<std::uint32_t> compatibility_fill_bits;
 };
@@ -242,7 +242,7 @@ struct NcarBodyConstructorObservation {
 [[nodiscard]] std::optional<NcarBodyConstructorObservation>
 make_ncar_body_constructor_observation_from_runtime_record(
     std::span<const std::byte> runtime_record,
-    std::uint32_t constructor_parameter_2,
+    std::optional<std::uint32_t> constructor_parameter_2,
     bool fdiv_compatibility_enabled,
     std::optional<std::uint32_t> compatibility_fill_bits = std::nullopt) noexcept;
 

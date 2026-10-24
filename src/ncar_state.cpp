@@ -2064,7 +2064,7 @@ NcarVertexMapPlan plan_ncar_vertex_maps(
 std::optional<NcarBodyConstructorObservation>
 make_ncar_body_constructor_observation_from_runtime_record(
     const std::span<const std::byte> runtime_record,
-    const std::uint32_t constructor_parameter_2,
+    const std::optional<std::uint32_t> constructor_parameter_2,
     const bool fdiv_compatibility_enabled,
     const std::optional<std::uint32_t> compatibility_fill_bits) noexcept
 {
@@ -2119,7 +2119,9 @@ NcarBodyConstructorPlan plan_ncar_body_constructor(
     write16(base_writes, 0x10U, 0U);
     write32(base_writes, 0x0cU, observation.source_record_word_0x00);
     write32(base_writes, 0x04U, 0U);
-    write32(base_writes, 0x08U, observation.constructor_parameter_2);
+    if (observation.constructor_parameter_2.has_value()) {
+        write32(base_writes, 0x08U, *observation.constructor_parameter_2);
+    }
     write32(base_writes, 0x3cU, 0U);
     write32(base_writes, 0x40U, 0U);
     write32(base_writes, 0x38U, 0x3f800000U);

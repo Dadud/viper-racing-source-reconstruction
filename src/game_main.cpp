@@ -1095,6 +1095,8 @@ struct WindowState {
     // remains the visible pose authority until the missing simulation inputs
     // are reconstructed.
     std::vector<std::byte> player_runtime_car_record;
+    std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
+    std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
     std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
     bool player_constructor_inputs_ready{};
@@ -1136,9 +1138,27 @@ struct WindowState {
             player_runtime_car_record.clear();
             return false;
         }
-        player_wheel_anchors =
-            viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
-                player_runtime_car_record, model_vertices);
+        const auto body_observation =
+            viper::make_ncar_body_constructor_observation_from_runtime_record(
+                player_runtime_car_record, std::nullopt, host_fdiv_compatibility);
+        if (!body_observation.has_value()) {
+            player_runtime_car_record.clear();
+            return false;
+        }
+        player_body_constructor_plan =
+            viper::plan_ncar_body_constructor(*body_observation);
+        player_wheel_core_initialization =
+            viper::initialize_ncar_four_wheel_core({
+                player_runtime_car_record, model_vertices,
+                player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0],
+                host_fdiv_compatibility});
+        if (!player_wheel_core_initialization->input_complete) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            player_wheel_core_initialization.reset();
+            return false;
+        }
+        player_wheel_anchors = player_wheel_core_initialization->anchors;
         if (!player_wheel_anchors.has_value()) {
             player_runtime_car_record.clear();
             return false;
@@ -1440,9 +1460,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::cerr << "Could not prepare base CARF wheel constructor inputs from the active setup.\n";
         return 1;
     }
-    std::cout << "Prepared session-owned base CARF wheel inputs: mapped record, "
+    std::cout << "Prepared session-owned base CARF constructor inputs: mapped record, "
+              << "body dimension scale "
+              << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
+              << " at +0x1F0, "
               << state.player_wheel_anchors->vertex_indices.size()
-              << " FNIM anchors, and four axle-selected tire response objects. "
+              << " FNIM anchors and four wheel core setups, plus four axle-selected "
+              << "tire response objects. Inherited constructor argument 2 is unknown "
+              << "and left unwritten. "
               << "Upgrade overlays are not requested in this race path.\n";
     state.playback_active = playback_trace != nullptr;
     state.route = extract_ideal_line_points(ideal_line);

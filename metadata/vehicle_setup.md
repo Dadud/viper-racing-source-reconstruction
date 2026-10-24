@@ -371,6 +371,23 @@ still need to be connected. Evidence: `0x4381E0`
 `0x43DFB0` (`ev_e7d523e8b77f8fc1d8059a4b99b406d1d2e609dc2341e5e700baf34d4440f375`),
 and `0x43E490` (`ev_429bba68149b6bd6316a116c77c7c0781a4d72f95fa6f80312b519ed161ce3b3`).
 
+The Windows race session now applies this body planner to the active mapped
+record and uses its derived `+0x1F0` scale for the four `0x441C10` wheel-core
+initializations, retaining the complete four-wheel result alongside the
+existing anchors and tire response objects. Constructor parameter 2 remains
+unset: `0x4224D0` reads it as a DWORD from the serialized object stream, passes
+it through factory `0x422580` and NCAR constructor `0x438E40`, into `0x42FF90`
+and then `0x43E490`. Since the quick-race session currently starts from a setup
+payload and CARF resources rather than that serialized object stream, the
+runtime leaves inherited base field `+0x08` unwritten in its diagnostic plan.
+The body dimensions and wheel-core setup are independent of that field. This
+bridge initializes constructor-model outputs only; body pose, velocity,
+contact/suspension feedback, and frame integration are still absent. Evidence:
+`0x4224D0` (`ev_81a7cb19522fa8820dfbbcc77f501f03aa9f78af287883fffedd7d7a42cbe1f`),
+`0x422580` (`ev_a16dc357fb9222db3c8d920b7f06d2763b2ccbf26080048be18fffdf2233b3f2`),
+`0x438E40` (`ev_0bd9fe82807b0bc05115c9b59c839ff6169e9a8c6ac46d0b073417e6cada751c`),
+and `0x43E490` (`ev_2461f2fe9963d443377d4e7a73eb0b4ee7f92faa292cc6e6fb954ec1d360ade5`).
+
 The base car constructor `0x42FF90` builds five resource-group vertex maps.
 Group 0 maps each vertex to its own truncated 16-bit index. For groups 1–4,
 each vertex maps to the nearest group-0 vertex by squared XYZ distance; the
