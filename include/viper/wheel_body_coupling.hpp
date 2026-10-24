@@ -365,6 +365,43 @@ struct NcarIntegratorCurveGateInput {
     std::uint8_t curve_gate_0x41{};
 };
 
+struct NcarIntegratorSignalState {
+    std::int32_t stored_value_0xddc{};
+    std::uint8_t copied_flag_0xe49{};
+    std::uint32_t value_bits_0xc7c{};
+    float limit_scale_0xc8c{};
+    float callback_scale_0xc90{};
+    float smoothed_value_0xc94{};
+};
+
+struct NcarIntegratorSignalInput {
+    std::uint8_t ramp_gate_0x2f9{};
+    std::uint32_t previous_value_bits_0x35c{};
+    float callback_value_0x339{};
+    float multiplier_0xdd0{};
+    float callback_value_0xc84{};
+    float callback_value_0xc80{};
+};
+
+struct NcarIntegratorSignalResult {
+    bool stored_value_representable{};
+    bool ramp_setter_0x43f8e0_reached{};
+    bool helper_0x43f830_reached{};
+    bool paired_setters_reached{};
+    float clamp_bound{};
+    float smoothed_value{};
+    float paired_setter_value{};
+    float paired_setter_opposite{};
+};
+
+// Models the post-controller signal stores and bounded smoother at 0x431150.
+// Virtual callback returns are supplied as observations; the two setter
+// arguments are reported without emulating their external target objects.
+[[nodiscard]] NcarIntegratorSignalResult advance_ncar_integrator_signal(
+    NcarIntegratorSignalState& state,
+    const NcarIntegratorSignalInput& input,
+    std::uint8_t copied_flag_0xc3c) noexcept;
+
 struct NcarIntegratorCurveGateResult {
     bool curve_helper_0x4402d0_reached{};
     bool curve_byte_0x40_written{};
@@ -439,6 +476,8 @@ struct FourWheelBodyStepInput {
     NcarIntegratorTimerInput integrator_timer_input{};
     NcarIntegratorCurveGateState integrator_curve_gate_state{};
     NcarIntegratorCurveGateInput integrator_curve_gate_input{};
+    NcarIntegratorSignalState integrator_signal_state{};
+    NcarIntegratorSignalInput integrator_signal_input{};
     NcarIntegratorChildControlStepInput integrator_child_control_input{};
     NcarIntegratorModeForceInput mode_force_input{};
     NcarIntegratorWheelPairDifferentialInput wheel_pair_differential_input{};
@@ -509,6 +548,8 @@ struct FourWheelBodyStepResult {
     NcarIntegratorCurveGateResult integrator_curve_gate{};
     NcarIntegratorCurveGateState integrator_curve_gate_state{};
     NcarIntegratorChildControlStepResult integrator_child_control{};
+    NcarIntegratorSignalResult integrator_signal{};
+    NcarIntegratorSignalState integrator_signal_state{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};

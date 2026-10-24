@@ -159,6 +159,60 @@ NcarIntegratorCurveGateResult advance_ncar_integrator_curve_gate(
     return result;
 }
 
+NcarIntegratorSignalResult advance_ncar_integrator_signal(
+    NcarIntegratorSignalState& state,
+    const NcarIntegratorSignalInput& input,
+    const std::uint8_t copied_flag_0xc3c) noexcept
+{
+    NcarIntegratorSignalResult result{};
+    const float scaled_callback = input.callback_value_0x339 * input.multiplier_0xdd0;
+    const double scaled_callback_wide = static_cast<double>(scaled_callback);
+    if (std::isfinite(scaled_callback_wide) &&
+        scaled_callback_wide >= -2147483648.0 &&
+        scaled_callback_wide < 2147483648.0) {
+        state.stored_value_0xddc = static_cast<std::int32_t>(scaled_callback);
+        result.stored_value_representable = true;
+    }
+    state.copied_flag_0xe49 = copied_flag_0xc3c;
+
+    constexpr std::int32_t ramp_threshold_bits = 0x44FA0000;
+    if (input.ramp_gate_0x2f9 != 0U &&
+        std::bit_cast<std::int32_t>(input.previous_value_bits_0x35c) >
+            ramp_threshold_bits) {
+        state.value_bits_0xc7c = 0x3F800000U;
+        result.ramp_setter_0x43f8e0_reached = true;
+    }
+
+    constexpr float ramp_weight = std::bit_cast<float>(0x3E199998U);
+    constexpr float retained_weight = std::bit_cast<float>(0x3F59999AU);
+    const float value_0xc7c = std::bit_cast<float>(state.value_bits_0xc7c);
+    const float clamp_bound = state.limit_scale_0xc8c * value_0xc7c;
+    auto delta = static_cast<float>(
+        (static_cast<double>(input.callback_value_0xc84) -
+         static_cast<double>(input.callback_value_0xc80)) *
+        static_cast<double>(state.callback_scale_0xc90));
+    if (clamp_bound < delta) {
+        delta = clamp_bound;
+    } else if (delta < -clamp_bound) {
+        delta = -clamp_bound;
+    }
+    state.smoothed_value_0xc94 = static_cast<float>(
+        static_cast<double>(delta) * static_cast<double>(ramp_weight) +
+        static_cast<double>(state.smoothed_value_0xc94) *
+            static_cast<double>(retained_weight));
+    const auto paired_value = static_cast<float>(
+        static_cast<double>(value_0xc7c) * static_cast<double>(value_0xc7c) *
+        static_cast<double>(state.smoothed_value_0xc94));
+
+    result.helper_0x43f830_reached = true;
+    result.paired_setters_reached = true;
+    result.clamp_bound = clamp_bound;
+    result.smoothed_value = state.smoothed_value_0xc94;
+    result.paired_setter_value = paired_value;
+    result.paired_setter_opposite = -paired_value;
+    return result;
+}
+
 NcarIntegratorChildControlStepResult
 advance_ncar_integrator_child_control_step(
     const NcarIntegratorChildControlStepInput& input,
@@ -787,6 +841,13 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         input.integrator_child_control_input,
         std::bit_cast<std::uint32_t>(
             result.integrator_curve_gate_state.value_0xde0));
+    result.integrator_signal_state = input.integrator_signal_state;
+    result.integrator_signal_state.value_bits_0xc7c =
+        input.integrator_curve_gate_input.parent_value_bits_0xc7c;
+    result.integrator_signal = advance_ncar_integrator_signal(
+        result.integrator_signal_state,
+        input.integrator_signal_input,
+        result.integrator_curve_gate_state.parent_flag_0xc3c);
     result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;
