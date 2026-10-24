@@ -191,10 +191,21 @@ and ratio and stores `+0xD84 = (1 - ratio * 0.01) * width * 0.0254` and
 reads those two little-endian floats from a bounded runtime record and accepts
 the steering angle separately. A regression composes the CARF mapper and this
 adapter for a synthetic 200/25 width-ratio pair. This establishes the native
-left/right scalar pair only: record `+0x128`, steering helper effects at
-`0x4509B0`, and the remaining 3D wheel placement inputs are still unresolved.
+left/right scalar pair only: record `+0x128` and the remaining 3D wheel
+placement inputs are still unresolved.
 Evidence: mapper `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ffa06eec1a05a08317`;
 constructor `0x433C00` `ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`.
+
+The `0x4509B0` call in `0x433C00` is a separate model-extents scan, not a
+steering transform. It obtains the model vertex count and pointer through
+`0x50D00`, scans XYZ at offsets `0`, `4`, and `8` of each 32-byte vertex, and
+writes six minimum/maximum outputs. `measure_model_vertex_bounds` reproduces
+that scan and its initial `+/-10000` sentinels for an empty vertex array. The
+FNIM regression checks both a synthetic triangle and the empty case. This
+provides asset-backed extents when called with a parsed model's vertices; it
+does not reconstruct the native model-object wrapper or all twelve subsequent
+collision-volume calls. Evidence: `0x4509B0`
+`ev_f3e69307c431f783075d86dbeed730ee32736a6159e31f8b9633cd65593d0208`.
 
 ### TIRE field consumption at `0x435BF0`
 

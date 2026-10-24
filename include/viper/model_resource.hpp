@@ -35,6 +35,16 @@ struct ModelResource {
     std::vector<ModelMaterialGroup> material_groups;
 };
 
+struct ModelVertexBounds {
+    std::array<float, 3> minimum{};
+    std::array<float, 3> maximum{};
+    std::size_t vertex_count{};
+};
+
+// Reconstructs the XYZ extrema loop in race.bin 0x4509B0 over 32-byte rows.
+[[nodiscard]] ModelVertexBounds measure_model_vertex_bounds(
+    std::span<const ModelVertex> vertices) noexcept;
+
 // Parses FNIM section counts/strides and builds each material group's local
 // triangle index stream. Only resource versions 0 and 1 are supported.
 [[nodiscard]] std::optional<ModelResource> parse_model_resource(

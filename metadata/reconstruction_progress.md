@@ -9,6 +9,14 @@
   `0x4509B0`, suspension/contact state, and full 3D placement remain open.
   Evidence and source limitations are recorded in `metadata/vehicle_setup.md`.
 
+- **2026-10-24, native model extent scan:** Recovered `0x4509B0` as an XYZ
+  bounding scan over 32-byte vertices, and added `measure_model_vertex_bounds`
+  to apply that scan to parsed FNIM vertex rows, retaining the native empty
+  scan sentinels. The FNIM regression checks synthetic triangle extrema and
+  the empty case. This supplies the extent calculation only; the native
+  resource wrapper and subsequent collision-volume construction are not yet
+  connected to the runtime. Evidence `ev_f3e69307c431f783075d86dbeed730ee32736a6159e31f8b9633cd65593d0208`.
+
 - **2026-10-24, recovered steering response in route runtime:** Connected
   `advance_route_motion` to the recovered `update_race_loop_steering` logic.
   Race setup `0x425420` calls `0x43AF60`, which initializes the steering state

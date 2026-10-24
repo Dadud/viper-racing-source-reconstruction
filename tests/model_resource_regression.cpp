@@ -69,6 +69,17 @@ int main()
         check(parsed.has_value(), "valid synthetic FNIM payload did not parse");
         check(parsed->vertices.size() == 3U, "vertex count mismatch");
         check(parsed->material_groups.size() == 1U, "material group count mismatch");
+        const auto bounds = viper::measure_model_vertex_bounds(parsed->vertices);
+        check(bounds.vertex_count == 3U &&
+                bounds.minimum == std::array<float, 3>{0.0F, 0.0F, 0.0F} &&
+                bounds.maximum == std::array<float, 3>{1.0F, 0.0F, 1.0F},
+            "native 32-byte vertex scan must return the XYZ extrema");
+        const auto empty_bounds =
+            viper::measure_model_vertex_bounds(std::span<const viper::ModelVertex>{});
+        check(empty_bounds.vertex_count == 0U &&
+                empty_bounds.minimum == std::array<float, 3>{10000.0F, 10000.0F, 10000.0F} &&
+                empty_bounds.maximum == std::array<float, 3>{-10000.0F, -10000.0F, -10000.0F},
+            "zero-vertex scan must preserve the native extrema sentinels");
         const auto& group = parsed->material_groups.front();
         check(group.material_name == "VIPER.tex", "material name mismatch");
         check(group.local_indices == std::vector<std::uint16_t>{0U, 1U, 2U},

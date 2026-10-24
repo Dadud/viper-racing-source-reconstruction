@@ -37,6 +37,22 @@ std::optional<std::size_t> section_bytes(const std::uint32_t count,
 
 } // namespace
 
+ModelVertexBounds measure_model_vertex_bounds(
+    const std::span<const ModelVertex> vertices) noexcept
+{
+    ModelVertexBounds result{{10000.0F, 10000.0F, 10000.0F},
+        {-10000.0F, -10000.0F, -10000.0F}, vertices.size()};
+    for (const auto& vertex : vertices) {
+        for (std::size_t axis = 0; axis < result.minimum.size(); ++axis) {
+            if (vertex.fields[axis] < result.minimum[axis])
+                result.minimum[axis] = vertex.fields[axis];
+            if (result.maximum[axis] < vertex.fields[axis])
+                result.maximum[axis] = vertex.fields[axis];
+        }
+    }
+    return result;
+}
+
 std::optional<ModelResource> parse_model_resource(
     const std::uint32_t resource_version,
     const std::span<const std::byte> payload)
