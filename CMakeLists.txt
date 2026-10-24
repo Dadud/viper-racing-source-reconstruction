@@ -12,6 +12,7 @@ target_compile_features(viper_asset_catalog PUBLIC cxx_std_20)
 
 add_library(viper_frontend_model
     src/career_file.cpp
+    src/career_file_store.cpp
     src/career_progression.cpp
     src/career_season.cpp
     src/config_directory.cpp
@@ -231,6 +232,10 @@ if(BUILD_TESTING)
     add_executable(viper_game_options_regression tests/game_options_regression.cpp)
     target_link_libraries(viper_game_options_regression PRIVATE viper_frontend_model)
     add_test(NAME game_options_regression COMMAND viper_game_options_regression)
+    add_executable(viper_career_file_store_regression
+        tests/career_file_store_regression.cpp)
+    target_link_libraries(viper_career_file_store_regression PRIVATE viper_frontend_model)
+    add_test(NAME career_file_store_regression COMMAND viper_career_file_store_regression)
     add_executable(viper_renderer_regression tests/renderer_regression.cpp)
     target_link_libraries(viper_renderer_regression PRIVATE viper_scene_model)
     add_test(NAME renderer_regression COMMAND viper_renderer_regression)
