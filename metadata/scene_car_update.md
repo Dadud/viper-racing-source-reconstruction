@@ -575,3 +575,13 @@ state accessor `0x451890`
 (`ev_c14d1b186c5376e69547270091a5a6811b1c060256e82b36f0408650ee8dfc91`),
 and snapshot refresh `0x457A20`
 (`ev_c42837495c0f84efbfe27caca7ad1b880eec14ae75246e16742027b7ceb3ddc2`).
+
+The `0x457A20` call used by the wheel bit-`0x100` toggle also has a portable
+snapshot projection. It always records the state-record pointer assignment to
+`0x509B30`. When `DAT_0050D778` is set, it writes the observed inverted-byte
+cache sentinels at offsets `0,1,8..14,20..23`, writes `0xFFFFFFFF` at `+0x10`,
+and preserves untouched cache bytes. The wheel plan applies this refresh to its
+local state/cache observations immediately after each actual `DAT_00509B39`
+flip, then uses the resulting records for the following `0x457AF0` plan.
+Evidence: `0x457A20`
+(`ev_c42837495c0f84efbfe27caca7ad1b880eec14ae75246e16742027b7ceb3ddc2`).

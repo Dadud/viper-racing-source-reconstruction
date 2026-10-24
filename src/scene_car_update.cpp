@@ -1019,6 +1019,33 @@ SceneWheelResourceManagerDestroyPlan destroy_scene_wheel_resource_allocator(
     return result;
 }
 
+SceneRenderStateSnapshotRefreshPlan plan_scene_render_state_snapshot_refresh(
+    const std::array<std::uint8_t, 24>& state_record,
+    const std::array<std::uint8_t, 24>& cached_state,
+    const bool dirty_flag_0x50d778)
+{
+    SceneRenderStateSnapshotRefreshPlan result{};
+    result.state_pointer_0x50d74c = 0x00509B30U;
+    result.cache_invalidation_applied = dirty_flag_0x50d778;
+    result.cached_state_after = cached_state;
+    if (!dirty_flag_0x50d778) {
+        return result;
+    }
+
+    result.cached_state_after[0] = state_record[0] == 0 ? 1 : 0;
+    result.cached_state_after[1] = state_record[1] == 0 ? 1 : 0;
+    constexpr std::array<std::size_t, 11> inverted_offsets{
+        8U, 9U, 10U, 11U, 12U, 13U, 14U, 0x14U, 0x15U, 0x16U, 0x17U};
+    for (const std::size_t offset : inverted_offsets) {
+        result.cached_state_after[offset] = state_record[offset] == 0 ? 1 : 0;
+    }
+    result.cached_state_after[0x10] = 0xFFU;
+    result.cached_state_after[0x11] = 0xFFU;
+    result.cached_state_after[0x12] = 0xFFU;
+    result.cached_state_after[0x13] = 0xFFU;
+    return result;
+}
+
 SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(
     const SceneSharedRenderStateSyncObservation& observation)
 {
@@ -1280,8 +1307,11 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
     };
     std::uint32_t current_state_mask = state_mask.has_value()
         ? state_mask->mask_at_0x509f50_plus_stride : 0U;
-    bool texture_stage_enabled = state_mask.has_value()
-        ? state_mask->texture_stage_enabled_0x509b39 : false;
+    auto state_record = state_mask.has_value()
+        ? state_mask->state_record_0x509b30 : std::array<std::uint8_t, 24>{};
+    auto cached_render_state = state_mask.has_value()
+        ? state_mask->cached_render_state_0x50d760 : std::array<std::uint8_t, 24>{};
+    bool texture_stage_enabled = state_mask.has_value() ? state_record[9] != 0 : false;
     const auto append_mask_call = [&](const SceneWheelResourceFrameOperationKind kind,
         const std::uint32_t argument) {
         append_call(kind, argument);
@@ -1298,8 +1328,12 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
             const bool next_enabled = kind == SceneWheelResourceFrameOperationKind::call_0x513a0;
             if (next_enabled != texture_stage_enabled) {
                 texture_stage_enabled = next_enabled;
+                state_record[9] = next_enabled ? 1U : 0U;
                 operation.state_snapshot_refresh_called = true;
                 operation.state_toggle_notification_value = next_enabled;
+                operation.state_snapshot_refresh = plan_scene_render_state_snapshot_refresh(
+                    state_record, cached_render_state, state_mask->dirty_flag_0x50d778);
+                cached_render_state = operation.state_snapshot_refresh->cached_state_after;
             }
         }
         operation.state_mask_after = current_state_mask;
@@ -1318,8 +1352,13 @@ SceneWheelResourceFramePlan plan_scene_wheel_resource_frame(
         0U, 0U, 0U, 0x3F800000U,
     };
     if (texture_binding.has_value()) {
+        auto effective_render_state_sync = render_state_sync;
+        if (state_mask.has_value() && effective_render_state_sync.has_value()) {
+            effective_render_state_sync->desired_state = state_record;
+            effective_render_state_sync->cached_state = cached_render_state;
+        }
         result.texture_binding = plan_scene_wheel_texture_binding(
-            *texture_binding, render_state_sync);
+            *texture_binding, effective_render_state_sync);
     }
 
     constexpr std::array<std::array<std::uint32_t, 2>, 4> uv_bits{{

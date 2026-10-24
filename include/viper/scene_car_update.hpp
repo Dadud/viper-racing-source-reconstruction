@@ -788,6 +788,17 @@ struct SceneWheelTextureBindingPlan {
     const SceneWheelTextureBindingObservation& observation,
     const std::optional<SceneSharedRenderStateSyncObservation>& render_state_sync = std::nullopt);
 
+struct SceneRenderStateSnapshotRefreshPlan {
+    std::uint32_t state_pointer_0x50d74c{};
+    bool cache_invalidation_applied{};
+    std::array<std::uint8_t, 24> cached_state_after{};
+};
+
+[[nodiscard]] SceneRenderStateSnapshotRefreshPlan plan_scene_render_state_snapshot_refresh(
+    const std::array<std::uint8_t, 24>& state_record,
+    const std::array<std::uint8_t, 24>& cached_state,
+    bool dirty_flag_0x50d778);
+
 struct SceneWheelResourceFrameOperation {
     SceneWheelResourceFrameOperationKind kind{};
     std::uint32_t argument{};
@@ -818,12 +829,15 @@ struct SceneWheelResourceFrameOperation {
     bool state_snapshot_refresh_called{};
     // Value passed to 0x455A60 when the toggle changes; otherwise absent.
     std::optional<bool> state_toggle_notification_value;
+    std::optional<SceneRenderStateSnapshotRefreshPlan> state_snapshot_refresh;
 };
 
 struct SceneWheelResourceStateMaskObservation {
     std::uint32_t state_index_0x4da120{};
     std::uint32_t mask_at_0x509f50_plus_stride{};
-    bool texture_stage_enabled_0x509b39{};
+    std::array<std::uint8_t, 24> state_record_0x509b30{};
+    std::array<std::uint8_t, 24> cached_render_state_0x50d760{};
+    bool dirty_flag_0x50d778{};
 };
 
 struct SceneWheelResourceFramePlan {
