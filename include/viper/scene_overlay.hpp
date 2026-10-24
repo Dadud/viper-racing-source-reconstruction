@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "viper/matrix_quaternion.hpp"
+#include "viper/resource_bundle.hpp"
 #include "viper/render_context.hpp"
 
 namespace viper {
@@ -1628,7 +1629,7 @@ struct SceneDashboardRasterObservation {
 
 struct ScenePausedBannerResourceRasterObservation {
     bool resource_pointer_nonnull{true};
-    SceneDashboardAtlasFontObservation image;
+    StampImage image;
     SceneDashboardRasterObservation renderer;
 };
 

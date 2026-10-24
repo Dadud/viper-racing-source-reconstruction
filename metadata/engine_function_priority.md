@@ -55,8 +55,9 @@ substitution is also recovered. State-4 paused-banner style descriptor 14 and
 its zero flags, `0x24` y offset, and runtime x offset are now projected;
 resource-constructor results remain inputs. Fallback boxes, `0x479580` text,
 and optional `0x44D0C0` resource-frame rasterization now have pixel-write
-projections. Resource lookup/decompression and native surface ownership and
-device submission remain open. Centered `0x404920` resource draw, cheater, two raw-flag text
+projections, with `parse_stamp_image` decoding the corresponding STMP frames.
+Runtime resource-manager lookup, native surface ownership, and device
+submission remain open. Centered `0x404920` resource draw, cheater, two raw-flag text
 draws, results heading, and result-row selection/time-format/draw paths are
 modeled. State 5's text and rotation
 math are modeled at portable precision; continue with its renderer effects and

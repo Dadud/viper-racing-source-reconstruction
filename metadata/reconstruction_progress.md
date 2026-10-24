@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added `parse_stamp_image` for the `0x44D0C0`
+  STMP frame format: it validates frame-row pointer counts, reads both 256-entry
+  palette planes, and decodes bounded RLE rows. The paused-banner rasterizer
+  now accepts the decoded image directly. `--inspect-image` confirmed `Load.stp`
+  (126x30) and `cross.stp` (16x16) in `common.res` have complete row streams.
+  Release build, asset inspection, and `git diff --check` pass; no tests were
+  run. Evidence: `ev_3bbd3fcdbe60647b79111eef559e4f597ef123048430898b07f080d4fa525bde`.
+
 - **2026-10-24 continuation:** Connected the paused-banner `0x44D0C0`
   resource-image branch to the shared indexed-RLE raster core. The resource
   frame supplies dimensions, origin, palette planes, and row runs; the banner

@@ -96,6 +96,27 @@ rows. Evidence: `0x44DA00`
 `0x44D470` (`ev_9c87753a7b96dd2eab7167774892dd8c6877748cc1df5c8cabe67c4f1dd8917f`),
 and `0x44D4B0` (`ev_257c3693e424fe89f3867434404a21c4e59f14182207e0decf39e99206b74e4d`).
 
+## STMP indexed images
+
+`0x44D0C0` treats an STMP payload as an indexed image object: width, height,
+origin x/y, and frame count occupy the first five DWORDs. Two 256-entry 16-bit
+palette planes begin at `+0x14` and `+0x214`; renderer mode 3 selects the first
+plane, while other modes select the second. The relocated pointer table at
+`+0x81C` contains one RLE row pointer per `height * frame_count` row. The new
+`parse_stamp_image` decoder validates that relationship and reads each bounded
+row into the shared high-bit literal/low-bit transparent run representation
+used by the atlas rasterizer. It records pointer-table and row completeness
+separately and never modifies the source bundle.
+
+`common.res` contains `Load.stp` at 126x30, origin (0,0), one frame, with 30
+complete rows; `cross.stp` is 16x16, origin (7,7), also one frame with 16
+complete rows. `--inspect-image BUNDLE RESOURCE` reports dimensions, frame
+count, completeness, and encoded row byte count. State-4 paused-banner raster
+input accepts this decoded `StampImage` directly, so its optional `0x44D0C0`
+pixel writes no longer need manually transcribed image data. Consumer evidence
+is `ev_3bbd3fcdbe60647b79111eef559e4f597ef123048430898b07f080d4fa525bde` in
+`metadata/state4_paused_banner_resource.evidence.json`.
+
 `plan_resource_file_load` projects the file resolver in `0x417EF0`. A `~` name
 is opened once beneath the game-root prefix after removing its marker; the
 format bytes at `0x4D3784` are `%s%s`. Other names are concatenated to the two

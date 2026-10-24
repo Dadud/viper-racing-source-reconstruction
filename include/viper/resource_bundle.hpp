@@ -131,6 +131,26 @@ struct StampFontIndex {
 [[nodiscard]] std::optional<StampFontIndex> parse_stamp_font_index(
     std::span<const std::byte> payload);
 
+struct StampImage {
+    std::int32_t width{};
+    std::int32_t height{};
+    std::int32_t origin_x{};
+    std::int32_t origin_y{};
+    std::int32_t frame_count{};
+    bool pointer_table_complete{};
+    bool rows_complete{};
+    std::array<std::array<std::uint16_t, 256>, 2> palette_planes{};
+    // frame -> row -> native RLE bytes. High-bit runs carry palette indices;
+    // low-bit runs are transparent skips; run lengths use the low seven bits.
+    std::vector<std::vector<std::vector<std::uint8_t>>> encoded_rows;
+};
+
+// Decodes the indexed-image layout consumed by 0x44D0C0 from a relocated STMP
+// payload while retaining incomplete pointer/row data as explicit status.
+[[nodiscard]] std::optional<StampImage> parse_stamp_image(
+    std::span<const std::byte> payload,
+    bool relocate_pointer_offsets);
+
 enum class ResourceGetExit : std::uint8_t {
     incomplete,
     returned_resource,

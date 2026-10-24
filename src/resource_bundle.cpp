@@ -182,6 +182,124 @@ std::optional<StampFontIndex> parse_stamp_font_index(
     return result;
 }
 
+std::optional<StampImage> parse_stamp_image(
+    const std::span<const std::byte> payload,
+    const bool relocate_pointer_offsets)
+{
+    constexpr std::size_t header_size = 0x14U;
+    constexpr std::size_t palette_0_offset = 0x14U;
+    constexpr std::size_t palette_1_offset = 0x214U;
+    constexpr std::size_t palette_entries = 256U;
+    constexpr std::size_t palette_bytes = palette_entries * 2U;
+    const auto read_u32 = [payload](const std::size_t offset)
+        -> std::optional<std::uint32_t> {
+        if (offset > payload.size() || payload.size() - offset < 4U) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint32_t>(
+                   std::to_integer<std::uint8_t>(payload[offset])) |
+               (static_cast<std::uint32_t>(
+                   std::to_integer<std::uint8_t>(payload[offset + 1U])) << 8U) |
+               (static_cast<std::uint32_t>(
+                   std::to_integer<std::uint8_t>(payload[offset + 2U])) << 16U) |
+               (static_cast<std::uint32_t>(
+                   std::to_integer<std::uint8_t>(payload[offset + 3U])) << 24U);
+    };
+    if (payload.size() < header_size ||
+        payload.size() < palette_1_offset + palette_bytes) {
+        return std::nullopt;
+    }
+    const auto width = read_u32(0x00U);
+    const auto height = read_u32(0x04U);
+    const auto origin_x = read_u32(0x08U);
+    const auto origin_y = read_u32(0x0cU);
+    const auto frame_count = read_u32(0x10U);
+    if (!width || !height || !origin_x || !origin_y || !frame_count) {
+        return std::nullopt;
+    }
+
+    StampImage result{};
+    result.width = std::bit_cast<std::int32_t>(*width);
+    result.height = std::bit_cast<std::int32_t>(*height);
+    result.origin_x = std::bit_cast<std::int32_t>(*origin_x);
+    result.origin_y = std::bit_cast<std::int32_t>(*origin_y);
+    result.frame_count = std::bit_cast<std::int32_t>(*frame_count);
+    if (result.width <= 0 || result.height <= 0 || result.frame_count <= 0) {
+        return result;
+    }
+
+    for (std::size_t plane = 0; plane < result.palette_planes.size(); ++plane) {
+        const auto plane_offset = plane == 0 ? palette_0_offset
+                                             : palette_1_offset;
+        for (std::size_t index = 0; index < palette_entries; ++index) {
+            const auto offset = plane_offset + index * 2U;
+            result.palette_planes[plane][index] = static_cast<std::uint16_t>(
+                std::to_integer<std::uint8_t>(payload[offset]) |
+                (static_cast<std::uint16_t>(
+                    std::to_integer<std::uint8_t>(payload[offset + 1U])) << 8U));
+        }
+    }
+
+    const auto stamp = parse_stamp_payload(payload, relocate_pointer_offsets);
+    if (!stamp.has_value()) return std::nullopt;
+    const auto expected_rows = static_cast<std::uint64_t>(result.height) *
+        static_cast<std::uint64_t>(result.frame_count);
+    result.pointer_table_complete = stamp->pointer_table_complete &&
+        expected_rows == stamp->pointer_entries.size();
+    result.rows_complete = result.pointer_table_complete &&
+        stamp->pointer_offsets_relocated && relocate_pointer_offsets;
+    if (!result.pointer_table_complete || !result.rows_complete) return result;
+
+    result.encoded_rows.resize(static_cast<std::size_t>(result.frame_count));
+    for (auto& frame_rows : result.encoded_rows) {
+        frame_rows.resize(static_cast<std::size_t>(result.height));
+    }
+    for (std::size_t row_index = 0;
+         row_index < stamp->pointer_entries.size(); ++row_index) {
+        const auto& pointer = stamp->pointer_entries[row_index];
+        if (!pointer.target_within_payload ||
+            pointer.relocated_payload_offset >= payload.size()) {
+            result.rows_complete = false;
+            continue;
+        }
+        auto cursor = static_cast<std::size_t>(
+            pointer.relocated_payload_offset);
+        std::uint64_t decoded_width = 0;
+        auto& encoded = result.encoded_rows[
+            row_index / static_cast<std::size_t>(result.height)][
+            row_index % static_cast<std::size_t>(result.height)];
+        while (decoded_width < static_cast<std::uint64_t>(result.width)) {
+            if (cursor >= payload.size()) {
+                result.rows_complete = false;
+                break;
+            }
+            const auto run = std::to_integer<std::uint8_t>(payload[cursor++]);
+            const auto count = static_cast<std::uint64_t>(run & 0x7fU);
+            if (count == 0U) {
+                result.rows_complete = false;
+                break;
+            }
+            const auto used_count = std::min(
+                count, static_cast<std::uint64_t>(result.width) - decoded_width);
+            encoded.push_back(run);
+            if ((run & 0x80U) != 0U) {
+                if (used_count > payload.size() - cursor) {
+                    result.rows_complete = false;
+                    encoded.clear();
+                    break;
+                }
+                for (std::uint64_t pixel = 0; pixel < used_count; ++pixel) {
+                    encoded.push_back(std::to_integer<std::uint8_t>(
+                        payload[cursor + static_cast<std::size_t>(pixel)]));
+                }
+                cursor += static_cast<std::size_t>(used_count);
+            }
+            decoded_width += used_count;
+        }
+    }
+    return result;
+}
+
 LegacyResourceRegistrationPlan plan_legacy_resource_registration(
     const LegacyResourceRegistrationObservation& observation) noexcept
 {

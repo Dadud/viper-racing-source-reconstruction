@@ -3185,15 +3185,33 @@ ScenePausedBannerResourceRasterPlan raster_scene_paused_banner_resource(
         return result;
     }
     result.draw_reached = true;
-    if (!observation.resource_pointer_nonnull || draw->raw_mode < 0 ||
+    if (!observation.resource_pointer_nonnull ||
+        !observation.image.pointer_table_complete ||
+        !observation.image.rows_complete || observation.image.width <= 0 ||
+        observation.image.height <= 0 || observation.image.frame_count <= 0 ||
+        draw->raw_mode < 0 ||
         draw->raw_mode > std::numeric_limits<std::int16_t>::max() ||
         static_cast<std::size_t>(draw->raw_mode) >=
-            observation.image.glyph_count) {
+            static_cast<std::size_t>(observation.image.frame_count)) {
         result.input_complete = false;
         return result;
     }
 
     result.frame_index = static_cast<std::size_t>(draw->raw_mode);
+    SceneDashboardAtlasFontObservation image_font{};
+    image_font.glyph_width = observation.image.width;
+    image_font.glyph_height = observation.image.height;
+    image_font.origin_x = observation.image.origin_x;
+    image_font.origin_y = observation.image.origin_y;
+    image_font.glyph_count =
+        static_cast<std::size_t>(observation.image.frame_count);
+    image_font.encoded_rows = observation.image.encoded_rows;
+    image_font.embedded_palette.reserve(512U);
+    for (const auto& palette_plane : observation.image.palette_planes) {
+        image_font.embedded_palette.insert(
+            image_font.embedded_palette.end(),
+            palette_plane.begin(), palette_plane.end());
+    }
     SceneDashboardTextLayout image_layout{};
     image_layout.glyph_calls.push_back({
         draw->helper,
@@ -3207,7 +3225,7 @@ ScenePausedBannerResourceRasterPlan raster_scene_paused_banner_resource(
     auto native_renderer = observation.renderer;
     native_renderer.explicit_palette.clear();
     result.raster = raster_scene_dashboard_text(
-        image_layout, observation.image, native_renderer);
+        image_layout, image_font, native_renderer);
     result.input_complete = result.raster.input_complete;
     return result;
 }

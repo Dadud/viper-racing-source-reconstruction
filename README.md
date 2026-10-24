@@ -219,8 +219,8 @@ files were present.
   `tools/extract_scene_font.py`. Shared state-4
   overlay gates, cheater-banner placement, paused-banner resource refresh and
   centered/fallback layout, a recovered style-14 descriptor, line-by-line text
-  rasterization, and optional loaded-resource frame rasterization from supplied
-  resource, font/atlas, and renderer observations,
+  rasterization, and optional loaded-resource frame rasterization from decoded
+  STMP image and renderer observations,
   two raw-flag text setup sequences, the results heading/prompt setup, and
   results record selection, conditional formatted time values, and per-row text
   calls are modeled in `scene_overlay.cpp` with all row and heading positions
@@ -474,6 +474,7 @@ cmake --build build --config Release
 ./build/viper_reconstruction --inspect-car ../game_install/GameData/viper.car viper
 ./build/viper_reconstruction --inspect-season ../game_install/GameData/ui.res season0.ssn
 ./build/viper_reconstruction --inspect-stamp ../game_install/GameData/common.res euro6.fnt
+./build/viper_reconstruction --inspect-image ../game_install/GameData/common.res Load.stp
 ./build/viper_reconstruction --inspect-font ../game_install/GameData/common.res euro6.fnt
 ./build/viper_reconstruction --inspect-terrain ../game_install/GameData/uptown.trk
 ```
@@ -490,14 +491,16 @@ track names, placement payouts, and placement points from a `SEAS` resource.
 conditional embedded-data fixups for `.fnt` and `.stp` resources.
 `--inspect-font` prints the 256 character lookup rows built from a font STMP
 resource; the two metric fields keep their raw offsets until their meanings
-are resolved.
+are resolved. `--inspect-image` decodes STMP indexed-image dimensions, palette
+planes, frame rows, and bounded RLE data.
 
 ## Scope and next steps
 
 The current target is a portable, source-only reconstruction, not yet a
 playable game. The C files are evidence fragments and are not compiled into the
 new target. The executable inventories external assets, lists RST0 bundle
-contents, and decodes TIRE, SEAS, and STMP resources. The C++ library also models
+contents, and decodes TIRE, SEAS, and STMP resources including indexed image
+frames. The C++ library also models
 observed wheel and tire response equations, kinematic ratios, response-vector
 assembly and correction, wheel contact and suspension state, the tire curve
 helpers, and a rigid-body contact-response/impulse path. Static

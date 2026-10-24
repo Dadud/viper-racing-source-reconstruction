@@ -35,7 +35,7 @@ struct RaceLoopSharedPausedBannerRasterObservation {
     ScenePausedBannerTextRasterObservation text{};
     SceneDashboardFontObservation layout_font{};
     SceneDashboardAtlasFontObservation atlas_font{};
-    std::optional<SceneDashboardAtlasFontObservation> resource_image;
+    std::optional<StampImage> resource_image;
     SceneDashboardRasterObservation resource_renderer{};
 };
 

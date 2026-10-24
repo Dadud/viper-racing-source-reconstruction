@@ -31,6 +31,7 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-car BUNDLE_PATH CAR_STEM\n"
            << "       viper_reconstruction --inspect-season BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-stamp BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --inspect-image BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-terrain BUNDLE_PATH\n"
            << "       viper_reconstruction --help | --version\n\n"
@@ -269,6 +270,38 @@ int inspect_font(const std::filesystem::path& path,
     return 0;
 }
 
+int inspect_stamp_image(const std::filesystem::path& path,
+                        const std::string_view resource_name)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* entry = bundle.find(
+        resource_name, viper::resource_type_code('S', 'T', 'M', 'P'));
+    if (entry == nullptr) {
+        throw std::runtime_error("STMP image resource not found: " +
+                                 std::string(resource_name));
+    }
+    const auto image = viper::parse_stamp_image(bundle.payload(*entry), true);
+    if (!image.has_value()) {
+        throw std::runtime_error("STMP image header or palette is truncated");
+    }
+    std::size_t encoded_bytes = 0;
+    for (const auto& frame : image->encoded_rows) {
+        for (const auto& row : frame) encoded_bytes += row.size();
+    }
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "resource\t" << entry->name << '\n'
+              << "width\t" << image->width << '\n'
+              << "height\t" << image->height << '\n'
+              << "origin_x\t" << image->origin_x << '\n'
+              << "origin_y\t" << image->origin_y << '\n'
+              << "frame_count\t" << image->frame_count << '\n'
+              << "pointer_table_complete\t"
+              << image->pointer_table_complete << '\n'
+              << "rows_complete\t" << image->rows_complete << '\n'
+              << "encoded_row_bytes\t" << encoded_bytes << '\n';
+    return image->pointer_table_complete && image->rows_complete ? 0 : 2;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -280,6 +313,7 @@ int main(int argc, char** argv)
         std::optional<std::string> tire_resource_name;
         std::optional<std::string> season_resource_name;
         std::optional<std::string> stamp_resource_name;
+        std::optional<std::string> stamp_image_resource_name;
         std::optional<std::string> font_resource_name;
         std::optional<std::string> car_stem;
         bool inspect_track_terrain = false;
@@ -332,6 +366,15 @@ int main(int argc, char** argv)
                 stamp_resource_name = argv[++i];
                 continue;
             }
+            if (argument == "--inspect-image") {
+                if (i + 2 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-image requires a bundle path and resource name");
+                }
+                resource_bundle_path = argv[++i];
+                stamp_image_resource_name = argv[++i];
+                continue;
+            }
             if (argument == "--inspect-font") {
                 if (i + 2 >= argc) {
                     throw std::invalid_argument(
@@ -379,6 +422,7 @@ int main(int argc, char** argv)
             const auto inspection_count = static_cast<unsigned>(tire_resource_name.has_value()) +
                 static_cast<unsigned>(season_resource_name.has_value()) +
                 static_cast<unsigned>(stamp_resource_name.has_value()) +
+                static_cast<unsigned>(stamp_image_resource_name.has_value()) +
                 static_cast<unsigned>(font_resource_name.has_value()) +
                 static_cast<unsigned>(car_stem.has_value()) +
                 static_cast<unsigned>(inspect_track_terrain);
@@ -394,6 +438,10 @@ int main(int argc, char** argv)
             }
             if (stamp_resource_name) {
                 return inspect_stamp(*resource_bundle_path, *stamp_resource_name);
+            }
+            if (stamp_image_resource_name) {
+                return inspect_stamp_image(
+                    *resource_bundle_path, *stamp_image_resource_name);
             }
             if (font_resource_name) {
                 return inspect_font(*resource_bundle_path, *font_resource_name);
