@@ -1368,7 +1368,7 @@ struct WindowState {
     // Win32 adapter records key events into its digital-button observation.
     std::array<std::uint8_t, 256> keyboard_button_states{};
     std::array<viper::RaceInputBinding, 4> control_bindings{{
-        {1U, VK_LEFT}, {1U, VK_RIGHT}, {1U, VK_UP}, {1U, VK_DOWN}}};
+        {1U, 0xcbU}, {1U, 0xcdU}, {1U, 0xc8U}, {1U, 0xd0U}}};
     HWND window{};
     std::wstring title_base;
     std::uint32_t target_laps{1U};
@@ -1667,6 +1667,17 @@ std::optional<UINT> parse_keyboard_binding(const std::string_view binding)
         std::string(binding));
 }
 
+std::optional<std::uint8_t> directinput_key_selector(const UINT virtual_key)
+{
+    const UINT mapped = MapVirtualKeyW(virtual_key, MAPVK_VK_TO_VSC_EX);
+    if (mapped == 0U) return std::nullopt;
+    const UINT scan_code = mapped & 0xffU;
+    const UINT prefix = (mapped >> 8U) & 0xffU;
+    // DirectInput's keyboard state uses DIK scan-code indexes. Extended E0
+    // scan codes occupy the high half of that table (e.g. Left = 0xCB).
+    return static_cast<std::uint8_t>(scan_code | (prefix == 0xe0U ? 0x80U : 0U));
+}
+
 void load_keyboard_bindings(WindowState& state,
                             const viper::GameOptions& options)
 {
@@ -1676,9 +1687,15 @@ void load_keyboard_bindings(WindowState& state,
         const auto configured = options.get("CONTROL", action_names[index]);
         if (configured) {
             const auto key = parse_keyboard_binding(*configured);
-            state.control_bindings[index] = key
-                ? viper::RaceInputBinding{1U, *key}
-                : viper::RaceInputBinding{};
+            if (!key) {
+                state.control_bindings[index] = {};
+                continue;
+            }
+            const auto selector = directinput_key_selector(*key);
+            if (!selector)
+                throw std::runtime_error("could not map keyboard binding to a DirectInput scan code: " +
+                    std::string(*configured));
+            state.control_bindings[index] = {1U, *selector};
         }
     }
 }
@@ -1699,8 +1716,9 @@ void refresh_keyboard_controls(WindowState& state)
 
 void update_control_key(WindowState& state, const UINT key, const bool pressed)
 {
-    if (key >= state.keyboard_button_states.size()) return;
-    state.keyboard_button_states[key] = static_cast<std::uint8_t>(pressed);
+    const auto selector = directinput_key_selector(key);
+    if (!selector) return;
+    state.keyboard_button_states[*selector] = static_cast<std::uint8_t>(pressed);
     refresh_keyboard_controls(state);
 }
 
