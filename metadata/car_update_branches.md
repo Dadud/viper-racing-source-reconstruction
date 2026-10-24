@@ -78,6 +78,20 @@ Evidence: `ev_96c88cabb88c7c78ae26cb2ae250b2939ebe2a35e35c952ee28e62aee3be1e0a`
 The helper and setter records are in
 [`ncar_integrator_curve_gate.evidence.json`](ncar_integrator_curve_gate.evidence.json).
 
+After the curve gate, `0x431150` initializes the embedded controller at
+`+0xC98`: it copies car `+0xDE0` to child `+0x64`, car `+0xDEC` to child
+`+0x5C`, then calls `0x43FAE0` with car byte `+0x534`. The four-wheel step now
+composes `setup_ncar_integrator_child_control` and
+`advance_ncar_animation_controller` at that point, feeding the post-curve-gate
+`+0xDE0` value into the first child setter. Controller callback values, child
+threshold fields, and setter target objects remain caller observations.
+
+Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
+(`0x431150` call order), `ev_1128dc7f406320fc5ef2f1ed4675611a89fdc97effbfc2c22b8811268e06d4ea`
+(`0x43FF80`), `ev_498d3e18c8202f1635d22ed6fdab875a921c74ff081aee95b6a8369055328bf2`
+(`0x43FF70`), and `ev_e3e3d51d09604ce173a3a18906c819e7484977c6a91f49f3edb6d87a451e26bf`
+(`0x43FAE0`).
+
 ## PCAR callback at `0x4384D0`
 
 The prologue combines object fields `+0x234`, `+0x238`, and `+0x23C` with

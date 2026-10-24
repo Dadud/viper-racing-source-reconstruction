@@ -277,6 +277,8 @@ files were present.
   plus the `0x433570` time-window ramp and caller-supplied ordinal-record gate,
   and the inverse `0x432130` out-of-bounds callback gate,
   then the guarded `0x4402D0` curve-byte and `+0xDE0` setter path,
+  followed by the composed `+0xC98` child initialization and `0x43FAE0`
+  animation-controller update,
   contact-gated wheel-pair differences, the following contact-count split and
   low-contact resistance/high-contact quadratic force projection, and the two
   post-resistance velocity/projection forces with their per-step energy sum;

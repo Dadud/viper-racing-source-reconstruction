@@ -159,6 +159,24 @@ NcarIntegratorCurveGateResult advance_ncar_integrator_curve_gate(
     return result;
 }
 
+NcarIntegratorChildControlStepResult
+advance_ncar_integrator_child_control_step(
+    const NcarIntegratorChildControlStepInput& input,
+    const std::uint32_t car_value_0xde0_bits)
+{
+    NcarIntegratorChildControlStepResult result{};
+    result.child = input.child;
+    result.targets = input.targets;
+    result.setup = setup_ncar_integrator_child_control(
+        result.child,
+        input.car_value_0xdec_bits,
+        car_value_0xde0_bits,
+        input.observation.mode_byte);
+    result.controller = advance_ncar_animation_controller(
+        result.child, result.targets, input.observation);
+    return result;
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,
@@ -765,6 +783,10 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     result.integrator_curve_gate = advance_ncar_integrator_curve_gate(
         result.integrator_curve_gate_state,
         input.integrator_curve_gate_input);
+    result.integrator_child_control = advance_ncar_integrator_child_control_step(
+        input.integrator_child_control_input,
+        std::bit_cast<std::uint32_t>(
+            result.integrator_curve_gate_state.value_0xde0));
     result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;

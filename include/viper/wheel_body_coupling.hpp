@@ -378,6 +378,26 @@ advance_ncar_integrator_curve_gate(
     NcarIntegratorCurveGateState& state,
     const NcarIntegratorCurveGateInput& input) noexcept;
 
+struct NcarIntegratorChildControlStepInput {
+    NcarIntegratorChildControl child{};
+    NcarAnimationControllerTargets targets{};
+    NcarAnimationControllerObservation observation{};
+    std::uint32_t car_value_0xdec_bits{};
+};
+
+struct NcarIntegratorChildControlStepResult {
+    NcarIntegratorChildControlResult setup{};
+    NcarAnimationControllerResult controller{};
+    NcarIntegratorChildControl child{};
+    NcarAnimationControllerTargets targets{};
+};
+
+// Composes 0x43FF80, 0x43FF70, and 0x43FAE0 in their observed order.
+[[nodiscard]] NcarIntegratorChildControlStepResult
+advance_ncar_integrator_child_control_step(
+    const NcarIntegratorChildControlStepInput& input,
+    std::uint32_t car_value_0xde0_bits);
+
 struct FourWheelBodyStepInput {
     std::array<std::uint8_t, 4> wheel_damage_flags_0x20{};
     bool wheel_update_prefix_enabled{};
@@ -419,6 +439,7 @@ struct FourWheelBodyStepInput {
     NcarIntegratorTimerInput integrator_timer_input{};
     NcarIntegratorCurveGateState integrator_curve_gate_state{};
     NcarIntegratorCurveGateInput integrator_curve_gate_input{};
+    NcarIntegratorChildControlStepInput integrator_child_control_input{};
     NcarIntegratorModeForceInput mode_force_input{};
     NcarIntegratorWheelPairDifferentialInput wheel_pair_differential_input{};
     NcarIntegratorCommonForceInput common_force_input{};
@@ -487,6 +508,7 @@ struct FourWheelBodyStepResult {
     NcarIntegratorEarlyBoundsResult integrator_early_bounds{};
     NcarIntegratorCurveGateResult integrator_curve_gate{};
     NcarIntegratorCurveGateState integrator_curve_gate_state{};
+    NcarIntegratorChildControlStepResult integrator_child_control{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};
