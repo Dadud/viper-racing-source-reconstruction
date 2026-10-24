@@ -461,26 +461,33 @@ struct NcarInterpolatedUpdatePlan {
 
 struct NcarInterpolatedRecordSelectionObservation {
     std::span<const std::byte> records;
-    std::int32_t frame_step_param_3{};
+    // Captures the orphan callsite at 0x427DA3: EBX is the object, whose +0xEF4
+    // pointer may point inside records and whose +0xEF8 supplies the limit.
+    std::size_t record_pointer_origin_index{};
+    std::uint32_t global_time_bits_0x508774{};
+    std::uint32_t object_value_bits_0xedc{};
+    std::uint32_t object_value_bits_0xee0{};
     // DAT_00508A58 in 0x426670/0x426940.
-    std::size_t global_count_0x508a58{};
+    std::int32_t global_count_0x508a58{};
     // 0x427630 calls 0x427B10 only when the next slot is below this value.
-    std::size_t upper_limit_param_4{};
+    std::int32_t object_limit_0xef8{};
 };
 
 struct NcarInterpolatedRecordSelectionPlan {
+    bool selection_parameters_valid{};
     bool record_window_valid{};
     bool interpolation_callback_0x427b10_reached{};
-    std::size_t first_record_index{};
-    std::size_t second_record_index{};
+    std::int32_t frame_step_param_3{};
+    std::int32_t first_slot_index{};
+    std::int32_t second_slot_index{};
     float interpolation_fraction{};
     std::array<std::uint8_t, ncar_interpolated_record_bytes> first_record{};
     std::array<std::uint8_t, ncar_interpolated_record_bytes> second_record{};
 };
 
-// Models the indexed ring selection in 0x427630 and its 0x3c-byte record
-// stride. Invalid spans are rejected before copying; native inputs are assumed
-// to point to a valid table.
+// Models the 0x427DA3 caller operands and indexed ring selection in 0x427630,
+// including signed frame-step arithmetic and the 0x3c-byte record stride.
+// Invalid spans are rejected before copying; native inputs are assumed valid.
 [[nodiscard]] NcarInterpolatedRecordSelectionPlan
 select_ncar_interpolated_records(
     const NcarInterpolatedRecordSelectionObservation& observation) noexcept;

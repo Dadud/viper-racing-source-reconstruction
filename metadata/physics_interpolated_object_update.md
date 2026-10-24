@@ -34,22 +34,37 @@ records with a `0x3C`-byte stride. This is a distinct layout from the
 `select_ncar_interpolated_records` projection preserves that distinction. Its
 index is `(param_3 / 6) % DAT_00508A58`, the next index is modulo the same
 global, and it calls `0x427B10` only when the next index is less than
-`param_4`. The interpolation fraction is `(param_3 % 6) * 0.16666667`. The
-global `DAT_00508A58` is also validated as the replay table capacity by
-`0x426790`, which separately bounds its loaded frame count by that capacity.
-The direct call to `0x427630` is at `0x427DA3`, which Ghidra does not associate
-with any procedure, so the caller-supplied `param_4` value remains unresolved;
-the model keeps both values as explicit observations. Evidence: `ev_5414f1bab7fbe8468b429851feddd8e526f06a75951618dba0a23d22e5f02da1`
+`param_4`. The interpolation fraction is `(param_3 % 6) * 0.16666667`, using
+signed division/remainder when `param_3` is negative. At the callsite
+`0x427DA3`, `param_1` is the object, `param_2` comes from object `+0xEF4`, and
+`param_4` comes from object `+0xEF8`. `param_3` is the wrapped signed 32-bit
+result of global `0x508774 - object[+0xEDC] - object[+0xEE0]`. The model derives
+these operands and accepts a record-storage span plus the `+0xEF4` pointer's
+origin within that span, allowing negative slots only when their addresses
+remain in bounds. `DAT_00508A58` is also validated as the replay table capacity
+by `0x426790`, which separately bounds its loaded frame count by that
+capacity. The callsite bytes are outside any Ghidra procedure body, so the
+earlier virtual/state gates around this call remain unresolved. Evidence:
+`ev_5414f1bab7fbe8468b429851feddd8e526f06a75951618dba0a23d22e5f02da1`
 (`0x432420`), `ev_ad8b6ec25530cd6f3e8b18886d04cab06a7fb03245737dbdad467b187ccc8fe7`
 (`0x427630`), `ev_541d5c1b7d180cc6cc8db1a02735e4657330aa015805cbe060945d8863cb16f5`
 (`0x426670`), and `ev_4cb2c0f90d46528bf13f96c52d78ae8437f22e4fa7aa8b306fde6a0be95de7bf`
 (`0x426940`). Replay-table and orphan-caller evidence: `ev_755f78caf1b538eacabe2f2bbe13f931431a55df97448083c2db2f9b79688fd4`
 (`0x426790`), `ev_9a7c638a499304d222c0abd9fa833b82f0832aff4fb8ae1afb3fc7ee143bbcf9`
 (`0x427630` xrefs), `ev_85c6eb02fa91005b7ce530236672d8f5f3942054e7ff23c2f2b57deaa060e373`
-(`0x427DA3` instruction), and `ev_6516c44e3e663b96ede78a8b1c395a0e990fdd95de79f36cb033ce5164405c81`
-(`0x427DA3` containing-procedure lookup). Bundles:
+(`0x427DA3` call), `ev_f1ff60c7cc4c5afa3cef719208622008392fbcd911b2bb137d454cf0579deeeb`
+(`0x427D64`, global tick), `ev_b7dbd33b8e02f54c8672f21a4df2000ce080e070188aa0d4954d9ab09c6e4c61`
+(`0x427D6D`, `+0xEDC`), `ev_fedc40a9e57ebbf1e370d48dba006151761f3cb5a1a0acd05f597bb378386f07`
+(`0x427D76`, `+0xEE0`), `ev_7871acaf88c69fdede058bd6c52093c41ff5318880441c38efb19cbdff6d29fd`
+(`0x427D92`, `+0xEF8`; same load at `0x427D88` is `ev_de916d269b06379b6d074495c289c731e26af82397c3d6ef30f284a0cdf20f96`),
+`ev_d2387b2d40280242f4caf8f8ad4556bd64563314c4a773fc21d7210b495feb7a`
+(`0x427D9B`, `+0xEF4`), and `ev_1eb310b3602428d4a37faaf3956c0f43d073403031a3915f8f1c38e54192acf3`
+(`0x427DA1`, push of `param_3`). The preceding `+0xED8` conditional is evidenced by
+`ev_a09eb9b4979ce9834dfb9ab0d21818840748f90c9b8f42b7146aee42234cdd70` and
+`ev_bdf939369ad82bbf05e7978dde0a71ce2bc9cebe2435ed39b6a48c5329384ae1`. Bundles:
 [`ncar_interpolation_ring.evidence.json`](ncar_interpolation_ring.evidence.json),
-[`ncar_replay_cursor.evidence.json`](ncar_replay_cursor.evidence.json).
+[`ncar_replay_cursor.evidence.json`](ncar_replay_cursor.evidence.json),
+[`ncar_interpolation_callsite.evidence.json`](ncar_interpolation_callsite.evidence.json).
 
 The direct subset is exposed as `update_ncar_interpolated_object`. It models
 the record ushort at `0x1E` into object `+0xD70` (`value*14000/32768 - 2000`),

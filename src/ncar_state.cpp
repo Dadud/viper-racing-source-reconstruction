@@ -1034,33 +1034,59 @@ NcarInterpolatedRecordSelectionPlan select_ncar_interpolated_records(
     const NcarInterpolatedRecordSelectionObservation& observation) noexcept
 {
     NcarInterpolatedRecordSelectionPlan result{};
-    if (observation.frame_step_param_3 < 0 ||
-        observation.global_count_0x508a58 == 0U ||
-        observation.global_count_0x508a58 > observation.records.size() /
-            ncar_interpolated_record_bytes) {
+    if (observation.global_count_0x508a58 <= 0) {
         return result;
     }
 
-    const auto step = static_cast<std::size_t>(observation.frame_step_param_3);
-    const auto current_slot = (step / 6U) % observation.global_count_0x508a58;
-    const auto next_slot =
-        (current_slot + 1U) % observation.global_count_0x508a58;
-    result.record_window_valid = true;
-    result.first_record_index = current_slot;
-    result.second_record_index = next_slot;
-    if (next_slot >= observation.upper_limit_param_4) {
+    const auto frame_step = std::bit_cast<std::int32_t>(
+        observation.global_time_bits_0x508774 -
+        observation.object_value_bits_0xedc -
+        observation.object_value_bits_0xee0);
+    result.selection_parameters_valid = true;
+    result.frame_step_param_3 = frame_step;
+
+    // Signed C++ division and remainder match the x86 idiv behavior for these
+    // nonzero positive divisors, including negative frame positions.
+    const auto first_slot = (frame_step / 6) %
+        observation.global_count_0x508a58;
+    const auto second_slot = (first_slot + 1) %
+        observation.global_count_0x508a58;
+    result.first_slot_index = first_slot;
+    result.second_slot_index = second_slot;
+    if (!(second_slot < observation.object_limit_0xef8)) {
         return result;
     }
 
     result.interpolation_callback_0x427b10_reached = true;
-    result.interpolation_fraction =
-        static_cast<float>(step % 6U) * 0.16666667F;
+    result.interpolation_fraction = static_cast<float>(frame_step % 6) *
+        0.16666667F;
+
+    const auto available_records = observation.records.size() /
+        ncar_interpolated_record_bytes;
+    if (observation.record_pointer_origin_index > available_records ||
+        observation.record_pointer_origin_index > static_cast<std::size_t>(
+            std::numeric_limits<std::int64_t>::max())) {
+        return result;
+    }
+    const auto origin = static_cast<std::int64_t>(
+        observation.record_pointer_origin_index);
+    const auto first_storage_index = origin + first_slot;
+    const auto second_storage_index = origin + second_slot;
+    if (first_storage_index < 0 || second_storage_index < 0 ||
+        first_storage_index >= static_cast<std::int64_t>(available_records) ||
+        second_storage_index >= static_cast<std::int64_t>(available_records)) {
+        return result;
+    }
+
+    result.record_window_valid = true;
     const auto* const records = observation.records.data();
     std::memcpy(result.first_record.data(),
-        records + current_slot * ncar_interpolated_record_bytes,
+        records + static_cast<std::size_t>(first_storage_index) *
+            ncar_interpolated_record_bytes,
         ncar_interpolated_record_bytes);
     std::memcpy(result.second_record.data(),
-        records + next_slot * ncar_interpolated_record_bytes,
+        records + static_cast<std::size_t>(second_storage_index) *
+            ncar_interpolated_record_bytes,
         ncar_interpolated_record_bytes);
     return result;
 }

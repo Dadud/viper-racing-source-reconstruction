@@ -372,7 +372,8 @@ files were present.
   1/15-second producer cadence to the timed FIFO and accepted sample-buffer
   path; `apply_ncar_callback_gate_bytes` models the callback's four normalized
   sample flags. `select_ncar_interpolated_records` models the separate 0x3C-byte
-  interpolation ring (distinct from the 0x3E-byte history payload), and
+  interpolation ring (distinct from the 0x3E-byte history payload). It derives
+  its signed selector inputs from the recovered `0x427DA3` object fields.
   `advance_ncar_callback_main` composes the recovered input,
   mode-3 setter/gate, and timer branches around the unreconstructed integrator
   body; it includes the integrator's entry-reset prefix.
