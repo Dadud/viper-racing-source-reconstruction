@@ -488,6 +488,46 @@ SceneCarEffectChildInitPlan plan_scene_car_effect_child_initializer(
     return result;
 }
 
+SceneCarBillboardQuadPlan plan_scene_car_billboard_quad(
+    const SceneCarBillboardQuadInput& input) noexcept
+{
+    SceneCarBillboardQuadPlan result{};
+    result.opaque_argument_0x38 = input.opaque_argument_0x38;
+    result.opaque_argument_0x34 = input.opaque_argument_0x34;
+    if (!input.converted_frame_index.has_value()) {
+        result.status = SceneCarBillboardQuadStatus::frame_conversion_observation_missing;
+        return result;
+    }
+    const auto frame = *input.converted_frame_index;
+    result.converted_frame_index = frame;
+    if (frame < 0 || frame >= 8) {
+        result.status = SceneCarBillboardQuadStatus::frame_out_of_range;
+        return result;
+    }
+
+    constexpr float atlas_cell = 0.125F;
+    constexpr float atlas_gutter = 0.0078125F;
+    constexpr float top_v = 0.1171875F;
+    constexpr float bottom_v = 0.0078125F;
+    const float u_min = static_cast<float>(frame) * atlas_cell + atlas_gutter;
+    const float u_max = static_cast<float>(frame + 1) * atlas_cell - atlas_gutter;
+    const float v_offset = input.mode == 0 ? 0.0F : atlas_cell;
+    result.half_extent = (input.frame_and_size * 1.3000001F + 0.4F) * 0.5F;
+    result.vertices = {{
+        {-result.half_extent, -result.half_extent, u_min, top_v + v_offset},
+        { result.half_extent, -result.half_extent, u_max, top_v + v_offset},
+        { result.half_extent,  result.half_extent, u_max, bottom_v + v_offset},
+        {-result.half_extent,  result.half_extent, u_min, bottom_v + v_offset},
+    }};
+    for (std::size_t vertex = 0; vertex < result.vertex_record_offsets.size(); ++vertex) {
+        result.vertex_record_offsets[vertex] = static_cast<std::uint32_t>(vertex * 0x20U);
+    }
+    result.status = SceneCarBillboardQuadStatus::generated;
+    result.vertex_data_written = true;
+    result.shared_quad_submission_called = true;
+    return result;
+}
+
 SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
     const SceneCarEffectParticleGeneratorInput& input) noexcept
 {

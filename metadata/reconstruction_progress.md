@@ -49,6 +49,13 @@
   `ev_62fbb1add8c5be568ef2f3f807af41519711a3cbbc782f0c1db3f13418508838`,
   and `ev_0adb01115cbb64610af2ba80c7adc608b25c8da6c1dbf6e36d7fd36a5b61a9da`.
 
+- **2026-10-24:** Projected `0x461650`'s four-vertex atlas quad: frame bounds,
+  half-extent formula, UV gutters/mode offset, vertex stride, and its flags-7
+  forwarding call. The common `0x44F9C0` renderer queue/device path remains
+  external. Evidence: `ev_2ffba83fd83f8daaf91a2409f11f5d18a0d3696efd9e7ebe3f8e95a4e7b42721`,
+  `ev_bd4f35ac48c918544966d4212753f4f620c06c42d4a8180b73d1b0bee859b852`,
+  and `ev_b6b2346770ffedb63c33c61d359265f9344b7c36431aaee691df3a0bdef5b9a6`.
+
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table
   at `0x81C`, embedded data base, and optional relocation. Added font character

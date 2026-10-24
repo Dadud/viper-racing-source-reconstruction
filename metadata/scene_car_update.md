@@ -122,8 +122,9 @@ each y component at the start of the next loop iteration (and flushes the last
 one after the loop); component masks preserve partial writes when supplied RNG
 observations run out. This bounded projection does not model `0x461AC0`'s
 randomized child-object fields inline; those fields have a separate projection
-in `plan_scene_car_effect_child_initializer`, while its final `0x461650`
-registration remains an external effect. Evidence:
+in `plan_scene_car_effect_child_initializer`, and `0x461650`'s quad geometry
+is projected by `plan_scene_car_billboard_quad`. The final common renderer
+queue/device mutations remain external. Evidence:
 callback bytes `0x468290..0x46841F`
 (`ev_c2cac3248c1a63da85831ae40530abbb100df6ab94e47f402974dc32797378dd`),
 constants at `0x4C94B4..0x4C94FB`
@@ -140,14 +141,27 @@ forms the three velocity components from input velocity times `0.3` plus
 three ordered jitter samples (`[-0.01, 0.01]`, `[0.01, 0.03]`, then
 `[-0.01, 0.01]`); the first/third samples feed z/x respectively, while the
 middle sample feeds y. `0x461650` is recorded as a call with the
-observed registration fields and scale 1; its renderer-side record writes are
-not projected here. Evidence: `0x461AC0`
+observed opaque arguments and scale 1; its quad writes are projected
+separately, while common renderer queue/device effects remain external.
+Evidence: `0x461AC0`
 (`ev_9d509939ffb7af7f87606397c1ed9e1e7eb001c378380eff367128b96553b858`),
 random-range helper `0x461BD0`
 (`ev_62fbb1add8c5be568ef2f3f807af41519711a3cbbc782f0c1db3f13418508838`),
 clock helper `0x425790` (`ev_4394f76cfa93de76984db3bbd98bb3696a7ab8b4159da55951abcbc5f7aabaef`),
 and registration routine `0x461650`
 (`ev_2ffba83fd83f8daaf91a2409f11f5d18a0d3696efd9e7ebe3f8e95a4e7b42721`).
+
+`plan_scene_car_billboard_quad` projects `0x461650`'s four vertex records and
+atlas UVs. The `__ftol`-converted frame must be in [0, 7]; the tag 2 child
+initializer passes frame/size 1.0, yielding half extent 0.85. U coordinates
+select one of eight horizontal cells with 1/128 gutters; V uses base values
+15/128 and 1/128, offset by 1/8 for nonzero mode. Each vertex has a 0x20-byte
+stride, with x/y/u/v at offsets 0, 4, 0x18, and 0x1C. The routine forwards
+the two opaque caller arguments to `0x44F750` with flags 7; common renderer
+queue processing at `0x44F9C0` remains outside this geometry plan. Evidence:
+`0x461650` (`ev_2ffba83fd83f8daaf91a2409f11f5d18a0d3696efd9e7ebe3f8e95a4e7b42721`),
+`0x44F750` (`ev_bd4f35ac48c918544966d4212753f4f620c06c42d4a8180b73d1b0bee859b852`),
+and `0x44F9C0` (`ev_b6b2346770ffedb63c33c61d359265f9344b7c36431aaee691df3a0bdef5b9a6`).
 
 Tag 0's outer effect management is also projected in
 `plan_scene_car_effect_tag_zero_handler`: `0x4692A0` compares the DWORD at

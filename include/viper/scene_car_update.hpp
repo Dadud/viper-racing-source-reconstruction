@@ -350,11 +350,53 @@ struct SceneCarEffectChildInitPlan {
     bool x87_rounding_approximated{true};
 };
 
-// Projects 0x461AC0's per-context particle fields. The final 0x461650 call is
-// reported as an external registration effect; its renderer-side writes are
-// not folded into this state projection.
+// Projects 0x461AC0's per-context particle fields. The 0x461650 quad is modeled
+// separately; the common renderer's queue/device mutations remain external.
 [[nodiscard]] SceneCarEffectChildInitPlan plan_scene_car_effect_child_initializer(
     const SceneCarEffectChildInitInput& input) noexcept;
+
+enum class SceneCarBillboardQuadStatus : std::uint8_t {
+    generated,
+    frame_conversion_observation_missing,
+    frame_out_of_range,
+};
+
+struct SceneCarBillboardVertex {
+    float x{};
+    float y{};
+    float u{};
+    float v{};
+};
+
+struct SceneCarBillboardQuadInput {
+    std::uint32_t opaque_argument_0x38{};
+    std::int32_t opaque_argument_0x34{};
+    float frame_and_size{1.0F};
+    // The source uses __ftol on its x87 value. Supply that conversion result
+    // explicitly when the caller's FPU rounding state is not known.
+    std::optional<std::int32_t> converted_frame_index{1};
+    std::uint8_t mode{};
+};
+
+struct SceneCarBillboardQuadPlan {
+    SceneCarBillboardQuadStatus status{
+        SceneCarBillboardQuadStatus::frame_conversion_observation_missing};
+    std::array<SceneCarBillboardVertex, 4> vertices{};
+    std::array<std::uint32_t, 4> vertex_record_offsets{};
+    std::uint32_t opaque_argument_0x38{};
+    std::int32_t opaque_argument_0x34{};
+    std::int32_t converted_frame_index{};
+    float half_extent{};
+    std::uint8_t submission_flags{7};
+    bool vertex_data_written{};
+    bool shared_quad_submission_called{};
+    bool x87_rounding_approximated{true};
+};
+
+// Projects 0x461650's quad vertex/UV writes. The common submission through
+// 0x44F750/0x44F9C0 is reported but its renderer-side mutations remain external.
+[[nodiscard]] SceneCarBillboardQuadPlan plan_scene_car_billboard_quad(
+    const SceneCarBillboardQuadInput& input) noexcept;
 
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,
