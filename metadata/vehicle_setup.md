@@ -621,13 +621,19 @@ remain raw offsets.
 The per-frame wheel update context at `0x4329C0` copies body `+0x50C` into
 wheel-context `+0x158` before calling the wheel routine. The NCAR body
 constructor `0x43E490` does not initialize body `+0x50C` in its observed
-pseudocode, so this term cannot be sourced from the currently modeled body
-constructor or safely defaulted to zero. The producer or reset path for body
-`+0x50C` must be recovered before the runtime can populate this suspension
-input faithfully. Evidence: `0x4329C0` dossier
-`ev_ec495a0523b6b3e8a6e16deb0b941496b12fb9879319d848e6ea55c41bb6ad6e` and
+pseudocode. Its value is instead written by the reconstructed interpolation
+and callback paths: `0x432420` interpolates or resets it from record byte
+`0x3A`, while `0x439160` decrements or clears it and the callback main path
+can set it to `1.0` or `0.8`. Those effects are modeled, but the live runtime
+does not yet own the native physics-record ring and callback state that drive
+them. Consequently, wheel `+0x158` remains unavailable to live suspension and
+must not be guessed from the CARF constructor. Evidence: `0x4329C0` dossier
+`ev_ec495a0523b6b3e8a6e16deb0b941496b12fb9879319d848e6ea55c41bb6ad6e`,
 `0x43E490` dossier
-`ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`.
+`ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`, and
+the interpolation/callback evidence in
+[`physics_interpolated_object_update.md`](physics_interpolated_object_update.md)
+and [`car_update_branches.md`](car_update_branches.md).
 
 After that base scalar, `adjust_wheel_suspension_for_surface` models the next
 adjustment. The updater projects a wheel-motion vector onto body basis values,
