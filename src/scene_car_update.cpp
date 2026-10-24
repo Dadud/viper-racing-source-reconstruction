@@ -1081,11 +1081,12 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
         observation.destination_before.end());
     const bool alpha_fill = callback_address == 0x00455D90U;
     const bool color_mask = callback_address == 0x00455E00U;
-    if (!alpha_fill && !color_mask) {
+    const bool depth_fade = callback_address == 0x00455F40U;
+    if (!alpha_fill && !color_mask && !depth_fade) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
         return result;
     }
-    if (color_mask && observation.descriptor_mode > 2U) {
+    if ((color_mask || depth_fade) && observation.descriptor_mode > 2U) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_descriptor_mode;
         return result;
     }
@@ -1130,6 +1131,19 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
             write(0x10U, alpha_color);
         } else {
             write(0x10U, source[4] | observation.color_or_mask_0x50d114);
+        }
+        if (depth_fade && row_index >= observation.depth_fade_alpha_bytes.size()) {
+            write(0x14U, 0U);
+            result.status = SceneRenderScanlineConversionStatus::depth_fade_result_observation_exhausted;
+            return result;
+        }
+        if (depth_fade) {
+            write(0x14U, 0U);
+            write(0x14U,
+                static_cast<std::uint32_t>(observation.depth_fade_alpha_bytes[row_index]) << 24U);
+            ++result.rows_processed;
+            ++result.row_counter_increments;
+            continue;
         }
         write(0x14U, 0xFF000000U);
         ++result.rows_processed;

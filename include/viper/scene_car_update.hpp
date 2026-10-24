@@ -823,6 +823,7 @@ enum class SceneRenderScanlineConversionStatus : std::uint8_t {
     negative_row_pointer,
     source_observation_exhausted,
     destination_observation_exhausted,
+    depth_fade_result_observation_exhausted,
 };
 
 struct SceneRenderScanlineConversionObservation {
@@ -831,6 +832,8 @@ struct SceneRenderScanlineConversionObservation {
     std::uint8_t descriptor_mode{}; // descriptor +0x10, used by 0x455E00
     std::uint8_t alpha_byte_0x50d110{}; // used by 0x455D90
     std::uint32_t color_or_mask_0x50d114{}; // used by 0x455E00
+    // Output byte of the x87 distance-fade branch, indexed by absolute row.
+    std::span<const std::uint8_t> depth_fade_alpha_bytes;
     std::span<const SceneRenderRowRecord> source_rows;
     std::span<const SceneRenderRowRecord> destination_before;
 };
@@ -850,7 +853,7 @@ struct SceneRenderScanlineConversionPlan {
     std::vector<SceneRenderScanlineWrite> writes;
 };
 
-// Models the two default callbacks selected by 0x455C80. Writes remain
+// Models observed row converters selected by 0x455C80. Writes remain
 // bounded by supplied source/destination rows; destination word +0x0C is
 // deliberately preserved because the native loop leaves it untouched.
 [[nodiscard]] SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(

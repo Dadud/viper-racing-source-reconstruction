@@ -1,5 +1,10 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended the bounded row-converter model to enabled-path
+  callback `0x455F40`. It preserves the native copy, color, zero-alpha, faded-
+  alpha write order and signed row bounds. Its distance/fade arithmetic is
+  documented from instruction evidence, while final alpha words remain
+  explicit observations to avoid claiming exact x87 conversion fidelity.
 - **2026-10-24:** Modeled the two default row converters selected by `0x455C80`.
   The bounded projection preserves native copy/store order, signed row bounds,
   mode rejection, untouched destination `+0x0C`, and per-row counter updates.

@@ -630,3 +630,36 @@ the second loop's stride and counter are `0x455E49`
 (`ev_95c9538bceda0852df6ac94bbd4e7e2f1a88daabde825882008fc4f705b75c7c`)
 and `0x455E76`
 (`ev_74d88c40605eed9fb3c86b35a844d84a3c76a8cc902f31637627197893206bd4`).
+
+The enabled texture path's `0x455F40` row callback now shares the bounded
+copy/write projection. Modes 0–2 all copy `+0,+4,+8,+0x18,+0x1C`, OR source
+`+0x10` with `DAT_0050D114`, initialize destination `+0x14` to zero, and then
+write its distance-fade alpha word. The distance test compares squared
+distance from the source position at `+0,+4,+8` to the global point at
+`0x50D0E8/EC/F0` against `0x50D11C`; the near branch writes
+`0xFF000000`, while the far branch derives an alpha from `0x50D120` and
+`0x50D128` with a floor of `0x80`. To avoid inventing exact x87 conversion
+results, the model takes the final per-row alpha byte as an explicit input and
+places it in the output word's high byte.
+If that observation is absent, the plan records the known copies, color word,
+and zero-alpha initialization, then stops before the unknown alpha write and
+row-counter increment. Evidence: callback entry and mode gate
+(`ev_a3299de5aef5f26a510e5ce984979283578d08228c6713413244c3a6c9831311`,
+`ev_6ccfaacf66eb4d956449e9d48766566ee2020e967ebf578483f028de26789fe7`),
+source row copy (`ev_9db877f82490898cc6cdbcdd64ed05d64b6fb6db79f16923058719453372b716`),
+color write and alpha initialization
+(`ev_3d1690998a70dfb77608c8d17a95b9b4a56512469aaa053184dc4ec6d80aac99`,
+`ev_f16d6517e78105902554264a867ac6575d153de9fe87a731b266d4f50a657db8`),
+distance threshold and branch (`ev_a79a8349cd6137176d0cc816cb155c87bf49c204a590871117214c2c7b3cfaaf`,
+`ev_0abbcd2ec8f7e1fd8980279c079aac42d151f7157fff975e125de662e896cce6`),
+far-alpha calculation/floor and output
+(`ev_36901fefbcafe779f31e25c86387af316a60217134fe7b96dca7578760708de4`,
+`ev_e9c8735c1be6bc8e162d6e90f7aa79d98279d5d2bab0ae39fb7d627462c074d9`,
+`ev_01fc371efde60a789492ffc27145b83cc4eff9b4c23093526ceb9c2910fc06c1`,
+`ev_c8b7dc69c8bace1e376dc3b27b93d87ffb4d2fc98b20688ef555f90540433854`,
+`ev_4d1fb796aa32e2d7540876a292dbace7447d83188244c91d5f64f7bb9c3786f4`,
+`ev_f26966c30a89b953432deb3695e3965fb8fa77afdc32386d621254ce53ac84`,
+`ev_2ec1aae36fc24654194530362fba20b9100853746e89a2a412ee680768d07852`),
+and row stride/counter (`ev_0d5984591da78047ccb44ce997e71f50bcf8a7f404c618d0ec8e60a33762894a`,
+`ev_323ef6a2a48884d33e80c59414813a71fa86054846f480620274109e64b7e4f2`,
+`ev_54c1397d51e32b056d00b3690a537945ba8a4f18ce889f32925825ddd3f2893b`).
