@@ -10,8 +10,7 @@ namespace {
 
 std::optional<std::vector<std::uint8_t>> raster_status_image_source_pixels(
     const StampImage& image, const std::uint8_t renderer_mode,
-    const std::int32_t pitch_bytes,
-    const std::span<const std::uint8_t> initial_pixels)
+    const std::int32_t pitch_bytes)
 {
     if (image.width <= 0 || image.height <= 0 || pitch_bytes <= 0 ||
         (renderer_mode != 3U && renderer_mode != 4U)) {
@@ -39,26 +38,14 @@ std::optional<std::vector<std::uint8_t>> raster_status_image_source_pixels(
     renderer.framebuffer_pitch_bytes = pitch_bytes;
     const auto raster = raster_scene_stamp_image(
         {true, 0x0044D0C0U, 0, 0, 0}, {true, image, renderer});
-    if (!raster.draw_reached || !raster.input_complete ||
-        (initial_pixels.empty() &&
-         raster.raster.pixel_writes.size() !=
-             static_cast<std::size_t>(pixel_count)) ||
-        (!initial_pixels.empty() &&
-         initial_pixels.size() < static_cast<std::size_t>(buffer_size))) {
-        // Transparent STMP pixels preserve the staging surface's prior
-        // contents, so only a complete frame or an observed initial buffer
-        // can determine every post-draw source byte.
+    if (!raster.draw_reached || !raster.input_complete) {
         return std::nullopt;
     }
 
-    std::vector<std::uint8_t> pixels;
-    if (initial_pixels.empty()) {
-        pixels.assign(static_cast<std::size_t>(buffer_size), 0U);
-    } else {
-        pixels.assign(initial_pixels.begin(),
-                      initial_pixels.begin() +
-                          static_cast<std::ptrdiff_t>(buffer_size));
-    }
+    // 0x4031F0 clears the complete 0x4EB2C0 viewport with color zero before
+    // drawing status.stp. Transparent STMP pixels therefore retain zero.
+    std::vector<std::uint8_t> pixels(
+        static_cast<std::size_t>(buffer_size), 0U);
     for (const auto& write : raster.raster.pixel_writes) {
         if (write.offset_from_framebuffer_base < 0 ||
             write.bytes_per_pixel != bytes_per_pixel) {
@@ -417,9 +404,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                         raster_status_image_source_pixels(
                             image,
                             bitmap_blit_observation.source_bitmap_mode,
-                            bitmap_blit_observation.bitmap_pitch_bytes,
-                            observation
-                                .state0_bitmap_source_initial_pixels);
+                            bitmap_blit_observation.bitmap_pitch_bytes);
                     if (rasterized_source.has_value()) {
                         bitmap_source_pixels = *rasterized_source;
                     } else {

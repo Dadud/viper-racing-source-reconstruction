@@ -952,13 +952,19 @@ now resolves that STMP from `race.res`, and the race-loop composer can raster it
 into source bytes for subsequent bitmap blits. The inspected `race.res` has
 SHA-256 `b07f40ef8dcba98fb7cef78c87034c9a2b47b9dcd7679aa70777c039be43d7e2`.
 The mode-4 raster path emits 40,933 palette writes for 40,960 pixels; its 27
-transparent pixels preserve pre-draw staging memory. Therefore deriving the
-full source requires either a complete raw post-draw buffer or an observed
-initial buffer for the transparent locations. The enhanced `--inspect-image`
+transparent pixels preserve the prior staging contents. That base is known:
+`0x403000` initializes `0x4EB27C` to zero, then `0x4031F0` selects `0x4EB2C0`
+and calls `0x449AA0(0)` before drawing the image. `0x449AA0` fills the complete
+reset viewport, so the transparent pixels are zero and the full source can be
+derived without caller-supplied initial bytes. The enhanced `--inspect-image`
 output reports mode-4 palette-write count and raster completeness. The original
 `race.res` remains outside this source repository. Automatic STMP-to-staging
-conversion currently supports 16-bit renderer modes 3 and 4; other modes still
-need an observed raw post-draw source buffer.
+conversion currently supports 16-bit renderer modes 3 and 4; mode 5 still
+needs its STMP pixel writer.
+Evidence: `0x403000` (`ev_55a1de5280d59dc142f147f2499a1260a546d35ff5b3cac79851a365ca577ba6`),
+`0x4031F0` (`ev_150bcb339cb567a82921879c0a511ebdccc8714a4557be04340fe326792dbea9`),
+`0x449AA0` (`ev_be7f4edcec14fa1add5ab0385980ebefad63dfb1f83697dc57d1bcdfee455176`),
+and `0x449C40` (`ev_f6bd288530792e286f363952e1ddb43c31b478ed3eb056d30594eb30d4c53eb6`).
 `plan_race_setup` exposes this operation plan at its `0x4031F0` call site.
 The `0x44CFD0` registration helper requests the `STMP` type through shared
 loader `0x417CB0`; for a present resource it requires the returned metadata
