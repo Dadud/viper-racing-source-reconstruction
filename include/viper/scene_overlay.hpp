@@ -1409,6 +1409,8 @@ scene_paused_banner_box_pixel_writes(
 struct SceneSharedPausedBannerObservation {
     SceneSharedOverlayObservation overlay_globals{};
     bool resource_generation_matches{};
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> paused_cached_generation_value;
     ScenePausedBannerRenderObservation render{};
 };
 

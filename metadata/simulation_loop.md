@@ -449,8 +449,12 @@ before it: when `0x404860` passes, `0x404970` compares the current resource
 generation at `0x4D3868` with the cached value at `0x4EB468`. A mismatch calls
 `0x418CC0` with resource object `0x4EB460`; either way the branch then calls
 `0x40C930` with handle `0x4EB464`. `0x40C930` calls `0x40C790` with the
-`load_stp` resource key and a zero mode byte. `scene_paused_banner_render_plan`
-projects its layout: when `load_stp` resolves, it centers that resource using
+`load_stp` resource key and a zero mode byte. The outer pause plan now derives
+that refresh decision from optional raw
+generation DWORDs at `0x4D3868` and `0x4EB468`; its prior match boolean remains
+a fallback.
+`scene_paused_banner_render_plan` projects its layout: when `load_stp` resolves,
+it centers that resource using
 width from `0x44D450` and height from `0x44D460`, then draws the text handle at
 `(surface_width/2, surface_height/2 + 4)`. If lookup fails, it measures the
 text using `0x479450(0x0E, handle)` and draws an outer box spanning

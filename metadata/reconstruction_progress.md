@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected the paused-banner branch to raw
+  resource-generation DWORDs. It now derives whether `0x418CC0` runs by
+  comparing cached value `0x4EB468` with current generation `0x4D3868`; the
+  previous match boolean remains a fallback. Release build and
+  `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Replaced Splash:Loading's opaque generation
   match with optional raw cached/current DWORD inputs. The gated branch now
   derives refresh from `0x4EB260` versus `0x4D3868`; the prior boolean remains

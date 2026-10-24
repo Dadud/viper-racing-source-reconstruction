@@ -3264,9 +3264,15 @@ SceneSharedPausedBannerPlan scene_shared_paused_banner_plan(
 {
     SceneSharedPausedBannerPlan result{};
     result.gates = scene_shared_overlay_gates(observation.overlay_globals);
+    const auto resource_generation_matches =
+        observation.current_resource_generation_value.has_value() &&
+                observation.paused_cached_generation_value.has_value()
+            ? *observation.current_resource_generation_value ==
+                *observation.paused_cached_generation_value
+            : observation.resource_generation_matches;
     result.outer_call = scene_shared_paused_banner_call(
         result.gates.paused_banner,
-        observation.resource_generation_matches);
+        resource_generation_matches);
     auto render_observation = observation.render;
     render_observation.gate_reached = result.outer_call.reached;
     result.inner_render = scene_paused_banner_render_plan(render_observation);
