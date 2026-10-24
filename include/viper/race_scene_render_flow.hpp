@@ -113,6 +113,7 @@ struct RaceLoopSharedOverlayPlan {
     SceneState5OverlayPlan state5_overlay{};
     bool dashboard_core_callback_reached{};
     SceneDashboardCoreCallbackPlan dashboard_core_callback{};
+    // Alias of the composed callback's complete native-order call list.
     std::vector<SceneDashboardTextCall> dashboard_core_text_calls;
     std::optional<SceneDashboardCoreCallbackRasterPlan>
         state0_dashboard_text_raster;

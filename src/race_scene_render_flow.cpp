@@ -262,8 +262,8 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         }
         plan.dashboard_core_callback = scene_dashboard_core_callback_plan(
             dashboard_observation);
-        plan.dashboard_core_text_calls = scene_dashboard_text_plan(
-            plan.dashboard_core_callback.reached_text_call_site_mask);
+        plan.dashboard_core_text_calls =
+            plan.dashboard_core_callback.ordered_text_calls;
         plan.dashboard_supplemental_time_reached =
             plan.dashboard_core_callback.supplemental_time_branch_reached;
         plan.dashboard_supplemental_time =

@@ -1387,6 +1387,9 @@ Position/Lap/final-time sites, the reached selected branch, supplemental rows,
 both metrics, and the auxiliary rows in callback order. Formatted arguments
 remain separate for values that still depend on runtime resources or raw
 stack state; helper-derived arguments are carried by their call descriptors.
+The race-loop's `dashboard_core_text_calls` alias exposes this full native-order
+list, including component calls; it no longer stops at the generic eight-site
+descriptor plan.
 
 `raster_scene_dashboard_core_callback` consumes that ordered list with one
 renderer context per call. It prefers a recovered call descriptor's formatted
