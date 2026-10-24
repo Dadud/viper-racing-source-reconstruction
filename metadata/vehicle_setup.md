@@ -192,10 +192,16 @@ stores this value multiplied by `0.0174` at `+0xDCC`. The implementation now
 exposes `initialize_ncar_integrator_wheel_callback_setup_from_runtime_record`,
 which reads all three little-endian inputs from a bounded runtime record. A
 regression composes the CARF mapper and this adapter for synthetic source
-values. This establishes these three constructor scalars only: record `+0x128`
-and the remaining 3D wheel placement inputs are still unresolved.
+values. The same mapper stores CARF word `0x66` unchanged at runtime-record
+`+0x128`; this is now preserved by the adapter alongside the scaled word
+`0x67` at `+0x12C`. A regression composes the word `0x66` store through to the
+FNIM-derived NCAR reset-proxy bounds. This resolves the record source but does
+not establish the field's semantic name; remaining 3D wheel placement inputs
+and live collision integration are still unresolved.
 Evidence: mapper `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ffa06eec1a05a08317`;
 constructor `0x433C00` `ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`.
+The direct `+0x128 <- CARF[0x66]` store is visible in dossier
+`ev_472e5bfc79a705e4af49ea09d44a0d3d3c3d05308100792e1c336237ca9ca4ff` (`0x45E4B0`).
 
 The `0x4509B0` call in `0x433C00` is a separate model-extents scan, not a
 steering transform. It obtains the model vertex count and pointer through
@@ -206,11 +212,12 @@ FNIM regression checks both a synthetic triangle and the empty case. This
 provides asset-backed extents when called with a parsed model's vertices; it
 now feeds the existing NCAR reset-sphere geometry observation through its
 precomputed-bounds field, so the native twelve-sphere proxy can consume parsed
-FNIM bounds without rescanning vertices. The geometry regression checks all
-twelve generated centers/radii and the aggregate group radius using an
-explicit synthetic value for runtime-record `+0x128`. That field remains
-unmapped by the CARF adapter and must be supplied by the caller; this work does
-not connect the proxy to live collision handling. Evidence: `0x4509B0`
+FNIM bounds without rescanning vertices. The CARF mapper stores word `0x66`
+unchanged at runtime-record `+0x128`; the setup regression composes that value
+through the actual geometry function. The geometry regression checks all
+twelve generated centers/radii and the aggregate group radius. The geometry
+function rejects non-finite model bounds and vehicle-record inputs. The proxy
+is still not connected to live collision handling. Evidence: `0x4509B0`
 `ev_f3e69307c431f783075d86dbeed730ee32736a6159e31f8b9633cd65593d0208`.
 
 ### TIRE field consumption at `0x435BF0`

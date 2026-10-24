@@ -1669,7 +1669,9 @@ NcarResetSphereBoundsPlan derive_ncar_reset_sphere_geometry(
         result.raw_bounds = {bounds.minimum[0], bounds.maximum[0],
             bounds.minimum[1], bounds.maximum[1],
             bounds.minimum[2], bounds.maximum[2]};
-        result.inputs_complete = true;
+        result.inputs_complete = std::all_of(
+            result.raw_bounds.begin(), result.raw_bounds.end(),
+            [](const float value) { return std::isfinite(value); });
     } else {
         result.raw_bounds = {10000.0F, -10000.0F, 10000.0F, -10000.0F,
             10000.0F, -10000.0F};
@@ -1685,6 +1687,14 @@ NcarResetSphereBoundsPlan derive_ncar_reset_sphere_geometry(
                     result.raw_bounds[axis * 2U + 1U], coordinates[axis]);
             }
         }
+    }
+
+    result.inputs_complete = result.inputs_complete &&
+        std::isfinite(observation.car_record_0x58) &&
+        std::isfinite(observation.car_record_0x5c) &&
+        std::isfinite(observation.car_record_0x128);
+    if (!result.inputs_complete) {
+        return result;
     }
 
     auto max_x = result.raw_bounds[1];

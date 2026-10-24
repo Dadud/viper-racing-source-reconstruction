@@ -73,9 +73,9 @@ struct NcarResetSphereBoundsObservation {
     std::span<const std::array<float, 8>> vertices;
     float car_record_0x58{};
     float car_record_0x5c{};
+    // Runtime +0x128 is copied from CARF v6 word 0x66 by 0x45E4B0.
     float car_record_0x128{};
     // Preferred when extents were already measured from a parsed FNIM model.
-    // The three vehicle-record fields remain explicit runtime inputs.
     std::optional<ModelVertexBounds> precomputed_model_bounds;
 };
 

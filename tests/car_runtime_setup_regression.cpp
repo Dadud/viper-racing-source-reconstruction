@@ -1,5 +1,7 @@
 #include "viper/world_track_objects.hpp"
 #include "viper/wheel_body_coupling.hpp"
+#include "viper/ncar_state.hpp"
+#include "viper/model_resource.hpp"
 
 #include <algorithm>
 #include <array>
@@ -51,6 +53,7 @@ int main()
         car_file.raw_words.fill(0x3f800000U);
         car_file.raw_words[12U] = std::bit_cast<std::uint32_t>(200.0F);
         car_file.raw_words[13U] = std::bit_cast<std::uint32_t>(25.0F);
+        car_file.raw_words[0x66U] = std::bit_cast<std::uint32_t>(10.0F);
         car_file.raw_words[0x67U] = std::bit_cast<std::uint32_t>(10.0F);
         // A zero setup-count discriminator selects the configured setup words.
         car_file.raw_words[0x3aU] = 0U;
@@ -75,6 +78,42 @@ int main()
         require(viper::apply_car_file_runtime_mapping(
                     runtime_record, *preparation.mapping),
             "prepared CARF mapping must apply to the bounded runtime record");
+        const auto body_shift_write = std::find_if(
+            preparation.mapping->writes.begin(), preparation.mapping->writes.end(),
+            [](const viper::CarFileRuntimeFieldWrite& write) {
+                return write.byte_offset == 0x128U;
+            });
+        require(body_shift_write != preparation.mapping->writes.end() &&
+                body_shift_write->raw_word == car_file.raw_words[0x66U],
+            "CARF v6 word 0x66 must map directly to runtime record +0x128");
+        const auto mapped_body_shift = [&runtime_record] {
+            std::uint32_t raw{};
+            for (std::size_t byte_index = 0; byte_index < sizeof(raw); ++byte_index) {
+                raw |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+                    runtime_record[0x128U + byte_index])) << (byte_index * 8U);
+            }
+            return std::bit_cast<float>(raw);
+        }();
+        require(mapped_body_shift == 10.0F,
+            "mapped runtime record must retain the native +0x128 body-shift scalar");
+        viper::ModelVertexBounds model_bounds{};
+        model_bounds.minimum = {-1.0F, -1.0F, -1.0F};
+        model_bounds.maximum = {1.0F, 1.0F, 3.0F};
+        model_bounds.vertex_count = 2U;
+        viper::NcarResetSphereBoundsObservation sphere_observation{};
+        sphere_observation.extents_pointer_present = true;
+        sphere_observation.precomputed_model_bounds = model_bounds;
+        sphere_observation.car_record_0x58 = 200.0F;
+        sphere_observation.car_record_0x5c = 25.0F;
+        sphere_observation.car_record_0x128 = mapped_body_shift;
+        const auto sphere_geometry =
+            viper::derive_ncar_reset_sphere_geometry(sphere_observation);
+        require(sphere_geometry.inputs_complete &&
+                std::fabs(sphere_geometry.local_geometry.local_b0_after_body_shift -
+                    (-1.0F - 10.0F * 0.0254F)) < 1.0e-5F &&
+                std::fabs(sphere_geometry.local_geometry.local_bc_after_clamp - 1.0F) <
+                    1.0e-5F,
+            "the CARF-derived runtime +0x128 value must reach native proxy bounds");
         const auto callback_setup =
             viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
                 runtime_record);

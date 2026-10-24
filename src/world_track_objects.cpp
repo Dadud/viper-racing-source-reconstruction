@@ -1362,6 +1362,7 @@ std::optional<CarFileRuntimeMapping> map_car_file_runtime_fields(
         write_word(static_cast<std::uint16_t>(0x100 + index * 4),
                    observation.car_file.raw_words[0x5c + index]);
     }
+    write_word(0x128, observation.car_file.raw_words[0x66]);
     write_float(0x12c, car_float(0x67) * config_float(0x22));
     for (std::size_t index = 0; index < 4; ++index) {
         write_word(static_cast<std::uint16_t>(0x130 + index * 4),
