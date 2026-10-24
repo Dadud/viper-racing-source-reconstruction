@@ -19,11 +19,11 @@ struct SceneRendererObjectObservation {
 };
 
 // Builds the generic-dispatch observation for the registered wheel-resource
-// manager; constructor 0x4622F0 installs 0x4623F0 at vtable slot +0x14.
+// manager. Its vtable +0x10 stub returns false, +0x0C returns true only when
+// DAT_004DCAE4 is zero, and +0x14 targets 0x4623F0.
 [[nodiscard]] SceneRendererObjectObservation observe_scene_wheel_resource_manager(
     bool pointer_present,
-    bool virtual_0x10_result,
-    bool virtual_0x0c_result) noexcept;
+    std::uint8_t renderer_gate_0x4dcae4) noexcept;
 
 inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
 inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;

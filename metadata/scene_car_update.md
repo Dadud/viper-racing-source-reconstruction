@@ -434,17 +434,33 @@ virtual slot `+0x10`, checks the global mode gate, calls slot `+0x0C`, then
 calls slot `+0x14` when both conditions permit. Since this manager's vtable
 slot `+0x14` is `0x4623F0`, this connects construction, registration, and
 frame rendering. The manager's frame gate at `0x45C380` still provides its
-internal reset-versus-draw branch. Evidence: manager vtable `+0x14`
+internal reset-versus-draw branch. The full vtable at `0x4C9270` resolves
+`+0x10` to `0x462A70` (`xor al,al; ret`), so that result is always false;
+`+0x0C` targets `0x462580`, which calls `0x460310` to read the low byte of
+`0x4DCAE4` and returns true only when that byte is zero. The class-specific
+observer now derives both results from the raw global byte, leaving only
+pointer presence external for these slots. Evidence: vtable bytes
+`ev_017dd59089be746b61a4b0718b36607c683214903fda985565ab9fa6d4e04088`,
+`0x462A70` `ev_a32c434d709372b0d89c4bfa234996eaf03e1bd3535f4a6c0e8a8697a0fcc211`,
+`0x462580`/compare/sbb/neg/return
+`ev_ef5cb36d52966a07625d76c5ad236c6104787db448d56f47401259ad898f695b`,
+`ev_aad7c28b09f92ec46e41ad87ee4f8d8bf0ab248ef6835b42f409d8080f2da7d3`,
+`ev_c25ed1eea9e99664a7efecc764aa36deed764ebaa792818d1d0dd0952875a063`,
+`ev_85b8caf9d861f32ac091e2f4d411ff95521ac11291ca9588c2f7b2ec22b9d306`,
+`ev_e565d9c019094860acf2e927577dd2aa426d61c60ef911c88532e9476605a123`,
+and getter `0x460310` `ev_ff7b97e52ece9f4a58cbcbabed54bb77b03e3a2dc2abfaf640f1942bb23dff5e`.
+Evidence: manager vtable `+0x14`
 `ev_1b91d34c52b1d19ee056410c599b67f72ae9ac2381bb2857090aa3ddda9ff43f`,
 dispatcher `0x45BEB0` `ev_1ffdfd37f67d2227d0d9e780f4db2f1b5a10c67c802e855cc30aa7dc09a7342e`,
 registration `0x45C2E0` `ev_f7d4a1c00acf8a61134b349e6cac89cebf193a462d77cca3b1c54eadb2070def`,
 and scene constructor `0x463920`
 `ev_761442b24e1e0ad9e1e15d7b5e33174a7144d92be40f035876d1cbada57a6f09`.
 
-The generic render observation can now retain the resolved `+0x14` target.
-`observe_scene_wheel_resource_manager` records `0x4623F0`, while leaving the
-generic `+0x10` and `+0x0C` return values as observations; when the generic
-dispatcher reaches `+0x14`, its action carries that native target address.
+The generic render observation retains the resolved `+0x14` target.
+`observe_scene_wheel_resource_manager` records `0x4623F0` and derives the
+manager's `+0x10`/`+0x0C` return values; other classes' generic `+0x10` and
+`+0x0C` results remain observations. When the dispatcher reaches `+0x14`, its
+action carries that native target address.
 This links the renderer's object walk to the already modeled wheel-manager
 frame method without inventing behavior for the manager's earlier gates.
 

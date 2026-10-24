@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Completed the wheel-manager's two pre-draw
+  virtual gates in the generic scene dispatcher. Vtable `+0x10` is a false
+  stub; `+0x0C` is derived from the zero/nonzero state of `0x4DCAE4` through
+  its getter/normalizer. The manager observer now needs only pointer presence
+  and that raw gate byte to derive both outcomes. Release build and
+  `git diff --check` pass; no tests were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
   nested texture-binding request from manager field `+0x10`, matching its
   observed `0x448E30` call and preventing a conflicting duplicate handle input.

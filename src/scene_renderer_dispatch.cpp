@@ -9,10 +9,10 @@ namespace viper {
 
 SceneRendererObjectObservation observe_scene_wheel_resource_manager(
     const bool pointer_present,
-    const bool virtual_0x10_result,
-    const bool virtual_0x0c_result) noexcept
+    const std::uint8_t renderer_gate_0x4dcae4) noexcept
 {
-    return {pointer_present, virtual_0x10_result, virtual_0x0c_result, 0x004623F0U};
+    return {pointer_present, false, renderer_gate_0x4dcae4 == 0U,
+        0x004623F0U};
 }
 
 namespace {
