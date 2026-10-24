@@ -170,10 +170,24 @@ struct AcarRouteFallbackPlan {
     std::optional<AcarRecoveryUpdateResult> recovery_state_result;
 };
 
+struct AcarComposedDriverCallbackPlan {
+    AcarDriverAiPlan route_candidate_plan{};
+    bool fallback_helper_0x42b040_called{};
+    std::optional<AcarRouteFallbackPlan> fallback_plan;
+    std::optional<bool> callback_return_value;
+};
+
 // Projects the route geometry and state selection in fallback helper 0x42B040.
 // The global route table row and node +0x3c values are explicit observations.
 [[nodiscard]] AcarRouteFallbackPlan plan_acar_route_fallback(
     AcarFallbackState& state,
     const AcarRouteFallbackObservation& observation);
+
+// Composes 0x42AD80, 0x42ADB0, and its conditional 0x42B040 fallback.
+[[nodiscard]] AcarComposedDriverCallbackPlan evaluate_acar_driver_callback_with_fallback(
+    AcarDriverAiState& driver_state,
+    AcarFallbackState& fallback_state,
+    const AcarDriverAiObservation& driver_observation,
+    const AcarRouteFallbackObservation& fallback_observation);
 
 } // namespace viper

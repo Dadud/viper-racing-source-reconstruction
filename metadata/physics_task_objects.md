@@ -641,3 +641,15 @@ Evidence: `0x42B040`
 `ev_5ba2192d1ee356002d5e7559588da142bf016877e8f1c911f588ec3bf8052c74`,
 `0x42A580` `ev_6b56f4cc7104146b456d6f99f2d11682aa093e37d97212c39ced7d5e5eb78005`,
 and `0x41FD80` `ev_d77fad4cfa1a3a294bad814d28b62842dcfb5e7b14fc476f4c9c0b09adbb131e`.
+
+`evaluate_acar_driver_callback_with_fallback` now composes the registered
+`0x42AD80` wrapper with both modeled helpers: it runs `0x42ADB0` first and
+returns immediately on its nonzero low byte, otherwise it executes the full
+`0x42B040` route-fallback projection and returns that result. The earlier
+wrapper overload remains available for callers that only have a captured
+fallback Boolean. If the fallback reaches missing required observations, the
+composed wrapper leaves its return value unknown. Evidence: wrapper instructions
+`ev_72a01f70afb7437130321395a3591dd048be93c5f9781d0617dfde72c72292ca`,
+`ev_3b2cc9e45cb543f86fab43b3b64471c22d63172c73e7e206b53b56a14aab6363`,
+`ev_d99f444141352b03eb457e8bc2f5d6c474fe1779dce6429bdabc27181fc3388`,
+and `ev_774cc7af43f607868f1e4d126f3e17c64cfb42dae3cc6e39b95c716363075025`.
