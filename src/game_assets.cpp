@@ -49,7 +49,8 @@ bool ascii_equal_case_insensitive(const std::string_view left,
 
 GameAssets GameAssets::load(const std::filesystem::path& root,
                             const std::string_view track,
-                            const std::string_view car)
+                            const std::string_view car,
+                            std::optional<GameOptions> options)
 {
     if (root.empty()) throw std::runtime_error("asset directory is required");
     GameAssets assets;
@@ -85,6 +86,7 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     if (!parsed_default_tire)
         throw std::runtime_error("common.res default tire resource def_tire.tir is invalid");
     assets.default_tire_ = *parsed_default_tire;
+    assets.options_ = options ? std::move(*options) : GameOptions{};
     constexpr std::uint32_t car_setup_type = 0x43435330U;
     const auto& car_bundle = assets.bundle(assets.bundle_names_[3]);
     const auto* car_setup_entry = car_bundle.find(

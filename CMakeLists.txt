@@ -15,6 +15,7 @@ add_library(viper_frontend_model
     src/career_progression.cpp
     src/career_season.cpp
     src/config_directory.cpp
+    src/game_options.cpp
     src/frontend_initialization.cpp
     src/frontend_dispatch.cpp
     src/replay_load.cpp
@@ -191,12 +192,15 @@ if(WIN32)
     endif()
     target_link_libraries(viper_game PRIVATE
         viper_resource_bundle viper_model_resource viper_language_resource viper_terrain_model
-        viper_vehicle_model
+        viper_vehicle_model viper_frontend_model
         viper_scene_model d3d11 dxgi user32)
 endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_game_options_regression tests/game_options_regression.cpp)
+    target_link_libraries(viper_game_options_regression PRIVATE viper_frontend_model)
+    add_test(NAME game_options_regression COMMAND viper_game_options_regression)
     add_executable(viper_renderer_regression tests/renderer_regression.cpp)
     target_link_libraries(viper_renderer_regression PRIVATE viper_scene_model)
     add_test(NAME renderer_regression COMMAND viper_renderer_regression)

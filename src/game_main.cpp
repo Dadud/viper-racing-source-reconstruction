@@ -81,8 +81,8 @@ HRESULT compile_shader(const char* source, const char* entry, const char* target
 
 struct Options {
     std::filesystem::path data_dir;
-    std::string track{"bemidji"};
-    std::string car{"viper"};
+    std::optional<std::string> track;
+    std::optional<std::string> car;
     bool validate_assets{};
     bool help{};
     bool software{};
@@ -156,12 +156,13 @@ Options parse_options(const int argc, wchar_t** argv)
 
 viper::GameAssets load_assets(const std::filesystem::path& root,
                               const std::string_view track,
-                              const std::string_view car)
+                              const std::string_view car,
+                              viper::GameOptions game_options)
 {
     if (root.empty()) {
         throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
     }
-    auto assets = viper::GameAssets::load(root, track, car);
+    auto assets = viper::GameAssets::load(root, track, car, std::move(game_options));
     if (assets.default_tire().label.empty() ||
         !std::all_of(assets.default_tire().parameters.begin(),
             assets.default_tire().parameters.end(),
@@ -182,12 +183,28 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << "Loaded shared tire " << assets.default_tire().label << " from common.res\n"
               << "Loaded " << assets.car_name() << " human setup record: "
               << assets.player_car_setup().size() << " bytes (CCS v2)\n"
+              << "Loaded settings: " << assets.options().entries().size()
+              << " sections from options.def\n"
               << "Parsed " << assets.car_name() << " level-0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
               << assets.player_model().material_groups.size() << " material groups, "
               << assets.player_model().section_counts[2] << " triangles; validated "
               << assets.model_resource_count() << " FNIM resources total\n"
               << "Required assets validated in " << assets.root().string() << '\n';
     return assets;
+}
+
+template <std::size_t N>
+std::string configured_stem(const viper::GameOptions& options,
+                            const std::string_view key,
+                            const std::array<std::string_view, N>& stems,
+                            const std::string_view fallback)
+{
+    const auto index = options.integer("GLOBAL", key);
+    if (!index) return std::string(fallback);
+    if (*index < 0 || static_cast<std::size_t>(*index) >= stems.size())
+        throw std::runtime_error("options.def [GLOBAL] " + std::string(key) +
+            " index is outside the shipped asset range");
+    return std::string(stems[static_cast<std::size_t>(*index)]);
 }
 
 class D3DWindow {
@@ -653,7 +670,23 @@ int wmain(int argc, wchar_t** argv)
     try {
         const auto options = parse_options(argc, argv);
         if (options.help) { usage(std::cout); return 0; }
-        auto assets = load_assets(options.data_dir, options.track, options.car);
+        if (options.data_dir.empty())
+            throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
+        constexpr std::array<std::string_view, 8> tracks{
+            "bemidji", "dundas", "hastings", "heaven", "kenyon", "limbo", "nfield", "uptown"};
+        constexpr std::array<std::string_view, 5> cars{
+            "viper", "exotic", "plane", "sedan", "sports"};
+        const auto config_path = options.data_dir / "options.def";
+        viper::GameOptions configured_options;
+        std::error_code config_error;
+        if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
+            configured_options = viper::GameOptions::load(config_path);
+        const auto track = options.track.value_or(
+            configured_stem(configured_options, "track_no", tracks, "bemidji"));
+        const auto car = options.car.value_or(
+            configured_stem(configured_options, "car_no", cars, "viper"));
+        auto assets = load_assets(options.data_dir, track, car,
+            std::move(configured_options));
         if (options.validate_assets) return 0;
         return run_window(options.software, options.smoke_frames,
             assets.track_name(), assets.car_name(), assets.terrain(),
