@@ -71,6 +71,20 @@ fed route; that last interpretation is an inference, not a recovered fact.
 `MainMenuItem`, `main_menu_control_value`, and `normalize_main_menu_result`
 model the visible selection path.
 
+`plan_main_menu_screen` extends that model across the stateful setup in
+`0x4805C0`. It projects the eight independent one-time localization
+registrations guarded by bits `0x01` through `0x80` of `DAT_00561008`, keeping
+each destination object, string key, and atexit callback address. It then
+accepts the observed generation-mismatch gates for the default player-name
+resource and the six visible menu labels, preserving their native refresh
+order (SingleRace, Career, Multiplayer, Replay, Options, Exit). The plan also
+records the player-name prepare/save helper addresses `0x46B020` and
+`0x46B080`, and retains the raw `0x472B30` interaction result and its
+`0x4805C0` normalization. This projection does not claim localization
+contents, resource-manager side effects, or menu-control callback execution.
+Shipped-image evidence for the main-menu routine is
+`ev_46296befbc4dd8fa5baf76ce27d21d870878fd89e0817e31afeb7087f4d97e0e`.
+
 ### Replay screen (`0x406950`)
 
 `plan_replay_screen` projects the replay handler's record-presence branches,

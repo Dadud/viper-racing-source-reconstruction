@@ -46,18 +46,18 @@ including recent compositions and successful builds. They are not claims of
 exhaustive coverage. The point totals make the estimate reproducible; update
 the maturity level when the evidence changes.
 
-### Reverse-engineering coverage: 56% (55.94 / 100)
+### Reverse-engineering coverage: 58% (57.81 / 100)
 
 | Workstream | Weight | Level | Points | Evidence / remaining gap |
 | --- | ---: | ---: | ---: | --- |
 | Target and asset recovery | 10 | 4 | 10.00 | Extracted game PE, installer and assets documented. Confirm target scope and provenance in `install_layout.md`. |
 | Resource and data formats | 10 | 3.25 | 8.13 | RST0/resource load paths, TIRE and track spline records, and shipped SEAS career records are decoded and connected to consumers; other payload semantics and runtime file outcomes remain open. See `resource_loading.md`, `vehicle_setup.md`, `world_track_objects.md`, `career_season_samples.md`. |
-| Startup and frontend flow | 15 | 2.5 | 9.38 | Startup handoff composes command-line/config flow, initialization, task/lock setup and cleanup; frontend/race transitions include composed callback and overlay paths. OS results, visible meanings, and several called systems remain unknown. See `engine_application_entry.md`, `frontend_dispatch.md`. |
+| Startup and frontend flow | 15 | 2.75 | 10.31 | Startup handoff composes command-line/config flow, initialization, task/lock setup and cleanup; frontend/race transitions include composed callback and overlay paths. The main-menu localization registrations and cache gates are now modeled. OS results, visible meanings, and several called systems remain unknown. See `engine_application_entry.md`, `frontend_dispatch.md`. |
 | Physics and simulation | 25 | 2.75 | 17.19 | Track placement, terrain/suspension/contact paths, tire response, PCAR/NCAR stages, physics-task record loading/population, and track service construction are modeled. Full race simulation, selector/helper effects, exact arithmetic, and runtime behavior remain open. See `simulation_loop.md`, `car_update_branches.md`, `physics_task_objects.md`, `world_track_objects.md`, `vehicle_setup.md`. |
-| Scene and rendering | 15 | 2 | 7.50 | Dashboard/race-frame flow, gear geometry and clipped pixel-write projections are composed. DirectDraw submission/state and full scene rendering remain unknown or unimplemented. See `scene_car_update.md`, `simulation_loop.md`. |
+| Scene and rendering | 15 | 2.25 | 8.44 | Dashboard/race-frame flow, gear geometry and clipped pixel-write projections are composed. DirectDraw submission/state and full scene rendering remain unknown or unimplemented. See `scene_car_update.md`, `simulation_loop.md`. |
 | Input, audio, platform services, multiplayer | 10 | 1.5 | 3.75 | Menu/race input gates, startup services, and multiplayer initialization/status/packet-queue paths have partial models; full controls, audio, transport/lobby behavior, and runtime semantics remain open. |
 | Original-game behavioral validation | 15 | 0 | 0.00 | No systematic original-versus-model capture and comparison recorded. |
-| **Total** | **100** |  | **55.94** | Rounded to 56%. |
+| **Total** | **100** |  | **57.81** | Rounded to 58%. |
 
 ### Baseline playable reconstruction: 16% (16.25 / 100, 2026-10-22)
 
@@ -318,3 +318,4 @@ After a meaningful change:
 
 - **2026-10-24:** Composed the known 0x430610 mesh deformation, two UV mask writes, five indexed group vertex copies, and descriptor refreshes. Confirmed the 0x450B40/0x450B20 resource descriptor layout and zero-length group behavior. Ratings unchanged because runtime mesh views and whole-game validation remain external observations.
 - **2026-10-24 continuation:** Added a bounded `0x45BEB0` scene renderer frame model with the render-state gate, camera transform, viewport/state order, and object virtual dispatch; followed `0x448940` through 4x4 matrix construction, cache invalidation, device transform submission and HRESULT logging; and traced viewport setup into the `+0x44` device call and buffer clear through `+0x30`. Scene/rendering maturity remains 2.25, for reverse-engineering coverage of 56.88% (57% rounded). Playable foundations remain 28.13% because there is no integrated renderer or original-runtime comparison. Geometry submission, DirectDraw behavior, and full scene rendering remain open.
+- **2026-10-24 continuation:** Extended `0x4805C0` through its one-time localized-label registration and cache refresh gates, and recorded the player-name helper and selection-result flow in `plan_main_menu_screen`. Raised startup/frontend maturity from 2.5 to 2.75. Reconciled the preceding renderer review's 2.25 scene maturity, bringing total reverse-engineering coverage from 56.88% to 57.81% (58% rounded). Playable foundations remain 28.13%; menu resource effects and original-runtime comparison remain open. Release build and `git diff --check` pass; no tests were run. Evidence: `ev_46296befbc4dd8fa5baf76ce27d21d870878fd89e0817e31afeb7087f4d97e0e`.

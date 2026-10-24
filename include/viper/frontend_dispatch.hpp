@@ -25,6 +25,41 @@ enum class MainMenuItem {
 [[nodiscard]] std::optional<int> main_menu_control_value(MainMenuItem item) noexcept;
 [[nodiscard]] int normalize_main_menu_result(int result) noexcept;
 
+struct MainMenuLabelRegistration {
+    std::uint32_t initialized_mask_bit{};
+    std::uint32_t resource_object_address{};
+    std::uint32_t localization_key_address{};
+    std::uint32_t atexit_callback_address{};
+};
+
+struct MainMenuScreenObservation {
+    // Low eight bits are the one-time registration flags at DAT_00561008.
+    std::uint32_t initialized_label_mask{};
+    bool default_player_name_resource_stale{};
+    // SingleRace, Career, Multiplayer, Replay, Options, Exit cache tests.
+    std::array<bool, 6> label_resources_stale{};
+    int raw_menu_result{};
+};
+
+struct MainMenuScreenPlan {
+    std::vector<MainMenuLabelRegistration> registrations;
+    std::vector<std::uint32_t> refreshed_resource_objects;
+    std::uint32_t initialized_label_mask_after{};
+    std::uint32_t player_name_prepare_helper_address{0x0046b020U};
+    std::uint32_t interaction_helper_address{0x00472b30U};
+    std::uint32_t player_name_save_helper_address{0x0046b080U};
+    bool refresh_default_player_name{};
+    bool interaction_called{true};
+    bool player_name_saved{true};
+    int raw_menu_result{};
+    int normalized_menu_result{};
+};
+
+// Projects 0x4805C0's one-time label registrations, generation-driven
+// resource refreshes, and result save/normalization around 0x472B30.
+[[nodiscard]] MainMenuScreenPlan plan_main_menu_screen(
+    const MainMenuScreenObservation& observation);
+
 // The original frontend dispatches these selector values to distinct native
 // handlers. Selector 7 is accepted by the switch but is not assigned to one
 // of the visible main-menu entries recovered so far.

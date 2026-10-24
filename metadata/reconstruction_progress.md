@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24:** Extended the main-menu model through `0x4805C0`'s stateful
+  setup. `plan_main_menu_screen` records all eight one-time localized-label
+  registrations, the default-name and six menu-label generation refresh gates,
+  and the raw/normalized `0x472B30` result. Localization data, resource effects,
+  and activated callback behavior remain observations. Evidence is in
+  `metadata/frontend_dispatch.evidence.json`; Release build and diff check
+  passed; no tests were run.
+
 - **2026-10-24:** Extended the dual-table planner to `0x456D00`, adding the
   distance-fade OR into the second palette word and mode-2 delegation to
   `0x4575A0`. The final alpha remains an explicit input; incomplete fade

@@ -23,6 +23,46 @@ int normalize_main_menu_result(const int result) noexcept
     return result > -3 && result < 0 ? 8 : result;
 }
 
+MainMenuScreenPlan plan_main_menu_screen(
+    const MainMenuScreenObservation& observation)
+{
+    constexpr std::array<MainMenuLabelRegistration, 8> labels{{
+        {0x01U, 0x00560f78U, 0x004dff5cU, 0x00480c70U},
+        {0x02U, 0x00560ee8U, 0x004dff78U, 0x00480c60U},
+        {0x04U, 0x00561010U, 0x004dff90U, 0x00480c50U},
+        {0x08U, 0x00560f50U, 0x004dffa8U, 0x00480c40U},
+        {0x10U, 0x00560f98U, 0x004dffbcU, 0x00480c30U},
+        {0x20U, 0x00561058U, 0x004dffd4U, 0x00480c20U},
+        {0x40U, 0x00560f68U, 0x004dffe8U, 0x00480c10U},
+        {0x80U, 0x00560ec0U, 0x004dfffcU, 0x00480c00U},
+    }};
+    constexpr std::array<std::uint32_t, 6> menu_label_objects{{
+        0x00561010U, 0x00560f50U, 0x00560f98U,
+        0x00561058U, 0x00560f68U, 0x00560ec0U,
+    }};
+
+    MainMenuScreenPlan plan{};
+    plan.initialized_label_mask_after = observation.initialized_label_mask;
+    for (const auto& label : labels) {
+        if ((observation.initialized_label_mask &
+             label.initialized_mask_bit) == 0) {
+            plan.registrations.push_back(label);
+            plan.initialized_label_mask_after |= label.initialized_mask_bit;
+        }
+    }
+    plan.refresh_default_player_name =
+        observation.default_player_name_resource_stale;
+    for (std::size_t index = 0; index < menu_label_objects.size(); ++index) {
+        if (observation.label_resources_stale[index]) {
+            plan.refreshed_resource_objects.push_back(menu_label_objects[index]);
+        }
+    }
+    plan.raw_menu_result = observation.raw_menu_result;
+    plan.normalized_menu_result =
+        normalize_main_menu_result(observation.raw_menu_result);
+    return plan;
+}
+
 FrontendHandler frontend_handler_for(const int selector) noexcept
 {
     switch (selector) {
