@@ -111,6 +111,31 @@ NcarIntegratorTimerResult advance_ncar_integrator_timer(
     return result;
 }
 
+NcarIntegratorEarlyBoundsResult plan_ncar_integrator_early_bounds(
+    const PhysicsVector3& position,
+    const std::uint32_t vehicle_ordinal_0x510) noexcept
+{
+    const std::array<std::uint32_t, 3> bits{
+        std::bit_cast<std::uint32_t>(position.x),
+        std::bit_cast<std::uint32_t>(position.y),
+        std::bit_cast<std::uint32_t>(position.z)};
+    const auto below_raw_limits =
+        bits[0] < 0xC59C4000U &&
+        std::bit_cast<std::int32_t>(bits[0]) < 0x459C4000 &&
+        bits[1] < 0xC47A0000U &&
+        std::bit_cast<std::int32_t>(bits[1]) < 0x453B8000 &&
+        bits[2] < 0xC59C4000U &&
+        std::bit_cast<std::int32_t>(bits[2]) < 0x459C4000;
+
+    NcarIntegratorEarlyBoundsResult result{};
+    result.within_bounds = below_raw_limits;
+    result.callback_0x508a04_slot_0x3c_reached = !below_raw_limits;
+    if (result.callback_0x508a04_slot_0x3c_reached) {
+        result.callback_vehicle_ordinal_0x510 = vehicle_ordinal_0x510;
+    }
+    return result;
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,
@@ -710,6 +735,9 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     result.integrator_timer = advance_ncar_integrator_timer(
         result.integrator_timer_state,
         input.integrator_timer_input);
+    result.integrator_early_bounds = plan_ncar_integrator_early_bounds(
+        kinematics_at_step_start.position,
+        input.post_body_input.vehicle_ordinal_0x510);
     result.input_complete = result.integrator_timer.input_complete;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;

@@ -49,6 +49,20 @@ and `ev_946ec3efe850470f7eea21d3d08dc427a46c9a686b71d929dbd583ebeab36ae6`
 (`0x433570` constants). The retained records are in
 [`ncar_integrator_timer.evidence.json`](ncar_integrator_timer.evidence.json).
 
+Immediately afterward, `0x431150` calls `0x432130` on the body position at
+`+0x5C`. The helper returns zero only when all three raw DWORD pairs pass:
+X/Z are strictly between -5000 and 5000, and Y is strictly between -1000 and
+3000. The caller invokes global interface slot `+0x3C` when the helper returns
+nonzero, so `plan_ncar_integrator_early_bounds` records the callback on any
+out-of-range position and forwards ordinal `+0x510`. The comparisons are
+retained as the original unsigned and signed integer tests over float bits,
+including their behavior for non-finite values; callback effects remain
+outside the portable model.
+
+Evidence: `ev_76372b1d20911ae6c6596f9fc9987110b1639312dde8af814ff1145e92ab0d56`
+(`0x432130` pseudocode and instructions), linked to caller `0x431150` in
+[`ncar_integrator_timer.evidence.json`](ncar_integrator_timer.evidence.json).
+
 ## PCAR callback at `0x4384D0`
 
 The prologue combines object fields `+0x234`, `+0x238`, and `+0x23C` with

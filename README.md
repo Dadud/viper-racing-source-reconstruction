@@ -275,6 +275,7 @@ files were present.
   four-wheel collision accumulator, observed mode-0/mode-1 force branch and
   the initial `+0x4FC` X/Z velocity reset and `+0xE3D` vertical-force prefix,
   plus the `0x433570` time-window ramp and caller-supplied ordinal-record gate,
+  and the inverse `0x432130` out-of-bounds callback gate,
   contact-gated wheel-pair differences, the following contact-count split and
   low-contact resistance/high-contact quadratic force projection, and the two
   post-resistance velocity/projection forces with their per-step energy sum;

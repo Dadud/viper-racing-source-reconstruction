@@ -342,6 +342,18 @@ struct NcarIntegratorTimerResult {
     NcarIntegratorTimerState& state,
     const NcarIntegratorTimerInput& input) noexcept;
 
+struct NcarIntegratorEarlyBoundsResult {
+    bool within_bounds{};
+    bool callback_0x508a04_slot_0x3c_reached{};
+    std::uint32_t callback_vehicle_ordinal_0x510{};
+};
+
+// Projects the raw DWORD range checks at 0x432130 and its inverse caller gate.
+[[nodiscard]] NcarIntegratorEarlyBoundsResult
+plan_ncar_integrator_early_bounds(
+    const PhysicsVector3& position,
+    std::uint32_t vehicle_ordinal_0x510) noexcept;
+
 struct FourWheelBodyStepInput {
     std::array<std::uint8_t, 4> wheel_damage_flags_0x20{};
     bool wheel_update_prefix_enabled{};
@@ -446,6 +458,7 @@ struct FourWheelBodyStepResult {
     NcarIntegratorPrefixResult integrator_prefix{};
     NcarIntegratorTimerResult integrator_timer{};
     NcarIntegratorTimerState integrator_timer_state{};
+    NcarIntegratorEarlyBoundsResult integrator_early_bounds{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
     NcarIntegratorCommonForceResult common_force{};
