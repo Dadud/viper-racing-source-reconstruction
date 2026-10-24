@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <span>
@@ -531,6 +532,26 @@ initialize_ncar_integrator_wheel_callback_setup(
 [[nodiscard]] std::optional<NcarIntegratorWheelCallbackSetup>
 initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
     std::span<const std::byte> runtime_record) noexcept;
+
+struct NcarWheelVertexAnchorInput {
+    // Mapped NCAR source-record values read by 0x433C00 at +0x58, +0x5C,
+    // and +0x128. Vertex positions are the first three floats of each FNIM row.
+    float source_width_0x58{};
+    float source_ratio_0x5c{};
+    float source_offset_0x128{};
+    std::span<const std::array<float, 3>> model_vertices;
+};
+
+struct NcarWheelVertexAnchorResult {
+    std::array<std::array<float, 3>, 4> candidate_positions{};
+    std::array<std::optional<std::size_t>, 4> vertex_indices{};
+    std::array<float, 4> nearest_distances{};
+};
+
+// Reconstructs the four candidate-point formulas and strict nearest-vertex
+// scan in NCAR constructor 0x433C00. Empty vertex spans leave indices unset.
+[[nodiscard]] NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
+    const NcarWheelVertexAnchorInput& input) noexcept;
 
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};

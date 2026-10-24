@@ -247,6 +247,37 @@ initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
     return initialize_ncar_integrator_wheel_callback_setup(input);
 }
 
+NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
+    const NcarWheelVertexAnchorInput& input) noexcept
+{
+    NcarWheelVertexAnchorResult result{};
+    const float width = input.source_width_0x58 * 0.0254F;
+    const float ratio = input.source_ratio_0x5c * 0.01F;
+    const float y = input.source_offset_0x128 * -0.0254F;
+    const std::array<float, 2> axle_z{
+        (1.0F - ratio) * width,
+        -(ratio * width)};
+    constexpr std::array<float, 4> x{-0.4F, 0.4F, -0.4F, 0.4F};
+    for (std::size_t wheel = 0; wheel < result.candidate_positions.size(); ++wheel) {
+        const auto z = axle_z[wheel < 2U ? 0U : 1U];
+        result.candidate_positions[wheel] = {x[wheel], y, z};
+        float nearest_distance = 100000.0F;
+        for (std::size_t vertex = 0; vertex < input.model_vertices.size(); ++vertex) {
+            const auto& point = input.model_vertices[vertex];
+            const float dx = x[wheel] - point[0];
+            const float dy = y - point[1];
+            const float dz = z - point[2];
+            const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (distance < nearest_distance) {
+                nearest_distance = distance;
+                result.vertex_indices[wheel] = vertex;
+            }
+        }
+        result.nearest_distances[wheel] = nearest_distance;
+    }
+    return result;
+}
+
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept
 {

@@ -220,6 +220,27 @@ function rejects non-finite model bounds and vehicle-record inputs. The proxy
 is still not connected to live collision handling. Evidence: `0x4509B0`
 `ev_f3e69307c431f783075d86dbeed730ee32736a6159e31f8b9633cd65593d0208`.
 
+### Mesh-derived wheel anchors in `0x433C00`
+
+After measuring model extents, the NCAR constructor selects one FNIM vertex for
+each wheel. It forms four candidate positions in the model-local basis:
+X alternates between `-0.4` and `+0.4`, Y is
+`-runtime[0x128] * 0.0254`, and Z is
+`(1 - runtime[0x5C] * 0.01) * runtime[0x58] * 0.0254` for indices 0/1 or
+`-(runtime[0x5C] * 0.01 * runtime[0x58] * 0.0254)` for indices 2/3. It scans
+the 32-byte model rows using XYZ at offsets 0/4/8, computes Euclidean distance,
+and replaces the current candidate only on a strict decrease. Equal-distance
+ties therefore retain the earliest vertex. The four selected pointers are
+passed in wheel order to `0x441C10`, whose subobjects advance by `0x1A4` bytes.
+
+`select_ncar_wheel_vertex_anchors` reconstructs these formulas and scan using
+the three mapped runtime fields and parsed model-space XYZ positions. It leaves
+an index unset for an empty mesh. This is setup geometry only: it does not
+establish a body pose, suspension travel, contact state, or a live physics step.
+Evidence: `0x433C00` pseudocode and body range
+`0x00433C00..0x00434A51`, dossier
+`ev_f2bb786a74070a51b02f0626e35bf0593a3b38ab0f124dd60bb1a06abe4d65dd`.
+
 ### TIRE field consumption at `0x435BF0`
 
 The tire-object initializer reads the 22-float record at `param_2 + 0x20` and
