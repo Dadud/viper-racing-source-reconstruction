@@ -67,6 +67,13 @@ collector, and body-integrator state are still not owned by `WindowState`.
 Build those persistent inputs and connect them to the existing wheel/body
 compositions before replacing route motion as the rendered pose authority.
 
+The model `advance_four_wheel_body_step` currently has no production call site.
+Its caller needs the registered object's body state at capture time for the
+NCAR sample pipeline. `0x420930` is only the registered-object lookup, not a state
+update; native ordering between integration and sampling must be established
+before wiring that pipeline into the race session. See
+`metadata/car_update_branches.md` for the corrected evidence reference.
+
 ### 2. Close the physical race loop: terrain, collision, damage, and finish
 
 **Outcome:** The player-owned simulation from milestone 1 runs stably for a
