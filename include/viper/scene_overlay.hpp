@@ -1678,6 +1678,31 @@ raster_scene_dashboard_builtin_font(
     const SceneDashboardAtlasFontObservation& font,
     const SceneDashboardRasterObservation& renderer);
 
+struct SceneDashboardCoreCallbackRasterObservation {
+    // One preformatted argument and renderer context for each ordered callback
+    // text call. Missing entries preserve the known prefix and report partial.
+    std::span<const std::string_view> formatted_text_arguments;
+    std::span<const SceneDashboardRasterObservation> per_call_renderers;
+};
+
+struct SceneDashboardCoreCallbackRasterPlan {
+    bool input_complete{true};
+    std::size_t expected_call_count{};
+    std::size_t text_arguments_used{};
+    std::size_t renderer_contexts_used{};
+    std::size_t text_calls_rasterized{};
+    std::vector<SceneTextPixelWrite> ordered_pixel_writes;
+};
+
+// Rasterizes the ordered text calls emitted by the state-0 dashboard callback.
+// Pixel writes are projected; surface mutation and device ownership stay external.
+[[nodiscard]] SceneDashboardCoreCallbackRasterPlan
+raster_scene_dashboard_core_callback(
+    const SceneDashboardCoreCallbackPlan& callback,
+    const SceneDashboardCoreCallbackRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font);
+
 struct ScenePhysicsWheelBarLabelRasterObservation {
     // Text color/font/flags selected by the 0x479580 style object (style 0x11).
     SceneDashboardTextCall text_style{};

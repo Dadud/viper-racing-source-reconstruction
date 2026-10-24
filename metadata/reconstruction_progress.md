@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added `raster_scene_dashboard_core_callback`, which composes
+  the state-0 dashboard callback's ordered text calls through existing font
+  layout and atlas rasterization. One formatted argument and renderer context
+  remain explicit per call; the result preserves callback order, aggregates
+  projected pixel writes, and reports incomplete input spans. Surface ownership
+  and device submission remain open. Release build and `git diff --check`
+  passed; no tests were run.
+
 - **2026-10-24:** Extended the multiplayer status supervisor with the two
   `DAT_00564320` one-time text registrations, their localized keys and atexit
   callbacks, and optional generation-cache refresh gates. Documented the

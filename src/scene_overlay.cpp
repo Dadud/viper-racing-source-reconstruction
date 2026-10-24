@@ -3246,6 +3246,41 @@ SceneSharedResultsRasterPlan raster_scene_shared_results_rows(
     return result;
 }
 
+SceneDashboardCoreCallbackRasterPlan raster_scene_dashboard_core_callback(
+    const SceneDashboardCoreCallbackPlan& callback,
+    const SceneDashboardCoreCallbackRasterObservation& observation,
+    const SceneDashboardFontObservation& layout_font,
+    const SceneDashboardAtlasFontObservation& atlas_font)
+{
+    SceneDashboardCoreCallbackRasterPlan result{};
+    result.expected_call_count = callback.ordered_text_calls.size();
+    result.input_complete =
+        observation.formatted_text_arguments.size() == result.expected_call_count &&
+        observation.per_call_renderers.size() == result.expected_call_count;
+
+    const auto call_count = std::min({
+        result.expected_call_count,
+        observation.formatted_text_arguments.size(),
+        observation.per_call_renderers.size(),
+    });
+    for (std::size_t index = 0; index < call_count; ++index) {
+        const auto layout = layout_scene_dashboard_text(
+            callback.ordered_text_calls[index],
+            observation.formatted_text_arguments[index],
+            layout_font);
+        const auto raster = raster_scene_dashboard_text(
+            layout, atlas_font, observation.per_call_renderers[index]);
+        ++result.text_arguments_used;
+        ++result.renderer_contexts_used;
+        ++result.text_calls_rasterized;
+        result.input_complete = result.input_complete && raster.input_complete;
+        result.ordered_pixel_writes.insert(
+            result.ordered_pixel_writes.end(), raster.pixel_writes.begin(),
+            raster.pixel_writes.end());
+    }
+    return result;
+}
+
 ScenePhysicsWheelBarLabelRasterPlan raster_scene_physics_wheel_bar_labels(
     const std::array<ScenePhysicsWheelBarPlan, 4>& bars,
     const ScenePhysicsWheelBarLabelRasterObservation& observation,

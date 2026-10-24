@@ -1141,6 +1141,14 @@ both metrics, and the auxiliary rows in callback order. Formatted arguments
 remain separate because several values come from runtime resources or raw
 stack state.
 
+`raster_scene_dashboard_core_callback` now consumes that ordered list together
+with one formatted text observation and renderer context per call. It applies
+the existing font layout and atlas rasterizer in callback order, concatenates
+their projected pixel writes, and marks missing or extra arguments/contexts as
+incomplete. This composes the state-0 dashboard's reached text effects through
+to framebuffer write addresses without claiming surface ownership or device
+submission.
+
 The null-font fallback in `0x44DC70` has a distinct renderer path: it invokes
 `0x44D6A0` twice at `(x+1,y+1)` and `(x,y)` with separate global colors.
 `0x44D6A0` brackets each string with `0x415090`/`0x4150A0` (both are `ret`

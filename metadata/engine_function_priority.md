@@ -45,7 +45,9 @@ layout and `0x44D0C0` atlas RLE raster projection are now modeled through
 clipping and 16-bit framebuffer writes; state-0 `0x44DB10` text width and
 `0x44DC50` extent now have bounded input implementations. The null-font 8x8
 bitmap path, extracted glyph table, and two color writers are modeled;
-actual device/surface ownership and remaining callback gates are still open.
+the ordered state-0 callback text list now composes through atlas layout and
+pixel-write projections. Actual device/surface ownership and remaining
+callback gates are still open.
 The `0x418500` locale
 initializer is now modeled, including both selected 13-DWORD tables and the
 raw sources of the metric multipliers; the target formatter's null `%s`
