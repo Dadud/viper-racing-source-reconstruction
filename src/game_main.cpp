@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <cstddef>
 #include <filesystem>
@@ -250,12 +251,22 @@ public:
     bool create(HWND hwnd, bool software,
                 const viper::TerrainSurfaceResourcePayload& terrain,
                 const viper::IdealLineTrackData& ideal_line,
-                const viper::ModelResource& player_model)
+                const viper::ModelResource& player_model,
+                const viper::TrackObjectTextTable& track_objects)
     {
         try {
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
             extract_terrain_points(terrain);
             player_model_ = &player_model;
+            const auto spawn = first_car_spawn(track_objects);
+            if (!spawn) throw std::runtime_error("track.obt has no usable obj car start position");
+            car_anchor_x_ = (*spawn)[0];
+            car_anchor_z_ = (*spawn)[1];
+            car_anchor_y_ = viper::terrain_height_or_zero(
+                terrain, car_anchor_x_, car_anchor_z_, false);
+            car_yaw_ = std::atan2(
+                ideal_line_points_[1][1] - ideal_line_points_[0][1],
+                ideal_line_points_[1][0] - ideal_line_points_[0][0]);
         } catch (const std::exception& e) {
             OutputDebugStringA(e.what());
             return false;
@@ -469,6 +480,22 @@ private:
         return true;
     }
 
+    static std::optional<std::array<float, 2>> first_car_spawn(
+        const viper::TrackObjectTextTable& table)
+    {
+        for (std::size_t row = 1; row < table.line_count; ++row) {
+            const auto line = viper::track_object_text_line(table, row);
+            if (!line) continue;
+            const auto directive = viper::classify_track_directive(*line);
+            if (directive.kind != viper::TrackDirectiveKind::object ||
+                !directive.object_line.starts_with("obj car ")) continue;
+            float x{}, z{};
+            if (sscanf_s(directive.object_line.data(), "obj car %f, %f", &x, &z) == 2 &&
+                std::isfinite(x) && std::isfinite(z)) return std::array<float, 2>{x, z};
+        }
+        return std::nullopt;
+    }
+
     bool update_car_buffer()
     {
         if (!width_ || !height_ || player_model_ == nullptr || player_model_->vertices.empty()) return true;
@@ -640,7 +667,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::string_view car_name,
                const viper::TerrainSurfaceResourcePayload& terrain,
                const viper::IdealLineTrackData& ideal_line,
-               const viper::ModelResource& player_model)
+               const viper::ModelResource& player_model,
+               const viper::TrackObjectTextTable& track_objects)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -666,7 +694,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
-    if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model)) {
+    if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model,
+            track_objects)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
         DestroyWindow(hwnd);
@@ -701,6 +730,25 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     return static_cast<int>(msg.wParam);
 }
 
+void report_start_grid(const viper::GameAssets& assets)
+{
+    const auto& table = assets.track_objects();
+    std::size_t car_directives = 0;
+    std::cout << "Recovered " << assets.track_name()
+              << " track.obt: " << table.line_count
+              << " rows, stride " << table.line_stride << ".\n";
+    for (std::size_t row = 1; row < table.line_count; ++row) {
+        const auto line = viper::track_object_text_line(table, row);
+        if (!line) continue;
+        const auto directive = viper::classify_track_directive(*line);
+        if (directive.kind != viper::TrackDirectiveKind::object ||
+            !directive.object_line.starts_with("obj car ")) continue;
+        ++car_directives;
+        std::cout << "  grid row " << row << ": " << directive.object_line << '\n';
+    }
+    std::cout << "  observed car placement directives: " << car_directives << '\n';
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv)
@@ -723,10 +771,11 @@ int wmain(int argc, wchar_t** argv)
             : configured_car_stem(options.data_dir, configured_options);
         auto assets = load_assets(options.data_dir, track, car,
             std::move(configured_options));
+        report_start_grid(assets);
         if (options.validate_assets) return 0;
         return run_window(options.software, options.smoke_frames,
             assets.track_name(), assets.car_name(), assets.terrain(),
-            assets.ideal_line(), assets.player_model());
+            assets.ideal_line(), assets.player_model(), assets.track_objects());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;

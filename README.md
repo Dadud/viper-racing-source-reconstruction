@@ -7,7 +7,10 @@ and [reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
 parses the selected track's terrain and ideal line plus the selected car's
 setup and level-0 indexed mesh, and draws them in a top-down Direct3D
-development view. It does not yet render a 3D track scene or run a race.
+development view. It loads the selected track's `track.obt` placement table and
+anchors the preview car at its first `obj car` start position, with height
+sampled from terrain data. The preview heading still follows the ideal line.
+It does not yet render a 3D track scene or run a race.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell

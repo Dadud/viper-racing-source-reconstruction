@@ -32,6 +32,7 @@ public:
     [[nodiscard]] const ResourceBundle& bundle(std::string_view name) const;
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
+    [[nodiscard]] const TrackObjectTextTable& track_objects() const noexcept { return track_objects_; }
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
@@ -48,6 +49,7 @@ private:
     std::string car_name_;
     LanguageResource language_;
     TerrainSurfaceResourcePayload terrain_;
+    TrackObjectTextTable track_objects_;
     IdealLineTrackData ideal_line_;
     CarFileResourcePayloads player_car_;
     ModelResource player_model_;

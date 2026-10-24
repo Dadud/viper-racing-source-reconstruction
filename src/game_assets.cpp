@@ -112,6 +112,17 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         throw std::runtime_error("invalid language resource " + language_path.string() + ": " + e.what());
     }
     const auto& track_bundle = assets.bundle(assets.bundle_names_[4]);
+    const auto* track_objects_entry = track_bundle.find(
+        "track.obt", TrackObjectTextTable::bats_resource_type_code);
+    if (track_objects_entry == nullptr)
+        throw std::runtime_error(assets.track_name_ +
+            " track.obt world-object resource is missing");
+    const auto track_objects = parse_track_object_text_table(
+        track_bundle.payload(*track_objects_entry));
+    if (!track_objects)
+        throw std::runtime_error(assets.track_name_ +
+            " track.obt world-object resource is invalid");
+    assets.track_objects_ = *track_objects;
     const auto terrain = parse_track_terrain_resource(track_bundle);
     if (!terrain) {
         throw std::runtime_error(assets.track_name_ +
