@@ -5,9 +5,10 @@
 The completion plan is tracked in [the feature ledger](metadata/completion_ledger.md)
 and [reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
-parses Bemidji's terrain and ideal line, and draws the recovered terrain
-triangles with an ideal-line overlay in a top-down Direct3D development view.
-It does not yet render a 3D track scene or run a race.
+parses Bemidji's terrain, ideal line, Viper setup, and indexed Viper0 mesh, and
+draws the recovered terrain triangles with the route and a provisionally
+projected Viper mesh in a top-down Direct3D development view. It does not yet
+render a 3D track scene or run a race.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell

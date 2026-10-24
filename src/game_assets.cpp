@@ -65,6 +65,19 @@ GameAssets GameAssets::load(const std::filesystem::path& root)
     if (!assets.player_car_.car_file) {
         throw std::runtime_error("Viper CARF version 6 resource is missing or invalid");
     }
+    bool player_model_loaded = false;
+    for (const auto& entry : assets.bundle("viper.car").entries()) {
+        if (entry.type_code != ModelResource::resource_type_code) continue;
+        const auto model = parse_model_resource(entry.attributes,
+            assets.bundle("viper.car").payload(entry));
+        if (!model) throw std::runtime_error("invalid or unsupported FNIM model resource: " + entry.name);
+        ++assets.model_resource_count_;
+        if (entry.name == "Viper0.mod") {
+            assets.player_model_ = *model;
+            player_model_loaded = true;
+        }
+    }
+    if (!player_model_loaded) throw std::runtime_error("Viper0 FNIM model resource is missing");
     return assets;
 }
 

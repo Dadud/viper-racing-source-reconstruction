@@ -1,6 +1,7 @@
 #pragma once
 
 #include "viper/language_resource.hpp"
+#include "viper/model_resource.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/terrain_surface.hpp"
 #include "viper/world_track_objects.hpp"
@@ -22,6 +23,8 @@ public:
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
+    [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
+    [[nodiscard]] std::size_t model_resource_count() const noexcept { return model_resource_count_; }
 
 private:
     std::filesystem::path root_;
@@ -30,6 +33,8 @@ private:
     TerrainSurfaceResourcePayload terrain_;
     IdealLineTrackData ideal_line_;
     CarFileResourcePayloads player_car_;
+    ModelResource player_model_;
+    std::size_t model_resource_count_{};
 };
 
 } // namespace viper

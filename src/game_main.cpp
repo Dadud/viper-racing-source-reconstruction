@@ -154,6 +154,10 @@ viper::GameAssets load_assets(const std::filesystem::path& root)
               << " records\n"
               << "Parsed Viper CARF: version " << assets.player_car().car_file->resource_version
               << ", " << assets.player_car().car_file->raw_words.size() << " configuration words\n"
+              << "Parsed Viper0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
+              << assets.player_model().material_groups.size() << " material groups, "
+              << assets.player_model().section_counts[2] << " triangles; validated "
+              << assets.model_resource_count() << " FNIM resources total\n"
               << "Required assets validated in " << assets.root().string() << '\n';
     return assets;
 }
@@ -162,11 +166,13 @@ class D3DWindow {
 public:
     bool create(HWND hwnd, bool software,
                 const viper::TerrainSurfaceResourcePayload& terrain,
-                const viper::IdealLineTrackData& ideal_line)
+                const viper::IdealLineTrackData& ideal_line,
+                const viper::ModelResource& player_model)
     {
         try {
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
             extract_terrain_points(terrain);
+            player_model_ = &player_model;
         } catch (const std::exception& e) {
             OutputDebugStringA(e.what());
             return false;
@@ -191,7 +197,7 @@ public:
             &desc, &swap_chain_, &device_, &selected, &context_);
         if (FAILED(hr)) return false;
         return create_target() && create_surface_pipeline() && create_line_pipeline() &&
-            update_surface_buffer() && update_line_buffer();
+            update_surface_buffer() && update_car_buffer() && update_line_buffer();
     }
 
     bool resize(UINT width, UINT height)
@@ -202,7 +208,7 @@ public:
         if (FAILED(swap_chain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0))) return false;
         width_ = width;
         height_ = height;
-        return create_target() && update_surface_buffer() && update_line_buffer();
+        return create_target() && update_surface_buffer() && update_car_buffer() && update_line_buffer();
     }
 
     bool render()
@@ -234,6 +240,18 @@ public:
         context_->VSSetShader(line_vertex_shader_.Get(), nullptr, 0);
         context_->PSSetShader(line_pixel_shader_.Get(), nullptr, 0);
         context_->Draw(ideal_line_vertex_count_, 0);
+        if (car_buffer_ && !car_draw_groups_.empty()) {
+            const UINT car_stride = sizeof(SurfaceVertex);
+            constexpr UINT car_offset = 0;
+            context_->RSSetState(surface_rasterizer_.Get());
+            context_->IASetInputLayout(surface_input_layout_.Get());
+            context_->IASetVertexBuffers(0, 1, car_buffer_.GetAddressOf(), &car_stride, &car_offset);
+            context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0);
+            context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0);
+            for (const auto& group : car_draw_groups_)
+                if (group.vertex_count) context_->Draw(group.vertex_count, group.first_vertex);
+        }
         return SUCCEEDED(swap_chain_->Present(1, 0));
     }
 
@@ -343,6 +361,60 @@ private:
         return true;
     }
 
+    bool update_car_buffer()
+    {
+        if (!width_ || !height_ || player_model_ == nullptr || player_model_->vertices.empty()) return true;
+        if (ideal_line_points_.size() < 2U) return false;
+        const float dx = ideal_line_points_[1][0] - ideal_line_points_[0][0];
+        const float dz = ideal_line_points_[1][1] - ideal_line_points_[0][1];
+        const float tangent_length = std::sqrt(dx * dx + dz * dz);
+        if (!(tangent_length > 1.0e-6f) || !std::isfinite(tangent_length)) return false;
+        const float sin_yaw = dx / tangent_length;
+        const float cos_yaw = dz / tangent_length;
+        const float anchor_x = ideal_line_points_[0][0];
+        const float anchor_z = ideal_line_points_[0][1];
+        std::vector<SurfaceVertex> vertices;
+        std::vector<CarDrawGroup> groups;
+        for (const auto& model_group : player_model_->material_groups) {
+            CarDrawGroup draw_group{};
+            draw_group.first_vertex = static_cast<UINT>(vertices.size());
+            const auto material = model_group.material_name;
+            const std::array<float, 3> color = material.find("WHEEL") != std::string::npos
+                ? std::array<float, 3>{0.10f, 0.11f, 0.12f}
+                : material.find("EFFECT") != std::string::npos
+                    ? std::array<float, 3>{0.95f, 0.57f, 0.12f}
+                    : material.find("UCAR") != std::string::npos
+                        ? std::array<float, 3>{0.18f, 0.48f, 0.82f}
+                        : std::array<float, 3>{0.78f, 0.20f, 0.12f};
+            for (const auto local_index : model_group.local_indices) {
+                const auto vertex_index = static_cast<std::size_t>(model_group.first_vertex) + local_index;
+                if (vertex_index >= player_model_->vertices.size()) return false;
+                const auto& model_vertex = player_model_->vertices[vertex_index].fields;
+                // FNIM stores vehicle-local XYZ; this overview projects local X/Z onto the map.
+                const float world_x = anchor_x + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
+                const float world_z = anchor_z - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
+                const auto pos = map_to_clip(world_x, world_z);
+                vertices.push_back({pos[0], pos[1], color[0], color[1], color[2]});
+            }
+            draw_group.vertex_count = static_cast<UINT>(vertices.size()) - draw_group.first_vertex;
+            groups.push_back(draw_group);
+        }
+        if (vertices.size() > std::numeric_limits<UINT>::max() / sizeof(SurfaceVertex)) return false;
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(SurfaceVertex));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA data{};
+        data.pSysMem = vertices.data();
+        ComPtr<ID3D11Buffer> buffer;
+        if (FAILED(device_->CreateBuffer(&desc, &data, &buffer))) return false;
+        car_buffer_ = std::move(buffer);
+        car_draw_groups_ = std::move(groups);
+        return true;
+    }
+
+    struct CarDrawGroup { UINT first_vertex{}; UINT vertex_count{}; };
+
     bool create_line_pipeline()
     {
         static constexpr char vertex_source[] =
@@ -407,12 +479,15 @@ private:
     ComPtr<ID3D11InputLayout> surface_input_layout_;
     ComPtr<ID3D11RasterizerState> surface_rasterizer_;
     ComPtr<ID3D11Buffer> surface_buffer_;
+    ComPtr<ID3D11Buffer> car_buffer_;
     ComPtr<ID3D11VertexShader> line_vertex_shader_;
     ComPtr<ID3D11PixelShader> line_pixel_shader_;
     ComPtr<ID3D11InputLayout> line_input_layout_;
     ComPtr<ID3D11Buffer> line_buffer_;
     std::vector<std::array<float, 2>> ideal_line_points_;
     std::vector<std::array<float, 3>> terrain_points_;
+    const viper::ModelResource* player_model_{};
+    std::vector<CarDrawGroup> car_draw_groups_;
     std::array<float, 4> map_bounds_{};
     float min_height_{};
     float max_height_{};
@@ -453,7 +528,8 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::TerrainSurfaceResourcePayload& terrain,
-               const viper::IdealLineTrackData& ideal_line)
+               const viper::IdealLineTrackData& ideal_line,
+               const viper::ModelResource& player_model)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -467,11 +543,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
-    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Bemidji Terrain Development View",
+    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Bemidji Terrain & Viper Mesh View",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
-    if (!state.graphics.create(hwnd, software, terrain, ideal_line)) {
+    if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
         DestroyWindow(hwnd);
@@ -515,7 +591,8 @@ int wmain(int argc, wchar_t** argv)
         if (options.help) { usage(std::cout); return 0; }
         auto assets = load_assets(options.data_dir);
         if (options.validate_assets) return 0;
-        return run_window(options.software, options.smoke_frames, assets.terrain(), assets.ideal_line());
+        return run_window(options.software, options.smoke_frames, assets.terrain(),
+            assets.ideal_line(), assets.player_model());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;
