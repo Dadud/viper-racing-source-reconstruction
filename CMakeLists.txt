@@ -292,7 +292,7 @@ if(BUILD_TESTING)
     add_executable(viper_car_runtime_setup_regression
         tests/car_runtime_setup_regression.cpp)
     target_link_libraries(viper_car_runtime_setup_regression PRIVATE
-        viper_scene_model viper_resource_bundle)
+        viper_scene_model viper_resource_bundle viper_wheel_body_coupling)
     add_test(NAME car_runtime_setup_regression
         COMMAND viper_car_runtime_setup_regression)
     add_executable(viper_human_car_setup_regression

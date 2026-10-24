@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <optional>
+#include <span>
+
 #include "viper/ncar_state.hpp"
 #include "viper/vehicle_setup.hpp"
 
@@ -521,6 +525,14 @@ struct NcarIntegratorWheelCallbackSetup {
 [[nodiscard]] NcarIntegratorWheelCallbackSetup
 initialize_ncar_integrator_wheel_callback_setup(
     const NcarIntegratorWheelCallbackSetupInput& input) noexcept;
+
+// Reads the mapped width and ratio at runtime-record +0x58/+0x5C. The
+// steering angle belongs to vehicle state (+0x4B0) and remains explicit.
+// Returns no result when either mapped field falls outside the input record.
+[[nodiscard]] std::optional<NcarIntegratorWheelCallbackSetup>
+initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
+    std::span<const std::byte> runtime_record,
+    float source_steering_angle_0x4b0) noexcept;
 
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};

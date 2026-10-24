@@ -1,7 +1,10 @@
 #include "viper/world_track_objects.hpp"
+#include "viper/wheel_body_coupling.hpp"
 
 #include <algorithm>
 #include <array>
+#include <bit>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -44,6 +47,8 @@ int main()
         viper::CarFilePayload car_file{};
         car_file.resource_version = viper::CarFilePayload::supported_resource_version;
         car_file.raw_words.fill(0x3f800000U);
+        car_file.raw_words[12U] = std::bit_cast<std::uint32_t>(200.0F);
+        car_file.raw_words[13U] = std::bit_cast<std::uint32_t>(25.0F);
         // A zero setup-count discriminator selects the configured setup words.
         car_file.raw_words[0x3aU] = 0U;
         resources.car_file = car_file;
@@ -61,6 +66,23 @@ int main()
         require(matching_write != preparation.mapping->writes.end() &&
                 matching_write->raw_word == words[0x14U],
             "setup source field 0x14 must reach the mapped vehicle field");
+
+        std::vector<std::byte> runtime_record(
+            viper::CarFileRuntimeMapping::runtime_record_size);
+        require(viper::apply_car_file_runtime_mapping(
+                    runtime_record, *preparation.mapping),
+            "prepared CARF mapping must apply to the bounded runtime record");
+        const auto callback_setup =
+            viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
+                runtime_record, 10.0F);
+        require(callback_setup.has_value() &&
+                std::fabs(callback_setup->value_0xd84 - 3.81F) < 1.0e-5F &&
+                std::fabs(callback_setup->value_0xd90 + 1.27F) < 1.0e-5F &&
+                std::fabs(callback_setup->angle_0xdcc - 0.174F) < 1.0e-5F,
+            "mapped CARF width/ratio must reach the exact paired callback offsets while steering stays explicit");
+        require(!viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
+                    std::span<const std::byte>(runtime_record).first(0x5fU), 10.0F),
+            "runtime records missing all bytes of +0x5C must be rejected");
 
         setup.pop_back();
         const auto short_preparation =

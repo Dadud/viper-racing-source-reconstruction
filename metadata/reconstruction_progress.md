@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24, CARF-to-wheel callback bridge:** Added a bounded adapter from
+  the mapped runtime-record width/ratio at `+0x58/+0x5C` to the exact lateral
+  wheel callback pair initialized by `0x433C00`; the vehicle steering angle
+  remains a separate state input. Extended the CARF setup regression to apply
+  the map, derive both callback values, and reject a truncated record. This is
+  not complete wheel geometry or live physics integration: `+0x128`, helper
+  `0x4509B0`, suspension/contact state, and full 3D placement remain open.
+  Evidence and source limitations are recorded in `metadata/vehicle_setup.md`.
+
 - **2026-10-24, recovered steering response in route runtime:** Connected
   `advance_route_motion` to the recovered `update_race_loop_steering` logic.
   Race setup `0x425420` calls `0x43AF60`, which initializes the steering state
