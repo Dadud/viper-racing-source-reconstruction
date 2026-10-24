@@ -1215,6 +1215,16 @@ displayed-position input remains separate: the TestTrack branch reads record
 `+0x00`, while the common Position row reads `+0x140`. The TestTrack plan's
 emitted calls remain in branch order; resource text, generation matches,
 distance scale, and suffix remain supplied observations.
+When `SceneDashboardCoreCallbackObservation::language_resource` is supplied,
+the callback resolves the `TRY`, `TIME`, and `DIST` labels from the exact
+`Dashboard:TestTrack:Try`, `Dashboard:TestTrack:Time`, and
+`Dashboard:TestTrack:DistanceAbbreviated` keys before applying the TestTrack
+plan. Generation matches and the distance unit suffix remain separate runtime
+observations. The key addresses are confirmed at `0x4CFCF0`, `0x4CFD08`, and
+`0x4CFD24` by string evidence
+`ev_bb72e4563d1e233a8c2f3b6161be56993c7dfde3b1f23787ed864efbfbcc396b`,
+`ev_5aa526aff8909e8c9188bc7870749404053fb90646b5b56c9c285ef804035b9a`, and
+`ev_ad17e14bf8192a87b55570db21c647d7b093db859447942fa3194424babd71bf`.
 On the type-0/global-`+0x40`-false branch, the flow also composes the
 supplemental `+0x24`/`+0x1C` rows before the paths converge at `0x403F7E`.
 Their position and count gates use the common `+0x140` Position result and

@@ -15,6 +15,8 @@
 
 namespace viper {
 
+struct LanguageResource;
+
 struct SceneOverlayTextCall {
     std::int32_t x{};
     std::int32_t y{};
@@ -840,6 +842,17 @@ struct SceneDashboardTestTrackResult {
     std::vector<SceneDashboardTextCall> calls;
 };
 
+struct SceneDashboardTestTrackLocalizationPlan {
+    bool try_label_resolved{};
+    bool time_label_resolved{};
+    bool distance_label_resolved{};
+};
+
+[[nodiscard]] SceneDashboardTestTrackLocalizationPlan
+apply_scene_dashboard_test_track_localization(
+    SceneDashboardTestTrackObservation& observation,
+    const LanguageResource& language);
+
 enum class SceneDashboardMetricSlot : std::uint8_t {
     value_0x10,
     value_0x14,
@@ -940,6 +953,7 @@ struct SceneDashboardCoreCallbackObservation {
     std::uint32_t global_method_0x20_result{};
     SceneDashboardLapTimeObservation lap_time{};
     SceneDashboardTestTrackObservation test_track{};
+    const LanguageResource* language_resource{};
     SceneDashboardSupplementalTimeObservation supplemental_time{};
     std::array<SceneDashboardMetricObservation, 2> metrics{};
     SceneDashboardAuxiliaryReadoutObservation auxiliary_readout{};
@@ -952,6 +966,8 @@ struct SceneDashboardCoreCallbackPlan {
     SceneDashboardFinalTimeResult final_time{};
     SceneDashboardLapTimeResult lap_time{};
     SceneDashboardTestTrackResult test_track{};
+    std::optional<SceneDashboardTestTrackLocalizationPlan>
+        test_track_localization;
     bool test_track_branch_reached{};
     SceneDashboardSupplementalTimeResult supplemental_time{};
     bool supplemental_time_branch_reached{};

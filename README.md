@@ -457,7 +457,9 @@ files were present.
   getter has no observed state effect, and raw offsets are preserved.
 - `include/viper/language_resource.hpp` and `src/language_resource.cpp` parse
   LANGRES0 language tables as bounded key/value offset pairs. The
-  `--inspect-language PATH [KEY]` command lists labels or resolves one key.
+  `--inspect-language PATH [KEY]` command lists labels or resolves one key;
+  the state-0 TestTrack callback can use a parsed table to resolve its three
+  localized labels.
 - `include/viper/legacy_allocator.hpp` and `src/legacy_allocator.cpp` model
   the optional VxD allocation marker and fill behavior; portable execution can
   use the normal host heap instead of opening `\\.\vexed.vxd`.

@@ -97,6 +97,7 @@ target_compile_features(viper_update_curve PUBLIC cxx_std_20)
 add_library(viper_language_resource src/language_resource.cpp)
 target_include_directories(viper_language_resource PUBLIC include)
 target_compile_features(viper_language_resource PUBLIC cxx_std_20)
+target_link_libraries(viper_scene_model PUBLIC viper_language_resource)
 
 add_library(viper_ncar_model src/ncar_state.cpp)
 target_include_directories(viper_ncar_model PUBLIC include)

@@ -1,5 +1,6 @@
 #include "viper/scene_overlay.hpp"
 #include "viper/scene_font_8x8.hpp"
+#include "viper/language_resource.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1992,6 +1993,11 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         test_track_observation.selected_record_type_0x18 =
             observation.selected_object_type_0x18;
         result.test_track_branch_reached = true;
+        if (observation.language_resource != nullptr) {
+            result.test_track_localization =
+                apply_scene_dashboard_test_track_localization(
+                    test_track_observation, *observation.language_resource);
+        }
         result.test_track = update_scene_dashboard_test_track(
             result.next_state, test_track_observation);
     }
@@ -2234,6 +2240,31 @@ SceneDashboardTestTrackResult update_scene_dashboard_test_track(
                                 0x004EB488, 0x004EB304, 0x21});
     }
     return result;
+}
+
+SceneDashboardTestTrackLocalizationPlan
+apply_scene_dashboard_test_track_localization(
+    SceneDashboardTestTrackObservation& observation,
+    const LanguageResource& language)
+{
+    SceneDashboardTestTrackLocalizationPlan plan{};
+    const auto apply = [&language](const std::string_view key,
+                                   std::string& destination) {
+        const auto value = language.find(key);
+        if (!value.has_value()) {
+            return false;
+        }
+        destination.assign(*value);
+        return true;
+    };
+    plan.try_label_resolved = apply(
+        "Dashboard:TestTrack:Try", observation.try_resource_text);
+    plan.time_label_resolved = apply(
+        "Dashboard:TestTrack:Time", observation.time_resource_text);
+    plan.distance_label_resolved = apply(
+        "Dashboard:TestTrack:DistanceAbbreviated",
+        observation.distance_resource_text);
+    return plan;
 }
 
 std::optional<std::uint8_t> scene_chatline_virtual_row_flag(
