@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added a paused-banner frame-write compositor
+  that merges fallback boxes, the optional STMP resource image, and text in the
+  recovered operation order. The race-loop result now exposes the merged list,
+  and `apply_scene_paused_banner_frame_raster` validates all destination ranges
+  before writing to a caller-supplied buffer, including masked rectangle
+  updates. Release build passes; native surface ownership and DirectDraw lock
+  handling remain external. No tests were run.
+
 - **2026-10-24 continuation:** Added `scene_dashboard_font_projection` to
   convert the decoded STMP character map into the runtime's 256-entry glyph
   index, advance, and x-offset tables. The race-loop paused-banner input can

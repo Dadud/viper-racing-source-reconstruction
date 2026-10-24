@@ -420,6 +420,19 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     plan.shared_overlay.paused_banner.inner_render,
                     resource_observation);
         }
+        if (plan.shared_overlay.paused_banner.inner_render.reached) {
+            const auto* resource_raster = plan
+                .shared_paused_banner_resource_raster.has_value()
+                ? &*plan.shared_paused_banner_resource_raster
+                : nullptr;
+            const auto* text_raster = plan
+                .shared_paused_banner_text_raster.has_value()
+                ? &*plan.shared_paused_banner_text_raster
+                : nullptr;
+            plan.shared_paused_banner_frame_raster =
+                compose_scene_paused_banner_frame_raster(
+                    plan.shared_overlay, resource_raster, text_raster);
+        }
         const auto& text_effects = plan.shared_overlay.text_effects;
         if (text_effects.predicate_0x4048e0.has_text_draw ||
             text_effects.predicate_0x404900.has_text_draw) {

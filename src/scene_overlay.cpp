@@ -3667,6 +3667,134 @@ SceneTextPixelApplyResult apply_scene_text_pixel_writes(
     return {true, writes.size()};
 }
 
+ScenePausedBannerFrameRasterPlan compose_scene_paused_banner_frame_raster(
+    const SceneSharedOverlayFramePlan& frame,
+    const ScenePausedBannerResourceRasterPlan* const resource_raster,
+    const ScenePausedBannerTextRasterPlan* const text_raster)
+{
+    ScenePausedBannerFrameRasterPlan result{};
+    const auto& banner = frame.paused_banner.inner_render;
+    result.reached = banner.reached;
+    result.input_complete = banner.input_complete;
+    if (!result.reached) {
+        return result;
+    }
+
+    bool box_writes_appended = false;
+    for (const auto& operation : banner.ordered_operations) {
+        switch (operation.kind) {
+        case ScenePausedBannerOperationKind::outer_box_fill_0x44a1b0:
+            if (!box_writes_appended) {
+                for (const auto& write : frame.paused_banner_box_pixel_writes) {
+                    result.ordered_pixel_writes.push_back({
+                        write.x,
+                        write.y,
+                        static_cast<std::int64_t>(write.destination_offset),
+                        write.value,
+                        write.write_mask,
+                        write.bytes_per_pixel,
+                        write.preserves_existing_bits,
+                    });
+                }
+                box_writes_appended = true;
+            }
+            break;
+        case ScenePausedBannerOperationKind::inner_box_fill_0x44a1b0:
+            // Both box fills are consecutive in the native operation list;
+            // their combined projection was appended at the outer fill.
+            break;
+        case ScenePausedBannerOperationKind::resource_draw_0x44d0c0:
+            if (resource_raster == nullptr ||
+                !resource_raster->draw_reached) {
+                result.input_complete = false;
+                break;
+            }
+            result.input_complete = result.input_complete &&
+                resource_raster->input_complete &&
+                resource_raster->raster.input_complete;
+            for (const auto& write : resource_raster->raster.pixel_writes) {
+                result.ordered_pixel_writes.push_back({
+                    write.x,
+                    write.y,
+                    write.offset_from_framebuffer_base,
+                    write.value,
+                    0xffffffffU,
+                    write.bytes_per_pixel,
+                    false,
+                });
+            }
+            break;
+        case ScenePausedBannerOperationKind::text_draw_0x479580:
+            if (text_raster == nullptr) {
+                result.input_complete = false;
+                break;
+            }
+            result.input_complete = result.input_complete &&
+                text_raster->input_complete;
+            for (const auto& write : text_raster->ordered_pixel_writes) {
+                result.ordered_pixel_writes.push_back({
+                    write.x,
+                    write.y,
+                    write.offset_from_framebuffer_base,
+                    write.value,
+                    0xffffffffU,
+                    write.bytes_per_pixel,
+                    false,
+                });
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    return result;
+}
+
+ScenePausedBannerFrameApplyResult apply_scene_paused_banner_frame_raster(
+    const ScenePausedBannerFrameRasterPlan& plan,
+    const std::span<std::uint8_t> framebuffer)
+{
+    if (!plan.reached || !plan.input_complete) {
+        return {};
+    }
+    for (const auto& write : plan.ordered_pixel_writes) {
+        if (write.offset_from_framebuffer_base < 0 ||
+            (write.bytes_per_pixel != 2U && write.bytes_per_pixel != 4U)) {
+            return {};
+        }
+        const auto offset = static_cast<std::uint64_t>(
+            write.offset_from_framebuffer_base);
+        const auto width = static_cast<std::uint64_t>(write.bytes_per_pixel);
+        if (offset > framebuffer.size() || width > framebuffer.size() - offset) {
+            return {};
+        }
+    }
+
+    for (const auto& write : plan.ordered_pixel_writes) {
+        const auto offset = static_cast<std::size_t>(
+            write.offset_from_framebuffer_base);
+        if (write.preserves_existing_bits) {
+            std::uint32_t existing = 0U;
+            for (std::uint8_t byte = 0; byte < write.bytes_per_pixel; ++byte) {
+                existing |= static_cast<std::uint32_t>(framebuffer[offset + byte])
+                    << (static_cast<std::uint32_t>(byte) * 8U);
+            }
+            const auto updated = (existing & ~write.write_mask) |
+                (write.value & write.write_mask);
+            for (std::uint8_t byte = 0; byte < write.bytes_per_pixel; ++byte) {
+                framebuffer[offset + byte] = static_cast<std::uint8_t>(
+                    updated >> (static_cast<std::uint32_t>(byte) * 8U));
+            }
+        } else {
+            for (std::uint8_t byte = 0; byte < write.bytes_per_pixel; ++byte) {
+                framebuffer[offset + byte] = static_cast<std::uint8_t>(
+                    write.value >> (static_cast<std::uint32_t>(byte) * 8U));
+            }
+        }
+    }
+    return {true, plan.ordered_pixel_writes.size()};
+}
+
 SceneDashboardLocaleState initialize_scene_dashboard_locale(
     const SceneDashboardLocaleObservation& observation) noexcept
 {

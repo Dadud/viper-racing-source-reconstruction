@@ -494,6 +494,13 @@ versus other-mode pointer offset. Bundle lookup and native surface
 ownership/presentation remain external. Evidence: `0x44D0C0`
 (`ev_3bbd3fcdbe60647b79111eef559e4f597ef123048430898b07f080d4fa525bde`),
 retained in `metadata/state4_paused_banner_resource.evidence.json`.
+The race-loop composer now merges reached fallback-box, resource-image, and
+text pixel writes in the banner's `ordered_operations` order. The
+`apply_scene_paused_banner_frame_raster` helper validates every destination
+range before mutating a caller-supplied framebuffer and preserves masked
+read-modify-write behavior for rectangle pixels. This makes the banner's CPU
+write sequence consumable as one frame result; the caller still owns the
+surface span and native DirectDraw lock/unlock lifecycle.
 
 `scene_shared_paused_banner_plan` composes the shared raw-global gate,
 resource-generation refresh decision, and inner paused-banner layout. The

@@ -222,7 +222,9 @@ files were present.
   rasterization, and optional loaded-resource frame rasterization from decoded
   STMP image and renderer observations. Parsed STMP fonts project their header
   baseline metrics and 256-entry glyph-index, advance, and horizontal-offset
-  tables into text layout. The model also
+  tables into text layout. The race-loop plan merges paused-banner pixel writes
+  in native draw order and can apply them to a caller-supplied framebuffer
+  after validating the complete write batch. The model also
   covers two raw-flag text setup sequences, the results heading/prompt setup, and
   results record selection, conditional formatted time values, and per-row text
   calls are modeled in `scene_overlay.cpp` with all row and heading positions

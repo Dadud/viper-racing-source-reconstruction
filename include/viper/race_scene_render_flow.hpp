@@ -113,6 +113,8 @@ struct RaceLoopSharedOverlayPlan {
         shared_paused_banner_text_raster;
     std::optional<ScenePausedBannerResourceRasterPlan>
         shared_paused_banner_resource_raster;
+    std::optional<ScenePausedBannerFrameRasterPlan>
+        shared_paused_banner_frame_raster;
 };
 
 // Carries the event-0x31 state change through callback dispatch and, when a

@@ -1719,6 +1719,27 @@ struct ScenePausedBannerResourceRasterPlan {
     SceneDashboardRasterPlan raster;
 };
 
+struct ScenePausedBannerFramePixelWrite {
+    std::int32_t x{};
+    std::int32_t y{};
+    std::int64_t offset_from_framebuffer_base{};
+    std::uint32_t value{};
+    std::uint32_t write_mask{};
+    std::uint8_t bytes_per_pixel{};
+    bool preserves_existing_bits{};
+};
+
+struct ScenePausedBannerFrameRasterPlan {
+    bool reached{};
+    bool input_complete{true};
+    std::vector<ScenePausedBannerFramePixelWrite> ordered_pixel_writes;
+};
+
+struct ScenePausedBannerFrameApplyResult {
+    bool applied{};
+    std::size_t pixels_written{};
+};
+
 struct SceneSharedTextEffectsRasterObservation {
     // Slots correspond to 0x4048E0 then 0x404900; inactive branches need no text.
     std::array<std::optional<std::string_view>, 2> text;
@@ -1897,6 +1918,21 @@ struct SceneTextPixelApplyResult {
 // The framebuffer is unchanged when any write falls outside the supplied span.
 [[nodiscard]] SceneTextPixelApplyResult apply_scene_text_pixel_writes(
     std::span<const SceneTextPixelWrite> writes,
+    std::span<std::uint8_t> framebuffer);
+
+// Merges fallback boxes, resource pixels, and banner text in the native
+// paused-banner operation order. Missing raster inputs for reached draw calls
+// are reported as incomplete rather than silently omitted.
+[[nodiscard]] ScenePausedBannerFrameRasterPlan
+compose_scene_paused_banner_frame_raster(
+    const SceneSharedOverlayFramePlan& frame,
+    const ScenePausedBannerResourceRasterPlan* resource_raster,
+    const ScenePausedBannerTextRasterPlan* text_raster);
+
+// Validates the full ordered write stream before mutating the supplied buffer.
+[[nodiscard]] ScenePausedBannerFrameApplyResult
+apply_scene_paused_banner_frame_raster(
+    const ScenePausedBannerFrameRasterPlan& plan,
     std::span<std::uint8_t> framebuffer);
 
 struct SceneState5OverlayPlan {
