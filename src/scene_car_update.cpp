@@ -333,6 +333,161 @@ SceneCarEffectTagOnePlan plan_scene_car_effect_tag_one_handler(
     return result;
 }
 
+SceneCarEffectTagTwoPlan plan_scene_car_effect_tag_two_handler(
+    const SceneCarEffectTagTwoInput& input) noexcept
+{
+    SceneCarEffectTagTwoPlan result{};
+    result.context_cursor_after = input.context_cursor_0x114;
+    if (!input.scene_effects_enabled_0x509b74 || !input.effect_context_enabled_0x53a4c4) {
+        result.status = SceneCarEffectTagTwoStatus::context_gate_closed;
+        return result;
+    }
+    if (input.context_cursor_0x114 < 0
+        || static_cast<std::size_t>(input.context_cursor_0x114)
+            >= scene_car_effect_tag_two_context_count) {
+        result.status = SceneCarEffectTagTwoStatus::cursor_out_of_range;
+        return result;
+    }
+
+    result.selected_context = static_cast<std::size_t>(input.context_cursor_0x114);
+    result.initializer_0x61ac0_called = true;
+    result.child_initializer_position = input.child_initializer_position_0xc4;
+    result.context_cursor_after = (input.context_cursor_0x114 + 1) & 0x0f;
+    result.context_cursor_written = true;
+    if (!input.previous_emit_time_0x118.has_value()) {
+        result.status = SceneCarEffectTagTwoStatus::timestamp_observation_missing;
+        return result;
+    }
+    if (!(input.now_0x45bb70 > *input.previous_emit_time_0x118 + 0.5F)) {
+        result.status = SceneCarEffectTagTwoStatus::waiting_for_timestamp_window;
+        return result;
+    }
+
+    result.stored_origin = input.payload_origin;
+    result.stored_emit_time = input.now_0x45bb70;
+    result.origin_and_time_written = true;
+
+    float clamped_scale = input.payload_scale_0x1c * 0.01F;
+    clamped_scale = std::isnan(clamped_scale)
+        ? 7.0F
+        : std::clamp(clamped_scale, 5.0F, 7.0F);
+    result.clamped_payload_scale = clamped_scale;
+    const float vx = input.payload_velocity[0] * 0.6F;
+    const float vy = input.payload_velocity[1] * 0.6F;
+    const float vz = input.payload_velocity[2] * 0.6F;
+    result.vertical_scale = vy + clamped_scale;
+
+    constexpr float random_scale = 0.001001001F;
+    std::optional<std::size_t> pending_y_index;
+    float pending_y{};
+    const auto random_range = [&](const std::size_t index, const float minimum,
+                                  const float maximum) {
+        const float unit = static_cast<float>(input.random_samples[index]) * random_scale;
+        return minimum + (maximum - minimum) * unit;
+    };
+
+    for (std::size_t point = 0; point < result.trail_points.size(); ++point) {
+        if (pending_y_index.has_value()) {
+            result.trail_points[*pending_y_index][1] = pending_y;
+            result.point_component_write_masks[*pending_y_index] |= 0x02U;
+            ++result.complete_points_written;
+            pending_y_index.reset();
+        }
+        const auto draw = [&](const float minimum, const float maximum,
+                              float& value) -> bool {
+            if (result.random_samples_consumed >= input.random_samples.size()) return false;
+            value = random_range(result.random_samples_consumed, minimum, maximum);
+            ++result.random_samples_consumed;
+            return true;
+        };
+
+        float x_jitter{};
+        if (!draw(-0.6F, 0.6F, x_jitter)) {
+            result.status = SceneCarEffectTagTwoStatus::random_observation_exhausted;
+            return result;
+        }
+        result.trail_points[point][0] = vx
+            + x_jitter * result.vertical_scale;
+        result.point_component_write_masks[point] |= 0x01U;
+
+        float z_jitter{};
+        if (!draw(-0.6F, 0.6F, z_jitter)) {
+            result.status = SceneCarEffectTagTwoStatus::random_observation_exhausted;
+            return result;
+        }
+        result.trail_points[point][2] = vz
+            + z_jitter * result.vertical_scale;
+        result.point_component_write_masks[point] |= 0x04U;
+
+        if (!draw(0.8F, 1.2F, pending_y)) {
+            result.status = SceneCarEffectTagTwoStatus::random_observation_exhausted;
+            return result;
+        }
+        pending_y *= result.vertical_scale;
+        pending_y_index = point;
+    }
+
+    if (pending_y_index.has_value()) {
+        result.trail_points[*pending_y_index][1] = pending_y;
+        result.point_component_write_masks[*pending_y_index] |= 0x02U;
+        ++result.complete_points_written;
+    }
+    result.status = SceneCarEffectTagTwoStatus::generated;
+    return result;
+}
+
+SceneCarEffectChildInitPlan plan_scene_car_effect_child_initializer(
+    const SceneCarEffectChildInitInput& input) noexcept
+{
+    SceneCarEffectChildInitPlan result{};
+    result.stored_mode = input.mode;
+    result.registration_id_0x34 = input.registration_id_0x34;
+    result.registration_data_0x38 = input.registration_data_0x38;
+    result.active_0x3c_written = true;
+    result.stored_position = input.position;
+    result.stored_position[1] += 0.2F;
+    result.position_written = true;
+
+    constexpr float random_scale = 0.000015259022F;
+    const auto random_range = [&](const std::size_t sample_index, const float minimum,
+                                  const float maximum) {
+        const float unit = static_cast<float>(input.random_samples[sample_index]) * random_scale;
+        return minimum + (maximum - minimum) * unit;
+    };
+    if (result.random_samples_consumed >= input.random_samples.size()) {
+        result.status = SceneCarEffectChildInitStatus::random_observation_exhausted;
+        return result;
+    }
+    result.lifetime_0x50 = random_range(result.random_samples_consumed, 0.75F, 1.75F);
+    ++result.random_samples_consumed;
+    const float current_time = static_cast<float>(input.timer_counter_0x508774) * 0.016F;
+    result.expires_at_0x4c = current_time + result.lifetime_0x50;
+    result.timer_0x54 = 0.0F;
+    result.lifetime_fields_written = true;
+
+    std::array<float, 3> noise{};
+    constexpr std::array<float, 3> minimum_noise{-0.01F, 0.01F, -0.01F};
+    constexpr std::array<float, 3> maximum_noise{0.01F, 0.03F, 0.01F};
+    for (std::size_t draw = 0; draw < noise.size(); ++draw) {
+        if (result.random_samples_consumed >= input.random_samples.size()) {
+            result.status = SceneCarEffectChildInitStatus::random_observation_exhausted;
+            return result;
+        }
+        noise[draw] = random_range(
+            result.random_samples_consumed, minimum_noise[draw], maximum_noise[draw]);
+        ++result.random_samples_consumed;
+    }
+    result.stored_velocity = {
+        input.velocity[0] * 0.3F + noise[2],
+        input.velocity[1] * 0.3F + noise[1],
+        input.velocity[2] * 0.3F + noise[0],
+    };
+    result.velocity_fields_written = true;
+    result.registration_0x461650_called = true;
+    result.status = SceneCarEffectChildInitStatus::initialized;
+    return result;
+}
+
 SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
     const SceneCarEffectParticleGeneratorInput& input) noexcept
 {

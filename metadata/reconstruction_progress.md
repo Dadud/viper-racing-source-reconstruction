@@ -39,6 +39,16 @@
   `ev_f826a09a5e60377e67248315096dc8878299c6c63f8ce1a1dc6641a129eb912f`,
   and `ev_878fa81da8d63d96b130a5a8c9968c52402b863cc2430660810a4bc2358dfeb2`.
 
+- **2026-10-24:** Added the tag 2 callback model for `0x468290`: one-of-sixteen
+  context cursor and its pre-timer initializer call, strict half-second
+  emission gate, scale clamp, and sixteen three-dimensional jitter points.
+  Added a separate `0x461AC0` child-field projection; its final renderer-side
+  `0x461650` registration remains external. Partial random observations expose
+  component write masks. Evidence: `ev_c2cac3248c1a63da85831ae40530abbb100df6ab94e47f402974dc32797378dd`,
+  `ev_9d509939ffb7af7f87606397c1ed9e1e7eb001c378380eff367128b96553b858`,
+  `ev_62fbb1add8c5be568ef2f3f807af41519711a3cbbc782f0c1db3f13418508838`,
+  and `ev_0adb01115cbb64610af2ba80c7adc608b25c8da6c1dbf6e36d7fd36a5b61a9da`.
+
 - **2026-10-23:** Added a bounded STMP payload parser and
   `--inspect-stamp`, using the `0x44CFD0` layout: factor-counted pointer table
   at `0x81C`, embedded data base, and optional relocation. Added font character

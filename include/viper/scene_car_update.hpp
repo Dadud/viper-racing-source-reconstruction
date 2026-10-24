@@ -258,6 +258,104 @@ struct SceneCarEffectTagOnePlan {
 [[nodiscard]] SceneCarEffectTagOnePlan plan_scene_car_effect_tag_one_handler(
     const SceneCarEffectTagOneInput& input) noexcept;
 
+inline constexpr std::size_t scene_car_effect_tag_two_context_count = 16;
+enum class SceneCarEffectTagTwoStatus : std::uint8_t {
+    context_gate_closed,
+    waiting_for_timestamp_window,
+    generated,
+    random_observation_exhausted,
+    timestamp_observation_missing,
+    cursor_out_of_range,
+};
+
+struct SceneCarEffectTagTwoInput {
+    bool scene_effects_enabled_0x509b74{};
+    bool effect_context_enabled_0x53a4c4{};
+    std::int32_t context_cursor_0x114{};
+    std::optional<float> previous_emit_time_0x118{};
+    // Existing manager vector passed to 0x461AC0 before the new payload origin
+    // is copied; it is not necessarily the current payload origin.
+    std::optional<std::array<float, 3>> child_initializer_position_0xc4{};
+    std::array<float, 3> payload_velocity{}; // handler payload +0x00
+    std::array<float, 3> payload_origin{}; // handler payload +0x0C
+    float payload_scale_0x1c{};
+    float now_0x45bb70{};
+    // Raw FUN_004193F0(1000) observations: x, z, y for each of 16 points.
+    std::span<const std::int32_t> random_samples{};
+};
+
+struct SceneCarEffectTagTwoPlan {
+    SceneCarEffectTagTwoStatus status{SceneCarEffectTagTwoStatus::context_gate_closed};
+    static constexpr std::int32_t returned_payload_bytes = 0x24;
+    std::int32_t context_cursor_after{};
+    std::size_t selected_context{};
+    std::size_t random_samples_consumed{};
+    std::size_t complete_points_written{};
+    std::array<float, 3> stored_origin{};
+    std::optional<std::array<float, 3>> child_initializer_position{};
+    std::array<float, 3> child_initializer_velocity{};
+    std::uint8_t child_initializer_mode{};
+    float stored_emit_time{};
+    float clamped_payload_scale{};
+    float vertical_scale{};
+    std::array<std::array<float, 3>, 16> trail_points{};
+    std::array<std::uint8_t, 16> point_component_write_masks{}; // x=1, y=2, z=4
+    std::optional<std::size_t> pending_vertical_point{};
+    float pending_vertical_value{};
+    bool initializer_0x61ac0_called{};
+    bool context_cursor_written{};
+    bool origin_and_time_written{};
+    bool x87_rounding_approximated{true};
+};
+
+// Projects tag 2 callback 0x468290's context ring, half-second emission gate,
+// and 16 randomized trail points. The 0x61AC0 initializer remains an external
+// effect; its selected context and invocation are reported explicitly.
+[[nodiscard]] SceneCarEffectTagTwoPlan plan_scene_car_effect_tag_two_handler(
+    const SceneCarEffectTagTwoInput& input) noexcept;
+
+enum class SceneCarEffectChildInitStatus : std::uint8_t {
+    initialized,
+    random_observation_exhausted,
+};
+
+struct SceneCarEffectChildInitInput {
+    std::array<float, 3> position{}; // 0x461AC0 param_1
+    std::array<float, 3> velocity{}; // 0x461AC0 param_2
+    std::uint8_t mode{}; // 0x461AC0 param_3
+    std::uint32_t timer_counter_0x508774{};
+    std::span<const std::int32_t> random_samples{}; // raw FUN_004193F0(0xFFFF)
+    std::int32_t registration_id_0x34{};
+    std::uint32_t registration_data_0x38{};
+};
+
+struct SceneCarEffectChildInitPlan {
+    SceneCarEffectChildInitStatus status{
+        SceneCarEffectChildInitStatus::random_observation_exhausted};
+    std::size_t random_samples_consumed{};
+    std::array<float, 3> stored_position{};
+    std::array<float, 3> stored_velocity{};
+    std::uint8_t stored_mode{};
+    float lifetime_0x50{};
+    float expires_at_0x4c{};
+    float timer_0x54{};
+    std::int32_t registration_id_0x34{};
+    std::uint32_t registration_data_0x38{};
+    float registration_scale{1.0F};
+    bool active_0x3c_written{};
+    bool position_written{};
+    bool lifetime_fields_written{};
+    bool velocity_fields_written{};
+    bool registration_0x461650_called{};
+    bool x87_rounding_approximated{true};
+};
+
+// Projects 0x461AC0's per-context particle fields. The final 0x461650 call is
+// reported as an external registration effect; its renderer-side writes are
+// not folded into this state projection.
+[[nodiscard]] SceneCarEffectChildInitPlan plan_scene_car_effect_child_initializer(
+    const SceneCarEffectChildInitInput& input) noexcept;
+
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,
     generated,

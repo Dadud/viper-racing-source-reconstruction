@@ -103,6 +103,52 @@ random-range helper `0x468420` (`ev_878fa81da8d63d96b130a5a8c9968c52402b863cc243
 RNG converter `0x4193F0` (`ev_6b1334751a6337d3165d366b0c495d29963640f958a57149aa3dfa596205c872`),
 and constants at `0x4C94F0` (`ev_ab6e2845b1b14c8a15f96a8fe418220c158b4387c355ae9b1b11b0605b93df83`).
 
+The tag 2 callback at `0x468290` is now projected by
+`plan_scene_car_effect_tag_two_handler`. When the shared `0x45BAE0` gate is
+open, it calls `0x461AC0` for the current one-of-sixteen context and advances
+that context cursor modulo 16 before checking the emission timer. The helper's
+child-object call receives the manager's existing `+0xC4` position, a zero
+velocity vector, and mode 0. This happens before the timer check and before a
+new payload origin overwrites that manager vector. The actual helper writes
+are available through `plan_scene_car_effect_child_initializer`; its final
+registration call remains external. Emission proceeds only when
+`now > previous_emit_time + 0.5`; it then
+copies the payload origin and current time, clamps `payload[+0x1C] * 0.01` to
+[5, 7], and computes vertical scale `payload_velocity_y * 0.6 + clamped_scale`.
+It produces sixteen points: x/z bases are payload velocity x/z scaled by 0.6,
+then receive jitter in [-0.6, 0.6] times the vertical value; y is a multiplier
+in [0.8, 1.2] times that vertical value. The x87 write pipeline stores
+each y component at the start of the next loop iteration (and flushes the last
+one after the loop); component masks preserve partial writes when supplied RNG
+observations run out. This bounded projection does not model `0x461AC0`'s
+randomized child-object fields inline; those fields have a separate projection
+in `plan_scene_car_effect_child_initializer`, while its final `0x461650`
+registration remains an external effect. Evidence:
+callback bytes `0x468290..0x46841F`
+(`ev_c2cac3248c1a63da85831ae40530abbb100df6ab94e47f402974dc32797378dd`),
+constants at `0x4C94B4..0x4C94FB`
+(`ev_1c3604802daed4cbcc7c909199173a45a6ab733a56facfc417b296c22fcc258a`),
+context gate `0x45BAE0` (`ev_f826a09a5e60377e67248315096dc8878299c6c63f8ce1a1dc6641a129eb912f`),
+initializer `0x461AC0` (`ev_9d509939ffb7af7f87606397c1ed9e1e7eb001c378380eff367128b96553b858`),
+and random-range helper `0x468420` (`ev_0adb01115cbb64610af2ba80c7adc608b25c8da6c1dbf6e36d7fd36a5b61a9da`).
+
+`plan_scene_car_effect_child_initializer` projects the `0x461AC0` helper used
+by tag 2 and the wheel-effect path. It sets the active/mode bytes, copies the
+position with `+0.2` on y, samples a `[0.75, 1.75]` lifetime, derives current
+time from the observed `0x425790` counter times `0.016`, clears `+0x54`, and
+forms the three velocity components from input velocity times `0.3` plus
+three ordered jitter samples (`[-0.01, 0.01]`, `[0.01, 0.03]`, then
+`[-0.01, 0.01]`); the first/third samples feed z/x respectively, while the
+middle sample feeds y. `0x461650` is recorded as a call with the
+observed registration fields and scale 1; its renderer-side record writes are
+not projected here. Evidence: `0x461AC0`
+(`ev_9d509939ffb7af7f87606397c1ed9e1e7eb001c378380eff367128b96553b858`),
+random-range helper `0x461BD0`
+(`ev_62fbb1add8c5be568ef2f3f807af41519711a3cbbc782f0c1db3f13418508838`),
+clock helper `0x425790` (`ev_4394f76cfa93de76984db3bbd98bb3696a7ab8b4159da55951abcbc5f7aabaef`),
+and registration routine `0x461650`
+(`ev_2ffba83fd83f8daaf91a2409f11f5d18a0d3696efd9e7ebe3f8e95a4e7b42721`).
+
 Tag 0's outer effect management is also projected in
 `plan_scene_car_effect_tag_zero_handler`: `0x4692A0` compares the DWORD at
 payload `+0x18` against the `+0x04` key in all 32 slots at `0x540B70..0x540BEC`.
