@@ -413,8 +413,8 @@ base constructor `0x4375C0` stores it at object `+0x08`. This is an absolute
 stream offset, not a CARF field, an object-size value, or the `0x1E4` runtime
 record length. The quick-race runtime now derives this cursor from `track.obt`
 by folding recovered serialized class advances through
-`plan_physics_task_stream_offsets`. The mapped classes are ACAR (`0x18C`),
-STAT (`0x20`), OBST (`0x2C`), WOBL (`0x34`), CHKP (`0x38`), and BALL (`0x40`).
+`plan_physics_task_stream_offsets`. ACAR advances by `0x18C`; STAT advances
+by zero; OBST, WOBL, CHKP, and BALL each advance by `0x34`.
 An incomplete row or an unmapped object class leaves the field unresolved.
 Runtime startup smokes now resolve this cursor on all eight shipped tracks:
 Bemidji `0xAD4`, Dundas `0x2DF8`, Hastings `0xAD4`, Heaven `0x18A4`, Kenyon
