@@ -150,8 +150,29 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     std::move(projection));
             }
         }
+        auto shared_overlay_observation = observation.shared_overlay;
+        if (plan.optional_dashboard_branch_enabled) {
+            shared_overlay_observation.renderer_mode_0x4d7a48 =
+                static_cast<std::uint8_t>(
+                    observation.state0_dashboard_render.renderer_mode_0x4d7a48);
+        }
+        if (plan.render_context_acquisition &&
+            plan.render_context_acquisition->disposition ==
+                RenderContextAcquisitionDisposition::acquired) {
+            shared_overlay_observation.render_context =
+                plan.render_context_acquisition->context.viewport;
+            shared_overlay_observation.framebuffer_base_value =
+                static_cast<std::uint32_t>(
+                    plan.render_context_acquisition->context
+                        .surface_bits_0x04);
+        } else if (plan.optional_dashboard_branch_enabled) {
+            shared_overlay_observation.render_context =
+                observation.state0_dashboard_render.render_context;
+            shared_overlay_observation.framebuffer_base_value =
+                observation.state0_dashboard_render.framebuffer_base_value;
+        }
         plan.shared_overlay = scene_shared_overlay_frame_plan(
-            observation.shared_overlay);
+            shared_overlay_observation);
     }
     return plan;
 }

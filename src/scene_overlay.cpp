@@ -2986,6 +2986,12 @@ SceneSharedOverlayFramePlan scene_shared_overlay_frame_plan(
     auto paused = observation.paused_banner;
     paused.overlay_globals = observation.overlay_globals;
     result.paused_banner = scene_shared_paused_banner_plan(paused);
+    result.paused_banner_box_pixel_writes =
+        scene_paused_banner_box_pixel_writes(
+            result.paused_banner.inner_render,
+            observation.render_context,
+            observation.renderer_mode_0x4d7a48,
+            observation.framebuffer_base_value);
 
     auto cheater = observation.cheater_banner;
     cheater.overlay_globals = observation.overlay_globals;

@@ -1505,6 +1505,9 @@ enum class SceneSharedOverlayBranch : std::uint8_t {
 };
 
 struct SceneSharedOverlayFrameObservation {
+    RenderContextViewport render_context;
+    std::uint8_t renderer_mode_0x4d7a48{};
+    std::uint32_t framebuffer_base_value{};
     SceneSharedOverlayObservation overlay_globals{};
     SceneSharedPausedBannerObservation paused_banner{};
     SceneSharedCheaterBannerObservation cheater_banner{};
@@ -1526,6 +1529,8 @@ struct SceneSharedOverlayFramePlan {
         SceneSharedOverlayBranch::splash_loading,
     }};
     SceneSharedPausedBannerPlan paused_banner{};
+    std::vector<SceneRectangleFillPixelWrite>
+        paused_banner_box_pixel_writes;
     SceneSharedCheaterBannerPlan cheater_banner{};
     SceneSharedTextEffectsPlan text_effects{};
     SceneSharedCenteredResourcePlan centered_resource{};

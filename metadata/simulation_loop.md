@@ -460,7 +460,13 @@ dimensions, and final backend submission remain supplied observations.
 observed order: fallback outer and inner fills then text; or resource draw,
 optional text, and release. `scene_paused_banner_box_pixel_writes` projects the
 two fallback boxes through the shared clip/mode path. Text/resource submission
-and acquired-resource behavior remain external calls.
+and acquired-resource behavior remain external calls. The shared-overlay frame
+plan now carries those ordered fallback fill writes as part of the composed
+state-4/shared callback result. In the race-loop composition, a successful
+render-context acquisition supplies the viewport and framebuffer base; the
+state-0 route supplies its renderer mode from the dashboard render observation.
+The state-4 route keeps renderer mode/context as explicit shared-overlay inputs
+when no successful acquisition plan is provided.
 Evidence: `0x404970` dossier
 `ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`,
 `0x404860` gate
