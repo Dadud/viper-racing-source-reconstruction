@@ -7,6 +7,8 @@
 #include <span>
 #include <vector>
 
+#include "viper/registered_object_table.hpp"
+
 namespace viper {
 
 struct PhysicsTaskGlobalStore {
@@ -226,6 +228,54 @@ struct PhysicsAuxiliaryPairPlan {
 // belong to the target (second) object; output accumulates on the receiver.
 [[nodiscard]] PhysicsAuxiliaryPairPlan plan_physics_auxiliary_pair(
     const PhysicsAuxiliaryPairObservation& observation) noexcept;
+
+inline constexpr std::size_t physics_auxiliary_object_count =
+    registered_object_table_count;
+using PhysicsAuxiliaryObjectTable = RegisteredObjectTable;
+
+struct PhysicsAuxiliaryPairCallObservation {
+    std::size_t receiver_index{};
+    std::size_t target_index{};
+    PhysicsAuxiliaryPairObservation pair{};
+};
+
+struct PhysicsAuxiliaryPassObservation {
+    bool alternate_time_path{};
+    PhysicsAuxiliaryObjectTable object_pointers_0x507d70{};
+    std::array<std::optional<std::array<float, 3>>,
+        physics_auxiliary_object_count> receiver_accumulators_0xdfc{};
+    std::span<const PhysicsAuxiliaryPairCallObservation> pair_calls;
+};
+
+struct PhysicsAuxiliaryPairDispatchStep {
+    std::size_t receiver_index{};
+    std::size_t target_index{};
+    bool observation_missing{};
+    bool observation_duplicated{};
+    bool receiver_accumulator_known{};
+    std::optional<PhysicsAuxiliaryPairPlan> pair_effect;
+};
+
+struct PhysicsAuxiliaryPassPlan {
+    std::array<std::optional<std::array<float, 3>>,
+        physics_auxiliary_object_count> receiver_accumulators_after{};
+    std::vector<PhysicsAuxiliaryPairDispatchStep> ordered_pair_calls;
+    std::uint32_t expected_pair_calls{};
+    std::uint32_t pair_observations_matched{};
+    std::uint32_t missing_pair_observations{};
+    std::uint32_t duplicate_pair_observations{};
+    std::uint32_t unused_pair_observations{};
+    bool alternate_time_path_delegated{};
+    bool accumulator_dependency_unknown{};
+    bool target_dereference_fault{};
+    bool returned_normally{};
+};
+
+// Composes the normal pairwise pass in 0x421050 in its exact nested table
+// order. Runtime fields and virtual returns are matched by the receiver/target
+// table indices; accumulator writes flow forward across each receiver's calls.
+[[nodiscard]] PhysicsAuxiliaryPassPlan plan_physics_auxiliary_pass(
+    const PhysicsAuxiliaryPassObservation& observation);
 
 struct PhysicsCommandHandlerRegistration {
     std::uint32_t command_id{};

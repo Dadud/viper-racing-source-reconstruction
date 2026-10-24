@@ -7,6 +7,7 @@
 #include <span>
 #include <vector>
 
+#include "viper/registered_object_table.hpp"
 #include "viper/timed_event_queue.hpp"
 
 namespace viper {
@@ -485,9 +486,9 @@ struct NcarInterpolatedRecordSelectionPlan {
     std::array<std::uint8_t, ncar_interpolated_record_bytes> second_record{};
 };
 
-inline constexpr std::size_t ncar_registered_object_count = 16;
-using NcarRegisteredObjectTable =
-    std::array<std::uint32_t, ncar_registered_object_count>;
+inline constexpr std::size_t ncar_registered_object_count =
+    registered_object_table_count;
+using NcarRegisteredObjectTable = RegisteredObjectTable;
 
 struct NcarObjectRegistrationObservation {
     NcarRegisteredObjectTable table{};
@@ -522,36 +523,6 @@ struct NcarObjectLookupPlan {
     const NcarObjectRegistrationObservation& observation) noexcept;
 [[nodiscard]] NcarObjectLookupPlan lookup_ncar_object(
     const NcarObjectLookupObservation& observation) noexcept;
-
-struct NcarRegisteredObjectInfluenceObservation {
-    std::array<float, 3> destination_position_0x5c{};
-    std::array<float, 3> source_position_0xe08{};
-    float source_radius_0xe14{};
-    std::array<float, 3> source_vector_0x234{};
-    std::array<float, 3> destination_accumulator_0xdfc{};
-    bool source_virtual_gate_0x30_nonzero{};
-    bool fdiv_compatibility_enabled{};
-};
-
-struct NcarRegisteredObjectInfluencePlan {
-    std::array<float, 3> destination_accumulator_0xdfc{};
-    std::array<float, 3> position_delta{};
-    float distance_squared{};
-    float radius_squared{};
-    float influence_fraction{};
-    bool source_virtual_gate_0x30_called{true};
-    bool source_virtual_gate_accepted{};
-    bool inside_strict_radius{};
-    bool influence_applied{};
-    bool fdiv_compatibility_used{};
-    bool x87_extended_precision_approximated{true};
-};
-
-// Projects the pairwise registered-object influence at 0x432300. The target's
-// +0xDFc accumulator is kept separate from the source object's pose/vector.
-[[nodiscard]] NcarRegisteredObjectInfluencePlan
-apply_ncar_registered_object_influence(
-    const NcarRegisteredObjectInfluenceObservation& observation) noexcept;
 
 // Runtime observations used by the outer object dispatcher around 0x427630.
 // Dynamic callback-table, object-registry, and transform-payload contents are

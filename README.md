@@ -377,8 +377,9 @@ files were present.
   `dispatch_ncar_interpolated_object` composes the outer flag, callback,
   registered-transform, time-gate, ring-selection and tail-counter behavior.
   The 16-entry `0x507D70` object registry also has bounded registration and
-  lookup projections, plus the `0x432300` pairwise radius-weighted accumulator
-  update; native out-of-range accesses remain explicit unknowns.
+  lookup projections; `plan_physics_auxiliary_pass` composes the ordered
+  `0x432300` radius-weighted accumulator updates while keeping native
+  out-of-range accesses explicit.
   `advance_ncar_callback_main` composes the recovered input,
   mode-3 setter/gate, and timer branches around the unreconstructed integrator
   body; it includes the integrator's entry-reset prefix.

@@ -242,6 +242,100 @@ PhysicsAuxiliaryPairPlan plan_physics_auxiliary_pair(
     return plan;
 }
 
+PhysicsAuxiliaryPassPlan plan_physics_auxiliary_pass(
+    const PhysicsAuxiliaryPassObservation& observation)
+{
+    PhysicsAuxiliaryPassPlan plan{};
+    plan.receiver_accumulators_after = observation.receiver_accumulators_0xdfc;
+    if (observation.alternate_time_path) {
+        plan.alternate_time_path_delegated = true;
+        plan.unused_pair_observations = static_cast<std::uint32_t>(
+            observation.pair_calls.size());
+        plan.returned_normally = true;
+        return plan;
+    }
+
+    std::vector<bool> matched_observations(observation.pair_calls.size(), false);
+    for (std::size_t receiver = 0; receiver <
+         observation.object_pointers_0x507d70.size(); ++receiver) {
+        if (observation.object_pointers_0x507d70[receiver] == 0U) continue;
+        for (std::size_t target = 0; target <
+             observation.object_pointers_0x507d70.size(); ++target) {
+            if (target == receiver ||
+                observation.object_pointers_0x507d70[target] == 0U) {
+                continue;
+            }
+
+            ++plan.expected_pair_calls;
+            PhysicsAuxiliaryPairDispatchStep step{};
+            step.receiver_index = receiver;
+            step.target_index = target;
+
+            const PhysicsAuxiliaryPairCallObservation* matched_call = nullptr;
+            std::size_t match_count = 0U;
+            for (std::size_t call_index = 0U;
+                 call_index < observation.pair_calls.size(); ++call_index) {
+                const auto& candidate = observation.pair_calls[call_index];
+                if (candidate.receiver_index == receiver &&
+                    candidate.target_index == target) {
+                    matched_call = &candidate;
+                    matched_observations[call_index] = true;
+                    ++match_count;
+                }
+            }
+
+            if (match_count == 0U) {
+                step.observation_missing = true;
+                ++plan.missing_pair_observations;
+                plan.receiver_accumulators_after[receiver].reset();
+                plan.accumulator_dependency_unknown = true;
+                plan.ordered_pair_calls.push_back(step);
+                continue;
+            }
+            plan.pair_observations_matched += static_cast<std::uint32_t>(
+                match_count);
+            if (match_count != 1U) {
+                step.observation_duplicated = true;
+                ++plan.duplicate_pair_observations;
+                plan.receiver_accumulators_after[receiver].reset();
+                plan.accumulator_dependency_unknown = true;
+                plan.ordered_pair_calls.push_back(step);
+                continue;
+            }
+            if (!plan.receiver_accumulators_after[receiver].has_value()) {
+                plan.accumulator_dependency_unknown = true;
+                plan.ordered_pair_calls.push_back(step);
+                continue;
+            }
+
+            step.receiver_accumulator_known = true;
+            auto pair = matched_call->pair;
+            pair.receiver_accumulator_0xdfc =
+                *plan.receiver_accumulators_after[receiver];
+            step.pair_effect = plan_physics_auxiliary_pair(pair);
+            if (step.pair_effect->status ==
+                PhysicsAuxiliaryPairStatus::target_object_null_dereference) {
+                plan.target_dereference_fault = true;
+                plan.ordered_pair_calls.push_back(step);
+                for (const bool matched : matched_observations) {
+                    if (!matched) ++plan.unused_pair_observations;
+                }
+                return plan;
+            }
+
+            plan.receiver_accumulators_after[receiver] =
+                step.pair_effect->receiver_accumulator_after;
+            plan.ordered_pair_calls.push_back(step);
+        }
+    }
+
+    for (const bool matched : matched_observations) {
+        if (!matched) ++plan.unused_pair_observations;
+    }
+    plan.returned_normally = true;
+    return plan;
+}
+
 std::vector<PhysicsTaskGlobalStore>
 physics_task_initialization_global_stores()
 {

@@ -1127,55 +1127,6 @@ NcarObjectLookupPlan lookup_ncar_object(
     return result;
 }
 
-NcarRegisteredObjectInfluencePlan apply_ncar_registered_object_influence(
-    const NcarRegisteredObjectInfluenceObservation& observation) noexcept
-{
-    NcarRegisteredObjectInfluencePlan result{};
-    result.destination_accumulator_0xdfc =
-        observation.destination_accumulator_0xdfc;
-    result.source_virtual_gate_0x30_called = true;
-    if (!observation.source_virtual_gate_0x30_nonzero) {
-        return result;
-    }
-    result.source_virtual_gate_accepted = true;
-
-    long double distance_squared = 0.0L;
-    long double radius_squared = 0.0L;
-    for (std::size_t axis = 0; axis < result.position_delta.size(); ++axis) {
-        result.position_delta[axis] = observation.source_position_0xe08[axis] -
-            observation.destination_position_0x5c[axis];
-        const long double delta = result.position_delta[axis];
-        distance_squared += delta * delta;
-    }
-    result.distance_squared = static_cast<float>(distance_squared);
-    const long double radius = observation.source_radius_0xe14;
-    radius_squared = radius * radius;
-    result.radius_squared = static_cast<float>(radius_squared);
-    if (!(result.distance_squared < result.radius_squared)) {
-        return result;
-    }
-    result.inside_strict_radius = true;
-
-    const long double numerator =
-        static_cast<long double>(result.radius_squared) -
-        result.distance_squared;
-    const long double fraction = divide_with_vc98_fdiv_compatibility(
-        numerator, result.radius_squared,
-        observation.fdiv_compatibility_enabled);
-    result.influence_fraction = static_cast<float>(fraction);
-    result.fdiv_compatibility_used =
-        observation.fdiv_compatibility_enabled;
-    for (std::size_t axis = 0; axis <
-         result.destination_accumulator_0xdfc.size(); ++axis) {
-        result.destination_accumulator_0xdfc[axis] = static_cast<float>(
-            static_cast<long double>(observation.source_vector_0x234[axis]) *
-                fraction +
-            observation.destination_accumulator_0xdfc[axis]);
-    }
-    result.influence_applied = true;
-    return result;
-}
-
 NcarInterpolatedDispatchPlan dispatch_ncar_interpolated_object(
     const NcarInterpolatedDispatchObservation& observation) noexcept
 {

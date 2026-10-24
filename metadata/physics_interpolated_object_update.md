@@ -254,16 +254,20 @@ separate observation.
 The same registry feeds the pairwise loop in `0x421050`: if the alternate-time
 gate is clear, every nonnull entry `i` is paired, in ascending order, with
 each nonnull `j != i`, calling `0x432300` with entry `i` as `this` and entry
-`j` as its parameter. `apply_ncar_registered_object_influence` models that
-pair primitive. The parameter object's `+0x30` virtual callback gates the
+`j` as its parameter. `plan_physics_auxiliary_pair` models that pair primitive;
+`plan_physics_auxiliary_pass` composes the ordered table traversal and carries
+each receiver's `+0xDFC` accumulator across its calls. Missing or duplicate
+pair observations invalidate only the affected receiver's final accumulator;
+an observed target dereference fault ends the pass. The parameter object's
+`+0x30` virtual callback gates the
 operation; on acceptance, the helper compares the squared distance between
 source `+0xE08..+0xE10` and destination `+0x5C..+0x64` against source radius
 `+0xE14` squared. Strictly inside the radius, it adds source vector
 `+0x234..+0x23C` scaled by `(radius_squared - distance_squared) /
 radius_squared` to destination accumulator `+0xDFC..+0xE04`. The legacy FDIV
-branch is retained, while x87 rounding is approximate. The pairwise inputs
-and virtual-gate results remain observations; registry traversal and downstream
-object state are not fabricated.
+branch is retained, while x87 rounding is approximate. Per-pair fields and
+virtual-gate results remain runtime observations, and the alternate-time
+branch delegates to the separate `0x426A10` projection.
 
 Evidence: initialization `ev_b3969ce0ed7661c09bc1c4b6c36050333512037ece3893fdfadd017abdb7146f`,
 registration/accessors `ev_4a390a130f8316b24f5cb6541adbf054b784337d070a8b265edb576ab64fe7e6`,

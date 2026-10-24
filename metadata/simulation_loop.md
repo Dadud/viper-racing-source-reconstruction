@@ -1664,11 +1664,29 @@ distance from receiver `+0x5C` to target `+0xE08`, and only when that is
 strictly less than target radius `+0xE14` squared, adds the target's force
 vector at `+0x234` multiplied by `(radius_squared-distance_squared)/radius_squared`
 to receiver accumulators at `+0xDFC`. The target's three force components
-therefore feed the receiver, in dispatcher argument order. The model preserves
-the stored binary32 distance/radius squares and uses the legacy FDIV helper for
-the proximity factor; x87 extended intermediates remain approximate. Evidence:
+therefore feed the receiver, in dispatcher argument order. The distance square
+is spilled to binary32 before the radius comparison; radius squared remains
+extended for that comparison, then spills to binary32 for the proximity
+factor, which uses the legacy FDIV helper. Remaining x87 extended intermediates
+are approximate. Evidence:
 `0x432300` pseudocode `ev_093a726660d0859203c394c4b6a10b413bfe3b6bc47d73582e1b7837d83f1bf4`
 and assembly `ev_04cfbeb623acd512909a581ee47905e7788fe86c1597666f2a7076b924c0d6d4`.
+
+`plan_physics_auxiliary_pass` now composes those calls across the 16-entry
+`0x507D70` table. It walks receiver and target indices in the binary's nested
+ascending order, skips null entries and self-pairs, and applies each observed
+pair through `plan_physics_auxiliary_pair`. The receiver's updated `+0xDFC`
+vector becomes the input to its next target call. Pair inputs are keyed by
+receiver/target indices; missing or duplicate entries invalidate that
+receiver's accumulator while preserving later call ordering, and an observed
+target dereference fault terminates the pass. With alternate time enabled,
+the pair pass is delegated to the already modeled `0x426A10` path. This
+composes the auxiliary portion of `0x421050`; its surrounding object callbacks
+and global side effects remain in `physics_task_fixed_step_dispatch_order`.
+Evidence for the loop and branch is `0x421050`,
+`ev_e91e243d2a75bd1f17a1d1dc64841e3b5122e94779806c54ebe0bc4421566982`; the
+pairwise target equation is supported by the helper pseudocode and assembly
+cited above.
 
 `plan_physics_time_slice` further projects the normal helper `0x427080`.
 `0x426670` selects the signed slot `(simulation_counter / 6) % slot_count`;
