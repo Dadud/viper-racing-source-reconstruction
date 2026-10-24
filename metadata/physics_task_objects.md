@@ -514,8 +514,12 @@ from the optional blend source or writes zeroes when the source is absent,
 clears its flag byte, maps the linked model node's `+0x1C` scalar through the
 observed clamp/scale helper, and stores the node pointer. Node links, blend
 pairs, and allocation outcomes remain explicit observations; truncated input
-is reported instead of being filled with invented zeros. Evidence for these
-helpers and the selection gates: `ev_921603fb8c35029f239b604139468c416af59e42234608c9cf737abd33242e2e`.
+is reported instead of being filled with invented zeros. Descriptor writes
+are relative to each allocated 0x18-byte entry; the separately supplied base
+address identifies each entry's location. A known null model lookup, failed
+nonempty descriptor allocation, or null link before the required count stops
+the constructor projection at the observed fault. Evidence for these helpers
+and the selection gates: `ev_921603fb8c35029f239b604139468c416af59e42234608c9cf737abd33242e2e`.
 
 `plan_physics_acar_runtime_initialization` expands the constructor's
 `0x428790` follow-up. It projects the selected configuration and profile words,
