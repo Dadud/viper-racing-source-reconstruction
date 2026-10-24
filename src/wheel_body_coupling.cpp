@@ -758,7 +758,8 @@ NcarIntegratorMeshResponseResult apply_ncar_integrator_mesh_response(
         result.group_descriptor_refresh_reached[group_index] = true;
         state.resource_flag_0x15[group_index] = 0U;
         if (group.destination_vertex_buffer_resolved &&
-            group.source_vertex_index_buffer_resolved) {
+            (group.destination_vertices.empty() ||
+             group.source_vertex_index_buffer_resolved)) {
             const auto count = std::min(group.destination_vertices.size(),
                                         group.source_vertex_indices.size());
             for (std::size_t vertex_index = 0; vertex_index < count;

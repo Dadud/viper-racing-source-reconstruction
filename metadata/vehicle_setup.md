@@ -878,6 +878,12 @@ scale bytes `0x4C7DA8` `ev_c3ef9ca6494f43d2e2252d646d0e6d7fc012722f81c7ae96bcf30
 Descriptor-refresh flag behavior is supported by `0x44F750`
 `ev_0e3f082206eadcd208a106544e27f61ba1c7f6e9d6dc64293634a909a82d21cc` and
 `0x44F9C0` `ev_f8b14f5c934c3ebeaec98b7b4d2c274e69d0c4b6db674daed52393fbeeae7a50`.
+The group view is grounded in `0x450B40`, which reads the vertex count and
+pointer from the descriptor at handle `+0x10`; `0x450B20` returns that same
+descriptor for refresh, and `0x450D00` is an identity wrapper. Evidence:
+`ev_b913ec97be8ebfb6069ea1b20d66c6e25622fda813f9bf797aa93f3e71bafc7d`,
+`ev_e847b4ac74ef670d80d95bdb26cc027edda8eb1b6c997ce12702c7793ed6e939`, and
+`ev_6e135c46f0d2c230000042107b505b911a7c4088f0b59cbd12de1ec0f2c999ee`.
 
 The embedded-record helper `0x4473D0` transforms its stored point through
 `0x437BA0`, which multiplies the local point by the basis at body `+0x38..+0x58`
