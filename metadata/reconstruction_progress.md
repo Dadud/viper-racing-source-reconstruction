@@ -10,6 +10,14 @@
   `git diff --check` passes; no tests were run. Evidence:
   `metadata/scene_car_update.md`.
 
+- **2026-10-24 continuation:** Added the fixed-gate effects class from the
+  32-object group initialized by `0x468090`: its vtable identifies constant
+  true `+0x10`/`+0x0C` gates and callback `0x4686A0`. The generic renderer now
+  derives those gates from the callback target; that callback is reached only
+  for renderer modes greater than 2. Release `viper_race_scene_flow` build and
+  `git diff --check` pass; no tests were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
   nested texture-binding request from manager field `+0x10`, matching its
   observed `0x448E30` call and preventing a conflicting duplicate handle input.

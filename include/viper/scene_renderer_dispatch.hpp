@@ -25,6 +25,11 @@ struct SceneRendererObjectObservation {
     bool pointer_present,
     std::uint8_t renderer_gate_0x4dcae4) noexcept;
 
+// Builds an observation for the fixed effects objects created by 0x468090.
+// Their vtable slots +0x10 and +0x0C both return true; +0x14 targets 0x4686A0.
+[[nodiscard]] SceneRendererObjectObservation observe_scene_fixed_effect_object(
+    bool pointer_present) noexcept;
+
 inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
 inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;
 

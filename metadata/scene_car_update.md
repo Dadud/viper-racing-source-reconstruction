@@ -477,6 +477,21 @@ action stream records `+0x10` and `+0x0C` but no `+0x14` call. This keeps the
 manager method model available while accurately representing the established
 generic frame path.
 
+The second effects group created by `0x468090` allocates 32 objects with
+vtable `0x4C9500`. Its `+0x10` slot points to `0x468690` and `+0x0C` points to
+`0x468670`; both are `mov al,1; ret` stubs. Slot `+0x14` points to
+`0x4686A0`. `observe_scene_fixed_effect_object` records those class facts, and
+the generic dispatcher now derives both gates from the resolved `+0x14`
+target. Since `+0x10` is true, the callback is reached only when
+`renderer_mode > 2`; within the active `0x45BEB0` draw path, that means modes
+3 and higher. Evidence: constructor `0x468090`
+`ev_b466aa22faf505aca957c810ba12a54714f045b5f4b12bf6b0055211483b2d98`,
+vtable bytes `ev_f1ad5268e73f92ee8a327e73b323d2966c1a320eee902359631057eb5bc349ba`,
+and gate instructions `0x468670`
+`ev_657034fc3afff2e949cbb9cde8313ef846ca7eccdf1847f2bdd8c0668519dbc1` and
+`0x468690`
+`ev_e2fac5e18f8297cec9a343a3b1f74da4d1305def86e5c3f0c376a41911c6af54`.
+
 ### Scene-car virtual `+0x18` callout
 
 `plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached

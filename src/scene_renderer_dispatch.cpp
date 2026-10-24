@@ -15,6 +15,12 @@ SceneRendererObjectObservation observe_scene_wheel_resource_manager(
         0x004623F0U};
 }
 
+SceneRendererObjectObservation observe_scene_fixed_effect_object(
+    const bool pointer_present) noexcept
+{
+    return {pointer_present, true, true, 0x004686A0U};
+}
+
 namespace {
 
 std::array<float, 12> make_scene_view_transform(
@@ -459,10 +465,14 @@ SceneRendererDispatchPlan plan_scene_renderer_dispatch(
             // pre-frame gate byte.
             const bool is_wheel_resource_manager =
                 object.virtual_0x14_target == 0x004623F0U;
+            const bool is_fixed_effect_object =
+                object.virtual_0x14_target == 0x004686A0U;
             const bool virtual_0x10_result = is_wheel_resource_manager
-                ? false : object.virtual_0x10_result;
+                ? false : is_fixed_effect_object
+                ? true : object.virtual_0x10_result;
             const bool virtual_0x0c_result = is_wheel_resource_manager
-                ? false : object.virtual_0x0c_result;
+                ? false : is_fixed_effect_object
+                ? true : object.virtual_0x0c_result;
             result.actions.push_back({SceneRendererDispatchActionKind::object_virtual_call,
                 0U, i, 0x10U});
             const bool mode_permits_draw = !virtual_0x10_result
