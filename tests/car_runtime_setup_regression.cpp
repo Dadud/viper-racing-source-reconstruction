@@ -123,7 +123,7 @@ int main()
                 std::fabs(callback_setup->angle_0xdcc - 0.174F) < 1.0e-5F,
             "mapped CARF width/ratio/value must reach the exact constructor callback fields");
 
-        std::vector<std::byte> anchor_record(0x12cU);
+        std::vector<std::byte> anchor_record(0x148U);
         write_u32_le(anchor_record, 0x58U, std::bit_cast<std::uint32_t>(200.0F));
         write_u32_le(anchor_record, 0x5cU, std::bit_cast<std::uint32_t>(25.0F));
         write_u32_le(anchor_record, 0x128U, std::bit_cast<std::uint32_t>(10.0F));
@@ -152,6 +152,15 @@ int main()
         }
         require(anchors->vertex_indices[0] == 0U,
             "strict nearest-distance comparison must keep the first tied model vertex");
+        const auto four_wheels = viper::initialize_ncar_four_wheel_core({
+            anchor_record, anchor_vertices, 0.5F, false});
+        require(four_wheels.input_complete &&
+                four_wheels.anchors.vertex_indices == anchors->vertex_indices &&
+                std::all_of(four_wheels.wheels.begin(), four_wheels.wheels.end(),
+                    [](const auto& wheel) { return wheel.has_value(); }) &&
+                four_wheels.wheels[0]->selected_model_vertex == expected_candidates[0] &&
+                four_wheels.wheels[3]->selected_model_vertex == expected_candidates[3],
+            "four-wheel orchestration must feed each nearest FNIM anchor to its matching constructor");
         const auto empty_mesh_anchors = viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
             anchor_record, std::span<const viper::ModelVertex>{});
         require(empty_mesh_anchors.has_value() &&
@@ -163,6 +172,12 @@ int main()
                     std::span<const std::byte>(anchor_record).first(0x12bU),
                     anchor_vertices),
             "runtime records missing bytes of +0x128 must be rejected");
+        const auto no_anchor_batch = viper::initialize_ncar_four_wheel_core({
+            anchor_record, std::span<const viper::ModelVertex>{}, 0.5F, false});
+        require(!no_anchor_batch.input_complete &&
+                std::none_of(no_anchor_batch.wheels.begin(), no_anchor_batch.wheels.end(),
+                    [](const auto& wheel) { return wheel.has_value(); }),
+            "four-wheel orchestration must remain incomplete when FNIM anchors are unavailable");
 
         std::vector<std::byte> wheel_record(0x148U);
         const auto write_float = [&wheel_record](const std::size_t offset,

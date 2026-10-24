@@ -591,6 +591,25 @@ struct NcarWheelCoreInitialization {
 initialize_ncar_wheel_core(
     const NcarWheelCoreInitializationInput& input) noexcept;
 
+struct NcarFourWheelCoreInitializationInput {
+    std::span<const std::byte> runtime_record;
+    std::span<const ModelVertex> model_vertices;
+    // Car-object +0x1F0, set by the observed NCAR body initializer.
+    float body_mass_scale_0x1f0{};
+    bool fdiv_compatibility_enabled{};
+};
+
+struct NcarFourWheelCoreInitialization {
+    NcarWheelVertexAnchorResult anchors{};
+    std::array<std::optional<NcarWheelCoreInitialization>, 4> wheels{};
+    bool input_complete{};
+};
+
+// Composes the observed 0x433C00 anchor scan and four 0x441C10 core setups.
+// Missing mapped fields or any unavailable anchor leaves the batch incomplete.
+[[nodiscard]] NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
+    const NcarFourWheelCoreInitializationInput& input) noexcept;
+
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};
     float angle_0xdcc{};

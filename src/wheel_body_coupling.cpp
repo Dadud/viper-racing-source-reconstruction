@@ -370,6 +370,29 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         value_0x48};
 }
 
+NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
+    const NcarFourWheelCoreInitializationInput& input) noexcept
+{
+    NcarFourWheelCoreInitialization result{};
+    const auto anchors = select_ncar_wheel_vertex_anchors_from_runtime_record(
+        input.runtime_record, input.model_vertices);
+    if (!anchors.has_value()) return result;
+    result.anchors = *anchors;
+    for (std::size_t wheel = 0; wheel < result.wheels.size(); ++wheel) {
+        const auto vertex_index = result.anchors.vertex_indices[wheel];
+        if (!vertex_index.has_value()) return result;
+        const auto& vertex = input.model_vertices[*vertex_index].fields;
+        result.wheels[wheel] = initialize_ncar_wheel_core({
+            input.runtime_record, wheel,
+            {vertex[0], vertex[1], vertex[2]},
+            input.body_mass_scale_0x1f0,
+            input.fdiv_compatibility_enabled});
+        if (!result.wheels[wheel].has_value()) return result;
+    }
+    result.input_complete = true;
+    return result;
+}
+
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept
 {
