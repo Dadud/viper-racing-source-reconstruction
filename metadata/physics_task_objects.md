@@ -708,10 +708,16 @@ speed, and scale are explicit observations. Evidence:
 gates, controller update call, target threshold, weighted curve-profile
 sampling, cutoff test, maximum-sample index selection, and `+0x24` setter
 branches. The curve evaluator composes `0x4404A0`, `0x4404D0`, and `0x43FA20`.
-The controller's virtual update effects remain explicit: its `+0x3C` pre-call
-scalar, `+0x34/+0x38/+0x68` post-call fields, and curve-evaluation object are
-observations. The callback's `+0xD64` copy now derives from the projected
-post-helper `+0xCBC` value.
+The embedded selector's `+0x50` controller pointer is the configured curve
+object. Its vtable `+0` method (`0x43F970`) only returns curve field `+0x10`,
+which the selector discards, so the virtual call does not mutate the fields
+that follow it. The overload taking `ConfiguredUpdateCurve` derives the
+selector's `+0x3C/+0x34/+0x38` values and evaluator coefficients from the
+configured object; it also carries the constructor's nonzero raw `+0x68`
+gate. The composed callback accepts this configured object as
+`curve_controller`, leaving the older explicit field observations available
+when setup data is unavailable. The callback's `+0xD64` copy derives from the
+projected post-helper `+0xCBC` value.
 
 `plan_acar_alternate_route_throttle_limit` also reconstructs the callback's
 independent `+0xF30` write to `+0x103C`: it preserves the existing value when

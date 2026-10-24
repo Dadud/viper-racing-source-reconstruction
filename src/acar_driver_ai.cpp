@@ -1170,6 +1170,32 @@ AcarCurveInteriorUpdatePlan plan_acar_curve_interior_update(
     return plan;
 }
 
+AcarCurveInteriorUpdatePlan plan_acar_curve_interior_update(
+    const AcarCurveInteriorUpdateObservation& observation,
+    const ConfiguredUpdateCurve& controller)
+{
+    auto derived = observation;
+    derived.controller_value_0x3c_before_update =
+        controller.scoring.cutoff_0x3c;
+    derived.controller_threshold_0x34_after_update =
+        controller.scoring.gate_value_0x34;
+    derived.controller_modulation_0x38_after_update =
+        controller.scoring.blend_value_0x38;
+    derived.controller_gate_0x68_after_update =
+        controller.selection_gate_0x68;
+    derived.curve_evaluation = AcarCurveEvaluationObservation{
+        .response_control_0x14 = controller.scoring.subtract_scale_0x14,
+        .input_cutoff_0x3c = controller.scoring.cutoff_0x3c,
+        .mode_0x40 = controller.scoring.mode_0x40,
+        .disable_curve_0x41 = controller.scoring.mode_0x41,
+        .quadratic_gain_0x44 = controller.scoring.quadratic_0x44,
+        .linear_gain_0x48 = controller.scoring.linear_0x48,
+        .constant_0x4c = controller.scoring.intercept_0x4c,
+        .delay_threshold_0x54 = controller.scoring.offset_0x54,
+        .delay_gain_0x58 = controller.scoring.penalty_0x58};
+    return plan_acar_curve_interior_update(derived);
+}
+
 AcarBrakeTailPlan plan_acar_brake_tail(
     const float brake_input,
     const AcarBrakeTailObservation& observation) noexcept
@@ -1375,8 +1401,13 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     auto curve_update_observation = observation.curve_interior_update;
     curve_update_observation.fdiv_compatibility_enabled =
         observation.geometry.fdiv_compatibility_enabled;
-    plan.curve_interior_update_plan = plan_acar_curve_interior_update(
-        curve_update_observation);
+    if (observation.curve_controller.has_value()) {
+        plan.curve_interior_update_plan = plan_acar_curve_interior_update(
+            curve_update_observation, *observation.curve_controller);
+    } else {
+        plan.curve_interior_update_plan = plan_acar_curve_interior_update(
+            curve_update_observation);
+    }
     plan.input_incomplete = plan.input_incomplete ||
         plan.curve_interior_update_plan->input_incomplete;
     plan.state_0xde0_after_callback =

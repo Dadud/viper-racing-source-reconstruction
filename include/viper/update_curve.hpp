@@ -30,6 +30,7 @@ struct ConfiguredUpdateCurve {
     float reciprocal_0x0c{};
     float getter_value_0x10{};
     float derived_value_0x30{};
+    std::int32_t selection_gate_0x68{0x43910000};
     UpdateCurveFields scoring{};
 };
 

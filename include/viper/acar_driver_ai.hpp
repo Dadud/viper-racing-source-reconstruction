@@ -1,6 +1,7 @@
 #pragma once
 
 #include "viper/acar_curve_tracker.hpp"
+#include "viper/update_curve.hpp"
 
 #include <array>
 #include <cstdint>
@@ -435,6 +436,12 @@ struct AcarCurveInteriorUpdatePlan {
 [[nodiscard]] AcarCurveInteriorUpdatePlan plan_acar_curve_interior_update(
     const AcarCurveInteriorUpdateObservation& observation);
 
+// Uses the configured curve object passed through the embedded selector's
+// +0x50 pointer, deriving the controller/profile fields read by 0x43FDD0.
+[[nodiscard]] AcarCurveInteriorUpdatePlan plan_acar_curve_interior_update(
+    const AcarCurveInteriorUpdateObservation& observation,
+    const ConfiguredUpdateCurve& controller);
+
 struct AcarBrakeTailObservation {
     std::optional<float> motion_axis_0x50;
     std::optional<float> velocity_x_0x234;
@@ -473,6 +480,7 @@ struct AcarBehaviorControlChainObservation {
     AcarSteeringHistoryTailObservation steering_history{};
     AcarThrottleTailObservation throttle_tail{};
     AcarCurveInteriorUpdateObservation curve_interior_update{};
+    std::optional<ConfiguredUpdateCurve> curve_controller;
     AcarBrakeTailObservation brake_tail{};
     std::optional<float> route_value_0xf0c;
     std::optional<float> route_scalar_0xfbc;
