@@ -38,6 +38,9 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         if (call.address == 0x004052E0U) {
             plan.dashboard_callback_geometry_reached = true;
         }
+        if (call.address == 0x00422A70U && call.receives_render_context) {
+            plan.state5_overlay_reached = true;
+        }
         if (call.address == 0x00404960U) {
             plan.shared_callback_reached = true;
             plan.shared_callback_wrapper = call.address;
@@ -48,6 +51,24 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             plan.shared_callback_second_argument = 1U;
             plan.optional_dashboard_branch_enabled = true;
         }
+    }
+
+    if (plan.state5_overlay_reached) {
+        auto state5_observation = observation.state5_overlay;
+        if (plan.render_context_acquisition &&
+            plan.render_context_acquisition->disposition ==
+                RenderContextAcquisitionDisposition::acquired) {
+            const auto& context = plan.render_context_acquisition->context;
+            state5_observation.framebuffer_base_value =
+                static_cast<std::uint32_t>(context.surface_bits_0x04);
+            state5_observation.framebuffer_pitch_bytes =
+                context.viewport.row_pitch_0x10;
+            state5_observation.clip_left = context.viewport.viewport_left_0x14;
+            state5_observation.clip_top = context.viewport.viewport_top_0x18;
+            state5_observation.clip_right = context.viewport.viewport_right_0x1c;
+            state5_observation.clip_bottom = context.viewport.viewport_bottom_0x20;
+        }
+        plan.state5_overlay = state5_numeric_overlay_plan(state5_observation);
     }
 
     if (plan.dashboard_core_callback_reached) {

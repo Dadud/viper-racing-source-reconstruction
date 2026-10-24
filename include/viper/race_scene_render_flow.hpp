@@ -40,6 +40,7 @@ struct RaceLoopSharedOverlayObservation {
     SceneDashboardAuxiliaryReadoutObservation dashboard_auxiliary_readout{};
     SceneDashboardCallbackGeometryObservation dashboard_callback_geometry{};
     SceneDashboardGearDisplayObservation dashboard_gear_display{};
+    SceneState5OverlayObservation state5_overlay{};
     SceneSharedOverlayFrameObservation shared_overlay{};
     RaceLoopSharedResultsRasterObservation shared_results_raster{};
     RaceLoopSharedTextEffectsRasterObservation shared_text_effects_raster{};
@@ -52,6 +53,8 @@ struct RaceLoopSharedOverlayPlan {
     std::uint32_t shared_callback_wrapper{};
     std::uint32_t shared_callback_second_argument{};
     bool optional_dashboard_branch_enabled{};
+    bool state5_overlay_reached{};
+    SceneState5OverlayPlan state5_overlay{};
     bool dashboard_core_callback_reached{};
     SceneDashboardCoreCallbackPlan dashboard_core_callback{};
     std::vector<SceneDashboardTextCall> dashboard_core_text_calls;

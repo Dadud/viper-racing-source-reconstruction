@@ -677,7 +677,12 @@ operations. The table can be regenerated with `tools/extract_scene_font.py`
 from the extracted `race.bin`. `apply_scene_text_pixel_writes` applies the
 already clipped little-endian glyph writes to a caller-supplied framebuffer
 span only after every destination range validates; it does not reproduce
-runtime surface acquisition or backend effects.
+runtime surface acquisition or backend effects. The race-loop scene composer
+now selects this state-5 plan only when callback-table slot `+0x04` reaches
+`0x422A70`; after successful context acquisition it derives the framebuffer
+base, pitch, and clip bounds from the acquired surface before projecting the
+background and both text calls. Matrix/camera globals, renderer mode, text
+colors, and unavailable context inputs remain explicit observations.
 
 Evidence: `ev_d1302d6070561e9af261fa64f57d21bb8e1f38b9450d57e098fbac520d0f4560`
 (`0x422A70` callback bytes) and
