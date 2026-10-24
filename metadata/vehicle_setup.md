@@ -18,6 +18,29 @@ code compares the bit patterns as unsigned integers. The portable
 `valid_wheel_lock_bits` preserves that exact comparison. The wider record
 layout and other field meanings are not inferred from this one validation.
 
+### Human setup file/resource versus configured race row
+
+The human vehicle path does not load its active setup from the 0xC8-byte
+participant row. `0x45EFD0` calls `0x45EE40`, which constructs a per-user
+`setups\\<name>.csu` path and accepts a 0xD4-byte file; it copies the first
+0x8C bytes into the active human vehicle. On an open/size failure,
+`0x45F150` tries bundled `<car>.ccs`, caller car fallback, and
+`default.ccs` resources; each is an 0x8C-byte CCS v2 payload. The validated
+external install has the bundled `.ccs` entries but no `.csu` setup files.
+
+Separately, the CARF mapper at `0x45E4B0` reads 35 DWORDs (0x8C bytes) from
+configured race row `+0x34`; row bytes `+0xC0..+0xC7` remain outside those
+reads. The matching 0x8C lengths make the CCS payload a plausible source for
+those 35 values, but the recovered calls do not establish that the payload is
+copied into that configured row or that its words have the same runtime
+meaning. The current asset loader therefore retains CCS as an opaque validated
+resource and does not use it as a CARF-mapper row. Close this bridge only with
+evidence for the row population/copy path, including the remaining row fields
+and any setup/upgrade selection behavior. Evidence: `0x45EFD0`
+`ev_adb94e23d97afe66b379995ca90ed5ccce81d943c2e3b7d3e776824dd966026f`,
+`0x45EE40` `ev_d5349302be5d3e8df0415e2df0b15fc7f1b0bf5fe3018f4e0ba7bef8c501b36f`,
+and `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ffa06eec1a05a08317`.
+
 ## World car variant tags at `0x45CAE0`
 
 The world parser reads a numeric subtype from each `obj_car` record and writes
