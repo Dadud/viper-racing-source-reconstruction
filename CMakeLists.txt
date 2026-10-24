@@ -167,6 +167,7 @@ target_link_libraries(viper_race_setup_model PUBLIC viper_scene_model)
 add_library(viper_physics_scheduler src/physics_scheduler.cpp)
 target_sources(viper_physics_scheduler PRIVATE
     src/physics_task_factory.cpp
+    src/physics_task_stream.cpp
     src/acar_curve_tracker.cpp
     src/acar_driver_ai.cpp
 )

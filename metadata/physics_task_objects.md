@@ -247,6 +247,20 @@ Evidence: `0x425720`
 `0x4224D0` `ev_a400cb5ab86f7098dfd08c8099bbb812751892d0e3b03cc4de1165538324a68f`,
 and `0x4375C0` `ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349f68`.
 
+`src/physics_task_stream.cpp` now models the exact tag-to-cursor-advance
+lookup used by `0x4209E0`, from the table at `0x4D4890`. Car tags `RAC\0`,
+`PCAR`, `ACAR`, and `NCAR` advance by `0x18C`; `GCAR` advances by `0x190`;
+`STAT` advances by zero; and `OBST`, `WOBL`, `CHKP`, and `BALL` advance by
+`0x34`. The `RAC\0` base tag is retained because it is present in the native
+resolver table, even though current track parsers emit only the four named car
+variants. `plan_physics_task_stream_offsets` folds these advances over an
+explicit ordered tag sequence and initial cursor, reporting an unknown tag or
+32-bit cursor overflow without fabricating later offsets. It deliberately
+does not infer serialization order or initial cursor, and the advances are
+not copied-record lengths or physics-object allocation sizes. Evidence:
+`0x4209E0`, `ev_67d39b50699f5d1fc7b65d5a5c1ea7527718bf5891e244fcdaadc17363c3052d`,
+and the native bytes at `0x4D4890`, observed by `read_bytes`.
+
 `plan_physics_track_service` projects selector dispatch, allocation size,
 constructor/vtable choices, panic behavior, and the final unconditional
 virtual `+0x14` call. For selectors 1 and 3, the initializer is a void helper

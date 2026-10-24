@@ -600,6 +600,8 @@ helpers, and a rigid-body contact-response/impulse path. Static
 analysis now ties the fixed-step physics task to conditional car body updates,
 shows that the main entity scene wrappers and physics objects are created from
 the same serialized car records, and traces the scene-side pose/wheel update;
+the native physics-task record-tag cursor advances are modeled, while the
+complete scene serialization order and initial cursor remain unresolved;
 the NCAR model captures recovered numeric timing gates and first-entry field
 writes without assigning semantic labels to opaque record fields;
 the game's full simulation, rendering, input, audio, persistence, replays, and
