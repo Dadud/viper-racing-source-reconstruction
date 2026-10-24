@@ -1354,6 +1354,80 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
         // The native constructor calls this helper even when allocation
         // returns null; its downstream memory effects are not fabricated.
         plan.model_helper_0x429440_called = true;
+        if (!observation.model_descriptor_allocation_succeeded) {
+            plan.model_helper_null_buffer_fault = true;
+        } else {
+            const bool blend_lookup_attempted =
+                !observation.helper_0x41b020_nonzero
+                && !observation.helper_0x426e50_nonzero;
+            const bool blend_data_available = blend_lookup_attempted
+                && observation.blend_source_result_available;
+            for (std::uint32_t index = 0U;
+                 index < observation.model_descriptor_count; ++index) {
+                PhysicsAcarModelDescriptorProjection descriptor{};
+                const auto base = 0x1054U + index * 0x18U;
+                descriptor.writes.push_back({base, 0U});
+                descriptor.writes.push_back({base + 2U, 0U});
+                if (blend_data_available
+                    && index < observation.blend_source_pairs.size()) {
+                    descriptor.copied_blend_pair = true;
+                    descriptor.writes.push_back({base + 4U,
+                        observation.blend_source_pairs[index][0]});
+                    descriptor.writes.push_back({base + 8U,
+                        observation.blend_source_pairs[index][1]});
+                } else if (!blend_data_available) {
+                    descriptor.writes.push_back({base + 4U, 0U});
+                    descriptor.writes.push_back({base + 8U, 0U});
+                } else {
+                    plan.model_helper_input_capture_incomplete = true;
+                }
+                descriptor.writes.push_back({base + 0x0cU, 0U});
+                if (index >= observation.model_nodes.size()) {
+                    plan.model_helper_input_capture_incomplete = true;
+                    plan.model_helper_null_node_fault =
+                        observation.model_node_capture_complete;
+                    plan.model_descriptors.push_back(std::move(descriptor));
+                    break;
+                }
+                const auto& node = observation.model_nodes[index];
+                if (index > 0U
+                    && observation.model_nodes[index - 1U].next_address
+                        != node.address) {
+                    plan.model_helper_input_capture_incomplete = true;
+                    plan.model_helper_null_node_fault =
+                        observation.model_nodes[index - 1U].next_address == 0U;
+                    plan.model_descriptors.push_back(std::move(descriptor));
+                    break;
+                }
+                descriptor.source_node_address = node.address;
+                auto mapped = 1.0L
+                    - static_cast<long double>(node.scalar_at_0x1c) * 20.0L;
+                const float rounded = static_cast<float>(mapped);
+                if (!(rounded >= 0.0F)) {
+                    mapped = 0.0L;
+                } else if (rounded > 1.0F) {
+                    mapped = 1.0L;
+                } else {
+                    mapped = static_cast<long double>(rounded);
+                }
+                descriptor.mapped_scalar = static_cast<float>(
+                    mapped * 0.39999998L + 0.3L);
+                descriptor.writes.push_back({base + 0x10U,
+                    std::bit_cast<std::uint32_t>(descriptor.mapped_scalar)});
+                descriptor.writes.push_back({base + 0x14U, node.address});
+                plan.model_descriptors.push_back(std::move(descriptor));
+                if (index + 1U < observation.model_descriptor_count
+                    && node.next_address == 0U) {
+                    plan.model_helper_null_node_fault = true;
+                    break;
+                }
+            }
+            if (blend_data_available
+                && observation.blend_source_pairs.size()
+                    < observation.model_descriptor_count) {
+                plan.model_helper_input_capture_incomplete = true;
+            }
+        }
     } else {
         plan.object_writes.push_back({0xfe8U, 0U});
     }

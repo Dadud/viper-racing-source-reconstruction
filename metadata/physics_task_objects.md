@@ -506,3 +506,12 @@ fails; the helper's memory effects remain opaque. It then allocates
 entry when the allocation succeeds. The three animation helpers, `+0x534`
 flag, and `0x428790` setup call are included. Evidence:
 `ev_becb0bf54909e1ef5b2a86dfd6fd63e34803446f8fdf780106218d38455f3971`.
+
+The `0x429440` helper is now expanded through `0x429010` and `0x429510`:
+each 0x18-byte descriptor clears its first two fields, either copies a pair
+from the optional blend source or writes zeroes when the source is absent,
+clears its flag byte, maps the linked model node's `+0x1C` scalar through the
+observed clamp/scale helper, and stores the node pointer. Node links, blend
+pairs, and allocation outcomes remain explicit observations; truncated input
+is reported instead of being filled with invented zeros. Evidence for these
+helpers and the selection gates: `ev_921603fb8c35029f239b604139468c416af59e42234608c9cf737abd33242e2e`.

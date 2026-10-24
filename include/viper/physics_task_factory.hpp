@@ -701,6 +701,19 @@ struct PhysicsObstacleTaskConstructorPlan {
 plan_physics_obstacle_task_constructor(
     const PhysicsObstacleTaskConstructorObservation& observation);
 
+struct PhysicsAcarModelNodeObservation {
+    std::uint32_t address{};
+    std::uint32_t next_address{};
+    float scalar_at_0x1c{};
+};
+
+struct PhysicsAcarModelDescriptorProjection {
+    std::vector<PhysicsTaskObjectFieldWrite> writes;
+    float mapped_scalar{};
+    std::uint32_t source_node_address{};
+    bool copied_blend_pair{};
+};
+
 struct PhysicsAcarTaskConstructorObservation {
     std::uint32_t object_address{};
     std::uint32_t registration_count_before{};
@@ -715,6 +728,12 @@ struct PhysicsAcarTaskConstructorObservation {
     std::optional<std::uint32_t> model_descriptors_address;
     bool model_descriptor_allocation_succeeded{};
     std::optional<std::uint32_t> model_descriptor_buffer_address;
+    bool helper_0x41b020_nonzero{};
+    bool helper_0x426e50_nonzero{};
+    bool blend_source_result_available{};
+    std::span<const std::array<std::uint32_t, 2>> blend_source_pairs;
+    std::span<const PhysicsAcarModelNodeObservation> model_nodes;
+    bool model_node_capture_complete{};
     std::uint32_t runtime_entry_count{};
     bool runtime_entry_allocation_succeeded{};
     std::optional<std::uint32_t> runtime_entry_buffer_address;
@@ -722,6 +741,7 @@ struct PhysicsAcarTaskConstructorObservation {
 
 struct PhysicsAcarTaskConstructorPlan {
     std::vector<PhysicsTaskObjectFieldWrite> object_writes;
+    std::vector<PhysicsAcarModelDescriptorProjection> model_descriptors;
     std::uint32_t model_descriptor_allocation_bytes{};
     std::uint32_t runtime_entry_allocation_bytes{};
     std::uint32_t runtime_entry_initializers_called{};
@@ -736,6 +756,9 @@ struct PhysicsAcarTaskConstructorPlan {
     bool model_data_present{};
     bool model_descriptor_allocation_attempted{};
     bool model_helper_0x429440_called{};
+    bool model_helper_null_buffer_fault{};
+    bool model_helper_null_node_fault{};
+    bool model_helper_input_capture_incomplete{};
     bool runtime_entry_allocation_attempted{};
     bool animation_helpers_called{};
     bool final_setup_helper_0x428790_called{};
