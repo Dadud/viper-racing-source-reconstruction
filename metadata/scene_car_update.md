@@ -70,10 +70,12 @@ one. The portable plan records each callback/result and guards missing payload
 or callback observations; actual handler side effects and out-of-bounds reads
 are not fabricated. Evidence: `0x462CF0` (`ev_87fc51588d2e71449560f2e725d0887ac52f4f6a0d86eaf3264f7f853b5c2d05`),
 `0x462D00` (`ev_27eaa986b6a64fe0b410e9978355b330863059004d75665dbb84e16d4425f4d4`),
-`0x462D30` (`ev_0399058f16c0cb7effc2a23bb68d22c10c549f947822e8f6f6523c8efe153d22`),
-`0x462D90` (`ev_df7587de6759c93e8fe32013823fe73d67e71deaae9c459db883dc1b01281cf0`),
+`0x462D30` (`ev_f2f4431afc3ee1da42fbe1f5bd88a52924b1b52d718f67fb98cf133d0635885a`),
+`0x462D90` (`ev_2d0096969d13bd67200d3ea8d5ba62679aea1068dd3fa19b99a9481237a22225`),
 `0x468090` (`ev_b466aa22faf505aca957c810ba12a54714f045b5f4b12bf6b0055211483b2d98`),
-and `0x469300` (`ev_48b9e3596cb4dfa50d1ba5991c3ebb11ac926bf35e4073d6b395ec00385f1e90`).
+`0x468270` (`ev_de0ec7660bac9a8b0e9493281c0c521b099e40ef0ff3b1994920e08e1a341b64`),
+`0x469300` (`ev_48b9e3596cb4dfa50d1ba5991c3ebb11ac926bf35e4073d6b395ec00385f1e90`),
+and `0x469350` (`ev_1ca4fe97607c76902eab28afb2b0b7376bfe322f74243d1aa4747465b7b74e28`).
 
 The wrapper measures the distance from object position `+0x28..+0x30` to the
 camera globals `0x509B58..0x509B60` using `0x448C10`; the following scale
