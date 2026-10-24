@@ -1424,9 +1424,9 @@ struct WindowState {
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<std::array<float, 4>> pose_buffer;
     // Base setup-derived native constructor inputs retained for the session.
-    // They currently feed diagnostics/future physics integration; route motion
-    // remains the visible pose authority until the missing simulation inputs
-    // are reconstructed.
+    // Wheel anchors currently feed live terrain/contact observations; route
+    // motion remains the visible pose authority until the missing simulation
+    // inputs are reconstructed.
     std::vector<std::byte> player_runtime_car_record;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
@@ -1586,13 +1586,22 @@ struct WindowState {
     void update_player_wheel_contacts(const float x, const float y, const float z,
                                       const float yaw)
     {
+        player_wheel_terrain_queries_succeeded.fill(false);
+        player_wheel_contact_results = {};
         if (terrain == nullptr || !player_constructor_inputs_ready ||
-            !player_wheel_core_initialization.has_value()) return;
+            !player_wheel_core_initialization.has_value()) {
+            for (auto& state : player_wheel_contact_states)
+                state.contact_active_0x168 = 0U;
+            return;
+        }
         const float cosine = std::cos(yaw);
         const float sine = std::sin(yaw);
         for (std::size_t wheel = 0; wheel < player_wheel_contact_states.size(); ++wheel) {
             const auto& core = player_wheel_core_initialization->wheels[wheel];
-            if (!core.has_value()) continue;
+            if (!core.has_value()) {
+                player_wheel_contact_states[wheel].contact_active_0x168 = 0U;
+                continue;
+            }
 
             // The selected vertex is subtracted by native 0x441C10 when it
             // stores +0x04..+0x0C, then added back by 0x437BA0. This is the
