@@ -104,6 +104,8 @@ struct RaceLoopSharedOverlayPlan {
     bool shared_text_effects_raster_reached{};
     SceneSharedTextEffectsRasterPlan shared_text_effects_raster{};
     SceneSharedOverlayFramePlan shared_overlay{};
+    std::optional<ScenePausedBannerStyle14MeasurePlan>
+        shared_paused_banner_fallback_measure;
     std::optional<ScenePausedBannerTextRasterPlan>
         shared_paused_banner_text_raster;
     std::optional<ScenePausedBannerResourceRasterPlan>

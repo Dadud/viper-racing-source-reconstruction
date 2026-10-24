@@ -1651,6 +1651,8 @@ struct ScenePausedBannerStyle14Observation {
     std::uint32_t resolved_font_source_0x44da00{};
     std::uint32_t resolved_color_source_0x44d530{};
     std::int32_t global_x_offset_0x560000{};
+    // Width returned by 0x44D450 for the optional style-row resource at +0x2C.
+    std::optional<std::int32_t> optional_resource_width_0x44d450;
 };
 
 struct ScenePausedBannerStyle14Plan {
@@ -1658,6 +1660,17 @@ struct ScenePausedBannerStyle14Plan {
     SceneDashboardTextCall text_style{};
     std::int32_t x_offset{};
     std::int32_t y_offset{};
+    bool measure_inputs_complete{true};
+    std::int32_t optional_resource_width{};
+};
+
+struct ScenePausedBannerStyle14MeasurePlan {
+    bool input_complete{true};
+    bool text_pointer_nonnull{};
+    std::int32_t text_width{};
+    std::int32_t style_minimum_width{};
+    std::int32_t optional_resource_width{};
+    std::int32_t returned_width{};
 };
 
 struct ScenePausedBannerTextRasterObservation {
@@ -1766,6 +1779,14 @@ raster_scene_paused_banner_text(
 [[nodiscard]] ScenePausedBannerStyle14Plan
 scene_paused_banner_style14_plan(
     const ScenePausedBannerStyle14Observation& observation) noexcept;
+
+// Projects 0x479450 for style 0x0E. The text width comes from 0x44DB10; a
+// null text pointer returns the optional resource width alone.
+[[nodiscard]] ScenePausedBannerStyle14MeasurePlan
+scene_paused_banner_style14_measure_width(
+    const ScenePausedBannerStyle14Plan& style,
+    bool text_pointer_nonnull,
+    std::int32_t text_width) noexcept;
 
 struct SceneDashboardCoreCallbackRasterObservation {
     // One preformatted argument and renderer context for each ordered callback

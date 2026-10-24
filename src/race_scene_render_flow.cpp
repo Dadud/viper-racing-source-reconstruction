@@ -250,8 +250,51 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                 paused_render.load_stp_resource_found = true;
             }
         }
+        if (observation.shared_paused_banner_raster.has_value()) {
+            const auto& banner_raster =
+                *observation.shared_paused_banner_raster;
+            const auto& text_observation = banner_raster.text;
+            const auto gates = scene_shared_overlay_gates(
+                shared_overlay_observation.overlay_globals);
+            auto resource_found = shared_overlay_observation.paused_banner
+                .render.load_stp_resource_found;
+            if (shared_overlay_observation.paused_banner.render
+                    .load_stp_resource_lookup.has_value()) {
+                const auto lookup = plan_resource_get(
+                    *shared_overlay_observation.paused_banner.render
+                         .load_stp_resource_lookup);
+                resource_found = lookup.exit ==
+                    ResourceGetExit::returned_resource;
+            }
+            if (gates.paused_banner && !resource_found &&
+                text_observation.style14.has_value()) {
+                auto text_end = text_observation.text.find('\0');
+                if (text_end == std::string_view::npos) {
+                    text_end = text_observation.text.size();
+                }
+                const auto text = text_observation.text.substr(0, text_end);
+                const auto style = scene_paused_banner_style14_plan(
+                    *text_observation.style14);
+                const auto text_layout = layout_scene_dashboard_text(
+                    style.text_style, text, banner_raster.layout_font);
+                plan.shared_paused_banner_fallback_measure =
+                    scene_paused_banner_style14_measure_width(
+                        style, text_observation.text_pointer_nonnull,
+                        text_layout.measured_width);
+                if (plan.shared_paused_banner_fallback_measure->input_complete) {
+                    shared_overlay_observation.paused_banner.render
+                        .fallback_text_width = plan
+                        .shared_paused_banner_fallback_measure->returned_width;
+                }
+            }
+        }
         plan.shared_overlay = scene_shared_overlay_frame_plan(
             shared_overlay_observation);
+        if (plan.shared_paused_banner_fallback_measure.has_value() &&
+            !plan.shared_paused_banner_fallback_measure->input_complete) {
+            plan.shared_overlay.paused_banner.inner_render.input_complete =
+                false;
+        }
         if (observation.shared_paused_banner_raster.has_value() &&
             plan.shared_overlay.paused_banner.inner_render.draws_text_handle) {
             auto raster_observation =

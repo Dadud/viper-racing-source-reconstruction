@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Modeled the state-4 style-14 `0x479450`
+  fallback-width rule and connected it to the race-loop composer. It invokes
+  text measurement, but the zero alignment flags mean non-null text returns
+  `max(0x24, optional style-resource width)`; null text returns the optional
+  resource width. That width remains an explicit input, so an unavailable
+  value marks the projection incomplete. Release build and `git diff --check`
+  pass; no tests were run.
+
 - **2026-10-24 continuation:** Composed the paused banner's fixed `load.stp`
   STMP request with `plan_resource_get` and exposed the `0x44CFD0` call in the
   inner operation trace. An explicit lookup plan now chooses resource drawing

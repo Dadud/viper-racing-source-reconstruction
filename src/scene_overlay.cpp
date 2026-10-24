@@ -3287,8 +3287,32 @@ ScenePausedBannerStyle14Plan scene_paused_banner_style14_plan(
         observation.resolved_font_source_0x44da00,
         result.descriptor_words[1],
     };
+    result.measure_inputs_complete =
+        observation.optional_resource_width_0x44d450.has_value();
+    result.optional_resource_width =
+        observation.optional_resource_width_0x44d450.value_or(0);
     result.x_offset = observation.global_x_offset_0x560000;
     result.y_offset = 0x24;
+    return result;
+}
+
+ScenePausedBannerStyle14MeasurePlan scene_paused_banner_style14_measure_width(
+    const ScenePausedBannerStyle14Plan& style,
+    const bool text_pointer_nonnull,
+    const std::int32_t text_width) noexcept
+{
+    ScenePausedBannerStyle14MeasurePlan result{};
+    result.input_complete = style.measure_inputs_complete;
+    result.text_pointer_nonnull = text_pointer_nonnull;
+    result.text_width = text_width;
+    result.style_minimum_width = 0x24;
+    result.optional_resource_width = style.optional_resource_width;
+    // 0x479450 calls 0x44DB10 for non-null text, but style 0x0E has
+    // alignment flags zero, so neither horizontal adjustment nor text width
+    // contributes to the returned width.
+    result.returned_width = text_pointer_nonnull
+        ? std::max(result.style_minimum_width, result.optional_resource_width)
+        : result.optional_resource_width;
     return result;
 }
 
