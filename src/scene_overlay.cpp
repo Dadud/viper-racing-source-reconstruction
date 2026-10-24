@@ -2573,6 +2573,7 @@ ScenePausedBannerRenderPlan scene_paused_banner_render_plan(
     ScenePausedBannerRenderPlan result{};
     result.reached = observation.gate_reached;
     result.text_source = observation.text_handle;
+    result.resource_object = observation.resource_object;
     result.outer_box_color = observation.outer_box_color_0x4ecbc8;
     result.inner_box_color = observation.inner_box_color_0x4ecb90;
     if (!result.reached) {
@@ -3691,8 +3692,19 @@ ScenePausedBannerFrameRasterPlan compose_scene_paused_banner_frame_raster(
     const ScenePausedBannerResourceRasterPlan* const resource_raster,
     const ScenePausedBannerTextRasterPlan* const text_raster)
 {
+    return compose_scene_banner_frame_raster(
+        frame.paused_banner.inner_render,
+        frame.paused_banner_box_pixel_writes,
+        resource_raster, text_raster);
+}
+
+ScenePausedBannerFrameRasterPlan compose_scene_banner_frame_raster(
+    const ScenePausedBannerRenderPlan& banner,
+    const std::span<const SceneRectangleFillPixelWrite> box_pixel_writes,
+    const ScenePausedBannerResourceRasterPlan* const resource_raster,
+    const ScenePausedBannerTextRasterPlan* const text_raster)
+{
     ScenePausedBannerFrameRasterPlan result{};
-    const auto& banner = frame.paused_banner.inner_render;
     result.reached = banner.reached;
     result.input_complete = banner.input_complete;
     if (!result.reached) {
@@ -3704,7 +3716,7 @@ ScenePausedBannerFrameRasterPlan compose_scene_paused_banner_frame_raster(
         switch (operation.kind) {
         case ScenePausedBannerOperationKind::outer_box_fill_0x44a1b0:
             if (!box_writes_appended) {
-                for (const auto& write : frame.paused_banner_box_pixel_writes) {
+                for (const auto& write : box_pixel_writes) {
                     result.ordered_pixel_writes.push_back({
                         write.x,
                         write.y,

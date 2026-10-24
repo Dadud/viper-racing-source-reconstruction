@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include "viper/race_loop_callbacks.hpp"
@@ -48,6 +49,17 @@ struct RaceLoopSharedPausedBannerRasterObservation {
     SceneDashboardRasterObservation resource_renderer{};
 };
 
+struct RaceLoopSharedLoadingBannerRasterObservation {
+    ScenePausedBannerRenderObservation render{};
+    ScenePausedBannerTextRasterObservation text{};
+    std::optional<std::string_view> localized_text;
+    SceneDashboardFontObservation layout_font{};
+    std::optional<StampFontIndex> parsed_layout_font;
+    SceneDashboardAtlasFontObservation atlas_font{};
+    std::optional<StampImage> resource_image;
+    SceneDashboardRasterObservation resource_renderer{};
+};
+
 struct RaceLoopSharedOverlayObservation {
     std::int32_t current_callback_state{};
     RaceLoopActiveFrameObservation following_frame{};
@@ -76,6 +88,8 @@ struct RaceLoopSharedOverlayObservation {
     RaceLoopSharedTextEffectsRasterObservation shared_text_effects_raster{};
     std::optional<RaceLoopSharedPausedBannerRasterObservation>
         shared_paused_banner_raster;
+    std::optional<RaceLoopSharedLoadingBannerRasterObservation>
+        shared_loading_banner_raster;
     std::optional<RaceLoopState0DashboardRasterObservation>
         state0_dashboard_raster;
 };
@@ -138,6 +152,13 @@ struct RaceLoopSharedOverlayPlan {
         shared_paused_banner_resource_raster;
     std::optional<ScenePausedBannerFrameRasterPlan>
         shared_paused_banner_frame_raster;
+    std::optional<ScenePausedBannerRenderPlan> shared_loading_banner_render;
+    std::optional<ScenePausedBannerTextRasterPlan>
+        shared_loading_banner_text_raster;
+    std::optional<ScenePausedBannerResourceRasterPlan>
+        shared_loading_banner_resource_raster;
+    std::optional<ScenePausedBannerFrameRasterPlan>
+        shared_loading_banner_frame_raster;
 };
 
 // Resolves the statically registered race.res image used by the state-0 gear
@@ -149,6 +170,8 @@ parse_state0_dashboard_gear_image(const ResourceBundle& race_bundle);
     const ResourceBundle& race_bundle);
 [[nodiscard]] std::optional<StampImage> parse_shared_cheater_banner_image(
     const ResourceBundle& race_bundle);
+[[nodiscard]] std::optional<StampImage> parse_shared_loading_resource_image(
+    const ResourceBundle& common_bundle);
 
 struct RaceLoopPausedBannerSurfaceWriteResult {
     bool frame_submitted{};

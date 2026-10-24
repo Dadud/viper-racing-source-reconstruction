@@ -1161,6 +1161,7 @@ struct ScenePausedBannerRenderObservation {
     std::optional<ResourceGetObservation> load_stp_resource_lookup;
     bool text_handle_nonnull{true};
     std::uint32_t text_handle{0x004EB464};
+    std::uint32_t resource_object{0x004EB460};
     std::int32_t surface_width{};
     std::int32_t surface_height{};
     // 0x44D450 returns the resource text width; 0x44D460 returns its height.
@@ -1949,6 +1950,13 @@ struct SceneTextPixelApplyResult {
 // Merges fallback boxes, resource pixels, and banner text in the native
 // paused-banner operation order. Missing raster inputs for reached draw calls
 // are reported as incomplete rather than silently omitted.
+[[nodiscard]] ScenePausedBannerFrameRasterPlan
+compose_scene_banner_frame_raster(
+    const ScenePausedBannerRenderPlan& banner,
+    std::span<const SceneRectangleFillPixelWrite> box_pixel_writes,
+    const ScenePausedBannerResourceRasterPlan* resource_raster,
+    const ScenePausedBannerTextRasterPlan* text_raster);
+
 [[nodiscard]] ScenePausedBannerFrameRasterPlan
 compose_scene_paused_banner_frame_raster(
     const SceneSharedOverlayFramePlan& frame,

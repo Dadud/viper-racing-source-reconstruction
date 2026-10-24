@@ -35,6 +35,15 @@ std::optional<StampImage> parse_shared_cheater_banner_image(
                                : std::nullopt;
 }
 
+std::optional<StampImage> parse_shared_loading_resource_image(
+    const ResourceBundle& common_bundle)
+{
+    const auto payload = common_bundle.find_payload(
+        "Load.stp", resource_type_code('S', 'T', 'M', 'P'));
+    return payload.has_value() ? parse_stamp_image(*payload, true)
+                               : std::nullopt;
+}
+
 RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
     const RaceLoopSharedOverlayObservation& observation)
 {
@@ -629,6 +638,86 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                 compose_scene_paused_banner_frame_raster(
                     plan.shared_overlay, resource_raster, text_raster);
         }
+        if (plan.shared_overlay.splash_loading.reached &&
+            observation.shared_loading_banner_raster.has_value()) {
+            const auto& input = *observation.shared_loading_banner_raster;
+            auto render = input.render;
+            render.gate_reached = true;
+            render.resource_object =
+                plan.shared_overlay.splash_loading.resource_object;
+            render.text_handle =
+                plan.shared_overlay.splash_loading.resource_handle;
+            if (input.resource_image.has_value()) {
+                render.resource_text_width = input.resource_image->width;
+                render.resource_text_height = input.resource_image->height;
+                if (!render.load_stp_resource_lookup.has_value()) {
+                    render.load_stp_resource_found = true;
+                }
+            }
+            plan.shared_loading_banner_render =
+                scene_paused_banner_render_plan(render);
+
+            auto layout_font = input.layout_font;
+            auto parsed_font_complete = true;
+            if (input.parsed_layout_font.has_value()) {
+                const auto projection = scene_dashboard_font_projection(
+                    *input.parsed_layout_font);
+                layout_font = projection.font;
+                parsed_font_complete = projection.input_complete;
+            }
+
+            if (plan.shared_loading_banner_render->draws_text_handle) {
+                std::vector<SceneDashboardRasterObservation> line_renderers(
+                    input.text.per_line_renderers.begin(),
+                    input.text.per_line_renderers.end());
+                for (auto& renderer : line_renderers) {
+                    renderer = shared_stamp_renderer(std::move(renderer));
+                }
+                auto text = input.text;
+                if (input.localized_text.has_value()) {
+                    text.text = *input.localized_text;
+                }
+                text.per_line_renderers = line_renderers;
+                plan.shared_loading_banner_text_raster =
+                    raster_scene_paused_banner_text(
+                        *plan.shared_loading_banner_render, text, layout_font,
+                        input.atlas_font);
+                if (!parsed_font_complete && text.text_pointer_nonnull) {
+                    plan.shared_loading_banner_text_raster->input_complete =
+                        false;
+                }
+                if (text.text_pointer_nonnull &&
+                    !input.localized_text.has_value()) {
+                    plan.shared_loading_banner_text_raster->input_complete =
+                        false;
+                }
+            }
+            if (plan.shared_loading_banner_render->draws_resource_text &&
+                input.resource_image.has_value()) {
+                auto resource_renderer = shared_stamp_renderer(
+                    input.resource_renderer);
+                const ScenePausedBannerResourceRasterObservation resource{
+                    true, *input.resource_image, std::move(resource_renderer)};
+                plan.shared_loading_banner_resource_raster =
+                    raster_scene_paused_banner_resource(
+                        *plan.shared_loading_banner_render, resource);
+            }
+            auto box_writes = scene_paused_banner_box_pixel_writes(
+                *plan.shared_loading_banner_render,
+                shared_overlay_observation.render_context,
+                shared_overlay_observation.renderer_mode_0x4d7a48,
+                shared_overlay_observation.framebuffer_base_value);
+            const auto* resource_raster = plan
+                .shared_loading_banner_resource_raster.has_value()
+                ? &*plan.shared_loading_banner_resource_raster : nullptr;
+            const auto* text_raster = plan
+                .shared_loading_banner_text_raster.has_value()
+                ? &*plan.shared_loading_banner_text_raster : nullptr;
+            plan.shared_loading_banner_frame_raster =
+                compose_scene_banner_frame_raster(
+                    *plan.shared_loading_banner_render, box_writes,
+                    resource_raster, text_raster);
+        }
         const auto& text_effects = plan.shared_overlay.text_effects;
         if (text_effects.predicate_0x4048e0.has_text_draw ||
             text_effects.predicate_0x404900.has_text_draw) {
@@ -954,7 +1043,23 @@ apply_race_loop_state0_dashboard_pixel_writes_to_locked_surface(
         }
     }
     if (overlay.splash_loading.reached) {
-        complete = false; // No splash-resource raster projection yet.
+        const auto& raster = plan.shared_loading_banner_frame_raster;
+        if (!raster.has_value() || !raster->reached ||
+            !raster->input_complete) {
+            complete = false;
+        } else {
+            for (const auto& write : raster->ordered_pixel_writes) {
+                if (write.offset_from_framebuffer_base < 0) {
+                    complete = false;
+                    break;
+                }
+                writes.push_back({
+                    static_cast<std::uint64_t>(
+                        write.offset_from_framebuffer_base),
+                    write.value, write.write_mask, write.bytes_per_pixel,
+                    write.preserves_existing_bits});
+            }
+        }
     }
     result.dashboard_write_plan_available = complete;
     if (!complete) {
