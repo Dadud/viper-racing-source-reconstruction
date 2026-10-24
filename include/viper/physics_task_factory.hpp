@@ -792,6 +792,8 @@ struct PhysicsAcarRuntimeInitializationObservation {
     bool model_object_has_records{};
     bool model_object_reset_flag_0x28{};
     std::optional<AcarCurveTrackerObservation> model_curve_observation;
+    std::optional<AcarCurveDistanceObservation> model_curve_seek_observation;
+    float model_fraction_0x08{};
     std::optional<std::uint32_t> timer_value_0xfb8;
     std::optional<float> linked_object_value_0x18;
     std::optional<float> last_model_node_value_0x18;
@@ -809,6 +811,7 @@ struct PhysicsAcarRuntimeInitializationPlan {
     std::vector<PhysicsTaskObjectFieldWrite> model_object_writes;
     std::optional<std::uint32_t> model_object_address;
     std::optional<AcarCurveTrackerPlan> model_curve_update_plan;
+    std::vector<AcarCurveDistancePlan> model_curve_seek_plans;
     std::optional<float> derived_threshold_0x1044;
     std::optional<float> normalized_value_0x1030;
     std::uint32_t cleared_runtime_entries{};
@@ -819,11 +822,15 @@ struct PhysicsAcarRuntimeInitializationPlan {
     bool model_sync_helper_0x41d170_called{};
     bool model_sync_null_receiver_fault{};
     bool model_curve_update_0x41d4f0_called{};
+    bool model_curve_update_input_incomplete{};
+    bool model_curve_update_null_node_fault{};
     bool model_object_helper_0x41d1d0_called{};
     std::uint32_t model_reset_helper_call_count{};
     std::uint32_t model_curve_seek_0x41d3a0_call_count{};
     float model_curve_seek_limit{10000.0F};
     bool model_object_reset_flag_cleared{};
+    bool model_curve_seek_input_incomplete{};
+    bool model_curve_seek_null_node_fault{};
     bool runtime_entry_clear_fault{};
     bool final_helper_0x428590_called{};
 };

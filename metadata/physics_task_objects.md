@@ -536,7 +536,8 @@ whether the derived threshold replaces profile `+0x98` is preserved. The
 sync. That helper copies four task vectors when the model has records, then
 selects reset (`0x41D1D0`) or curve update (`0x41D4F0`) from model flag `+0x28`.
 The caller performs a second unconditional `0x41D1D0`, modeled as clearing
-model `+4` and calling the still-opaque `0x41D3A0` with limit `10000`. A null
+model `+4` and invoking the `0x41D3A0` curve-distance projection with limit
+`10000`. A null
 model receiver is reported as a fault before that second call. The initializer
 clears one DWORD per eight-byte runtime entry; a null buffer with a positive
 count is a fault. On the surviving route, `0x428590` installs callbacks
@@ -558,3 +559,12 @@ is selected. Evidence: `ev_44cc376596921a8b71472de9e75f93d2def8b1a228f10049dc831
 The portable inner link walk is bounded by the captured-node set so non-finite
 fractions on cyclic captures cannot hang the reconstruction; this capture
 bound is a modeling safeguard, not a recovered game loop limit.
+
+`plan_acar_curve_distance` models the reset/seek helper `0x41D3A0` and its
+initial selector `0x41D290`: nearest eligible directed segment selection on a
+circular list, linear position/tangent projection, ten Newton updates,
+accumulated segment length, the caller's maximum-distance clear, negative
+fraction clamp, and the same-node backward-progress cursor clear. It returns
+missing-link/capture states instead of following arbitrary pointers. Evidence:
+`ev_44cc376596921a8b71472de9e75f93d2def8b1a228f10049dc831a15505294df` and
+`ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.

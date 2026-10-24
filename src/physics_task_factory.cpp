@@ -1595,6 +1595,47 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
         return plan;
     }
     plan.model_object_address = observation.model_object_address;
+    auto model_fraction = observation.model_fraction_0x08;
+    const auto call_curve_seek = [&]() {
+        plan.model_reset_helper_call_count += 1U;
+        plan.model_object_helper_0x41d1d0_called = true;
+        plan.model_curve_seek_0x41d3a0_call_count += 1U;
+        // 0x41D1D0 clears the linked-node cursor before it enters 0x41D3A0.
+        plan.model_object_writes.push_back({0x04U, 0U});
+        if (!observation.model_curve_seek_observation.has_value()) {
+            plan.model_curve_seek_input_incomplete = true;
+            return false;
+        }
+        auto seek_observation = *observation.model_curve_seek_observation;
+        seek_observation.cursor_node_address = 0U;
+        seek_observation.fraction_0x08 = model_fraction;
+        seek_observation.maximum_distance = plan.model_curve_seek_limit;
+        auto seek_plan = plan_acar_curve_distance(seek_observation);
+        plan.model_curve_seek_plans.push_back(seek_plan);
+        if (!seek_plan.output_written) {
+            if (seek_plan.status == AcarCurveDistanceStatus::
+                    null_node_dereference) {
+                plan.model_curve_seek_null_node_fault = true;
+            } else {
+                plan.model_curve_seek_input_incomplete = true;
+            }
+            return false;
+        }
+        plan.model_object_writes.push_back({0x04U,
+            seek_plan.cursor_node_address});
+        plan.model_object_writes.push_back({0x08U,
+            std::bit_cast<std::uint32_t>(seek_plan.fraction_0x08)});
+        model_fraction = seek_plan.fraction_0x08;
+        return true;
+    };
+    const auto record_unmodeled_curve_seek = [&]() {
+        plan.model_reset_helper_call_count += 1U;
+        plan.model_object_helper_0x41d1d0_called = true;
+        plan.model_curve_seek_0x41d3a0_call_count += 1U;
+        plan.model_object_writes.push_back({0x04U, 0U});
+        plan.model_curve_seek_input_incomplete = true;
+    };
+
     if (observation.model_object_has_records) {
         plan.model_object_writes.push_back({0x18U,
             observation.object_position_xz[0]});
@@ -1605,8 +1646,9 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
         plan.model_object_writes.push_back({0x24U,
             observation.object_vector_0x234_0x23c[1]});
         if (observation.model_object_reset_flag_0x28) {
-            plan.model_reset_helper_call_count += 1U;
-            plan.model_object_writes.push_back({0x04U, 0U});
+            if (!call_curve_seek()) {
+                return plan;
+            }
             plan.model_object_writes.push_back({0x28U, 0U});
             plan.model_object_reset_flag_cleared = true;
         } else {
@@ -1614,17 +1656,40 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
             if (observation.model_curve_observation.has_value()) {
                 plan.model_curve_update_plan = plan_acar_curve_tracker_update(
                     *observation.model_curve_observation);
+                if (!plan.model_curve_update_plan->output_written) {
+                    if (plan.model_curve_update_plan->status
+                        == AcarCurveTrackerStatus::null_node_dereference) {
+                        plan.model_curve_update_null_node_fault = true;
+                        return plan;
+                    }
+                    plan.model_curve_update_input_incomplete = true;
+                    // The caller would still run its unconditional reset helper,
+                    // but its fraction input depends on this missing result.
+                    record_unmodeled_curve_seek();
+                    return plan;
+                }
+                plan.model_object_writes.push_back({0x04U,
+                    plan.model_curve_update_plan->segment_node_address});
+                plan.model_object_writes.push_back({0x08U,
+                    std::bit_cast<std::uint32_t>(
+                        plan.model_curve_update_plan->fraction_0x08)});
+                plan.model_object_writes.push_back({0x30U,
+                    plan.model_curve_update_plan->segment_valid ? 1U : 0U});
+                model_fraction =
+                    plan.model_curve_update_plan->fraction_0x08;
+            } else {
+                plan.model_curve_update_input_incomplete = true;
+                record_unmodeled_curve_seek();
+                return plan;
             }
         }
     }
 
     // 0x428790 invokes 0x41d1d0 again after 0x429690 returns, regardless of
     // whether 0x41d170 selected its reset or curve-update branch.
-    plan.model_reset_helper_call_count += 1U;
-    plan.model_object_helper_0x41d1d0_called = true;
-    plan.model_object_writes.push_back({0x04U, 0U});
-    plan.model_curve_seek_0x41d3a0_call_count =
-        plan.model_reset_helper_call_count;
+    if (!call_curve_seek()) {
+        return plan;
+    }
 
     if (observation.runtime_entry_count > 0U
         && !observation.runtime_entry_buffer_available) {
