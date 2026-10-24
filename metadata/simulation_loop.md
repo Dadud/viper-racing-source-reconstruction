@@ -810,6 +810,21 @@ the standalone render plan likewise derives full redraw from the mask instead of
 accepting a separate boolean. This prevents the geometry, bitmap calls, and
 full-surface fill from using stale or contradictory redraw inputs. Instruction
 evidence is retained in `dashboard_render_dirty_mask.evidence.json`.
+Each selected rectangle is then handled by `0x404430`: it finds the index of
+the lowest set bit in the supplied mask, reads that row's four DWORDs from
+`0x4CFA20 + index*0x10`, aligns the left edge down and right edge up to a
+four-pixel boundary, and calls `0x4498A0` on `0x4EB3D0` with the row's vertical
+bounds. `0x4498A0` clamps the viewport origin to zero and the right/bottom
+edges to the bitmap object's width/height. The helper then calls
+`0x44AFD0(0x4EB2C0, 0, 0)` and restores `0x4EB3D0`'s full viewport with
+`0x4498E0`. This confirms the existing render-operation ordering—viewport,
+bitmap draw, restore—and explains why the raw viewport call arguments and the
+effective clipped viewport are distinct values. The implementation preserves
+the observed call arguments; destination clipping is separately represented by
+the blit projection. Evidence: `0x404430`
+(`ev_ad59cfd36f8467757fbe525cbd753365da3f3124434cf4eceba3fdd480bd077f`),
+`0x4498A0` (`ev_9feab525c0ad34933b494e5f50fd686980c6b4f396cb9118de9f356335b1ae53`),
+and `0x44AFD0` (`ev_2ec2e357b740cdf8d763dc1b043267bb3175732ab63380bc9e107b2e38695c7e`).
 When `RaceLoopSharedOverlayObservation::state0_dashboard_raster` is supplied,
 the shared race-loop plan also feeds the core callback's ordered text list
 through the layout/atlas pixel-write composer. A successful context acquisition
