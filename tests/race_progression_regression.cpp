@@ -56,6 +56,20 @@ int main()
         require(motion.race.finished && motion.race.completed_laps == 2U &&
                 motion_result.finished && motion.race.elapsed_seconds > 0.0F,
             "the runtime route integrator must drive through the configured finish");
+
+        viper::RouteMotionState steering_motion{};
+        viper::initialize_race_progression(steering_motion.race, 0U);
+        const std::vector<std::array<float, 2>> straight_route{
+            {0.0F, 0.0F}, {100.0F, 0.0F}};
+        const auto right_input = viper::advance_route_motion(steering_motion,
+            straight_route, false, true, false, false, 0.05F, 1U);
+        require(std::abs(steering_motion.steering - 0.25F) < 1.0e-6F &&
+                std::abs(right_input.yaw - (1.57079632679F + 0.0875F)) < 1.0e-6F,
+            "digital steering must use the recovered native response rate");
+        (void)viper::advance_route_motion(steering_motion, straight_route,
+            false, false, false, false, 0.05F, 1U);
+        require(std::abs(steering_motion.steering - 0.125F) < 1.0e-6F,
+            "released digital steering must decay at the recovered native rate");
         std::cout << "race progression regression checks passed\n";
         return 0;
     } catch (const std::exception& error) {

@@ -199,6 +199,7 @@ target_compile_features(viper_reconstruction PRIVATE cxx_std_20)
 add_library(viper_race_progression src/race_progression.cpp)
 target_include_directories(viper_race_progression PUBLIC include)
 target_compile_features(viper_race_progression PUBLIC cxx_std_20)
+target_link_libraries(viper_race_progression PUBLIC viper_race_loop_model)
 
 if(WIN32)
     add_executable(viper_game src/game_main.cpp src/game_assets.cpp)

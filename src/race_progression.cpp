@@ -1,5 +1,7 @@
 #include "viper/race_progression.hpp"
 
+#include "viper/race_loop_callbacks.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -51,10 +53,25 @@ RouteMotionResult advance_route_motion(
     }
     delta_seconds = std::clamp(delta_seconds, 0.0F, 0.05F);
     advance_race_clock(state.race, delta_seconds);
-    const float steering_input = static_cast<float>(steer_right) -
-        static_cast<float>(steer_left);
-    state.steering += (steering_input - state.steering) *
-        std::min(1.0F, delta_seconds * 5.0F);
+    // Race setup 0x43AF60 resets +0x509358 to zero and initializes the
+    // steering smoothing, gain, and response globals (+0x509428,
+    // +0x509390, +0x5093A8) to 1.0. The keyboard controls are digital inputs,
+    // corresponding to the native type-1 ramped binding path.
+    RaceLoopSteeringState steering_state{state.steering};
+    update_race_loop_steering(steering_state, {
+        delta_seconds,
+        1.0F,
+        1.0F,
+        1.0F,
+        static_cast<float>(steer_left),
+        static_cast<float>(steer_right),
+        false,
+        true,
+        true,
+        steer_left,
+        steer_right,
+    });
+    state.steering = steering_state.value_0x509358;
     const float drive = static_cast<float>(accelerate) - static_cast<float>(brake);
     state.speed = std::clamp((state.speed + drive * 14.0F * delta_seconds) *
         std::pow(0.992F, delta_seconds * 60.0F), -8.0F, 38.0F);

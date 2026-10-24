@@ -1,5 +1,17 @@
 # Reconstruction progress
 
+- **2026-10-24, recovered steering response in route runtime:** Connected
+  `advance_route_motion` to the recovered `update_race_loop_steering` logic.
+  Race setup `0x425420` calls `0x43AF60`, which initializes the steering state
+  and sets the native smoothing, gain, and response-rate globals to `1.0`; the
+  keyboard controls use the observed ramped type-1 binding path. This removes
+  the route prototype's hand-authored steering smoothing. Route lateral and
+  yaw pose conversion remain provisional, and vehicle wheel/body simulation
+  is not integrated. Evidence: `0x43AF60`
+  `ev_d6835d01d71cd76f2266fa1a734a506d3c8fd1f98a6adb15cbd9bcfb5eb40b74` and
+  `0x425420` `ev_0c5ca75a39ac6b15a40b00d86be2b955b101b06c42c52c7e135dff0c69a2d767`.
+  Windows Release build succeeded and full CTest passed 42/42.
+
 - **2026-10-24 ADNT note parsing:** Added native-style filename key construction
   for `.trk<key>.dnt` and `*notes\\<key>.dnt`, including the recovered car-name
   normalization, plus a bounded ADNT v7 parser that preserves node bytes and

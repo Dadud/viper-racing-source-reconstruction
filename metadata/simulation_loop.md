@@ -2255,6 +2255,19 @@ post-refresh snapshot selected by the cadence result: the tick snapshot
 includes the axis reset and `0x416D30` refresh. Platform input polling and
 binding record contents remain caller-supplied observations.
 
+The route-motion runtime now uses this recovered steering accumulator for its
+digital keyboard controls. Race setup `0x425420` calls `0x43AF60` before
+initializing physics; `0x43AF60` clears the primary steering value and sets
+the smoothing, gain, and response-rate globals at `0x509428`, `0x509390`, and
+`0x5093A8` to `1.0`. The keyboard controls are represented as active type-1
+ramped bindings. This removes the route prototype's prior hand-authored
+steering smoothing, but its conversion from the native steering accumulator
+to route lateral offset and yaw is still a visualization approximation; the
+original applies steering through the vehicle physics path. Evidence:
+`0x43AF60` `ev_d6835d01d71cd76f2266fa1a734a506d3c8fd1f98a6adb15cbd9bcfb5eb40b74`
+and race setup caller `0x425420`
+`ev_0c5ca75a39ac6b15a40b00d86be2b955b101b06c42c52c7e135dff0c69a2d767`.
+
 The unconditional `0x444E10` call refreshes normalized mouse position and
 three mouse-button bytes; on a periodic tick it first clears four controller
 axis globals and calls `0x416D30`. The tick-only `0x4170A0` dispatch writes a
