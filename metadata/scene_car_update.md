@@ -457,8 +457,12 @@ x87 extended arithmetic. The projection input now records object position
 with 1.0 added to its Y component. `0x448CD0` installs the identity transform
 and delegates to `0x452350`; the caller continues only when the returned low
 byte is nonzero. The transformed X coordinate and transformed Z minus 32.0
-feed the native truncating `0x4BD1F8` conversions used as text pixels; the
-resource image uses the same X and Y minus 9.
+feed the native truncating `0x4BD1F8` conversions used as text pixels. The
+secondary image uses projected X and truncated projected Y minus 9; secondary
+text applies that same Y offset and the `0x44D710` helper's additional
+four-pixel vertical adjustment. The portable model keeps the Z-minus-32
+subtraction in double precision to avoid an extra binary32 rounding before
+truncation.
 
 After projection succeeds, the callback sets its text context through
 `0x449900` and looks up the scene object's ordinal through `0x45DFB0`. Gate

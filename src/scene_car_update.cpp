@@ -1859,10 +1859,10 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
         return text.substr(0, terminator == std::string_view::npos
             ? text.size() : terminator);
     };
-    const auto ftol = [](const float value) {
+    const auto ftol = [](const double value) {
         if (!std::isfinite(value) ||
-            static_cast<double>(value) < std::numeric_limits<std::int32_t>::min() ||
-            static_cast<double>(value) >= 2147483648.0) {
+            value < std::numeric_limits<std::int32_t>::min() ||
+            value >= 2147483648.0) {
             return std::numeric_limits<std::int32_t>::min();
         }
         return static_cast<std::int32_t>(value);
@@ -1904,9 +1904,12 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
         return result;
     }
 
-    const auto projected_x = ftol(input.transformed_position_0x452350[0]);
-    const auto projected_y = ftol(
-        input.transformed_position_0x452350[2] - projected_y_offset);
+    const auto projected_x = ftol(static_cast<double>(
+        input.transformed_position_0x452350[0]));
+    // The native x87 subtraction stays extended until FTOL; avoid an
+    // intermediate binary32 rounding after subtracting 32.0.
+    const auto projected_y = ftol(static_cast<double>(
+        input.transformed_position_0x452350[2]) - projected_y_offset);
 
     result.operations.push_back({
         SceneCarCalloutOperationKind::set_text_context_0x449900,
@@ -1956,7 +1959,7 @@ SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
                 std::bit_cast<std::uint32_t>(projected_x)
                 - static_cast<std::uint32_t>(result.secondary_text.size()) * 4U),
             std::bit_cast<std::int32_t>(
-                std::bit_cast<std::uint32_t>(projected_y) - 4U),
+                std::bit_cast<std::uint32_t>(projected_y) - 13U),
             result.secondary_text.size(), 0x0044D6A0U, 0});
     }
     return result;

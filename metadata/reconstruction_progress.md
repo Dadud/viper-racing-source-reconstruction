@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Tightened scene-car callout pixel fidelity from
+  the instruction sequence at `0x46499B`-`0x464A1E`: projected Z minus 32 now
+  reaches FTOL without an intervening binary32 rounding, and secondary text
+  coordinates include the native nine-pixel anchor offset before the font
+  helper's four-pixel adjustment. Release `viper_race_scene_flow` build and
+  `git diff --check` pass; no tests were run. Evidence:
+  `disasm/engine_.text.asm` and `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** Reduced the scene-car callout's guessed runtime
   inputs: its distance threshold, projection Y offset, text pixel coordinates,
   and image pixel coordinates are now derived from recovered constants and the
