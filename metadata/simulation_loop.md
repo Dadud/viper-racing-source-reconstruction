@@ -663,6 +663,8 @@ its cached generation `0x4EB260` differs from `0x4D3868`, and draws handle
 mask/refresh/draw sequence. Its ordered operations now record registration
 (`0x418C90` with cleanup `0x405240`) when needed, generation refresh
 (`0x418CC0`) when stale, and the final resource draw (`0x40C930`).
+The refresh comparison now derives from optional raw cached/current DWORDs at
+`0x4EB260` and `0x4D3868`; the prior match boolean remains a fallback.
 The shared `0x40C930` wrapper calls `0x40C790("load.stp", handle, '\\0')`
 and then refreshes `0x4ECBFC` from `0x413BD0`; both paused and splash branches
 reach this wrapper. Splash:Loading now reuses the common banner layout and

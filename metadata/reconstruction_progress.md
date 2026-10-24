@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Replaced Splash:Loading's opaque generation
+  match with optional raw cached/current DWORD inputs. The gated branch now
+  derives refresh from `0x4EB260` versus `0x4D3868`; the prior boolean remains
+  a fallback. Release build and `git diff --check` pass; no tests were run.
+  See `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Added raw generation-word comparison for the
   selected type-0 LapTime resource. Both positive-delta and fallback text paths
   now derive refresh from cached DWORD `0x4EB2B8` versus current generation

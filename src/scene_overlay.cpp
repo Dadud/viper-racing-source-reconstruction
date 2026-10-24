@@ -3293,7 +3293,13 @@ SceneSharedLoadingBannerPlan scene_shared_loading_banner_plan(
             result.register_helper, result.resource_object,
             result.cleanup_callback});
     }
-    result.refresh_resource = !observation.resource_generation_matches;
+    const auto resource_generation_matches =
+        observation.current_resource_generation_value.has_value() &&
+                observation.loading_cached_generation_value.has_value()
+            ? *observation.current_resource_generation_value ==
+                *observation.loading_cached_generation_value
+            : observation.resource_generation_matches;
+    result.refresh_resource = !resource_generation_matches;
     if (result.refresh_resource) {
         result.ordered_operations.push_back({
             SceneSharedLoadingBannerOperationKind::refresh_resource_0x418cc0,

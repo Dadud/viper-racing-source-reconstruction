@@ -1427,6 +1427,8 @@ struct SceneSharedLoadingBannerObservation {
     SceneSharedOverlayObservation overlay_globals{};
     std::uint32_t resource_init_mask_0x4eb37c{};
     bool resource_generation_matches{};
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> loading_cached_generation_value;
 };
 
 enum class SceneSharedLoadingBannerOperationKind : std::uint8_t {
