@@ -663,3 +663,18 @@ far-alpha calculation/floor and output
 and row stride/counter (`ev_0d5984591da78047ccb44ce997e71f50bcf8a7f404c618d0ec8e60a33762894a`,
 `ev_323ef6a2a48884d33e80c59414813a71fa86054846f480620274109e64b7e4f2`,
 `ev_54c1397d51e32b056d00b3690a537945ba8a4f18ce889f32925825ddd3f2893b`).
+
+Four other second-slot callback targets are constant-argument panic
+forwarders: `0x455F20` passes `0x4DB74C`, `0x455F30` passes `0x4DB78C`,
+`0x456210` passes `0x4DB7C8`, and `0x456220` passes `0x4DB808` to
+`0x411000`. `plan_scene_render_panic_forwarder` reports this callback-to-
+reporter mapping; the strings at those data addresses and callback dispatch-
+time consequences are not inferred here. Evidence pairs show each stub's
+push and call: (`ev_cbbf47451c7a9b25c55418f88cd35693e7cdced5a203431b21813aa1f2a5c80f`,
+`ev_a037d9e223d80e01116e93668c47a10a99cfa9f3318949a8b75ab73c40a0fa10`),
+(`ev_5f6b8ef2fb5a7b7f6532cecf58c8749a9d39666abdb3776a3f56ce360704a42a`,
+`ev_bdfb496302c87b96e2d44fbdb9b50d1d1e9949922e96e6aded14d6de8cbb3a3f`),
+(`ev_31d473f88395ec60ab428c2b292111d983b4afa6cb27bf13547b61ddf9d9ed37`,
+`ev_23cf023a0522fc3b0302a957f61d50d1a8f02701167eb84ef94a987bcea93ecf`),
+and (`ev_8312f2375d61d5a115fe0c2e9f8c940ae60397056ad16caa0dfb0f393db3297a`,
+`ev_d6eb78e5db4a92fb25d404f115ae24dab73b50a74378caf39898056bef4c9c54`).

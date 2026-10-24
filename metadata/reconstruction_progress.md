@@ -1,9 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24:** Mapped four callback-table panic forwarders to `0x411000`,
+  preserving each static format-pointer address in a portable plan. Message
+  text and indirect-dispatch timing remain unresolved; see `scene_car_update.md`.
 - **2026-10-24:** Extended the bounded row-converter model to enabled-path
   callback `0x455F40`. It preserves the native copy, color, zero-alpha, faded-
   alpha write order and signed row bounds. Its distance/fade arithmetic is
-  documented from instruction evidence, while final alpha words remain
+  documented from instruction evidence, while final alpha bytes remain
   explicit observations to avoid claiming exact x87 conversion fidelity.
 - **2026-10-24:** Modeled the two default row converters selected by `0x455C80`.
   The bounded projection preserves native copy/store order, signed row bounds,

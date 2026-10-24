@@ -860,6 +860,17 @@ struct SceneRenderScanlineConversionPlan {
     std::uint32_t callback_address,
     const SceneRenderScanlineConversionObservation& observation);
 
+struct SceneRenderPanicForwarderPlan {
+    std::uint32_t callback_address{};
+    std::uint32_t panic_reporter_address{}; // 0x411000
+    std::uint32_t format_pointer{};
+};
+
+// Resolves callback-table stubs that forward a static message pointer to the
+// shared panic reporter. This does not model when the indirect callback runs.
+[[nodiscard]] std::optional<SceneRenderPanicForwarderPlan>
+plan_scene_render_panic_forwarder(std::uint32_t callback_address) noexcept;
+
 struct SceneWheelResourceFrameOperation {
     SceneWheelResourceFrameOperationKind kind{};
     std::uint32_t argument{};

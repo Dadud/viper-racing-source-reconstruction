@@ -1152,6 +1152,20 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
     return result;
 }
 
+std::optional<SceneRenderPanicForwarderPlan> plan_scene_render_panic_forwarder(
+    const std::uint32_t callback_address) noexcept
+{
+    std::uint32_t format_pointer{};
+    switch (callback_address) {
+    case 0x00455F20U: format_pointer = 0x004DB74CU; break;
+    case 0x00455F30U: format_pointer = 0x004DB78CU; break;
+    case 0x00456210U: format_pointer = 0x004DB7C8U; break;
+    case 0x00456220U: format_pointer = 0x004DB808U; break;
+    default: return std::nullopt;
+    }
+    return SceneRenderPanicForwarderPlan{callback_address, 0x00411000U, format_pointer};
+}
+
 SceneSharedRenderStateSyncPlan plan_scene_shared_render_state_sync(
     const SceneSharedRenderStateSyncObservation& observation)
 {
