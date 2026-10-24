@@ -6,6 +6,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace viper {
 
@@ -525,6 +526,198 @@ SceneCarBillboardQuadPlan plan_scene_car_billboard_quad(
     result.status = SceneCarBillboardQuadStatus::generated;
     result.vertex_data_written = true;
     result.shared_quad_submission_called = true;
+    return result;
+}
+
+SceneRendererRefreshPlan plan_scene_renderer_refresh(
+    const SceneRendererRefreshInput& input)
+{
+    SceneRendererRefreshPlan result{};
+    result.stored_descriptor_block_identity = input.descriptor_block_identity;
+    result.stored_byte_0x15 = input.stored_byte_0x15;
+    result.binding_nodes_after.assign(
+        input.existing_binding_nodes.begin(), input.existing_binding_nodes.end());
+    result.resource_handle_cells_after.reserve(input.resources.size());
+    for (const auto& resource : input.resources) {
+        result.resource_handle_cells_after.push_back(resource.handle_cell_value);
+    }
+
+    const auto set_partial_status = [&](const SceneRendererRefreshStatus status) {
+        if (result.status == SceneRendererRefreshStatus::complete) result.status = status;
+    };
+    const auto c_string_view = [](const std::string& value) {
+        const auto nul = value.find('\0');
+        return value.substr(0, nul == std::string::npos ? value.size() : nul);
+    };
+    const auto names_equal = [&](const std::string& left, const std::string& right) {
+        const auto a = c_string_view(left);
+        const auto b = c_string_view(right);
+        if (a.size() != b.size()) return false;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            auto ca = static_cast<unsigned char>(a[i]);
+            auto cb = static_cast<unsigned char>(b[i]);
+            if (ca >= 'A' && ca <= 'Z') ca = static_cast<unsigned char>(ca + ('a' - 'A'));
+            if (cb >= 'A' && cb <= 'Z') cb = static_cast<unsigned char>(cb + ('a' - 'A'));
+            if (ca != cb) return false;
+        }
+        return true;
+    };
+    const auto stored_name = [&](const std::string& name) {
+        return c_string_view(name).substr(0, 0x10);
+    };
+    const std::size_t requested_count = input.descriptor_count > 0
+        ? static_cast<std::size_t>(input.descriptor_count)
+        : 0U;
+    const std::size_t available_count = std::min(requested_count, input.descriptors.size());
+    const bool descriptor_span_incomplete = requested_count > input.descriptors.size()
+        && (input.flags & 0x03U) != 0;
+
+    if ((input.flags & 0x01U) != 0) {
+        for (std::size_t descriptor_index = 0; descriptor_index < available_count;
+             ++descriptor_index) {
+            const auto& descriptor = input.descriptors[descriptor_index];
+            for (std::int32_t vertex = descriptor.first_vertex_0x1c;
+                 vertex < descriptor.end_vertex_0x1e; ++vertex) {
+                if (vertex < 0 || static_cast<std::size_t>(vertex) >= input.source_vertices.size()) {
+                    set_partial_status(SceneRendererRefreshStatus::vertex_source_observation_exhausted);
+                    continue;
+                }
+                if (static_cast<std::size_t>(vertex) >= input.destination_vertex_capacity) {
+                    set_partial_status(
+                        SceneRendererRefreshStatus::vertex_destination_observation_exhausted);
+                    continue;
+                }
+                const auto& source = input.source_vertices[static_cast<std::size_t>(vertex)];
+                const auto subtract_wrap = [](const std::int16_t value,
+                                              const std::int16_t center) {
+                    const std::uint16_t bits = static_cast<std::uint16_t>(
+                        static_cast<std::uint16_t>(value)
+                        - static_cast<std::uint16_t>(center));
+                    return std::bit_cast<std::int16_t>(bits);
+                };
+                const std::array<std::int16_t, 3> rebased{
+                    subtract_wrap(source[0], descriptor.center_0x18),
+                    subtract_wrap(source[1], descriptor.center_0x18),
+                    subtract_wrap(source[2], descriptor.center_0x18),
+                };
+                result.rebased_vertices.push_back({static_cast<std::size_t>(vertex), rebased});
+                result.actions.push_back({SceneRendererRefreshActionKind::rebase_vertex,
+                    descriptor_index, static_cast<std::size_t>(vertex), 0, 0, {}});
+                ++result.source_vertices_rebased;
+            }
+        }
+    }
+
+    if ((input.flags & 0x02U) != 0) {
+        std::vector<SceneRendererBindingNode> updated_nodes;
+        updated_nodes.reserve(std::max(requested_count, input.existing_binding_nodes.size()));
+        std::size_t old_node_index = 0;
+        std::size_t allocation_index = 0;
+        std::size_t load_index = 0;
+        for (std::size_t descriptor_index = 0; descriptor_index < available_count;
+             ++descriptor_index) {
+            const auto& descriptor = input.descriptors[descriptor_index];
+            SceneRendererBindingNode node{};
+            const bool reusing_node = old_node_index < input.existing_binding_nodes.size();
+            if (reusing_node) {
+                node = input.existing_binding_nodes[old_node_index++];
+            } else {
+                if (allocation_index >= input.node_allocation_results.size()) {
+                    result.status = SceneRendererRefreshStatus::allocation_observation_exhausted;
+                    break;
+                }
+                const bool allocated = input.node_allocation_results[allocation_index++] != 0;
+                result.actions.push_back({SceneRendererRefreshActionKind::allocate_binding_node,
+                    descriptor_index, allocation_index - 1U, 0,
+                    allocated ? 1 : 0, {}});
+                ++result.node_allocations_consumed;
+                if (!allocated) {
+                    result.status = SceneRendererRefreshStatus::binding_node_allocation_failed;
+                    break;
+                }
+                node.handle = -1;
+            }
+
+            const std::string descriptor_name = c_string_view(descriptor.name_0x00);
+            const std::string source_name = names_equal(descriptor_name, node.name)
+                ? node.name
+                : descriptor_name;
+            std::optional<std::size_t> resource_index;
+            for (std::size_t index = 0; index < input.resources.size(); ++index) {
+                if (names_equal(source_name, input.resources[index].lookup_name_0x00)) {
+                    resource_index = index;
+                    break;
+                }
+            }
+            const std::string canonical_name = resource_index.has_value()
+                ? c_string_view(input.resources[*resource_index].canonical_name_0x10)
+                : source_name;
+            const std::int32_t resource_id = resource_index.has_value()
+                ? input.resources[*resource_index].resource_id_0x20
+                : 0;
+
+            if (!names_equal(node.name, canonical_name) || node.resource_id != resource_id) {
+                if (load_index >= input.resource_load_results.size()) {
+                    result.actions.push_back({SceneRendererRefreshActionKind::load_resource,
+                        descriptor_index, 0, resource_index.value_or(
+                            std::numeric_limits<std::size_t>::max()), resource_id, canonical_name});
+                    node.name = stored_name(canonical_name);
+                    node.resource_id = resource_id;
+                    updated_nodes.push_back(std::move(node));
+                    result.status = SceneRendererRefreshStatus::resource_load_observation_exhausted;
+                    break;
+                }
+                const std::int32_t loaded_handle = input.resource_load_results[load_index++];
+                result.actions.push_back({SceneRendererRefreshActionKind::load_resource,
+                    descriptor_index, 0, resource_index.value_or(
+                        std::numeric_limits<std::size_t>::max()), loaded_handle, canonical_name});
+                ++result.resource_loads_consumed;
+                if (node.handle != -1) {
+                    result.actions.push_back({SceneRendererRefreshActionKind::release_resource,
+                        descriptor_index, 0, resource_index.value_or(
+                            std::numeric_limits<std::size_t>::max()), node.handle, node.name});
+                }
+                node.name = stored_name(canonical_name);
+                node.resource_id = resource_id;
+                node.handle = loaded_handle;
+                if (resource_index.has_value()
+                    && input.resources[*resource_index].handle_cell_present_0x24) {
+                    result.resource_handle_cells_after[*resource_index] = loaded_handle;
+                    result.actions.push_back({SceneRendererRefreshActionKind::update_handle_cell,
+                        descriptor_index, 0, *resource_index, loaded_handle, canonical_name});
+                }
+            }
+
+            const auto first_vertex = static_cast<std::int32_t>(descriptor.first_vertex_0x1c);
+            const auto end_vertex = static_cast<std::int32_t>(descriptor.end_vertex_0x1e);
+            node.vertex_pointer_0x18 = input.destination_vertex_buffer_address
+                + static_cast<std::uint32_t>(first_vertex * 6);
+            node.vertex_component_count_0x1c = (end_vertex - first_vertex) * 3;
+            node.texture_offset_0x20 = static_cast<std::int32_t>(
+                static_cast<std::uint32_t>(static_cast<std::int32_t>(descriptor.center_0x18) * 0x20)
+                + static_cast<std::uint32_t>(input.texture_data_base_0x4d9fec));
+            node.texture_component_count_0x24 =
+                static_cast<std::int32_t>(descriptor.field_0x1a)
+                - static_cast<std::int32_t>(descriptor.center_0x18);
+            updated_nodes.push_back(std::move(node));
+            ++result.descriptor_rows_processed;
+        }
+
+        if (result.status == SceneRendererRefreshStatus::complete && !descriptor_span_incomplete) {
+            for (; old_node_index < input.existing_binding_nodes.size(); ++old_node_index) {
+                const auto& stale = input.existing_binding_nodes[old_node_index];
+                result.actions.push_back({SceneRendererRefreshActionKind::release_resource,
+                    requested_count, old_node_index, 0, stale.handle, stale.name});
+                result.actions.push_back({SceneRendererRefreshActionKind::free_binding_node,
+                    requested_count, old_node_index, 0, 0, stale.name});
+            }
+        }
+        result.binding_nodes_after = std::move(updated_nodes);
+    }
+
+    if (descriptor_span_incomplete) {
+        set_partial_status(SceneRendererRefreshStatus::descriptor_observation_exhausted);
+    }
     return result;
 }
 

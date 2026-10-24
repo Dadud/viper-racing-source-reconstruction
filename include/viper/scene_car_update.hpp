@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace viper {
@@ -397,6 +398,101 @@ struct SceneCarBillboardQuadPlan {
 // 0x44F750/0x44F9C0 is reported but its renderer-side mutations remain external.
 [[nodiscard]] SceneCarBillboardQuadPlan plan_scene_car_billboard_quad(
     const SceneCarBillboardQuadInput& input) noexcept;
+
+struct SceneRendererDescriptor {
+    std::string name_0x00;
+    std::int16_t center_0x18{};
+    std::int16_t field_0x1a{};
+    std::int16_t first_vertex_0x1c{};
+    std::int16_t end_vertex_0x1e{};
+};
+
+struct SceneRendererResourceEntry {
+    std::string lookup_name_0x00;
+    std::string canonical_name_0x10;
+    std::int32_t resource_id_0x20{};
+    bool handle_cell_present_0x24{};
+    std::int32_t handle_cell_value{};
+};
+
+struct SceneRendererBindingNode {
+    std::string name;
+    std::int32_t resource_id{};
+    std::int32_t handle{-1};
+    std::uint32_t vertex_pointer_0x18{};
+    std::int32_t vertex_component_count_0x1c{};
+    std::int32_t texture_offset_0x20{};
+    std::int32_t texture_component_count_0x24{};
+};
+
+enum class SceneRendererRefreshActionKind : std::uint8_t {
+    rebase_vertex,
+    allocate_binding_node,
+    load_resource,
+    release_resource,
+    update_handle_cell,
+    free_binding_node,
+};
+
+struct SceneRendererRefreshAction {
+    SceneRendererRefreshActionKind kind{};
+    std::size_t descriptor_index{};
+    std::size_t item_index{};
+    std::size_t resource_table_index{};
+    std::int32_t value{};
+    std::string name;
+};
+
+enum class SceneRendererRefreshStatus : std::uint8_t {
+    complete,
+    descriptor_observation_exhausted,
+    vertex_source_observation_exhausted,
+    vertex_destination_observation_exhausted,
+    allocation_observation_exhausted,
+    binding_node_allocation_failed,
+    resource_load_observation_exhausted,
+};
+
+struct SceneRendererRefreshInput {
+    std::uint8_t flags{}; // 0x44F9C0 param_4
+    std::uint8_t stored_byte_0x15{}; // param_3
+    std::uint32_t descriptor_block_identity{}; // pointer identity written at +0x10
+    std::int32_t descriptor_count{}; // descriptor block +0x08
+    std::span<const SceneRendererDescriptor> descriptors{}; // +0x0C, stride 0x20
+    std::span<const std::array<std::int16_t, 4>> source_vertices{}; // +0x14, stride 8
+    std::uint32_t destination_vertex_buffer_address{}; // renderer state +0x24
+    std::size_t destination_vertex_capacity{}; // available 3-short output rows
+    std::int32_t texture_data_base_0x4d9fec{};
+    std::span<const SceneRendererResourceEntry> resources{}; // renderer state +0x18/+0x1C
+    std::span<const SceneRendererBindingNode> existing_binding_nodes{}; // list at state +0x28
+    std::span<const std::uint8_t> node_allocation_results{}; // 0=allocation failed
+    std::span<const std::int32_t> resource_load_results{}; // FUN_00447D10 returns
+};
+
+struct SceneRendererRebasedVertex {
+    std::size_t vertex_index{};
+    std::array<std::int16_t, 3> position{};
+};
+
+struct SceneRendererRefreshPlan {
+    SceneRendererRefreshStatus status{SceneRendererRefreshStatus::complete};
+    std::uint32_t stored_descriptor_block_identity{};
+    std::uint8_t stored_byte_0x15{};
+    std::size_t descriptor_rows_processed{};
+    std::size_t source_vertices_rebased{};
+    std::size_t resource_loads_consumed{};
+    std::size_t node_allocations_consumed{};
+    std::vector<SceneRendererRebasedVertex> rebased_vertices;
+    std::vector<SceneRendererBindingNode> binding_nodes_after;
+    std::vector<std::int32_t> resource_handle_cells_after;
+    std::vector<SceneRendererRefreshAction> actions;
+};
+
+// Projects 0x44F9C0 flags 1/2/4: centered short-vertex rebasing, case-
+// insensitive resource-list reuse/update/cleanup, and unconditional header
+// stores. Allocation, resource-load returns and memory spans are observations.
+[[nodiscard]] SceneRendererRefreshPlan plan_scene_renderer_refresh(
+    const SceneRendererRefreshInput& input);
 
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,

@@ -163,6 +163,33 @@ queue processing at `0x44F9C0` remains outside this geometry plan. Evidence:
 `0x44F750` (`ev_bd4f35ac48c918544966d4212753f4f620c06c42d4a8180b73d1b0bee859b852`),
 and `0x44F9C0` (`ev_b6b2346770ffedb63c33c61d359265f9344b7c36431aaee691df3a0bdef5b9a6`).
 
+`plan_scene_renderer_refresh` projects the shared `0x44F9C0` update path.
+The routine always stores its descriptor-block pointer at renderer state
+`+0x10` and its byte argument at `+0x15`; flags independently gate the other
+work. Flag 1 walks each descriptor's signed vertex range, reads 8-byte source
+rows, subtracts the descriptor center from all three signed-short coordinates,
+and writes 6-byte destination rows. Flag 2 walks the current binding list in
+descriptor order, reuses or allocates 0x2C-byte nodes, resolves names against
+the renderer resource table, projects resource load/release and handle-cell
+effects, writes the four observed node fields, then releases and frees leftover
+nodes. Names are compared case-insensitively and stored names are bounded to
+the observed 16-byte field. Allocation and resource-load return values are
+explicit input observations; incomplete spans stop or limit the projection
+instead of fabricating memory contents. The flag-4 reset case is the already
+documented unconditional pointer/byte stores with no flag-1/2 work. This model
+describes CPU-side queue state and resource lifecycle; it does not reconstruct
+the device/backend renderer. Evidence: `0x44F9C0`
+(`ev_b6b2346770ffedb63c33c61d359265f9344b7c36431aaee691df3a0bdef5b9a6`),
+resource resolution `0x44FBC0`
+(`ev_3f709d251610dddb4f5078f98a2c8c5ad682d359afdab0bd5e97c043a3d75ccd`),
+identity wrapper `0x450D00`
+(`ev_28c9ed2c5e137c1681b99f606fcb80ac4aef97bd1d1549ecef402c7a446f70a`),
+load/release wrappers `0x447D10` (`ev_cbb3100486c3b2dffe144d5620aa439003e4421e2ad2122abbabd07456ee7eda`)
+and `0x447D50` (`ev_db25c0cd3b56e43beb331eb6b94a5ce9288572ad01be3f4df3938f8d5ece494e`),
+and pool allocation/free `0x419830`
+(`ev_0dc5d78cd998d9b70f89abfbb69efbb990b83a70dfc53827510fe782daaa6add`)
+and `0x419870` (`ev_d113bf8ac577ac505673e2d0a5faee32c788c9493e67f3c92fed386be43f422a`).
+
 Tag 0's outer effect management is also projected in
 `plan_scene_car_effect_tag_zero_handler`: `0x4692A0` compares the DWORD at
 payload `+0x18` against the `+0x04` key in all 32 slots at `0x540B70..0x540BEC`.
