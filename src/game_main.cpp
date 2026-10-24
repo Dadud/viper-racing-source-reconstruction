@@ -274,6 +274,14 @@ public:
         return SUCCEEDED(swap_chain_->Present(1, 0));
     }
 
+    bool set_car_pose(const float anchor_x, const float anchor_z, const float yaw)
+    {
+        car_anchor_x_ = anchor_x;
+        car_anchor_z_ = anchor_z;
+        car_yaw_ = yaw;
+        return update_car_buffer();
+    }
+
 private:
     void extract_terrain_points(const viper::TerrainSurfaceResourcePayload& terrain)
     {
@@ -384,14 +392,8 @@ private:
     {
         if (!width_ || !height_ || player_model_ == nullptr || player_model_->vertices.empty()) return true;
         if (ideal_line_points_.size() < 2U) return false;
-        const float dx = ideal_line_points_[1][0] - ideal_line_points_[0][0];
-        const float dz = ideal_line_points_[1][1] - ideal_line_points_[0][1];
-        const float tangent_length = std::sqrt(dx * dx + dz * dz);
-        if (!(tangent_length > 1.0e-6f) || !std::isfinite(tangent_length)) return false;
-        const float sin_yaw = dx / tangent_length;
-        const float cos_yaw = dz / tangent_length;
-        const float anchor_x = ideal_line_points_[0][0];
-        const float anchor_z = ideal_line_points_[0][1];
+        const float sin_yaw = std::sin(car_yaw_);
+        const float cos_yaw = std::cos(car_yaw_);
         std::vector<SurfaceVertex> vertices;
         std::vector<CarDrawGroup> groups;
         for (const auto& model_group : player_model_->material_groups) {
@@ -410,8 +412,8 @@ private:
                 if (vertex_index >= player_model_->vertices.size()) return false;
                 const auto& model_vertex = player_model_->vertices[vertex_index].fields;
                 // FNIM stores vehicle-local XYZ; this overview projects local X/Z onto the map.
-                const float world_x = anchor_x + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
-                const float world_z = anchor_z - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
+                const float world_x = car_anchor_x_ + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
+                const float world_z = car_anchor_z_ - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
                 const auto pos = map_to_clip(world_x, world_z);
                 vertices.push_back({pos[0], pos[1], color[0], color[1], color[2]});
             }
@@ -510,13 +512,68 @@ private:
     std::array<float, 4> map_bounds_{};
     float min_height_{};
     float max_height_{};
+    float car_anchor_x_{};
+    float car_anchor_z_{};
+    float car_yaw_{};
     UINT ideal_line_vertex_count_{};
     UINT surface_vertex_count_{};
     UINT width_{};
     UINT height_{};
 };
 
-struct WindowState { D3DWindow graphics; };
+struct WindowState {
+    D3DWindow graphics;
+    const viper::TerrainSurfaceResourcePayload* terrain{};
+    std::vector<std::array<float, 2>> route;
+    std::size_t route_segment{};
+    float route_fraction{};
+    float steering{};
+    float speed{};
+    float yaw{};
+    bool accelerate{};
+    bool brake{};
+    bool left{};
+    bool right{};
+    ULONGLONG last_tick{};
+
+    bool advance(float delta_seconds)
+    {
+        if (route.size() < 2U || terrain == nullptr) return false;
+        delta_seconds = (std::clamp)(delta_seconds, 0.0f, 0.05f);
+        const float steering_input = static_cast<float>(right) - static_cast<float>(left);
+        steering += (steering_input - steering) * (std::min)(1.0f, delta_seconds * 5.0f);
+        const float drive = (accelerate ? 1.0f : 0.0f) - (brake ? 1.0f : 0.0f);
+        speed += drive * 14.0f * delta_seconds;
+        speed *= std::pow(0.992f, delta_seconds * 60.0f);
+        speed = (std::clamp)(speed, -8.0f, 38.0f);
+        yaw += steering * speed * 0.035f * delta_seconds;
+        route_fraction += speed * delta_seconds / 8.0f;
+        while (route_fraction >= 1.0f) {
+            route_fraction -= 1.0f;
+            route_segment = (route_segment + 1U) % route.size();
+        }
+        while (route_fraction < 0.0f) {
+            route_fraction += 1.0f;
+            route_segment = (route_segment + route.size() - 1U) % route.size();
+        }
+        const auto& a = route[route_segment];
+        const auto& b = route[(route_segment + 1U) % route.size()];
+        const float route_x = a[0] + (b[0] - a[0]) * route_fraction;
+        const float route_z = a[1] + (b[1] - a[1]) * route_fraction;
+        const float tangent = std::atan2(b[0] - a[0], b[1] - a[1]);
+        const float lateral = steering * (speed * speed) * 0.0008f;
+        const float x = route_x + std::cos(tangent) * lateral;
+        const float z = route_z - std::sin(tangent) * lateral;
+        const auto surface = viper::sample_terrain_resource(*terrain,
+            {x, 1000.0f, z}, true);
+        if (!surface.query_succeeded) {
+            speed *= 0.5f;
+            return false;
+        }
+        yaw = tangent + steering * 0.35f;
+        return graphics.set_car_pose(x, z, yaw);
+    }
+};
 
 LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
@@ -534,6 +591,20 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
         return 0;
     case WM_KEYDOWN:
         if (wparam == VK_ESCAPE) { DestroyWindow(hwnd); return 0; }
+        if (state && (lparam & (1LL << 30)) == 0) {
+            if (wparam == VK_UP || wparam == 'W') state->accelerate = true;
+            if (wparam == VK_DOWN || wparam == 'S') state->brake = true;
+            if (wparam == VK_LEFT || wparam == 'A') state->left = true;
+            if (wparam == VK_RIGHT || wparam == 'D') state->right = true;
+        }
+        return 0;
+    case WM_KEYUP:
+        if (state) {
+            if (wparam == VK_UP || wparam == 'W') state->accelerate = false;
+            if (wparam == VK_DOWN || wparam == 'S') state->brake = false;
+            if (wparam == VK_LEFT || wparam == 'A') state->left = false;
+            if (wparam == VK_RIGHT || wparam == 'D') state->right = false;
+        }
         break;
     case WM_CLOSE:
         DestroyWindow(hwnd);
@@ -564,6 +635,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
+    state.terrain = &terrain;
+    state.route = extract_ideal_line_points(ideal_line);
     const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
         " & " + std::string(car_name) + " Mesh View";
     const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
@@ -597,6 +670,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             DispatchMessageW(&msg);
         }
         if (running && !IsIconic(hwnd)) {
+            const ULONGLONG now = GetTickCount64();
+            if (state.last_tick != 0U) {
+                const auto elapsed = static_cast<float>(now - state.last_tick) / 1000.0f;
+                if (!state.advance(elapsed)) {
+                    std::cerr << "Vehicle left the sampled terrain surface.\n";
+                    DestroyWindow(hwnd);
+                    return 1;
+                }
+            }
+            state.last_tick = now;
             if (!state.graphics.render()) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
