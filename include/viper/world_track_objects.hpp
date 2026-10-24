@@ -52,6 +52,7 @@ struct IdealLineTrackData {
     std::vector<std::byte> trailing_bytes;
     bool orientation_normalized{};
     bool category_labels_normalized{};
+    bool category_label_input_incomplete{};
 };
 
 // Models the optional orientation normalization and unconditional circular

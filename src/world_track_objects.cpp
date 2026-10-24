@@ -210,20 +210,72 @@ std::optional<IdealLineTrackData> normalize_ideal_line_resource(
                 read_record_word(record, 0x10U) ^ 0x80000000U);
         }
 
-        const auto first_label = read_record_byte(result.records.front(), 0x6eU);
-        if (first_label != 0U && first_label < 5U) {
+        // Native code advances a byte pointer by 0x44 while reading at +0x7a
+        // from the resource header, i.e. +0x6e from the record array. This
+        // intentionally aliases the next row's +0x2a field. Model that flat
+        // address explicitly instead of indexing beyond each std::array.
+        const auto read_category_label = [&result, &read_record_byte](
+            const std::size_t record_index)
+            -> std::optional<std::uint8_t> {
+            const auto flat_offset = record_index *
+                static_cast<std::size_t>(IdealLineResourcePayload::record_stride) +
+                0x6eU;
+            const auto records_size = result.records.size() *
+                static_cast<std::size_t>(IdealLineResourcePayload::record_stride);
+            if (flat_offset < records_size) {
+                const auto row = flat_offset /
+                    IdealLineResourcePayload::record_stride;
+                const auto in_row = flat_offset %
+                    IdealLineResourcePayload::record_stride;
+                return read_record_byte(result.records[row], in_row);
+            }
+            const auto tail_offset = flat_offset - records_size;
+            if (tail_offset < result.trailing_bytes.size()) {
+                return read_u8(result.trailing_bytes, tail_offset);
+            }
+            return std::nullopt;
+        };
+        const auto write_category_label = [&result, &write_record_byte](
+            const std::size_t record_index, const std::uint8_t value) {
+            const auto flat_offset = record_index *
+                static_cast<std::size_t>(IdealLineResourcePayload::record_stride) +
+                0x6eU;
+            const auto records_size = result.records.size() *
+                static_cast<std::size_t>(IdealLineResourcePayload::record_stride);
+            if (flat_offset < records_size) {
+                const auto row = flat_offset /
+                    IdealLineResourcePayload::record_stride;
+                const auto in_row = flat_offset %
+                    IdealLineResourcePayload::record_stride;
+                write_record_byte(result.records[row], in_row, value);
+                return;
+            }
+            const auto tail_offset = flat_offset - records_size;
+            if (tail_offset < result.trailing_bytes.size()) {
+                result.trailing_bytes[tail_offset] = static_cast<std::byte>(value);
+            }
+        };
+
+        const auto first_label = read_category_label(0U);
+        if (first_label && *first_label != 0U && *first_label < 5U) {
             result.category_labels_normalized = true;
             write_record_byte(result.records.front(), 0x2aU, 1U);
-            auto previous_label = first_label;
+            auto previous_label = *first_label;
             std::uint8_t normalized_label = 1U;
-            for (auto& record : result.records) {
-                const auto label = read_record_byte(record, 0x6eU);
-                if (label != previous_label) {
-                    ++normalized_label;
-                    previous_label = label;
+            for (std::size_t index = 0; index + 1U < result.records.size(); ++index) {
+                const auto label = read_category_label(index);
+                if (!label) {
+                    result.category_label_input_incomplete = true;
+                    break;
                 }
-                write_record_byte(record, 0x6eU, normalized_label);
+                if (*label != previous_label) {
+                    ++normalized_label;
+                    previous_label = *label;
+                }
+                write_category_label(index, normalized_label);
             }
+        } else if (!first_label) {
+            result.category_label_input_incomplete = true;
         }
     }
 

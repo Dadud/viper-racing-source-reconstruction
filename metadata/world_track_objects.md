@@ -45,6 +45,13 @@ when its first value is 1 through 4. It also creates the circular next-row
 links, clears the `0xFEEDBEEF` marker from nonterminal rows at `+0x3C`, and
 writes each row index at `+0x28`. `normalize_ideal_line_resource` exposes the
 link indices separately from raw row bytes rather than storing host pointers.
+The category pointer advances by the 0x44-byte row stride while reading at
+`+0x6E`, so for rows 0 through count-2 it aliases the following row's `+0x2A`
+byte. The portable model expresses that as a bounded flat-array address instead
+of indexing beyond a row object, and scans exactly count-1 labels as the native
+loop does. For a one-row resource, the first label lies 0x2A bytes into trailing
+data; when those bytes are absent, normalization reports
+`category_label_input_incomplete` rather than reading outside host memory.
 `make_track_spline_index_nodes` projects the normalized `+0x24` key and `+0x20`
 duration fields into `select_track_spline_segment` inputs. This reconstructs
 the resource envelope and conversion; the actual numeric `.ild`/`.ili` records

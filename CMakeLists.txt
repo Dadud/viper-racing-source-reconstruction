@@ -243,6 +243,12 @@ if(BUILD_TESTING)
     target_link_libraries(viper_track_table_regression PRIVATE
         viper_scene_model viper_resource_bundle)
     add_test(NAME track_table_regression COMMAND viper_track_table_regression)
+    add_executable(viper_world_track_objects_regression
+        tests/world_track_objects_regression.cpp)
+    target_link_libraries(viper_world_track_objects_regression PRIVATE
+        viper_scene_model viper_resource_bundle)
+    add_test(NAME world_track_objects_regression
+        COMMAND viper_world_track_objects_regression)
     add_test(NAME inspection_help COMMAND viper_reconstruction --help)
     if(WIN32)
         add_test(NAME game_help COMMAND viper_game --help)
