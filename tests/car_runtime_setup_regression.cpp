@@ -47,6 +47,32 @@ int main()
         words[0x22U] = std::bit_cast<std::uint32_t>(1.0F);
         write_u32_le(setup, 0x22U * sizeof(std::uint32_t), words[0x22U]);
 
+        viper::TireDefinition tire_definition{};
+        tire_definition.parameters = {
+            0.0F, 0.0F, 0.0F, 2.0F, 3.0F, 0.1F, 0.2F, 0.3F, 0.4F,
+            2.0F, 4.0F, 4.0F, 10.0F, 2.0F, 8.0F, 5.0F, 30.0F,
+            7.0F, 8.0F, 9.0F, 30.0F, 11.0F};
+        const auto tire_object = viper::initialize_tire_response_object(
+            tire_definition, 0.0254F);
+        const auto tire_curves = viper::derive_tire_response_curves(tire_definition);
+        const auto tire_terms = viper::derive_tire_trigonometric_terms(tire_definition);
+        require(tire_object.words[0] == tire_curves.quadratic.quadratic &&
+                tire_object.words[1] == tire_curves.quadratic.linear &&
+                tire_object.words[2] == tire_curves.linear.slope &&
+                tire_object.words[3] == tire_curves.linear.intercept &&
+                tire_object.words[4] == 7.0F && tire_object.words[5] == 8.0F &&
+                tire_object.words[6] == 9.0F &&
+                tire_object.words[7] == tire_terms.coefficient_0x1c &&
+                tire_object.words[8] == tire_terms.coefficient_0x20 &&
+                tire_object.words[9] == tire_terms.coefficient_0x24 &&
+                tire_object.words[10] == tire_terms.coefficient_0x28 &&
+                tire_object.words[11] == 0.0254F &&
+                tire_object.words[12] == 2.0F * 0.4545F &&
+                tire_object.words[13] == 3.0F * 0.042279862F &&
+                tire_object.words[14] == tire_curves.input_limit_at_0x38 &&
+                tire_object.words[15] == 11.0F,
+            "0x435BF0 must populate all sixteen tire-object DWORD slots");
+
         viper::CarFileResourcePayloads resources{};
         viper::CarFilePayload car_file{};
         car_file.resource_version = viper::CarFilePayload::supported_resource_version;

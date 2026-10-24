@@ -31,6 +31,17 @@ struct TireDefinition {
     std::array<float, 22> parameters{};
 };
 
+struct TireResponseObject {
+    // The 0x435B50/0x435BF0 allocation is 0x40 bytes (16 DWORDs).
+    // Keep destination slots numeric; their physical meanings are unproven.
+    std::array<float, 16> words{};
+};
+
+// Reconstructs the 0x435BF0 tire-object stores from a parsed 120-byte TIRE
+// record. The 0x2C slot is the caller-supplied value computed by 0x435B50.
+[[nodiscard]] TireResponseObject initialize_tire_response_object(
+    const TireDefinition& tire, float supplied_value_0x2c) noexcept;
+
 struct TireQuadraticTerms {
     float quadratic{};
     float linear{};

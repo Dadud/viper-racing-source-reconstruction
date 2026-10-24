@@ -306,6 +306,16 @@ after replacing each ordinate with `y/x`: inputs form points
 calling them particular physical tire curves remains a hypothesis until the
 record consumers are traced.
 
+`initialize_tire_response_object` now reconstructs this complete 16-DWORD
+destination as `TireResponseObject`, retaining numeric slots instead of
+assigning unproven physical labels. It takes the `0x435BF0` third argument
+explicitly because `0x435B50` derives that value as its first dimension
+argument divided by TIRE float 0. The `0x441C10` call supplies that dimension
+as the axle-specific setup scale multiplied by `999.99994`; FDIV compatibility
+remains a caller/runtime input. The regression checks all 16 destination slots
+for a nondegenerate synthetic TIRE record. The object is not yet owned by the
+live game wheel state.
+
 ### Car-to-wheel update path and runtime curve consumers
 
 The base constructor's body initializer `0x43E490` calls `0x4375C0`, initializes

@@ -85,6 +85,40 @@ std::optional<TireDefinition> parse_tire_resource(
     return tire;
 }
 
+TireResponseObject initialize_tire_response_object(
+    const TireDefinition& tire, const float supplied_value_0x2c) noexcept
+{
+    const auto& p = tire.parameters;
+    TireResponseObject result{};
+    const float qx1 = p[13] * 4.45F;
+    const float qy1 = p[14] * 255.74712F;
+    const float qx2 = p[15] * 4.45F;
+    const float qy2 = p[16] * 255.74712F;
+    const float qy1_over_x1 = qy1 / qx1;
+    const float qy2_over_x2 = qy2 / qx2;
+    result.words[0] = (qy2_over_x2 - qy1_over_x1) / (qx2 - qx1);
+    result.words[1] = qy1_over_x1 - result.words[0] * qx1;
+
+    const float lx1 = p[9] * 4.45F;
+    const float ly1 = p[10];
+    const float lx2 = p[11] * 4.45F;
+    const float ly2 = p[12];
+    result.words[2] = (ly2 - ly1) / (lx2 - lx1);
+    result.words[3] = ly1 - result.words[2] * lx1;
+    result.words[4] = p[17];
+    result.words[5] = p[18];
+    result.words[6] = p[19];
+    for (std::size_t index = 0; index < 4U; ++index)
+        result.words[7U + index] = p[5U + index];
+    result.words[11] = supplied_value_0x2c;
+    result.words[12] = p[3] * 0.4545F;
+    result.words[13] = p[4] * 0.042279862F;
+    result.words[14] = static_cast<float>(std::sin(
+        static_cast<long double>(p[20]) * 0.017453292F));
+    result.words[15] = p[21];
+    return result;
+}
+
 float evaluate_tire_quadratic(const TireQuadraticTerms& terms,
                               const float input) noexcept
 {
