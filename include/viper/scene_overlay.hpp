@@ -684,6 +684,9 @@ struct SceneDashboardPositionObservation {
     std::uint32_t entity_count{};
     bool context_changed_0x44e3d0{};
     bool decrement_entity_count_0x40e6d0{};
+    // Compared at 0x4036C1 when a full redraw reaches the Position resource.
+    std::optional<std::uint32_t> current_resource_generation_value;
+    std::optional<std::uint32_t> position_cached_generation_value;
 };
 
 // The state-0 callback's ESI points at the selected record's +0x138 block.
@@ -710,6 +713,8 @@ project_scene_dashboard_selected_record(
 
 struct SceneDashboardPositionResult {
     bool redraw_all{};
+    // Whether 0x4036CE calls 0x418CC0; unresolved if raw words were absent.
+    std::optional<bool> refresh_position_resource;
     std::int32_t displayed_position{};
     std::int32_t displayed_count{};
     std::uint32_t newly_registered_resource_bits{};

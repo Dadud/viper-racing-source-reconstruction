@@ -1202,7 +1202,10 @@ updates. The initial cache DWORDs at `0x4CF9C8` and `0x4CF9CC` are both
 `0xFFFFFFFF`. The same common prefix initializes the Position and RaceTime
 resources using bits `0x01` and `0x02` of `0x4EB484`;
 `update_scene_dashboard_position` reports newly set bits while projecting row
-caches.
+caches. On full redraw, the plan also derives whether the Position resource
+refresh helper at `0x4036CE` is called by comparing cached generation
+`0x4EB480` against current generation `0x4D3868` at `0x4036C1`; this result
+stays unresolved when either raw DWORD was not observed.
 
 The layout helper `layout_scene_dashboard_text` models the font-backed portion
 of `0x44DC70` after formatting has produced a byte string. It sums signed

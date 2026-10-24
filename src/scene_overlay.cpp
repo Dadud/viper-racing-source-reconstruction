@@ -1666,6 +1666,14 @@ SceneDashboardPositionResult update_scene_dashboard_position(
     const bool redraw_all = observation.context_changed_0x44e3d0 ||
         state.reset_byte_0x4eb300 ||
         state.selected_ordinal_cache_0x4cf9c8 != observation.selected_ordinal;
+    std::optional<bool> refresh_position_resource;
+    if (redraw_all &&
+        observation.current_resource_generation_value.has_value() &&
+        observation.position_cached_generation_value.has_value()) {
+        refresh_position_resource =
+            *observation.current_resource_generation_value !=
+            *observation.position_cached_generation_value;
+    }
     if (redraw_all) {
         state.selected_ordinal_cache_0x4cf9c8 = observation.selected_ordinal;
         state.redraw_mask_0x4eb40c = 0xFFFF;
@@ -1700,8 +1708,8 @@ SceneDashboardPositionResult update_scene_dashboard_position(
     state.resource_init_mask_0x4eb484 |=
         position_and_race_time_resource_bits;
 
-    return {redraw_all, position, count, newly_registered_resource_bits,
-            reached_calls};
+    return {redraw_all, refresh_position_resource, position, count,
+            newly_registered_resource_bits, reached_calls};
 }
 
 SceneDashboardLapResult update_scene_dashboard_lap(

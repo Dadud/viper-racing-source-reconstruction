@@ -1,5 +1,11 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added the Position-resource refresh decision
+  for full redraws by comparing optional raw generation DWORDs at `0x4EB480`
+  and `0x4D3868`, matching `0x4036C1`/`0x4036CE`. The result remains
+  unresolved if either word is unavailable. Release build and
+  `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Extended the selected-record projection with
   DWORDs at ESI `+0x20` and `+0x28` and connected them to the supplemental
   string-table indices. When those bytes and the table are available, the
