@@ -45,6 +45,17 @@ controller support, control rebinding UI, or physical simulation. A Windows
 smoke test records throttle while Up is held and confirms it clears after
 key-up.
 
+Press C at race setup to open the five-slot career-file screen. The runtime
+uses the resolved Config directory and the native `careerN.dat` reader to
+show slots 1–5 as empty/invalid or display the stored player-name bytes for a
+valid slot. Enter repeats header, payload, XOR, and checksum validation and
+reports whether the slot passed. Escape returns to race setup. This screen is
+deliberately a slot browser and validator: the original career action loop,
+event setup, upgrades, and result progression are not connected, so passing a
+slot does not launch a quick race or claim to continue a career. `--config-dir`
+can point the screen at an explicit Config directory; if no Config directory
+can be resolved, the career hotkey is unavailable.
+
 ## Acceptance still open
 
 - Run a complete Viper/Bemidji race from the setup window, inspect standings,
@@ -56,4 +67,6 @@ key-up.
   matrix; establish the supported car roster against original frontend data.
 - Implement and retain supported settings, control rebinding, random-track
   behavior, mode/difficulty/lap selection, and native-compatible writeback.
+- Connect validated career payloads to the reconstructed career action/event
+  loop, preserving upgrades and progression through results and native saves.
 - Compare controlled original and reconstructed menu/race/results captures.

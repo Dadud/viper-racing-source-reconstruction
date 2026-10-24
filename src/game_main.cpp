@@ -15,6 +15,7 @@
 #include "viper/sound_resource.hpp"
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/world_track_objects.hpp"
+#include "viper/career_file_store.hpp"
 
 #include <array>
 #include <algorithm>
@@ -417,6 +418,11 @@ struct SetupWindowState {
     std::vector<std::string> cars;
     std::size_t track_index{};
     std::size_t car_index{};
+    std::filesystem::path config_directory;
+    std::array<std::string, 5> career_rows{};
+    int career_slot{};
+    bool career_screen{};
+    std::string career_message;
     bool accepted{};
 };
 
@@ -444,23 +450,43 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
         DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &rect,
             format | DT_SINGLELINE | DT_VCENTER);
     };
-    write(L"VIPER RACING", 56, 42, 54);
-    SetTextColor(dc, RGB(118, 208, 155));
-    write(L"RACE SETUP", 58, 110, 34);
-    SetTextColor(dc, RGB(238, 244, 240));
-    const auto track = state.tracks.empty() ? L"(no tracks)" :
-        ascii_to_wide(state.tracks[state.track_index]);
-    const auto car = state.cars.empty() ? L"(no cars)" :
-        ascii_to_wide(state.cars[state.car_index]);
-    write(L"TRACK", 74, 190, 30);
-    write(L"<  " + track + L"  >", 74, 228, 42);
-    write(L"CAR", 490, 190, 30);
-    write(L"<  " + car + L"  >", 490, 228, 42);
-    SetTextColor(dc, RGB(190, 205, 198));
-    write(L"UP / DOWN: CHOOSE TRACK", 74, 332, 30);
-    write(L"LEFT / RIGHT: CHOOSE CAR", 74, 370, 30);
-    write(L"ENTER: START RACE", 74, 426, 30);
-    write(L"ESC: EXIT", 74, 464, 30);
+    if (!state.career_screen) {
+        write(L"VIPER RACING", 56, 42, 54);
+        SetTextColor(dc, RGB(118, 208, 155));
+        write(L"RACE SETUP", 58, 110, 34);
+        SetTextColor(dc, RGB(238, 244, 240));
+        const auto track = state.tracks.empty() ? L"(no tracks)" :
+            ascii_to_wide(state.tracks[state.track_index]);
+        const auto car = state.cars.empty() ? L"(no cars)" :
+            ascii_to_wide(state.cars[state.car_index]);
+        write(L"TRACK", 74, 190, 30);
+        write(L"<  " + track + L"  >", 74, 228, 42);
+        write(L"CAR", 490, 190, 30);
+        write(L"<  " + car + L"  >", 490, 228, 42);
+        SetTextColor(dc, RGB(190, 205, 198));
+        write(L"UP / DOWN: CHOOSE TRACK", 74, 332, 30);
+        write(L"LEFT / RIGHT: CHOOSE CAR", 74, 370, 30);
+        write(L"ENTER: START RACE", 74, 426, 30);
+        write(L"C: CAREER SLOTS", 74, 464, 30);
+        write(L"ESC: EXIT", 74, 502, 30);
+    }
+    if (state.career_screen) {
+        SetTextColor(dc, RGB(118, 208, 155));
+        write(L"CAREER SLOT VALIDATION", 74, 120, 34);
+        SetTextColor(dc, RGB(238, 244, 240));
+        for (std::size_t index = 0; index < state.career_rows.size(); ++index) {
+            std::wstring row = index == static_cast<std::size_t>(state.career_slot)
+                ? L"> " : L"  ";
+            row += L"SLOT " + std::to_wstring(index + 1U) + L"  ";
+            row += ascii_to_wide(state.career_rows[index]);
+            write(row, 100, 190 + static_cast<int>(index) * 44, 36);
+        }
+        SetTextColor(dc, RGB(190, 205, 198));
+        write(L"UP / DOWN: SELECT     ENTER: VALIDATE", 100, 430, 30);
+        if (!state.career_message.empty())
+            write(ascii_to_wide(state.career_message), 100, 462, 30);
+        write(L"ESC: BACK", 100, 500, 30);
+    }
     SelectObject(dc, old_font);
     EndPaint(hwnd, &paint);
 }
@@ -483,6 +509,33 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
         return 0;
     case WM_KEYDOWN:
         if (state && (lparam & (1LL << 30)) == 0) {
+            if (state->career_screen) {
+                if (wparam == VK_UP || wparam == VK_DOWN) {
+                    state->career_slot = (state->career_slot +
+                        (wparam == VK_UP ? 4 : 1)) % 5;
+                    state->career_message.clear();
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam == VK_ESCAPE) {
+                    state->career_screen = false;
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam == VK_RETURN) {
+                    const auto loaded = viper::load_career_slot(
+                        state->config_directory, state->career_slot);
+                    if (loaded.file.returns_success) {
+                        state->career_message = "VALID FILE - native career loop pending";
+                    } else {
+                        state->career_rows[static_cast<std::size_t>(state->career_slot)] = "EMPTY OR INVALID";
+                        state->career_message = "SLOT FAILED NATIVE VALIDATION";
+                    }
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                return 0;
+            }
             if (wparam == VK_UP && !state->tracks.empty())
                 state->track_index = (state->track_index + state->tracks.size() - 1U) % state->tracks.size();
             else if (wparam == VK_DOWN && !state->tracks.empty())
@@ -494,6 +547,11 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
             else if (wparam == VK_RETURN && !state->tracks.empty() && !state->cars.empty()) {
                 state->accepted = true;
                 DestroyWindow(hwnd);
+                return 0;
+            } else if (wparam == 'C' &&
+                       !state->config_directory.empty()) {
+                state->career_screen = true;
+                InvalidateRect(hwnd, nullptr, FALSE);
                 return 0;
             } else if (wparam == VK_ESCAPE) {
                 DestroyWindow(hwnd);
@@ -516,11 +574,29 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
 
 std::optional<FrontendSelection> show_setup_frontend(
     std::vector<std::string> tracks, std::vector<std::string> cars,
-    const std::string_view initial_track, const std::string_view initial_car)
+    const std::string_view initial_track, const std::string_view initial_car,
+    const std::filesystem::path& config_directory)
 {
     if (tracks.empty() || cars.empty())
         throw std::runtime_error("frontend cannot show an empty track or car inventory");
-    SetupWindowState state{std::move(tracks), std::move(cars)};
+    SetupWindowState state{};
+    state.tracks = std::move(tracks);
+    state.cars = std::move(cars);
+    state.config_directory = config_directory;
+    for (std::size_t slot = 0; slot < state.career_rows.size(); ++slot) {
+        const auto loaded = viper::load_career_slot(config_directory,
+            static_cast<int>(slot));
+        if (loaded.file.returns_success) {
+            const auto& payload = loaded.file.decoded_payload;
+            const auto name_end = payload.begin() + std::min<std::size_t>(
+                payload.size(), 0x10U);
+            const auto end = std::find(payload.begin(), name_end, 0U);
+            state.career_rows[slot] = "AVAILABLE: " + std::string(
+                payload.begin(), end);
+        } else {
+            state.career_rows[slot] = "EMPTY OR INVALID";
+        }
+    }
     const auto track = std::find(state.tracks.begin(), state.tracks.end(), initial_track);
     if (track != state.tracks.end())
         state.track_index = static_cast<std::size_t>(track - state.tracks.begin());
@@ -2112,7 +2188,10 @@ int wmain(int argc, wchar_t** argv)
                 const auto selection = show_setup_frontend(
                     selectable_track_stems(options.data_dir),
                     selectable_car_stems(options.data_dir),
-                    selected_track, selected_car);
+                    selected_track, selected_car,
+                    options.setup_config_directory
+                        ? *options.setup_config_directory
+                        : resolve_setup_config_directory(options.data_dir));
                 if (!selection) return 0;
                 selected_track = selection->track;
                 selected_car = selection->car;
