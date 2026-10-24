@@ -27,6 +27,9 @@ int main()
     const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto root = std::filesystem::temp_directory_path() /
         ("viper-career-store-" + std::to_string(nonce));
+    const auto missing = viper::load_career_slot(root, 0);
+    check(missing.file.status == viper::CareerFileLoadStatus::open_failed,
+        "reports a missing slot as an open failure");
     std::vector<std::uint8_t> payload(viper::career_file_payload_size);
     for (std::size_t i = 0; i < payload.size(); ++i)
         payload[i] = static_cast<std::uint8_t>((i * 37U + 11U) & 0xffU);
@@ -64,6 +67,28 @@ int main()
     const auto invalid = viper::save_career_slot(root, 3,
         std::span<const std::uint8_t>(payload.data(), payload.size() - 1U));
     check(!invalid.saved, "rejects payloads with non-native size");
+    std::filesystem::create_directories(root / "career");
+    const auto image = viper::make_career_file_save_image(payload);
+    const auto truncated_path = root / "career" / "career4.dat";
+    {
+        std::ofstream file(truncated_path, std::ios::binary);
+        file.write(reinterpret_cast<const char*>(image.file_bytes.data()), 0x10 + 3);
+    }
+    const auto truncated = viper::load_career_slot(root, 4);
+    check(truncated.file.status == viper::CareerFileLoadStatus::payload_read_failed,
+        "reports a short encrypted payload as a payload read failure");
+
+    const auto invalid_header_path = root / "career" / "career5.dat";
+    {
+        auto bad_header = image.file_bytes;
+        bad_header[0] ^= 0x01U;
+        std::ofstream file(invalid_header_path, std::ios::binary);
+        file.write(reinterpret_cast<const char*>(bad_header.data()), 0x10);
+    }
+    const auto invalid_header = viper::load_career_slot(root, 5);
+    check(invalid_header.file.status == viper::CareerFileLoadStatus::invalid_header,
+        "rejects a malformed native career header");
+
     const auto negative = viper::load_career_slot(root, -1);
     check(!negative.error.empty(), "rejects negative slot numbers");
 
