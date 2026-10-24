@@ -88,6 +88,66 @@ std::optional<StampImage> parse_state0_dashboard_background_image(
                                : std::nullopt;
 }
 
+std::optional<std::vector<std::uint8_t>>
+raster_state0_dashboard_background_source(
+    const StampImage& image, const std::uint8_t renderer_mode,
+    const std::int32_t pitch_bytes)
+{
+    return raster_status_image_source_pixels(image, renderer_mode, pitch_bytes);
+}
+
+bool populate_state0_dashboard_background_source_from_bundle(
+    RaceLoopSharedOverlayObservation& observation,
+    const ResourceBundle& race_bundle)
+{
+    const auto image = parse_state0_dashboard_background_image(race_bundle);
+    if (!image.has_value()) {
+        return false;
+    }
+
+    auto renderer_mode =
+        observation.state0_bitmap_blit.source_bitmap_mode;
+    auto pitch_bytes = observation.state0_bitmap_blit.bitmap_pitch_bytes;
+    if (observation.state0_bitmap_descriptor_bytes.has_value()) {
+        const auto descriptor = parse_scene_dashboard_bitmap_descriptor(
+            *observation.state0_bitmap_descriptor_bytes);
+        if (!descriptor.input_complete ||
+            descriptor.width != image->width ||
+            descriptor.height != image->height) {
+            return false;
+        }
+        renderer_mode = descriptor.source_mode;
+        pitch_bytes = descriptor.pitch_bytes;
+    } else if ((observation.state0_bitmap_blit.bitmap_width > 0 &&
+                observation.state0_bitmap_blit.bitmap_width != image->width) ||
+               (observation.state0_bitmap_blit.bitmap_height > 0 &&
+                observation.state0_bitmap_blit.bitmap_height != image->height)) {
+        return false;
+    }
+
+    std::optional<std::vector<std::uint8_t>> derived_pixels;
+    if (observation.state0_bitmap_source_pixels.empty()) {
+        derived_pixels = raster_state0_dashboard_background_source(
+            *image, renderer_mode, pitch_bytes);
+        if (!derived_pixels.has_value()) {
+            return false;
+        }
+    }
+
+    observation.state0_dashboard_background_image = *image;
+    observation.state0_dashboard_render.background_bitmap_width = image->width;
+    observation.state0_dashboard_render.background_bitmap_height = image->height;
+    observation.state0_bitmap_blit.source_bitmap_mode = renderer_mode;
+    observation.state0_bitmap_blit.bitmap_width = image->width;
+    observation.state0_bitmap_blit.bitmap_height = image->height;
+    observation.state0_bitmap_blit.bitmap_pitch_bytes = pitch_bytes;
+    if (derived_pixels.has_value()) {
+        observation.state0_bitmap_source_pixels =
+            std::move(*derived_pixels);
+    }
+    return true;
+}
+
 std::optional<StampImage> parse_shared_centered_resource_image(
     const ResourceBundle& race_bundle)
 {
@@ -403,7 +463,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     bitmap_source_image_complete = false;
                 } else {
                     const auto rasterized_source =
-                        raster_status_image_source_pixels(
+                        raster_state0_dashboard_background_source(
                             image,
                             bitmap_blit_observation.source_bitmap_mode,
                             bitmap_blit_observation.bitmap_pitch_bytes);

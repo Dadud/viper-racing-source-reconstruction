@@ -503,7 +503,9 @@ conditional embedded-data fixups for `.fnt` and `.stp` resources.
 resource; the two metric fields keep their raw offsets until their meanings
 are resolved. `--inspect-image` decodes STMP indexed-image dimensions, palette
 planes, frame rows, and bounded RLE data. It also reports first-frame
-mode-4/mode-5 palette-write coverage and raster completeness.
+mode-4/mode-5 palette-write coverage and raster completeness. For
+`status.stp`, it also populates the state-0 observation from `race.res` and
+reports the reconstructed source-buffer sizes for both modes.
 
 ## Scope and next steps
 

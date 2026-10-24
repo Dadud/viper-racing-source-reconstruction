@@ -178,6 +178,15 @@ parse_state0_dashboard_gear_image(const ResourceBundle& race_bundle);
 // 0x4EB2C0 staging bitmap during initialization.
 [[nodiscard]] std::optional<StampImage>
 parse_state0_dashboard_background_image(const ResourceBundle& race_bundle);
+[[nodiscard]] std::optional<std::vector<std::uint8_t>>
+raster_state0_dashboard_background_source(const StampImage& image,
+                                         std::uint8_t renderer_mode,
+                                         std::int32_t pitch_bytes);
+// Loads race.res::status.stp into the state-0 observation and, when raw source
+// bytes are absent, reconstructs 0x4EB2C0 from the observed zero clear.
+[[nodiscard]] bool populate_state0_dashboard_background_source_from_bundle(
+    RaceLoopSharedOverlayObservation& observation,
+    const ResourceBundle& race_bundle);
 
 [[nodiscard]] std::optional<StampImage> parse_shared_centered_resource_image(
     const ResourceBundle& race_bundle);

@@ -958,6 +958,8 @@ and calls `0x449AA0(0)` before drawing the image. `0x449AA0` fills the complete
 reset viewport, so the transparent pixels are zero and the full source can be
 derived without caller-supplied initial bytes. The enhanced `--inspect-image`
 output reports mode-4 and mode-5 palette-write counts and raster completeness.
+For `status.stp`, it also calls `populate_state0_dashboard_background_source_from_bundle`
+and confirms full source buffers of 81,920 and 163,840 bytes for modes 4 and 5.
 Both recovered projections emit 40,933 writes for this image. The original
 `race.res` remains outside this source repository. `0x44D0C0` selects palette
 plane zero only for renderer tag 3, otherwise plane one, and writes each

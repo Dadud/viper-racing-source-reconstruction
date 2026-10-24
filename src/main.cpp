@@ -1,6 +1,7 @@
 #include "viper/asset_catalog.hpp"
 #include "viper/career_season.hpp"
 #include "viper/resource_bundle.hpp"
+#include "viper/race_scene_render_flow.hpp"
 #include "viper/scene_overlay.hpp"
 #include "viper/terrain_surface.hpp"
 #include "viper/vehicle_setup.hpp"
@@ -18,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -315,6 +317,31 @@ int inspect_stamp_image(const std::filesystem::path& path,
     };
     const auto first_frame_mode4 = first_frame_for_mode(4U);
     const auto first_frame_mode5 = first_frame_for_mode(5U);
+    std::optional<std::size_t> status_source_bytes_mode4;
+    std::optional<std::size_t> status_source_bytes_mode5;
+    if (entry->name == "status.stp") {
+        const auto prepare_source = [&](const std::uint8_t mode) {
+            viper::RaceLoopSharedOverlayObservation observation{};
+            observation.state0_bitmap_blit.source_bitmap_mode = mode;
+            observation.state0_bitmap_blit.bitmap_width = image->width;
+            observation.state0_bitmap_blit.bitmap_height = image->height;
+            observation.state0_bitmap_blit.bitmap_pitch_bytes =
+                image->width * (mode == 5U ? 4 : 2);
+            const auto complete =
+                viper::populate_state0_dashboard_background_source_from_bundle(
+                    observation, bundle);
+            return std::pair{complete,
+                observation.state0_bitmap_source_pixels.size()};
+        };
+        const auto mode4_source = prepare_source(4U);
+        const auto mode5_source = prepare_source(5U);
+        if (mode4_source.first) {
+            status_source_bytes_mode4 = mode4_source.second;
+        }
+        if (mode5_source.first) {
+            status_source_bytes_mode5 = mode5_source.second;
+        }
+    }
     std::cout << "bundle\t" << path.string() << '\n'
               << "resource\t" << entry->name << '\n'
               << "width\t" << image->width << '\n'
@@ -334,9 +361,24 @@ int inspect_stamp_image(const std::filesystem::path& path,
               << first_frame_mode5.raster.pixel_writes.size() << '\n'
               << "frame_0_raster_complete_mode5\t"
               << first_frame_mode5.input_complete << '\n';
+    if (entry->name == "status.stp") {
+        std::cout << "status_source_bytes_mode4\t"
+                  << (status_source_bytes_mode4.has_value()
+                          ? *status_source_bytes_mode4
+                          : 0U)
+                  << '\n'
+                  << "status_source_bytes_mode5\t"
+                  << (status_source_bytes_mode5.has_value()
+                          ? *status_source_bytes_mode5
+                          : 0U)
+                  << '\n';
+    }
     return image->pointer_table_complete && image->rows_complete &&
             first_frame_mode4.input_complete &&
-            first_frame_mode5.input_complete
+            first_frame_mode5.input_complete &&
+            (entry->name != "status.stp" ||
+             (status_source_bytes_mode4.has_value() &&
+              status_source_bytes_mode5.has_value()))
         ? 0
         : 2;
 }
