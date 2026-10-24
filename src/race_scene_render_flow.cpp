@@ -192,6 +192,24 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                  ++index) {
                 const auto& operation =
                     plan.state0_dashboard_render_operations[index];
+                if (operation.kind ==
+                    SceneDashboardRenderOperationKind::full_surface_fill_0x44a1b0) {
+                    if (plan.state0_dashboard_fill_projection.has_value()) {
+                        auto fill_writes = scene_rectangle_fill_pixel_writes(
+                            operation.left, operation.top, operation.right,
+                            operation.bottom,
+                            static_cast<std::uint32_t>(
+                                operation.raw_auxiliary_argument),
+                            render_observation.render_context,
+                            static_cast<std::uint8_t>(
+                                render_observation.renderer_mode_0x4d7a48),
+                            render_observation.framebuffer_base_value);
+                        plan.state0_dashboard_fill_pixel_writes.insert(
+                            plan.state0_dashboard_fill_pixel_writes.end(),
+                            fill_writes.begin(), fill_writes.end());
+                    }
+                    continue;
+                }
                 if (operation.kind !=
                     SceneDashboardRenderOperationKind::bitmap_draw_0x44afd0) {
                     continue;
@@ -216,6 +234,11 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     scene_dashboard_background_bitmap_pixel_writes(
                         blit_observation,
                         observation.state0_bitmap_source_pixels);
+                const auto expected_pixel_count =
+                    static_cast<std::uint64_t>(std::max(0, projection.blit.width)) *
+                    static_cast<std::uint64_t>(std::max(0, projection.blit.height));
+                projection.input_complete = !projection.blit.transfer_happened ||
+                    projection.pixel_writes.size() == expected_pixel_count;
                 plan.state0_dashboard_bitmap_projections.push_back(
                     std::move(projection));
             }
@@ -506,6 +529,130 @@ apply_race_loop_paused_banner_to_locked_surface(
         result.application = apply_scene_paused_banner_frame_raster(
             *plan.shared_paused_banner_frame_raster, locked_surface);
     }
+    return result;
+}
+
+RaceLoopState0DashboardSurfaceWriteResult
+apply_race_loop_state0_dashboard_background_to_locked_surface(
+    const RaceLoopSharedOverlayPlan& plan,
+    const std::span<std::uint8_t> locked_surface)
+{
+    RaceLoopState0DashboardSurfaceWriteResult result{};
+    const auto& frame = plan.state_transition_and_frame.following_frame;
+    result.frame_submitted = frame.frame_submitted;
+    if (!result.frame_submitted || !plan.shared_callback_reached ||
+        plan.shared_callback_wrapper != 0x004052D0U ||
+        !frame.surface_unlock.has_value() ||
+        !frame.surface_unlock->reached ||
+        frame.surface_unlock->ordered_helpers !=
+            std::array<std::uint32_t, 3>{
+                0x00415090U, 0x00459030U, 0x004150A0U}) {
+        return result;
+    }
+
+    const auto callback = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x004052D0U && call.state_indexed_callback;
+        });
+    const auto submit = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x0045C090U;
+        });
+    const auto unlock = std::find_if(
+        frame.calls.begin(), frame.calls.end(), [](const auto& call) {
+            return call.address == 0x00447CE0U;
+        });
+    if (callback == frame.calls.end() || submit == frame.calls.end() ||
+        unlock == frame.calls.end() || !(submit < callback && callback < unlock)) {
+        return result;
+    }
+    result.dashboard_callback_before_surface_unlock = true;
+
+    struct OrderedWrite {
+        std::uint64_t offset{};
+        std::uint32_t value{};
+        std::uint32_t write_mask{};
+        std::uint8_t bytes_per_pixel{};
+        bool preserves_existing_bits{};
+    };
+    std::vector<OrderedWrite> writes;
+    auto complete = !plan.state0_dashboard_render_operations.empty();
+    for (std::size_t operation_index = 0;
+         operation_index < plan.state0_dashboard_render_operations.size();
+         ++operation_index) {
+        const auto& operation =
+            plan.state0_dashboard_render_operations[operation_index];
+        if (operation.kind ==
+            SceneDashboardRenderOperationKind::full_surface_fill_0x44a1b0) {
+            if (!plan.state0_dashboard_fill_projection.has_value()) {
+                complete = false;
+                break;
+            }
+            for (const auto& write : plan.state0_dashboard_fill_pixel_writes) {
+                writes.push_back({write.destination_offset, write.value,
+                                  write.write_mask, write.bytes_per_pixel,
+                                  write.preserves_existing_bits});
+            }
+            continue;
+        }
+        if (operation.kind !=
+            SceneDashboardRenderOperationKind::bitmap_draw_0x44afd0) {
+            continue;
+        }
+        const auto projection = std::find_if(
+            plan.state0_dashboard_bitmap_projections.begin(),
+            plan.state0_dashboard_bitmap_projections.end(),
+            [operation_index](const auto& item) {
+                return item.render_operation_index == operation_index;
+            });
+        if (projection == plan.state0_dashboard_bitmap_projections.end() ||
+            !projection->input_complete ||
+            projection->blit.path ==
+                SceneDashboardBitmapBlitPath::unsupported_format_pair) {
+            complete = false;
+            break;
+        }
+        for (const auto& write : projection->pixel_writes) {
+            writes.push_back({write.destination_offset, write.value, 0U,
+                              write.bytes_per_pixel, false});
+        }
+    }
+    result.dashboard_write_plan_available = complete;
+    if (!complete) {
+        return result;
+    }
+
+    for (const auto& write : writes) {
+        if (write.bytes_per_pixel == 0U || write.bytes_per_pixel > 4U ||
+            (write.preserves_existing_bits && write.bytes_per_pixel != 2U) ||
+            write.offset > locked_surface.size() ||
+            write.bytes_per_pixel > locked_surface.size() - write.offset) {
+            return result;
+        }
+    }
+    for (const auto& write : writes) {
+        const auto offset = static_cast<std::size_t>(write.offset);
+        if (write.preserves_existing_bits) {
+            std::uint32_t existing = 0U;
+            for (std::uint8_t byte = 0U; byte < write.bytes_per_pixel; ++byte) {
+                existing |= static_cast<std::uint32_t>(locked_surface[offset + byte])
+                    << (static_cast<std::uint32_t>(byte) * 8U);
+            }
+            const auto updated = (existing & ~write.write_mask) |
+                (write.value & write.write_mask);
+            for (std::uint8_t byte = 0U; byte < write.bytes_per_pixel; ++byte) {
+                locked_surface[offset + byte] = static_cast<std::uint8_t>(
+                    updated >> (static_cast<std::uint32_t>(byte) * 8U));
+            }
+        } else {
+            for (std::uint8_t byte = 0U; byte < write.bytes_per_pixel; ++byte) {
+                locked_surface[offset + byte] = static_cast<std::uint8_t>(
+                    write.value >> (static_cast<std::uint32_t>(byte) * 8U));
+            }
+        }
+    }
+    result.applied = true;
+    result.pixel_writes_applied = writes.size();
     return result;
 }
 

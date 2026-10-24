@@ -233,6 +233,9 @@ files were present.
   be rasterized from supplied localized strings and renderer observations; other
   renderer effects, and the exact Pentium FDIV compatibility correction remain
   partial.
+  The state-0 dashboard's ordered `0x405100` full-surface fill and background
+  bitmap writes can also be applied transactionally to a caller-owned surface
+  when the race-loop submission/callback/unlock gates match the observed order.
 - `metadata/frontend_dispatch.md` records the recovered routing evidence and
   remaining uncertainty.
 - `include/viper/vehicle_setup.hpp` and `src/vehicle_setup.cpp` implement the

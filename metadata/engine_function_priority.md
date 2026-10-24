@@ -48,6 +48,11 @@ bitmap path, extracted glyph table, and two color writers are modeled;
 the ordered state-0 callback text list now composes through atlas layout and
 pixel-write projections. Actual device/surface ownership and remaining
 callback gates are still open.
+The state-0 `0x405100` full-surface fill and background bitmap write stream now
+applies in observed order inside the submitted `0x4052D0`-to-unlock interval
+when complete source bytes are supplied. Next, connect other `0x4052D0`
+renderer effects without mixing in the pre-acquisition `0x4035E0` callback;
+actual viewport/device execution and native surface ownership remain open.
 The `0x418500` locale
 initializer is now modeled, including both selected 13-DWORD tables and the
 raw sources of the metric multipliers; the target formatter's null `%s`
