@@ -1462,7 +1462,8 @@ struct WindowState {
         const viper::CarFileResourcePayloads& car_resources,
         const std::span<const std::byte> player_setup,
         const std::span<const viper::ModelVertex> model_vertices,
-        const std::array<viper::TireDefinition, 4>& tire_definitions)
+        const std::array<viper::TireDefinition, 4>& tire_definitions,
+        const std::optional<std::uint32_t> serialized_stream_offset)
     {
         bool host_fdiv_compatibility = false;
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
@@ -1484,7 +1485,8 @@ struct WindowState {
         }
         const auto body_observation =
             viper::make_ncar_body_constructor_observation_from_runtime_record(
-                player_runtime_car_record, std::nullopt, host_fdiv_compatibility);
+                player_runtime_car_record, serialized_stream_offset,
+                host_fdiv_compatibility);
         if (!body_observation.has_value()) {
             player_runtime_car_record.clear();
             return false;
@@ -1960,8 +1962,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     }
     WindowState state;
     state.terrain = &terrain;
+    const auto cursor_plan =
+        viper::plan_track_player_physics_cursor(track_objects, player_car_index);
+    const auto serialized_stream_offset = cursor_plan.serialized_object_stream_offset;
     if (!state.initialize_player_constructor_inputs(player_car_resources,
-            player_car_setup, player_model.vertices, wheel_tires)) {
+            player_car_setup, player_model.vertices, wheel_tires,
+            serialized_stream_offset)) {
         std::cerr << "Could not prepare base CARF wheel constructor inputs from the active setup.\n";
         return 1;
     }
@@ -1973,8 +1979,22 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << " at +0x200, "
               << state.player_wheel_anchors->vertex_indices.size()
               << " FNIM anchors and four wheel core setups, plus four axle-selected "
-              << "tire response objects. Inherited constructor argument 2 is unknown "
-              << "and left unwritten. "
+              << "tire response objects. ";
+    if (serialized_stream_offset.has_value()) {
+        std::cout << "Inherited constructor argument 2 uses track-derived physics "
+                  << "stream offset 0x" << std::hex << *serialized_stream_offset
+                  << std::dec << ". ";
+    } else if (cursor_plan.unsupported_object_row.has_value()) {
+        const auto row = *cursor_plan.unsupported_object_row;
+        const auto line = viper::track_object_text_line(track_objects, row);
+        std::cout << "Inherited constructor argument 2 is unresolved at track.obt row "
+                  << row << " (" << (line ? *line : std::string_view{})
+                  << "); its serialized class advance is not yet mapped. ";
+    } else {
+        std::cout << "Inherited constructor argument 2 is unresolved because an "
+                  << "earlier non-car physics object is not yet mapped. ";
+    }
+    std::cout
               << "Upgrade overlays are not requested in this race path.\n";
     state.playback_active = playback_trace != nullptr;
     state.route = extract_ideal_line_points(ideal_line);

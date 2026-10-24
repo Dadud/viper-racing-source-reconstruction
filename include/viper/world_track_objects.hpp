@@ -91,6 +91,31 @@ struct TrackDirectiveObservation {
 [[nodiscard]] TrackDirectiveObservation classify_track_directive(
     std::string_view line) noexcept;
 
+enum class TrackPhysicsCursorStatus {
+    complete,
+    track_data_incomplete,
+    unsupported_prior_object,
+    player_car_not_found,
+    stream_plan_failed,
+};
+
+struct TrackPhysicsCursorPlan {
+    TrackPhysicsCursorStatus status{TrackPhysicsCursorStatus::player_car_not_found};
+    std::optional<std::uint32_t> serialized_object_stream_offset;
+    std::size_t target_car_index{};
+    std::size_t preceding_car_count{};
+    std::optional<std::size_t> incomplete_row;
+    std::optional<std::size_t> unsupported_object_row;
+};
+
+// Derives the native physics-task stream cursor before a configured player car
+// from track.obt serialization order. It supports recovered car, static,
+// obstacle, wobble, checkpoint, and ball tags; unknown preceding scene-object
+// classes leave the cursor unresolved instead of assigning a guessed advance.
+[[nodiscard]] TrackPhysicsCursorPlan plan_track_player_physics_cursor(
+    const TrackObjectTextTable& table,
+    std::size_t player_car_index);
+
 enum class TrackCarSubtype : std::uint32_t {
     pcar = 0,
     acar = 1,

@@ -1,4 +1,5 @@
 #include "viper/world_track_objects.hpp"
+#include "viper/physics_task_stream.hpp"
 #include "viper/resource_bundle.hpp"
 
 #include <algorithm>
@@ -363,6 +364,84 @@ TrackDirectiveObservation classify_track_directive(
         return {TrackDirectiveKind::object, original_line};
     }
     return {TrackDirectiveKind::bad_token, {}};
+}
+
+TrackPhysicsCursorPlan plan_track_player_physics_cursor(
+    const TrackObjectTextTable& table,
+    const std::size_t player_car_index)
+{
+    TrackPhysicsCursorPlan result{};
+    result.target_car_index = player_car_index;
+    std::vector<std::uint32_t> preceding_tags;
+    std::size_t car_index = 0U;
+    for (std::size_t row = 0U; row < table.line_count; ++row) {
+        const auto line = track_object_text_line(table, row);
+        if (!line.has_value()) {
+            result.status = TrackPhysicsCursorStatus::track_data_incomplete;
+            result.incomplete_row = row;
+            return result;
+        }
+        const auto directive = classify_track_directive(*line);
+        if (directive.kind != TrackDirectiveKind::object) continue;
+
+        auto object_line = directive.object_line;
+        while (!object_line.empty() &&
+               (object_line.front() == ' ' || object_line.front() == '\t' ||
+                object_line.front() == '\r' || object_line.front() == '\n')) {
+            object_line.remove_prefix(1U);
+        }
+        if (object_line.size() < 3U ||
+            !equals_ascii_case_insensitive(object_line.substr(0U, 3U), "obj")) {
+            result.status = TrackPhysicsCursorStatus::unsupported_prior_object;
+            result.unsupported_object_row = row;
+            return result;
+        }
+        object_line.remove_prefix(3U);
+        while (!object_line.empty() &&
+               (object_line.front() == ' ' || object_line.front() == '\t')) {
+            object_line.remove_prefix(1U);
+        }
+        const auto type_end = std::find_if(object_line.begin(), object_line.end(),
+            [](const char value) { return value == ' ' || value == '\t' || value == '\r'; });
+        const std::string_view object_type(object_line.data(),
+            static_cast<std::size_t>(type_end - object_line.begin()));
+        std::optional<std::uint32_t> record_tag;
+        if (equals_ascii_case_insensitive(object_type, "car")) {
+            if (car_index == player_car_index) {
+                const auto stream = plan_physics_task_stream_offsets(preceding_tags, 0U);
+                if (stream.status != PhysicsTaskStreamPlanStatus::complete) {
+                    result.status = TrackPhysicsCursorStatus::stream_plan_failed;
+                    return result;
+                }
+                result.status = TrackPhysicsCursorStatus::complete;
+                result.serialized_object_stream_offset = stream.final_cursor;
+                result.preceding_car_count = car_index;
+                return result;
+            }
+            // In a single-player lineup all earlier configured cars are CPU
+            // ACAR objects; this tag advances by the native 0x18C class size.
+            record_tag = 0x41434152U;
+            ++car_index;
+        } else if (equals_ascii_case_insensitive(object_type, "static")) {
+            record_tag = 0x53544154U; // STAT: zero-byte task-stream advance
+        } else if (equals_ascii_case_insensitive(object_type, "obstacle")) {
+            record_tag = 0x4F425354U; // OBST
+        } else if (equals_ascii_case_insensitive(object_type, "wobble")) {
+            record_tag = 0x4C424F57U; // WOBL
+        } else if (equals_ascii_case_insensitive(object_type, "checkpoint")) {
+            record_tag = 0x43484B50U; // CHKP
+        } else if (equals_ascii_case_insensitive(object_type, "ball")) {
+            record_tag = 0x42414C4CU; // BALL
+        }
+        if (!record_tag.has_value()) {
+            result.status = TrackPhysicsCursorStatus::unsupported_prior_object;
+            result.unsupported_object_row = row;
+            return result;
+        }
+        preceding_tags.push_back(*record_tag);
+    }
+    result.status = TrackPhysicsCursorStatus::player_car_not_found;
+    return result;
 }
 
 TrackTransformPlan plan_track_transform_from_checkpoint(

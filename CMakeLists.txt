@@ -174,6 +174,7 @@ target_sources(viper_physics_scheduler PRIVATE
 target_include_directories(viper_physics_scheduler PUBLIC include)
 target_compile_features(viper_physics_scheduler PUBLIC cxx_std_20)
 target_link_libraries(viper_physics_scheduler PUBLIC viper_update_curve)
+target_link_libraries(viper_scene_model PUBLIC viper_physics_scheduler)
 
 add_library(viper_timed_event_queue src/timed_event_queue.cpp)
 target_include_directories(viper_timed_event_queue PUBLIC include)
@@ -219,7 +220,7 @@ if(WIN32)
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
         viper_scene_model viper_race_setup_model viper_wheel_body_coupling
-        d3d11 dxgi dsound user32)
+        viper_physics_scheduler d3d11 dxgi dsound user32)
 endif()
 
 include(CTest)
@@ -233,7 +234,7 @@ if(BUILD_TESTING)
     add_executable(viper_physics_task_stream_regression
         tests/physics_task_stream_regression.cpp)
     target_link_libraries(viper_physics_task_stream_regression PRIVATE
-        viper_physics_scheduler)
+        viper_physics_scheduler viper_scene_model viper_resource_bundle)
     add_test(NAME physics_task_stream_regression
         COMMAND viper_physics_task_stream_regression)
     add_executable(viper_game_options_regression tests/game_options_regression.cpp)

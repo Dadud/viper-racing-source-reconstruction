@@ -1,10 +1,15 @@
 #include "viper/physics_task_stream.hpp"
+#include "viper/world_track_objects.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
+#include <initializer_list>
 #include <limits>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -12,6 +17,28 @@ namespace {
 void require(const bool condition, const char* message)
 {
     if (!condition) throw std::runtime_error(message);
+}
+
+viper::TrackObjectTextTable make_track_object_table(
+    const std::initializer_list<std::string_view> lines)
+{
+    viper::TrackObjectTextTable table{};
+    table.line_count = static_cast<std::uint32_t>(lines.size());
+    table.line_stride = 64U;
+    table.line_offsets.fill(0U);
+    table.raw_payload.resize(viper::TrackObjectTextTable::header_size +
+        lines.size() * table.line_stride);
+    std::size_t index = 0U;
+    for (const auto line : lines) {
+        const auto offset = viper::TrackObjectTextTable::header_size +
+            index * table.line_stride;
+        const auto length = std::min(line.size(),
+            static_cast<std::size_t>(table.line_stride - 1U));
+        std::memcpy(table.raw_payload.data() +
+            static_cast<std::ptrdiff_t>(offset), line.data(), length);
+        ++index;
+    }
+    return table;
 }
 
 } // namespace
@@ -52,6 +79,57 @@ int main()
                     plan.records[3].stream_offset == 0x1C0U &&
                     plan.records[4].stream_offset == 0x350U,
                 "record offsets do not follow native class-size advances");
+
+        const auto bemidji_prefix = make_track_object_table({
+            "out\\track.txt", "map test.map", "ai test.vf",
+            "obj car 1, 1", "obj car 2, 2", "obj car 3, 3", "obj car 4, 4",
+            "obj car 5, 5", "obj car 6, 6", "obj car 7, 7", "obj car 8, 8",
+            "obj checkpoint finish 1,1 2,2"});
+        const auto player_cursor =
+            viper::plan_track_player_physics_cursor(bemidji_prefix, 7U);
+        require(player_cursor.status == viper::TrackPhysicsCursorStatus::complete &&
+                    player_cursor.serialized_object_stream_offset == 0xAD4U &&
+                    player_cursor.preceding_car_count == 7U,
+                "Bemidji player cursor must fold seven preceding ACAR records to 0xAD4");
+
+        const auto interleaved_object = make_track_object_table({
+            "obj car 1, 1", "obj unknown_physics_object 2, 2", "obj car 3, 3"});
+        const auto unresolved_cursor =
+            viper::plan_track_player_physics_cursor(interleaved_object, 1U);
+        require(unresolved_cursor.status ==
+                    viper::TrackPhysicsCursorStatus::unsupported_prior_object &&
+                    unresolved_cursor.unsupported_object_row == 1U &&
+                    !unresolved_cursor.serialized_object_stream_offset.has_value(),
+                "unmapped prior object must leave the player stream cursor unresolved");
+
+        const auto mapped_interleaving = make_track_object_table({
+            "obj wobble pole 0", "obj car 1, 1", "obj static flag 0 0 0 0 0 0 0 0 0",
+            "obj car 2, 2"});
+        const auto mapped_cursor =
+            viper::plan_track_player_physics_cursor(mapped_interleaving, 1U);
+        require(mapped_cursor.status == viper::TrackPhysicsCursorStatus::complete &&
+                    mapped_cursor.serialized_object_stream_offset == 0x1C0U &&
+                    mapped_cursor.preceding_car_count == 1U,
+                "wobble and static rows must contribute their recovered cursor advances");
+
+        const auto known_scene_objects = make_track_object_table({
+            "obj obstacle wall", "obj wobble pole 0", "obj checkpoint finish",
+            "obj ball ball", "obj static flag", "obj car 1, 1"});
+        const auto known_scene_cursor =
+            viper::plan_track_player_physics_cursor(known_scene_objects, 0U);
+        require(known_scene_cursor.status ==
+                    viper::TrackPhysicsCursorStatus::complete &&
+                    known_scene_cursor.serialized_object_stream_offset == 0xD0U,
+                "known obstacle, wobble, checkpoint, ball, and static prefixes must fold safely");
+
+        const auto short_car_table = make_track_object_table({
+            "obj car 1, 1", "obj car 2, 2"});
+        const auto missing_cursor =
+            viper::plan_track_player_physics_cursor(short_car_table, 2U);
+        require(missing_cursor.status ==
+                    viper::TrackPhysicsCursorStatus::player_car_not_found &&
+                    !missing_cursor.serialized_object_stream_offset.has_value(),
+                "missing player directive must not fabricate a stream cursor");
 
         constexpr std::array<std::uint32_t, 3> unknown_tail{
             0x50434152U, 0x12345678U, 0x4F425354U};

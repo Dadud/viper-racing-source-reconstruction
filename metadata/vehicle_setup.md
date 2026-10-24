@@ -411,9 +411,15 @@ advances that cursor by the class-specific size from `0x4209E0`. The loader
 and NCAR constructor `0x438E40`, into `0x42FF90` and `0x43E490`; the shared
 base constructor `0x4375C0` stores it at object `+0x08`. This is an absolute
 stream offset, not a CARF field, an object-size value, or the `0x1E4` runtime
-record length. The quick-race runtime does not reproduce the complete scene
-serialization order, so its planner leaves this field explicitly unknown.
-The body dimensions and wheel-core setup are independent of that field. This
+record length. The quick-race runtime now derives this cursor from `track.obt`
+by folding recovered serialized class advances through
+`plan_physics_task_stream_offsets`. The mapped classes are ACAR (`0x18C`),
+STAT (`0x20`), OBST (`0x2C`), WOBL (`0x34`), CHKP (`0x38`), and BALL (`0x40`).
+An incomplete row or an unmapped object class leaves the field unresolved.
+Runtime startup smokes now resolve this cursor on all eight shipped tracks:
+Bemidji `0xAD4`, Dundas `0x2DF8`, Hastings `0xAD4`, Heaven `0x18A4`, Kenyon
+`0xAD4`, Limbo `0xAD4`, Nfield `0x14FC`, and Uptown `0xAD4`.
+The body dimensions and wheel-core setup are independent of this field. This
 bridge initializes constructor-model outputs only; body pose, velocity,
 contact/suspension feedback, and frame integration are still absent. Evidence:
 `0x4224D0` (`ev_81a7cb19522fa8820dfbbcc77f501f03aa9f78af287883fffedd7d7a42cbe1f`),
