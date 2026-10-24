@@ -721,6 +721,121 @@ SceneRendererRefreshPlan plan_scene_renderer_refresh(
     return result;
 }
 
+SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
+    const SceneRendererModelDrawInput& input)
+{
+    SceneRendererModelDrawPlan result{};
+    const auto requested_count = input.queued_draw_path_0x4d9fdc
+        ? (input.descriptor_count > 0
+            ? static_cast<std::size_t>(input.descriptor_count) : 1U)
+        : (input.descriptor_count > 0
+            ? static_cast<std::size_t>(input.descriptor_count) : 0U);
+    const auto available_descriptors = std::min(
+        requested_count, input.descriptors.size());
+    const auto descriptor_address = [&input](const std::size_t index) {
+        return input.descriptor_block_address + 0x0CU
+            + static_cast<std::uint32_t>(index * 0x20U);
+    };
+
+    if (!input.queued_draw_path_0x4d9fdc) {
+        result.actions.push_back({
+            SceneRendererModelDrawActionKind::apply_renderer_state,
+            0x00457AF0U,
+        });
+    }
+
+    const bool filter_rows = !input.queued_draw_path_0x4d9fdc
+        && input.filter_draw_rows_0x4d9fe0
+        && input.filter_draw_rows_0x4d9fe4;
+    for (std::size_t index = 0; index < available_descriptors; ++index) {
+        if (index >= input.bindings.size()) {
+            result.status = SceneRendererModelDrawStatus::binding_observation_exhausted;
+            break;
+        }
+        const auto& binding = input.bindings[index];
+        if (!binding.pointer_present) {
+            result.status = SceneRendererModelDrawStatus::null_binding_node;
+            break;
+        }
+        ++result.descriptors_visited;
+        const auto current_descriptor_address = descriptor_address(index);
+        if (input.queued_draw_path_0x4d9fdc) {
+            result.actions.push_back({
+                SceneRendererModelDrawActionKind::enqueue_alternate_draw,
+                0x00450EE0U,
+                index,
+                index,
+                current_descriptor_address,
+                binding.address,
+                binding.fields.handle == -1 ? 0U
+                    : static_cast<std::uint32_t>(binding.fields.handle),
+                {input.descriptor_block_address, current_descriptor_address,
+                    binding.address, 0U},
+            });
+            ++result.alternate_queue_calls;
+            continue;
+        }
+
+        if (filter_rows && input.descriptors[index].draw_enabled_0x10 != 1U) {
+            ++result.descriptors_filtered;
+            continue;
+        }
+
+        const auto& node = binding.fields;
+        result.actions.push_back({
+            SceneRendererModelDrawActionKind::bind_texture_handle,
+            0x004524E0U,
+            index,
+            index,
+            current_descriptor_address,
+            binding.address,
+            node.handle == -1 ? 0xFFFFFFFFU
+                : static_cast<std::uint32_t>(node.handle),
+        });
+        const auto submit_helper = input.renderer_mode_0x15 == 0U
+            ? 0x00455D50U : 0x00455D70U;
+        result.actions.push_back({
+            SceneRendererModelDrawActionKind::submit_descriptor_vertices,
+            submit_helper,
+            index,
+            index,
+            current_descriptor_address,
+            binding.address,
+            0U,
+            {current_descriptor_address, input.vertex_data_address,
+                input.texture_data_base_0x4d9fec, 0U},
+        });
+        result.actions.push_back({
+            SceneRendererModelDrawActionKind::draw_descriptor_range,
+            0x004525B0U,
+            index,
+            index,
+            current_descriptor_address,
+            binding.address,
+            0U,
+            {static_cast<std::uint32_t>(node.texture_offset_0x20),
+                static_cast<std::uint32_t>(node.texture_component_count_0x24),
+                node.vertex_pointer_0x18,
+                static_cast<std::uint32_t>(node.vertex_component_count_0x1c)},
+        });
+        result.actions.push_back({
+            SceneRendererModelDrawActionKind::no_op_helper,
+            0x004525E0U,
+            index,
+            index,
+            current_descriptor_address,
+            binding.address,
+        });
+        ++result.descriptors_drawn;
+    }
+
+    if (result.status == SceneRendererModelDrawStatus::complete
+        && requested_count > input.descriptors.size()) {
+        result.status = SceneRendererModelDrawStatus::descriptor_observation_exhausted;
+    }
+    return result;
+}
+
 SceneCarEffectParticleGeneratorPlan plan_scene_car_effect_particle_generator(
     const SceneCarEffectParticleGeneratorInput& input) noexcept
 {

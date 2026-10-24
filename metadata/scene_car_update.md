@@ -563,6 +563,34 @@ submission `0x44F7D0` `ev_677f9b19abca30d5f14c3d0e498fd737e63ce57b504385e7b0f456
 and its model traversal `0x44FC80`
 `ev_b7dbe6ec2281426ff24a33134a53fd108e956e75ad007ac709a3c7f44b1bab92`.
 
+`plan_scene_renderer_model_draw` now projects the traversal at `0x44FC80` over
+the descriptor rows and binding nodes produced by the shared refresh model.
+The normal path calls `0x457AF0` once, then draws every row unless both
+`0x4D9FE0` and `0x4D9FE4` activate filtering; under that filter only rows whose
+byte at `+0x10` equals 1 are drawn. Each drawn row binds the node's `+0x14`
+handle through `0x4524E0`, chooses indirect submit wrapper `0x455D50` or
+`0x455D70` from renderer byte `+0x15`, issues the `0x4525B0` node-range call,
+and records the `0x4525E0` no-op. When `0x4D9FDC` is nonzero, the alternate
+path queues each descriptor/node pair through `0x450EE0`; its native do-while
+behavior visits one row even when the signed descriptor count is nonpositive.
+The plan bounds both spans and reports missing or null binding nodes. The
+alternate queue allocator/pointer identities and the indirect backend function
+pointer targets remain explicit boundaries. Evidence: traversal
+`0x44FC80` `ev_c9d9f0ad32331cd592c97d4535f98d7555b0d045309af35d166a1caf4000be2d`,
+alternate queue helper `0x450EE0`
+`ev_e2244cc17b523c18715e0ff1b1a7cad2833103234314c83d572faa804719929a`,
+handle binder `0x4524E0`
+`ev_1970e36fc2bde71031a2e51ed4bd8f9b5513f59d35955621317fb66f28fb34e6`,
+submit wrappers `0x455D50/0x455D70`
+(`ev_461f1bf076d3c10bd9593718b082e22f9bde78cce484fad982f51078ccfc6ca3`,
+`ev_cbf58ce5be74e4a367e5fc9b2edaf13bfd1b09911b8e630192086e7b33faf7e7`),
+draw range `0x4525B0`
+`ev_c96940bf855c88380b9f53898912d9b1809b6cb3b0da7d6b359709191087875f`,
+no-op `0x4525E0`
+`ev_1aac625083cf8a52da61e2cff422fd36705de1a4cdbe44fa12a5e523d091d79d`,
+and state synchronizer `0x457AF0`
+`ev_d30c81d210844af974abb11e55058426b5933463dc63b28adddde76086fb6e3e`.
+
 ### Scene-car virtual `+0x18` callout
 
 `plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached

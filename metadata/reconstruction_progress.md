@@ -45,6 +45,15 @@
   target builds and `git diff --check` passes; no tests were run. Evidence:
   `metadata/scene_car_update.md`.
 
+- **2026-10-24 continuation:** Added `plan_scene_renderer_model_draw` for the
+  nested `0x44FC80` traversal: normal descriptor/binding draws, dual-global
+  active-row filtering, the renderer-mode submit-wrapper choice, and the
+  alternate queue path including its one-iteration nonpositive-count behavior.
+  Binding spans are bounded; queue allocator identities and indirect backend
+  targets remain open. The Release `viper_race_scene_flow` target builds and
+  `git diff --check` passes; no tests were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
   nested texture-binding request from manager field `+0x10`, matching its
   observed `0x448E30` call and preventing a conflicting duplicate handle input.

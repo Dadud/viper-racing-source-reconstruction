@@ -402,6 +402,7 @@ struct SceneCarBillboardQuadPlan {
 
 struct SceneRendererDescriptor {
     std::string name_0x00;
+    std::uint8_t draw_enabled_0x10{};
     std::int16_t center_0x18{};
     std::int16_t field_0x1a{};
     std::int16_t first_vertex_0x1c{};
@@ -494,6 +495,67 @@ struct SceneRendererRefreshPlan {
 // stores. Allocation, resource-load returns and memory spans are observations.
 [[nodiscard]] SceneRendererRefreshPlan plan_scene_renderer_refresh(
     const SceneRendererRefreshInput& input);
+
+struct SceneRendererDrawBindingObservation {
+    bool pointer_present{true};
+    std::uint32_t address{};
+    SceneRendererBindingNode fields;
+};
+
+enum class SceneRendererModelDrawActionKind : std::uint8_t {
+    apply_renderer_state,
+    enqueue_alternate_draw,
+    bind_texture_handle,
+    submit_descriptor_vertices,
+    draw_descriptor_range,
+    no_op_helper,
+};
+
+struct SceneRendererModelDrawAction {
+    SceneRendererModelDrawActionKind kind{};
+    std::uint32_t helper{};
+    std::size_t descriptor_index{};
+    std::size_t binding_index{};
+    std::uint32_t descriptor_address{};
+    std::uint32_t binding_address{};
+    std::uint32_t handle{};
+    std::array<std::uint32_t, 4> integer_arguments{};
+};
+
+enum class SceneRendererModelDrawStatus : std::uint8_t {
+    complete,
+    descriptor_observation_exhausted,
+    binding_observation_exhausted,
+    null_binding_node,
+};
+
+struct SceneRendererModelDrawInput {
+    std::uint32_t descriptor_block_address{}; // iVar1; +0x0C is the 0x20-byte rows
+    std::uint32_t vertex_data_address{}; // *(iVar1 + 4)
+    std::uint32_t texture_data_base_0x4d9fec{};
+    std::int32_t descriptor_count{}; // *(iVar1 + 8)
+    std::uint8_t renderer_mode_0x15{};
+    bool queued_draw_path_0x4d9fdc{};
+    bool filter_draw_rows_0x4d9fe0{};
+    bool filter_draw_rows_0x4d9fe4{};
+    std::span<const SceneRendererDescriptor> descriptors{};
+    // Bounded in linked-list order, one node per descriptor row.
+    std::span<const SceneRendererDrawBindingObservation> bindings{};
+};
+
+struct SceneRendererModelDrawPlan {
+    SceneRendererModelDrawStatus status{SceneRendererModelDrawStatus::complete};
+    std::size_t descriptors_visited{};
+    std::size_t descriptors_drawn{};
+    std::size_t alternate_queue_calls{};
+    std::size_t descriptors_filtered{};
+    std::vector<SceneRendererModelDrawAction> actions;
+};
+
+// Projects 0x44FC80 over the renderer descriptor rows and binding-node list.
+// The function records queue/device helper calls but does not execute them.
+[[nodiscard]] SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
+    const SceneRendererModelDrawInput& input);
 
 enum class SceneCarEffectGeneratorStatus : std::uint8_t {
     inactive_horizontal_motion,
