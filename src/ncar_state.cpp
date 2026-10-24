@@ -763,6 +763,116 @@ NcarPackedPayload24 encode_ncar_packed_payload24(
     return result;
 }
 
+NcarSampleProducerCaptureResult capture_ncar_sample_record(
+    NcarSampleRecord& destination,
+    NcarSampleProducerObjectState& body,
+    const float current_time,
+    const bool fdiv_compatibility_enabled) noexcept
+{
+    NcarSampleProducerCaptureResult result{};
+    result.fdiv_compatibility_enabled = fdiv_compatibility_enabled;
+
+    auto candidate_orientation = body.orientation_0x38;
+    const auto normalize = [fdiv_compatibility_enabled](
+        const std::array<float, 3>& vector,
+        std::array<float, 3>& normalized) noexcept {
+        const long double x = vector[0];
+        const long double y = vector[1];
+        const long double z = vector[2];
+        const long double length = std::sqrt(x * x + y * y + z * z);
+        if (!(length > 0.0L) || !std::isfinite(length)) return false;
+        const long double inverse = divide_with_vc98_fdiv_compatibility(
+            1.0L, length, fdiv_compatibility_enabled);
+        normalized = {static_cast<float>(x * inverse),
+                      static_cast<float>(y * inverse),
+                      static_cast<float>(z * inverse)};
+        return std::isfinite(normalized[0]) && std::isfinite(normalized[1]) &&
+            std::isfinite(normalized[2]);
+    };
+
+    // 0x422C90 normalizes the first basis vector, takes the cross product of
+    // the original third and first vectors for the second, then recomputes the
+    // third as their cross product.
+    const std::array<float, 3> first_source{
+        candidate_orientation[0], candidate_orientation[1], candidate_orientation[2]};
+    const std::array<float, 3> third_source{
+        candidate_orientation[6], candidate_orientation[7], candidate_orientation[8]};
+    std::array<float, 3> first{};
+    if (!normalize(first_source, first)) return result;
+    const std::array<float, 3> second_source{
+        third_source[1] * first_source[2] - third_source[2] * first_source[1],
+        third_source[2] * first_source[0] - third_source[0] * first_source[2],
+        third_source[0] * first_source[1] - third_source[1] * first_source[0]};
+    std::array<float, 3> second{};
+    if (!normalize(second_source, second)) return result;
+    const std::array<float, 3> third{
+        second[1] * first[2] - second[2] * first[1],
+        second[2] * first[0] - second[0] * first[2],
+        second[0] * first[1] - second[1] * first[0]};
+    std::copy(first.begin(), first.end(), candidate_orientation.begin());
+    std::copy(second.begin(), second.end(), candidate_orientation.begin() + 3);
+    std::copy(third.begin(), third.end(), candidate_orientation.begin() + 6);
+
+    // Inline matrix-to-quaternion conversion at 0x43E050 follows 0x422FD0's
+    // row-major branch equations once 0x422C90 has rebuilt the basis.
+    const auto converted = matrix3x3_to_quaternion(
+        candidate_orientation, fdiv_compatibility_enabled);
+    if (!std::all_of(converted.quaternion.begin(), converted.quaternion.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return result;
+    }
+
+    NcarSampleRecord captured = destination;
+    const auto store_u32 = [&captured](const std::size_t offset,
+                                       const std::uint32_t value) noexcept {
+        write_u32_le(captured.raw_bytes.data() + offset, value);
+    };
+    const auto store_float = [&store_u32](const std::size_t offset,
+                                          const float value) noexcept {
+        store_u32(offset, std::bit_cast<std::uint32_t>(value));
+    };
+
+    captured.sample_time_bits_0x04 = std::bit_cast<std::uint32_t>(current_time);
+    captured.value_bits_0x08 = std::bit_cast<std::uint32_t>(body.value_0xde4);
+    captured.signed_scalar_bits_0x0c = std::bit_cast<std::uint32_t>(body.value_0x500);
+    captured.value_bits_0x10 = body.value_0xc34;
+    captured.small_integer_0x14 = body.value_0xd64;
+    captured.scaled_byte_value_bits_0x18 = std::bit_cast<std::uint32_t>(body.value_0xd70);
+    store_float(0x04, current_time);
+    store_u32(0x08, captured.value_bits_0x08);
+    store_u32(0x0c, captured.signed_scalar_bits_0x0c);
+    store_u32(0x10, captured.value_bits_0x10);
+    store_u32(0x14, captured.small_integer_0x14);
+    store_u32(0x18, captured.scaled_byte_value_bits_0x18);
+
+    for (std::size_t axis = 0; axis < body.position_0x5c.size(); ++axis) {
+        captured.vector_bits_0x1c[axis] =
+            std::bit_cast<std::uint32_t>(body.position_0x5c[axis]);
+        store_float(0x1c + axis * 4U, body.position_0x5c[axis]);
+    }
+    for (std::size_t component = 0; component < converted.quaternion.size(); ++component) {
+        captured.rotation_bits_0x28[component] =
+            std::bit_cast<std::uint32_t>(converted.quaternion[component]);
+        store_float(0x28 + component * 4U, converted.quaternion[component]);
+    }
+    captured.flag_0x38 = body.flag_0xe28;
+    captured.flag_0x39 = body.flag_0xec0;
+    captured.gate_bytes_0x3a = body.wheel_damage_0x574;
+    captured.raw_bytes[0x38] = static_cast<std::byte>(captured.flag_0x38);
+    captured.raw_bytes[0x39] = static_cast<std::byte>(captured.flag_0x39);
+    for (std::size_t wheel = 0; wheel < captured.gate_bytes_0x3a.size(); ++wheel) {
+        captured.raw_bytes[0x3a + wheel] =
+            static_cast<std::byte>(captured.gate_bytes_0x3a[wheel]);
+    }
+
+    body.orientation_0x38 = candidate_orientation;
+    body.flag_0xec0 = 0U;
+    destination = captured;
+    result.captured = true;
+    result.orientation_normalized = true;
+    return result;
+}
+
 NcarPackedPayloadApplyResult decode_ncar_packed_payload24(
     const std::span<const std::byte, 0x18> payload,
     const std::uint32_t current_tick,
@@ -854,6 +964,7 @@ NcarSampleWindow decode_ncar_sample_window(
         record.sample_time_bits_0x04 = read_u32_le(bytes.data(), base + 0x04);
         record.value_bits_0x08 = read_u32_le(bytes.data(), base + 0x08);
         record.signed_scalar_bits_0x0c = read_u32_le(bytes.data(), base + 0x0c);
+        record.value_bits_0x10 = read_u32_le(bytes.data(), base + 0x10);
         record.small_integer_0x14 = read_u32_le(bytes.data(), base + 0x14);
         record.scaled_byte_value_bits_0x18 = read_u32_le(bytes.data(), base + 0x18);
         for (std::size_t axis = 0; axis < record.vector_bits_0x1c.size(); ++axis) {

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -90,6 +91,66 @@ int main()
                 all_world_positions_match &&
                 near(group_plan.group_radius_0x50, expected_group_radius),
             "backend-group planning must build the twelve mapped sphere children");
+
+        viper::NcarSampleRecord sample{};
+        sample.raw_bytes.fill(std::byte{0xA5});
+        sample.raw_bytes[0] = std::byte{0x5A};
+        viper::NcarSampleProducerObjectState body{};
+        body.value_0xd70 = 12.5F;
+        body.value_0xd64 = 0x12345678U;
+        body.value_0x500 = -3.25F;
+        body.value_0xde4 = 8.75F;
+        body.flag_0xe28 = 1U;
+        body.value_0xc34 = 0xABCDEF01U;
+        body.flag_0xec0 = 1U;
+        body.wheel_damage_0x574 = {2U, 3U, 4U, 5U};
+        body.position_0x5c = {10.0F, 20.0F, 30.0F};
+        // A scaled, slightly skewed native basis exercises orthonormalization.
+        body.orientation_0x38 = {2.0F, 0.0F, 0.0F,
+                                 0.0F, 4.0F, 0.2F,
+                                 0.0F, 0.0F, 3.0F};
+        const auto capture = viper::capture_ncar_sample_record(
+            sample, body, 42.5F, false);
+        require(capture.captured && capture.orientation_normalized &&
+                near(std::bit_cast<float>(sample.sample_time_bits_0x04), 42.5F) &&
+                sample.value_bits_0x08 == std::bit_cast<std::uint32_t>(8.75F) &&
+                sample.signed_scalar_bits_0x0c == std::bit_cast<std::uint32_t>(-3.25F) &&
+                sample.value_bits_0x10 == 0xABCDEF01U &&
+                sample.small_integer_0x14 == 0x12345678U &&
+                sample.scaled_byte_value_bits_0x18 == std::bit_cast<std::uint32_t>(12.5F) &&
+                sample.vector_bits_0x1c == std::array<std::uint32_t, 3>{
+                    std::bit_cast<std::uint32_t>(10.0F),
+                    std::bit_cast<std::uint32_t>(20.0F),
+                    std::bit_cast<std::uint32_t>(30.0F)} &&
+                sample.flag_0x38 == 1U && sample.flag_0x39 == 1U &&
+                sample.gate_bytes_0x3a == std::array<std::uint8_t, 4>{2U, 3U, 4U, 5U} &&
+                sample.raw_bytes[0] == std::byte{0x5A} && body.flag_0xec0 == 0U,
+            "timed producer capture must copy native fields and clear the one-shot flag");
+        const auto& basis = body.orientation_0x38;
+        const auto dot = [](const std::size_t first_axis, const std::size_t second_axis,
+                            const std::array<float, 9>& matrix) {
+            return matrix[first_axis * 3U] * matrix[second_axis * 3U] +
+                matrix[first_axis * 3U + 1U] * matrix[second_axis * 3U + 1U] +
+                matrix[first_axis * 3U + 2U] * matrix[second_axis * 3U + 2U];
+        };
+        require(near(dot(0U, 0U, basis), 1.0F) &&
+                near(dot(1U, 1U, basis), 1.0F) &&
+                near(dot(2U, 2U, basis), 1.0F) &&
+                near(dot(0U, 1U, basis), 0.0F) &&
+                near(dot(0U, 2U, basis), 0.0F) &&
+                near(dot(1U, 2U, basis), 0.0F),
+            "producer capture must store a normalized orthogonal orientation basis");
+
+        auto rejected_sample = sample;
+        auto degenerate_body = body;
+        degenerate_body.flag_0xec0 = 1U;
+        degenerate_body.orientation_0x38 = {};
+        const auto rejected_capture = viper::capture_ncar_sample_record(
+            rejected_sample, degenerate_body, 43.0F, false);
+        require(!rejected_capture.captured && rejected_sample.raw_bytes == sample.raw_bytes &&
+                degenerate_body.flag_0xec0 == 1U &&
+                degenerate_body.orientation_0x38 == std::array<float, 9>{},
+            "degenerate producer orientation must not partially mutate state");
 
         std::cout << "NCAR geometry regression checks passed\n";
         return 0;

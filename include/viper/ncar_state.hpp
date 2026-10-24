@@ -391,6 +391,7 @@ struct NcarSampleRecord {
     // serialized representation avoids assuming host-side rounding semantics.
     std::uint32_t value_bits_0x08{};
     std::uint32_t signed_scalar_bits_0x0c{};
+    std::uint32_t value_bits_0x10{};
     std::uint32_t small_integer_0x14{};
     std::uint32_t scaled_byte_value_bits_0x18{};
     std::array<std::uint32_t, 3> vector_bits_0x1c{};
@@ -399,6 +400,37 @@ struct NcarSampleRecord {
     std::uint8_t flag_0x39{};
     std::array<std::uint8_t, 4> gate_bytes_0x3a{};
 };
+
+// Mutable NCAR body fields read by the timed sample snapshot at 0x43E050.
+// The offsets are kept explicit until their gameplay meanings are recovered.
+struct NcarSampleProducerObjectState {
+    float value_0xd70{};
+    std::uint32_t value_0xd64{};
+    float value_0x500{};
+    float value_0xde4{};
+    std::uint8_t flag_0xe28{};
+    std::uint32_t value_0xc34{};
+    std::uint8_t flag_0xec0{};
+    std::array<std::uint8_t, 4> wheel_damage_0x574{};
+    std::array<float, 3> position_0x5c{};
+    // Row-major orientation matrix stored at object +0x38.
+    std::array<float, 9> orientation_0x38{};
+};
+
+struct NcarSampleProducerCaptureResult {
+    bool captured{};
+    bool orientation_normalized{};
+    bool fdiv_compatibility_enabled{};
+};
+
+// Captures the direct state writes of 0x43E050. The orientation matrix and
+// +0xEC0 flag are mutated in the same order as the native callback. A
+// degenerate basis is rejected before changing either object or record state.
+[[nodiscard]] NcarSampleProducerCaptureResult capture_ncar_sample_record(
+    NcarSampleRecord& destination,
+    NcarSampleProducerObjectState& body,
+    float current_time,
+    bool fdiv_compatibility_enabled) noexcept;
 
 struct NcarInterpolatedWheelObservation {
     std::array<std::uint8_t, 5> first_record{};

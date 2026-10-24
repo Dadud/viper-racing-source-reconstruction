@@ -149,7 +149,10 @@ target_link_libraries(viper_update_curve PUBLIC viper_legacy_fdiv)
 target_link_libraries(viper_terrain_model PUBLIC viper_legacy_fdiv)
 target_link_libraries(viper_race_setup_model PUBLIC viper_legacy_fdiv viper_ai_resources)
 target_link_libraries(viper_scene_model PUBLIC viper_legacy_fdiv)
-target_link_libraries(viper_ncar_model PUBLIC viper_legacy_fdiv)
+target_link_libraries(viper_ncar_model PUBLIC
+    viper_legacy_fdiv
+    viper_matrix_quaternion
+)
 target_link_libraries(viper_race_loop_model PUBLIC viper_legacy_fdiv)
 
 add_library(viper_render_context src/render_context.cpp)
