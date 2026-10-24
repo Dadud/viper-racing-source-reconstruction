@@ -20,6 +20,10 @@ recorded as incomplete in the physics, AI, and race-mode rows of
 models are substantial but many still accept caller observations and are not
 owned by the live session (`metadata/car_update_branches.md`,
 `metadata/simulation_loop.md`, `metadata/vehicle_setup.md`).
+The player now owns four byte-backed wheel objects containing resolved wheel
+constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
+and persistent contact outputs. This closes object-state materialization only;
+the live loop still does not consume those bytes as suspension inputs.
 
 The original-client attempt currently stops during graphics initialization;
 there is no paired gameplay baseline (`metadata/graphics_startup.md`,
@@ -66,6 +70,12 @@ chain, but the live PCAR setter state, complete wheel/contact inputs, force
 collector, and body-integrator state are still not owned by `WindowState`.
 Build those persistent inputs and connect them to the existing wheel/body
 compositions before replacing route motion as the rendered pose authority.
+All currently modeled `0x441C10` outputs are now materialized at their wheel
+offsets, so the next unresolved wheel inputs are per-frame `+0x158` from body
+`+0x50C`, initialized-history `+0xE8`, and the body-motion projection and
+environment polarity used by surface adjustment. Do not promote the initial
+constructor value of `+0x50C` to a per-frame value until the callback/sample
+state that mutates it is connected.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 Native order inside NCAR callback `0x439200` is known: its timed sample/queue

@@ -443,6 +443,40 @@ NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
     return result;
 }
 
+bool apply_ncar_wheel_core_initialization(
+    NcarWheelRuntimeObjectState& destination,
+    const std::uint32_t wheel_object_offset,
+    const NcarWheelCoreInitialization& initialization) noexcept
+{
+    std::array<NcarObjectFieldWrite, 17> writes{};
+    std::size_t count = 0U;
+    const auto write_float = [&](const std::uint32_t local_offset,
+                                 const float value) {
+        writes[count++] = {wheel_object_offset + local_offset, 4U,
+            std::bit_cast<std::uint32_t>(value)};
+    };
+    for (std::size_t axis = 0; axis < 3U; ++axis) {
+        write_float(0x004U + static_cast<std::uint32_t>(axis * 4U),
+            initialization.position_relative_to_selected_vertex[axis]);
+    }
+    write_float(0x024U, initialization.suspension_piecewise_terms.positive_slope);
+    write_float(0x028U, initialization.suspension_piecewise_terms.positive_intercept);
+    write_float(0x02cU, initialization.suspension_piecewise_terms.nonpositive_slope);
+    write_float(0x030U, initialization.suspension_piecewise_terms.nonpositive_intercept);
+    write_float(0x03cU, initialization.value_0x3c);
+    write_float(0x040U, initialization.value_0x40);
+    write_float(0x044U, initialization.value_0x44);
+    write_float(0x048U, initialization.value_0x48);
+    write_float(0x04cU, initialization.value_0x4c);
+    write_float(0x05cU, initialization.value_0x5c);
+    write_float(0x060U, initialization.angle_0x60);
+    write_float(0x064U, initialization.angle_0x64);
+    write_float(0x09cU, initialization.coefficient_0x9c);
+    write_float(0x0a0U, initialization.coefficient_0xa0);
+    return apply_ncar_wheel_object_writes(destination, wheel_object_offset,
+        std::span<const NcarObjectFieldWrite>(writes.data(), count));
+}
+
 std::optional<NcarWheelTireSetup> initialize_ncar_wheel_tire_setup(
     const std::span<const std::byte> runtime_record,
     const std::size_t wheel_index,

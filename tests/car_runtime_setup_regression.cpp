@@ -339,6 +339,36 @@ int main()
                     ((0.03F / 0.0254F * 4.45F * 0.13333334F -
                       0.03F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F,
             "0x441C10 front-wheel position, geometry, and steering stores must be reconstructed");
+        viper::NcarWheelRuntimeObjectState materialized_front_wheel{};
+        const auto front_wheel_base = 0x554U;
+        const auto front_wheel_constructor = viper::plan_ncar_wheel_constructor(
+            front_wheel_base, viper::NcarWheelConstructorObservation{});
+        require(front_wheel.has_value() &&
+                viper::materialize_ncar_wheel_constructor(materialized_front_wheel,
+                    front_wheel_base, front_wheel_constructor) &&
+                viper::apply_ncar_wheel_core_initialization(materialized_front_wheel,
+                    front_wheel_base, *front_wheel),
+            "resolved wheel-core constructor outputs must apply to persistent storage");
+        const auto read_front_wheel_u32 = [&materialized_front_wheel](
+                const std::size_t offset) {
+            std::uint32_t bits{};
+            for (std::size_t byte = 0; byte < 4U; ++byte) {
+                bits |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+                    materialized_front_wheel.bytes[offset + byte])) << (byte * 8U);
+            }
+            return bits;
+        };
+        require(read_front_wheel_u32(0x03cU) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x3c) &&
+                read_front_wheel_u32(0x044U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x44) &&
+                read_front_wheel_u32(0x024U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->suspension_piecewise_terms.positive_slope) &&
+                read_front_wheel_u32(0x09cU) == std::bit_cast<std::uint32_t>(
+                    front_wheel->coefficient_0x9c) &&
+                materialized_front_wheel.initialized_bytes[0x03cU] != 0U &&
+                materialized_front_wheel.initialized_bytes[0x0a0U + 3U] != 0U,
+            "live wheel bytes must retain exact constructor geometry and spring fields");
         const auto right_front_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 1U, {0.4F, -0.254F, 3.81F}, 0.5F, false});
         require(right_front_wheel.has_value() && right_front_wheel->front_axle &&

@@ -590,6 +590,13 @@ struct NcarWheelCoreInitialization {
     WheelPiecewiseTerms suspension_piecewise_terms{};
 };
 
+// Applies the constructor outputs modeled above to the byte-backed native
+// wheel object, preserving its initialized-byte mask.
+[[nodiscard]] bool apply_ncar_wheel_core_initialization(
+    NcarWheelRuntimeObjectState& destination,
+    std::uint32_t wheel_object_offset,
+    const NcarWheelCoreInitialization& initialization) noexcept;
+
 // Reconstructs position and steering stores from wheel constructor 0x441C10.
 // Missing record fields or wheel indices outside [0, 4) yield no result.
 [[nodiscard]] std::optional<NcarWheelCoreInitialization>

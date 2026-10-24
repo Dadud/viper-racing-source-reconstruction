@@ -1644,6 +1644,18 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
+            const auto& core = player_wheel_core_initialization->wheels[wheel];
+            if (!core.has_value()) {
+                player_runtime_car_record.clear();
+                player_runtime_state = {};
+                return false;
+            }
+            if (!viper::apply_ncar_wheel_core_initialization(
+                    player_runtime_state.wheel_objects[wheel], wheel_offset, *core)) {
+                player_runtime_car_record.clear();
+                player_runtime_state = {};
+                return false;
+            }
             player_runtime_state.wheel_constructor_plans[wheel] = std::move(plan);
         }
         player_wheel_anchors = player_wheel_core_initialization->anchors;

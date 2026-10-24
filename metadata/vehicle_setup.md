@@ -281,6 +281,16 @@ existing VC98 compatibility division model when that flag is set. Tire loading,
 helper-owned wheel transforms and remaining `0x441C10` stores are still outside
 this core plan.
 
+The live player's byte-backed wheel objects now receive these modeled core
+constructor results after the `0x4419A0` defaults: selected-vertex-relative
+position at `+0x04..+0x0C`, piecewise terms at `+0x24..+0x30`, geometry and
+steering fields at `+0x3C..+0x64`, and surface coefficients at `+0x9C/+0xA0`.
+Each store marks only its four bytes initialized. This keeps the setup-derived
+values in the same persistent objects as later contact outputs; it does not
+run the per-frame suspension path. Wheel `+0x158` is still copied from the
+mutable body `+0x50C` during the native frame update, whose callback and sample
+state are not yet owned by the live session.
+
 ### TIRE field consumption at `0x435BF0`
 
 The tire-object initializer reads the 22-float record at `param_2 + 0x20` and
