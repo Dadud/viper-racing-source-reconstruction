@@ -393,6 +393,36 @@ int main()
         require(body_step.wheel_contact_pipeline_results[0]
                     .suspension.surface.absolute_motion_projection == 20.0F,
             "four-wheel step must project point velocity through the body fields");
+        viper::NcarSurfacePolarityState polarity_state{};
+        polarity_state.initialized = true;
+        polarity_state.index_a_0x4f0aa4 = 0x60U;
+        polarity_state.index_b_0x4f0aa8 = 0x20U;
+        polarity_state.phase_0x4f0908 = 0.02F;
+        polarity_state.increment_0x4f0a94 = 0.1F;
+        polarity_state.wrap_0x4f0a98 = 0.999F;
+        polarity_state.table_0x4f0910[0x60U] = 0.1F;
+        polarity_state.table_0x4f0910[0x20U] = 0.8F;
+        const auto polarity_value = viper::advance_ncar_surface_polarity_value_0x4193f0(
+            polarity_state, 2);
+        require(polarity_value == 1 &&
+                polarity_state.index_a_0x4f0aa4 == 0x5fU &&
+                polarity_state.index_b_0x4f0aa8 == 0x1fU &&
+                std::abs(polarity_state.table_0x4f0910[0x60U] - 0.3F) < 1.0e-6F &&
+                std::abs(polarity_state.phase_0x4f0908 - 0.919F) < 1.0e-6F,
+            "native surface phase must update table, indices, accumulator, and scaled integer result");
+        polarity_state.index_a_0x4f0aa4 = 0U;
+        polarity_state.index_b_0x4f0aa8 = 0U;
+        const auto wrapped_phase = viper::advance_ncar_surface_polarity_phase_0x419620(
+            polarity_state);
+        require(wrapped_phase.has_value() && *wrapped_phase > 0.0F &&
+                *wrapped_phase < 1.0F &&
+                polarity_state.index_a_0x4f0aa4 == 0x60U &&
+                polarity_state.index_b_0x4f0aa8 == 0x60U,
+            "native surface phase indices must wrap from zero back to table entry 0x60");
+        viper::NcarSurfacePolarityState uninitialized_polarity{};
+        require(!viper::advance_ncar_surface_polarity_phase_0x419620(
+                    uninitialized_polarity).has_value(),
+            "surface phase update must reject missing random table initialization");
         const auto right_front_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 1U, {0.4F, -0.254F, 3.81F}, 0.5F, false});
         require(right_front_wheel.has_value() && right_front_wheel->front_axle &&

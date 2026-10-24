@@ -76,7 +76,10 @@ motion projection from the prior contact point and step-start body kinematics,
 before the current contact query can replace that point. This composition is
 still not called by the production race session. The next unresolved wheel
 inputs are per-frame `+0x158` from body `+0x50C`, initialized-history `+0xE8`,
-and the global environment-polarity phase. Do not promote the initial
+and the random-seeded table/call lifecycle for environment polarity. The
+`0x419620` phase transition and `0x4193F0` scale/conversion are modeled, but
+the two initialization draws and their exact runtime ordering are not yet
+owned. Do not promote the initial
 constructor value of `+0x50C` to a per-frame value until the callback/sample
 state that mutates it is connected.
 

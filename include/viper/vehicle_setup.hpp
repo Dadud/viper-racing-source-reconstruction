@@ -787,6 +787,31 @@ struct WheelSuspensionResult {
     float combined_response_0x178{};
 };
 
+// Mutable process-global phase state used by the surface polarity helper.
+// The initializer's random table contents must be supplied by its caller.
+struct NcarSurfacePolarityState {
+    std::array<float, 97> table_0x4f0910{};
+    std::uint32_t index_a_0x4f0aa4{0x60U};
+    std::uint32_t index_b_0x4f0aa8{0x20U};
+    float phase_0x4f0908{};
+    float increment_0x4f0a94{};
+    float wrap_0x4f0a98{};
+    bool initialized{};
+};
+
+// Advances one 0x419620 table/phase step. Callers must serialize access as the
+// native helper does under its process lock. Returns the value before scaling.
+// Malformed or uninitialized state fails without changing the supplied state.
+[[nodiscard]] std::optional<float> advance_ncar_surface_polarity_phase_0x419620(
+    NcarSurfacePolarityState& state) noexcept;
+
+// Composes 0x419620, the integer scale in 0x4193F0, and its __ftol-like
+// nearest conversion for ordinary finite values.
+[[nodiscard]] std::optional<std::int64_t>
+advance_ncar_surface_polarity_value_0x4193f0(
+    NcarSurfacePolarityState& state,
+    std::int32_t scale) noexcept;
+
 struct WheelSuspensionSurfaceInput {
     float suspension_response{};
     float signed_motion_projection{};

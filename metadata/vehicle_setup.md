@@ -675,9 +675,9 @@ and [`car_update_branches.md`](car_update_branches.md).
 After that base scalar, `adjust_wheel_suspension_for_surface` models the next
 adjustment. The updater projects a wheel-motion vector onto body basis values,
 takes the absolute projection, caps a copy at `1`, then forms
-`capped_abs * (abs_projection * +0xA0 + projection^2 * +0x9C)`. A global
-polarity helper supplies a sign before multiplication by the suspension
-response. The resulting adjustment is multiplied by `9` for feature `10` when
+`capped_abs * (abs_projection * +0xA0 + projection^2 * +0x9C)`. A shared
+phase helper supplies the integer result before multiplication by the
+suspension response. The resulting adjustment is multiplied by `9` for feature `10` when
 the `+0x1A0` flag is clear, set to zero for feature `0`, and otherwise
 multiplied by `3`; 30 percent is added back to the base response and stored at
 `+0x178`. This model accepts the projection and polarity as inputs because
@@ -690,8 +690,11 @@ linear velocity, and angular velocity, then projects X/Y/Z through body fields
 `+0x50/+0x58/+0x54`, matching the operand order in `0x442530`. The same
 pre-query point velocity is reused by the later tire response stages, matching
 the native local computed before `0x443F00` can replace wheel contact point
-`+0x130`. The polarity value remains a separate unresolved global-phase
-result; static constructor state cannot supply it. Evidence: `0x442530`
+`+0x130`. The `0x419620` table/index/phase transition and `0x4193F0`
+scale-plus-`__ftol` conversion are now modeled with explicit persistent state.
+The startup table still depends on two process random draws, and initialization
+and call timing are not connected to the player session, so this result is not
+yet supplied to live suspension. Evidence: `0x442530`
 `ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`,
 `0x43E9B0` `ev_55e374cea3290f211e8f05c04418071e112cc7253a3051ed7ff43e7214c913b0`,
 and polarity chain `0x4193F0` `ev_ac4ff3b289c237c75c0e1fd826f40009860951ca0f75f62d7779fda1dab6ee56`,

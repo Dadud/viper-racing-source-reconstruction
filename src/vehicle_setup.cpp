@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cmath>
+#include <limits>
 
 namespace viper {
 
@@ -852,6 +853,54 @@ WheelSuspensionResult evaluate_wheel_suspension(
         result.combined_response_0x178 -= result.spring_adjustment * 0.9F;
     }
     return result;
+}
+
+std::optional<float> advance_ncar_surface_polarity_phase_0x419620(
+    NcarSurfacePolarityState& state) noexcept
+{
+    if (!state.initialized || state.index_a_0x4f0aa4 >= state.table_0x4f0910.size() ||
+        state.index_b_0x4f0aa8 >= state.table_0x4f0910.size() ||
+        !std::isfinite(state.phase_0x4f0908) ||
+        !std::isfinite(state.increment_0x4f0a94) ||
+        !std::isfinite(state.wrap_0x4f0a98)) {
+        return std::nullopt;
+    }
+
+    auto value = state.table_0x4f0910[state.index_a_0x4f0aa4] -
+        state.table_0x4f0910[state.index_b_0x4f0aa8];
+    if (!std::isfinite(value)) return std::nullopt;
+    if (value < 0.0F) value += 1.0F;
+    auto next_phase = state.phase_0x4f0908 - state.increment_0x4f0a94;
+    if (next_phase < 0.0F) {
+        next_phase += state.wrap_0x4f0a98;
+    }
+    auto result = value - next_phase;
+    if (result < 0.0F) result += 1.0F;
+    if (!std::isfinite(next_phase) || !std::isfinite(result)) return std::nullopt;
+
+    state.table_0x4f0910[state.index_a_0x4f0aa4] = value;
+    state.index_a_0x4f0aa4 = state.index_a_0x4f0aa4 == 0U
+        ? 0x60U : state.index_a_0x4f0aa4 - 1U;
+    state.index_b_0x4f0aa8 = state.index_b_0x4f0aa8 == 0U
+        ? 0x60U : state.index_b_0x4f0aa8 - 1U;
+    state.phase_0x4f0908 = next_phase;
+    return result;
+}
+
+std::optional<std::int64_t> advance_ncar_surface_polarity_value_0x4193f0(
+    NcarSurfacePolarityState& state,
+    const std::int32_t scale) noexcept
+{
+    const auto phase = advance_ncar_surface_polarity_phase_0x419620(state);
+    if (!phase.has_value()) return std::nullopt;
+    const auto scaled = std::nearbyint(
+        static_cast<long double>(*phase) * static_cast<long double>(scale));
+    if (!std::isfinite(scaled) ||
+        scaled < static_cast<long double>(std::numeric_limits<std::int64_t>::min()) ||
+        scaled >= static_cast<long double>(std::numeric_limits<std::int64_t>::max())) {
+        return std::nullopt;
+    }
+    return static_cast<std::int64_t>(scaled);
 }
 
 WheelSuspensionSurfaceResult adjust_wheel_suspension_for_surface(
