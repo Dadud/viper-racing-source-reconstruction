@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added the scene-car virtual `+0x18` callout
+  plan for `0x4648A0`: selected-car suppression, the strict distance/status-word
+  gate (including x87 unordered behavior), projection return gate, context
+  update, primary record-text gate, and secondary resource/text gates. Raw
+  formatted strings, projection results, and `__ftol` screen coordinates stay
+  explicit inputs. Details and helper evidence are in
+  `metadata/scene_car_update.md`. Release `viper_race_scene_flow` build and
+  `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Preserved a resolved object-specific render
   callback address in generic scene dispatch and added
   `observe_scene_wheel_resource_manager`, which carries the constructor-proven

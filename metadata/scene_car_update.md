@@ -444,6 +444,35 @@ dispatcher reaches `+0x14`, its action carries that native target address.
 This links the renderer's object walk to the already modeled wheel-manager
 frame method without inventing behavior for the manager's earlier gates.
 
+### Scene-car virtual `+0x18` callout
+
+`plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached
+from submitter `0x45C090`. It suppresses the selected car, then applies the
+strict squared-distance comparison against the threshold at `0x4C9384`. The
+native x87 status-word test checks C0; unordered distances therefore continue
+to the projection path. The portable squared-distance arithmetic uses double
+intermediates and remains an approximation to x87 extended precision. Passing
+the distance gate calls `0x448CD0`; its AL result is the following visibility
+gate. The wrapper installs the identity transform and delegates the world
+position conversion to `0x452350`/device transform state.
+
+After projection succeeds, the callback sets its text context through
+`0x449900` and looks up the scene object's ordinal through `0x45DFB0`. Gate
+`0x49BE40` enables the primary formatted string using record offsets `+5` and
+`+0x140`, format source `0x4DCDA4`, and draw helper `0x4D710`. The later
+`0x40D250` gate is true only when both `0x4D10FC` and `0x4ECC98` are nonzero;
+record byte `+0x32` must also be nonzero before the callback calls `0x44D0C0`
+with object field `+0x7B4` and then draws that record string through `0x4D710`.
+The portable plan preserves these ordered call gates and record offsets. Device
+projection results, formatted text, and `__ftol` pixel coordinates remain
+inputs because their results depend on runtime transform/device and CRT state.
+Evidence: vtable/submit path and raw callback instructions in
+`metadata/simulation_loop.md` and `disasm/engine_.text.asm`; helper dossiers
+`ev_863e3d62425fc238f2f7d05582aadddfb0a640870bf31a34c16400574dbc1d0b`,
+`ev_b66f1af6bc9ebabb616d42d22c6e9cc544095105e212c61780e913c9b146754f`,
+`ev_0d1cac05b94aa5dc4c850cd384bb6e6cb97abe2a8a92e0f36bab0295f5a90e28`,
+and `ev_a66356af194e82eb5f16751b35cd3e4030ff0e736b2f0b30de2f2e8efeb0f482`.
+
 `plan_scene_renderer_dispatch` projects the enclosing generic render frame at
 `0x45BEB0`. The profile begin/end wrappers bracket the invocation. The active
 draw gate is `renderer_mode > 0` with renderer state in `{0,1,2}`. When active,

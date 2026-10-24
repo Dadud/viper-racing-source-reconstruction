@@ -1028,4 +1028,60 @@ struct SceneCarWheelFramePlan {
     const SceneCarWheelFrameInput& input,
     const std::array<SceneWheelAuxiliaryState, scene_car_wheel_count>& initial_state) noexcept;
 
+enum class SceneCarCalloutStatus : std::uint8_t {
+    complete,
+    selected_car_suppressed,
+    outside_distance_threshold,
+    projection_rejected,
+    record_observation_missing,
+};
+
+enum class SceneCarCalloutOperationKind : std::uint8_t {
+    project_world_position_0x448cd0,
+    set_text_context_0x449900,
+    check_secondary_text_gate_0x40d250,
+    draw_primary_text_0x4d710,
+    draw_secondary_resource_0x44d0c0,
+    draw_secondary_text_0x4d710,
+};
+
+struct SceneCarCalloutOperation {
+    SceneCarCalloutOperationKind kind{};
+    std::uint32_t address{};
+    std::uint32_t data_source_address{};
+    std::int32_t first_record_offset{};
+    std::int32_t second_record_offset{};
+    std::int32_t x{};
+    std::int32_t y{};
+};
+
+struct SceneCarCalloutInput {
+    std::int32_t object_ordinal{};
+    std::int32_t selected_car_ordinal{};
+    std::array<float, 3> object_position{};
+    std::array<float, 3> camera_position{};
+    float squared_distance_threshold{};
+    bool projection_visible_0x448cd0{};
+    bool record_observed{};
+    bool primary_text_gate_0x49be40{};
+    bool secondary_global_a_0x4d10fc{};
+    bool secondary_global_b_0x4ecc98{};
+    bool secondary_record_text_present{};
+    std::int32_t primary_text_x_after_ftol{};
+    std::int32_t primary_text_y_after_ftol{};
+    std::int32_t secondary_text_x_after_ftol{};
+    std::int32_t secondary_text_y_after_ftol{};
+};
+
+struct SceneCarCalloutPlan {
+    SceneCarCalloutStatus status{SceneCarCalloutStatus::complete};
+    double squared_distance{};
+    std::vector<SceneCarCalloutOperation> operations;
+};
+
+// Projects scene-car virtual +0x18 at 0x4648A0. Projection and record/global
+// values that depend on renderer/device state are supplied observations.
+[[nodiscard]] SceneCarCalloutPlan plan_scene_car_callout(
+    const SceneCarCalloutInput& input);
+
 } // namespace viper

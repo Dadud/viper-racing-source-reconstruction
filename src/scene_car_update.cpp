@@ -1847,4 +1847,69 @@ SceneCarWheelFramePlan plan_scene_car_wheel_frame(
     return result;
 }
 
+SceneCarCalloutPlan plan_scene_car_callout(const SceneCarCalloutInput& input)
+{
+    SceneCarCalloutPlan result{};
+    if (input.object_ordinal == input.selected_car_ordinal) {
+        result.status = SceneCarCalloutStatus::selected_car_suppressed;
+        return result;
+    }
+
+    const double delta_x = static_cast<double>(input.camera_position[0])
+        - input.object_position[0];
+    const double delta_y = static_cast<double>(input.camera_position[1])
+        - input.object_position[1];
+    const double delta_z = static_cast<double>(input.camera_position[2])
+        - input.object_position[2];
+    result.squared_distance = delta_y * delta_y + delta_z * delta_z + delta_x * delta_x;
+    // The native C0 test skips when C0 is clear. X87 unordered comparisons set
+    // C0, so NaN follows the projection path just like the original branch.
+    if (result.squared_distance >= input.squared_distance_threshold) {
+        result.status = SceneCarCalloutStatus::outside_distance_threshold;
+        return result;
+    }
+
+    result.operations.push_back({
+        SceneCarCalloutOperationKind::project_world_position_0x448cd0,
+        0x00448CD0U});
+    if (!input.projection_visible_0x448cd0) {
+        result.status = SceneCarCalloutStatus::projection_rejected;
+        return result;
+    }
+
+    result.operations.push_back({
+        SceneCarCalloutOperationKind::set_text_context_0x449900,
+        0x00449900U});
+    if (!input.record_observed) {
+        result.status = SceneCarCalloutStatus::record_observation_missing;
+        return result;
+    }
+
+    if (input.primary_text_gate_0x49be40) {
+        result.operations.push_back({
+            SceneCarCalloutOperationKind::draw_primary_text_0x4d710,
+            0x0044D710U, 0x004DCDA4U, 5, 0x140,
+            input.primary_text_x_after_ftol, input.primary_text_y_after_ftol});
+    }
+
+    result.operations.push_back({
+        SceneCarCalloutOperationKind::check_secondary_text_gate_0x40d250,
+        0x0040D250U});
+    if (input.secondary_global_a_0x4d10fc
+        && input.secondary_global_b_0x4ecc98
+        && input.secondary_record_text_present) {
+        result.operations.push_back({
+            SceneCarCalloutOperationKind::draw_secondary_resource_0x44d0c0,
+            0x0044D0C0U, 0U, 0x7B4, 0,
+            input.secondary_text_x_after_ftol,
+            input.secondary_text_y_after_ftol});
+        result.operations.push_back({
+            SceneCarCalloutOperationKind::draw_secondary_text_0x4d710,
+            0x0044D710U, 0x0053F194U, 0x32, 0,
+            input.secondary_text_x_after_ftol,
+            input.secondary_text_y_after_ftol});
+    }
+    return result;
+}
+
 } // namespace viper
