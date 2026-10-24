@@ -1146,6 +1146,9 @@ scene_shared_paused_banner_call(bool gate_reached,
 struct ScenePausedBannerRenderObservation {
     bool gate_reached{};
     bool load_stp_resource_found{};
+    // When present, the native ResourceGet result takes precedence over the
+    // compatibility found flag above. Name/type are fixed to load.stp/STMP.
+    std::optional<ResourceGetObservation> load_stp_resource_lookup;
     bool text_handle_nonnull{true};
     std::uint32_t text_handle{0x004EB464};
     std::int32_t surface_width{};
@@ -1160,6 +1163,10 @@ struct ScenePausedBannerRenderObservation {
 };
 
 enum class ScenePausedBannerOperationKind : std::uint8_t {
+    resource_lookup_0x44cfd0,
+    resource_measure_height_0x44d460,
+    resource_measure_width_0x44d450,
+    fallback_measure_width_0x479450,
     outer_box_fill_0x44a1b0,
     inner_box_fill_0x44a1b0,
     resource_draw_0x44d0c0,
@@ -1181,6 +1188,8 @@ struct ScenePausedBannerOperation {
 
 struct ScenePausedBannerRenderPlan {
     bool reached{};
+    bool input_complete{true};
+    std::optional<ResourceGetPlan> resource_lookup;
     bool draws_fallback_box{};
     bool draws_resource_text{};
     bool draws_text_handle{};
@@ -1194,6 +1203,8 @@ struct ScenePausedBannerRenderPlan {
     std::int32_t text_x{};
     std::int32_t text_y{};
     std::uint32_t resource_object{0x004EB460};
+    std::uint32_t resource_load_helper{0x0044CFD0};
+    std::uint32_t resource_name_source{0x004D1058};
     std::uint32_t text_source{};
     std::uint32_t resource_draw_helper{0x0044D0C0};
     std::uint32_t box_draw_helper{0x0044A1B0};

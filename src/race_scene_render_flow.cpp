@@ -238,6 +238,18 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             shared_overlay_observation.framebuffer_base_value =
                 observation.state0_dashboard_render.framebuffer_base_value;
         }
+        if (observation.shared_paused_banner_raster.has_value() &&
+            observation.shared_paused_banner_raster->resource_image.has_value()) {
+            auto& paused_render =
+                shared_overlay_observation.paused_banner.render;
+            const auto& resource_image = *observation
+                .shared_paused_banner_raster->resource_image;
+            paused_render.resource_text_width = resource_image.width;
+            paused_render.resource_text_height = resource_image.height;
+            if (!paused_render.load_stp_resource_lookup.has_value()) {
+                paused_render.load_stp_resource_found = true;
+            }
+        }
         plan.shared_overlay = scene_shared_overlay_frame_plan(
             shared_overlay_observation);
         if (observation.shared_paused_banner_raster.has_value() &&

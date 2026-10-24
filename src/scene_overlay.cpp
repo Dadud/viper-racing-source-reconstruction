@@ -2554,14 +2554,35 @@ ScenePausedBannerRenderPlan scene_paused_banner_render_plan(
         return result;
     }
 
+    auto load_stp_found = observation.load_stp_resource_found;
+    if (observation.load_stp_resource_lookup.has_value()) {
+        auto lookup = *observation.load_stp_resource_lookup;
+        lookup.normalized_name_first_byte = 'l';
+        lookup.requested_type_code =
+            resource_type_code('S', 'T', 'M', 'P');
+        result.resource_lookup = plan_resource_get(lookup);
+        result.input_complete = result.resource_lookup->input_complete;
+        load_stp_found = result.resource_lookup->exit ==
+            ResourceGetExit::returned_resource;
+    }
+    result.ordered_operations.push_back({
+        ScenePausedBannerOperationKind::resource_lookup_0x44cfd0,
+        result.resource_load_helper, {}, 0, 0, 0, 0,
+        result.resource_name_source, 0});
+
     const auto center_x = observation.surface_width / 2;
     const auto center_y = observation.surface_height / 2;
-    result.draws_fallback_box = !observation.load_stp_resource_found;
-    result.draws_resource_text = observation.load_stp_resource_found;
-    result.draws_text_handle = !observation.load_stp_resource_found ||
+    result.draws_fallback_box = !load_stp_found;
+    result.draws_resource_text = load_stp_found;
+    result.draws_text_handle = !load_stp_found ||
         observation.text_handle_nonnull;
 
     if (result.draws_fallback_box) {
+        result.ordered_operations.push_back({
+            ScenePausedBannerOperationKind::fallback_measure_width_0x479450,
+            0x00479450U, {}, 0, 0,
+            static_cast<std::int32_t>(result.raw_text_size_0xe), 0,
+            result.text_source, result.raw_text_size_0xe});
         const auto half_width = (observation.fallback_text_width + 0x14) / 2;
         result.outer_box = {
             center_x - half_width,
@@ -2585,6 +2606,14 @@ ScenePausedBannerRenderPlan scene_paused_banner_render_plan(
             result.inner_box_color});
     }
     if (result.draws_resource_text) {
+        result.ordered_operations.push_back({
+            ScenePausedBannerOperationKind::resource_measure_height_0x44d460,
+            0x0044d460U, {}, 0, 0, 0, 0,
+            result.resource_object, 0});
+        result.ordered_operations.push_back({
+            ScenePausedBannerOperationKind::resource_measure_width_0x44d450,
+            0x0044d450U, {}, 0, 0, 0, 0,
+            result.resource_object, 0});
         result.resource_x =
             (observation.surface_width - observation.resource_text_width) / 2;
         result.resource_y =

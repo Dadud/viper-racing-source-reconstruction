@@ -1,5 +1,16 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Composed the paused banner's fixed `load.stp`
+  STMP request with `plan_resource_get` and exposed the `0x44CFD0` call in the
+  inner operation trace. An explicit lookup plan now chooses resource drawing
+  versus fallback boxes; a decoded `StampImage` supplies centered dimensions
+  and implies success when no separate runtime lookup result is supplied.
+  Added native call-order entries for resource height/width and fallback
+  style-width measurements. Release build and `git diff --check` pass; no tests
+  were run. Consumer
+  evidence: `0x44CFD0` (`ev_dc4e4553c2b95266ca3c76190a77d6371abee5ab9520656220facd6f817484b1`)
+  and `0x40C790` (`ev_1c065c92998a4cd49e818f980a1d6b5ddaba78b56125ce8b9747963977b4210b`).
+
 - **2026-10-24 continuation:** Added `parse_stamp_image` for the `0x44D0C0`
   STMP frame format: it validates frame-row pointer counts, reads both 256-entry
   palette planes, and decodes bounded RLE rows. The paused-banner rasterizer

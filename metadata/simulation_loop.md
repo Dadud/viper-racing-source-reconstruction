@@ -447,8 +447,16 @@ text using `0x479450(0x0E, handle)` and draws an outer box spanning
 `center_x +/- (text_width + 20)/2` and `center_y +/- 15`, followed by an inset
 box with each edge moved inward by 2. It then draws the text handle at the same
 center-plus-4 location through `0x479580` with size `0x0E`. A resolved resource
-is passed to `0x44D0C0` and released through `0x44D0A0`. The lookup result,
-measured dimensions, and box colors remain raw inputs; renderer effects remain
+is passed to `0x44D0C0` and released through `0x44D0A0`. The inner plan now
+records the `0x44CFD0` `load.stp`/STMP request in operation order and can
+compose a supplied `ResourceGetObservation` through `plan_resource_get`; that
+modeled result chooses the resource or fallback branch. Resource-manager
+search outcomes and box colors remain inputs. The resource path records
+`0x44D460` height measurement before `0x44D450` width measurement and draw;
+the fallback path records `0x479450` style-width measurement before its two
+box fills. At the race-loop level, a decoded
+`StampImage` supplies resource width/height and implies a found resource when
+no explicit ResourceGet observation is supplied. Renderer effects remain
 outside the model.
 `raster_scene_paused_banner_text` projects the text branch of `0x479580`
 through the existing `0x44DC70` layout and atlas rasterizer. It splits the
@@ -463,8 +471,8 @@ the flags at zero, y offset at `0x24`, and x offset at the runtime value from
 font/atlas bytes, and renderer/palette state remain observations; pass the
 style-14 observation to the rasterizer to derive the fields recovered here.
 The race-loop composer uses the acquired context when available and otherwise
-retains explicit per-line renderer contexts. Resource-icon rendering, surface
-ownership, and device submission remain open. Evidence: `0x479580`
+retains explicit per-line renderer contexts. Other resource-image paths,
+surface ownership, and device submission remain open. Evidence: `0x479580`
 (`ev_8ea0d058927243f23b31fa69d01a4bcf40c15e14d826b47e3affabc9e68dfe54`),
 `0x44DDF0` (`ev_cb05306e5d275df4cc6d96917141986b444a6bad6fee1922abc2d3b120591923`),
 and style-0x0E data bytes (`ev_9606ba33e38b3270a8a3e18af26cc2a1748024c266184e2e06dacaa0bb1cf801`).
