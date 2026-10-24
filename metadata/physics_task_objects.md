@@ -525,10 +525,10 @@ coefficient builder and configuration call are supported by
 `0x433C00` `ev_fbd640d5fbdc72a165c76c2dee2639411e71c3beaf9416d13c51fc2bd9d7ee93`,
 `0x440060` `ev_51fe14341ac7e9945724cb0e6a077c15095a8b23f43714ecc4f00c7e660f085f`,
 and `0x4401D0` `ev_526b27be310dedb1c7a98f7bd538049eb926532ccc16736c185aa53a07a2cf2c`.
-The parameter-4 array is passed explicitly as six values. Portable arithmetic
-does not reproduce the original x87 register-stack precision at every
-intermediate step; invalid divisors and exceptional operand behavior remain
-outside this projection.
+The parameter-4 array is passed explicitly as six values. The model preserves
+the native `<=` comparison behavior for unordered values and keeps derived
+arithmetic in wide intermediates, but does not reproduce exact x87 register-
+stack precision or the assembly helper's full exceptional-operand behavior.
 
 The `0x429440` helper is now expanded through `0x429010` and `0x429510`:
 each 0x18-byte descriptor clears its first two fields, either copies a pair

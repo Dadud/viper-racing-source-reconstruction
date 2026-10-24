@@ -35,17 +35,27 @@ ConfiguredUpdateCurve configure_update_curve(
     curve.offset_0x54 = parameter_4[4];
     curve.penalty_0x58 = parameter_4[5];
 
-    float curve_value = curve.linear_0x48 * parameter_6
-        + (parameter_6 * parameter_6 * curve.quadratic_0x44
-            - (parameter_6 > curve.offset_0x54
-                ? (parameter_6 - curve.offset_0x54) * curve.penalty_0x58
-                : 0.0F))
+    const auto profile_value = static_cast<long double>(parameter_6);
+    auto delayed_distance = profile_value
+        - static_cast<long double>(curve.offset_0x54);
+    if (delayed_distance <= 0.0L) {
+        delayed_distance = 0.0L;
+    }
+    const auto curve_value =
+        static_cast<long double>(curve.linear_0x48) * profile_value
+        + (profile_value * profile_value * curve.quadratic_0x44
+            - delayed_distance * curve.penalty_0x58)
         + curve.intercept_0x4c;
-    const float denominator_base = parameter_6 > 1000.0F ? parameter_6 : 1000.0F;
-    const float denominator = (parameter_5 / denominator_base) * curve_value;
+    auto denominator_base = profile_value;
+    if (profile_value <= 1000.0L) {
+        denominator_base = 1000.0L;
+    }
+    const auto normalized_cutoff = divide_with_vc98_fdiv_compatibility(
+        parameter_5, denominator_base, fdiv_compatibility_enabled);
     configured.derived_value_0x30 = static_cast<float>(
         divide_with_vc98_fdiv_compatibility(
-            parameter_6, denominator, fdiv_compatibility_enabled)
+            profile_value, normalized_cutoff * curve_value,
+            fdiv_compatibility_enabled)
         * static_cast<long double>(parameter_3));
     return configured;
 }
