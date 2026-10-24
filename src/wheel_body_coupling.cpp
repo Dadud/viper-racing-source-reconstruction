@@ -465,6 +465,39 @@ WheelConditionalTireForceResult apply_wheel_conditional_tire_force(
     return result;
 }
 
+NcarIntegratorVirtualRecordCallbackResult
+apply_ncar_integrator_virtual_record_callback(
+    NcarPostBodyState& state,
+    const NcarIntegratorVirtualRecordCallbackInput& input) noexcept
+{
+    NcarIntegratorVirtualRecordCallbackResult result{};
+    result.callback_reached = true;
+    result.global_gate_passed = input.global_update_gate_0x425870;
+    if (!result.global_gate_passed) {
+        return result;
+    }
+
+    const auto& force = input.record.normalized_first_vector;
+    result.force_magnitude_squared =
+        force.z * force.z + force.y * force.y + force.x * force.x;
+    result.impact_threshold_passed =
+        result.force_magnitude_squared > 550069.4F;
+    if (!result.impact_threshold_passed) {
+        return result;
+    }
+
+    state.timeout_pending_0x48c = 1U;
+    state.timeout_start_0x488 = input.current_time_0x425790;
+    result.timeout_state_written = true;
+    result.timeout_start_time_written = input.current_time_0x425790;
+
+    // 0x4273C0 receives an event header and a 14-byte payload here; the exact
+    // byte construction is not yet resolved, so preserve it as an open effect.
+    result.event_payload_bytes_resolved = false;
+    result.secondary_virtual_call_reached = true;
+    return result;
+}
+
 NcarPostBodyResult advance_ncar_post_body_tail(
     NcarPostBodyState& state,
     const NcarPostBodyInput& input) noexcept
@@ -1424,12 +1457,19 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         result.body_tail_state,
         result.point_impulse_state,
         force_collection_input);
-
-    for (std::size_t index = 0;
-         index < result.body_tail_state.running_accumulators_0x93_to_0x98.size();
-         ++index) {
-        result.body_tail_state.running_accumulators_0x93_to_0x98[index] +=
-            input.virtual_record_accumulator_delta[index];
+    result.input_complete = result.input_complete &&
+        result.force_collection.virtual_record_calls.truncated_records == 0U;
+    result.integrator_virtual_record_callbacks.reserve(
+        result.force_collection.virtual_record_calls.calls.size());
+    for (const auto& record : result.force_collection.virtual_record_calls.calls) {
+        const NcarIntegratorVirtualRecordCallbackInput callback_input{
+            record,
+            input.post_body_input.global_update_gate_0x425870,
+            input.post_body_input.current_time_0x425790,
+            input.post_body_input.vehicle_ordinal_0x510};
+        result.integrator_virtual_record_callbacks.push_back(
+            apply_ncar_integrator_virtual_record_callback(
+                result.post_body_state, callback_input));
     }
 
     auto kinematics_input = kinematics_at_step_start;

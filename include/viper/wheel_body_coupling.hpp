@@ -184,6 +184,35 @@ struct NcarPostBodyState {
     std::array<std::uint8_t, 5> resource_flag_0x15{};
 };
 
+struct NcarIntegratorVirtualRecordCallbackInput {
+    BodyIntegrationVirtualRecordCall record{};
+    bool global_update_gate_0x425870{};
+    float current_time_0x425790{};
+    std::uint32_t vehicle_ordinal_0x510{};
+};
+
+struct NcarIntegratorVirtualRecordCallbackResult {
+    bool callback_reached{};
+    float force_magnitude_squared{};
+    bool global_gate_passed{};
+    bool impact_threshold_passed{};
+    bool timeout_state_written{};
+    float timeout_start_time_written{};
+    std::uint32_t event_helper{0x004273C0};
+    std::uint8_t event_type{5};
+    std::uint8_t event_payload_size{0x0e};
+    bool event_payload_bytes_resolved{};
+    bool secondary_virtual_call_reached{};
+    std::uint32_t secondary_virtual_wrapper{0x00427E00};
+    std::uint32_t secondary_virtual_target{0x00430610};
+};
+
+// Models the PCAR/NCAR vtable +0x38 method reached by duration-gated records.
+[[nodiscard]] NcarIntegratorVirtualRecordCallbackResult
+apply_ncar_integrator_virtual_record_callback(
+    NcarPostBodyState& state,
+    const NcarIntegratorVirtualRecordCallbackInput& input) noexcept;
+
 struct NcarPostBodyInput {
     // 0xD88 vector transformed by the post-0x43ECE0 orientation matrix. The
     // optional derivation is enabled by the composed four-wheel body step.
@@ -215,6 +244,8 @@ struct NcarPostBodyResult {
     // The integrator's final global-interface +0x38 callback is unconditional.
     bool integrator_callback_0x508a04_slot_0x38_reached{};
     std::uint32_t integrator_callback_vehicle_ordinal_0x510{};
+    std::vector<NcarIntegratorVirtualRecordCallbackResult>
+        integrator_virtual_record_callbacks;
     std::uint8_t resource_groups_visited{};
     std::array<std::size_t, 5> resource_records_copied{};
     std::array<std::size_t, 5> resource_records_unprocessed{};
@@ -560,10 +591,6 @@ struct FourWheelBodyStepInput {
     bool compatibility_division_enabled{};
     float gravity_mass_0x7c{};
     std::span<const float> packed_virtual_records;
-    // Net mutations made by the duration-gated virtual +0x38 callbacks. Their
-    // per-record behavior is not recovered, so the six aggregate deltas stay
-    // an observation.
-    std::array<float, 6> virtual_record_accumulator_delta{};
     BodyIntegrationKinematicsInput kinematics{};
     NcarPostBodyState post_body_state{};
     NcarPostBodyInput post_body_input{};

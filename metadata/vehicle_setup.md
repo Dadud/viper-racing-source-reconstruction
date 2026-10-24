@@ -788,16 +788,15 @@ The same function dossier supports these stores.
 `advance_four_wheel_body_step` now composes those four collision gates with the
 `+0xD78` eighth-call gate and its `0x4323E0` four-wheel/vehicle animation
 updates, then the body's counted embedded-record batch, gravity and
-point-impulse force collection, caller-supplied net mutations from the
-duration-gated virtual `+0x38` calls, and
+point-impulse force collection, per-record callback gate and timeout effects
+from the duration-gated virtual `+0x38` calls, and
 linear/angular/orientation/basis kinematics and tail clears.
 The incoming `+0x24C/+0x258` force/moment values seed the shared accumulator;
 the embedded-record rows update that state and energy before the body consumes
 it. This connects the reconstructed wheel and terrain-contact effects to the
 body update in executable order. It does not derive wheel collision inputs
-from the rest of `0x442530`, nor infer virtual callback mutations; those remain
-explicit inputs. Exact x87 arithmetic and the unresolved local basis stack
-words also remain noted below.
+from the rest of `0x442530`. Exact x87 arithmetic and the unresolved local basis
+stack words also remain noted below.
 
 The body-step composition now reuses its current kinematics for the remaining
 body-force branches: mode force gets current linear/angular velocity and center,
@@ -835,8 +834,14 @@ records starting at index `0xAC` has its first three components divided by the
 same scalar and is passed, with the following three components and seventh
 scalar, to the car's virtual method at vtable offset `+0x38`.
 `materialize_body_integration_virtual_record_calls` decodes those callback
-arguments from a bounded packed span; it reports records whose seven input
-floats were unavailable, and leaves callback behavior unmodeled.
+arguments from a bounded packed span and reports missing seven-float rows. The
+shipped PCAR/NCAR vtable slot `+0x38` resolves to `0x430BF0`. That callback
+checks global gate `0x425870`, then compares the normalized first vector's
+squared magnitude strictly against `550069.4`; on success it sets `+0x48C` and
+`+0x488` from `0x425790`, builds a type-5, 14-byte event through `0x4273C0`,
+and reaches the secondary virtual wrapper `0x427E00` / target `0x430610`.
+The event payload bytes and the target's mesh/resource response remain
+unresolved. Evidence bundle: `metadata/ncar_integrator_virtual_record.evidence.json`.
 
 The embedded-record helper `0x4473D0` transforms its stored point through
 `0x437BA0`, which multiplies the local point by the basis at body `+0x38..+0x58`
