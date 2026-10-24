@@ -374,7 +374,11 @@ and `0x43E490` (`ev_429bba68149b6bd6316a116c77c7c0781a4d72f95fa6f80312b519ed161c
 The Windows race session now applies this body planner to the active mapped
 record and uses its derived `+0x1F0` scale for the four `0x441C10` wheel-core
 initializations, retaining the complete four-wheel result alongside the
-existing anchors and tire response objects. Constructor parameter 2 remains
+existing anchors and tire response objects. It also retains the reciprocal
+dimension at `+0x200` as the exact inverse-mass input expected by the body
+kinematics model. This prepares a real constructor-derived integrator field,
+but does not invoke body integration without the remaining state and timing
+inputs. Constructor parameter 2 remains
 unset: `0x4224D0` reads it as a DWORD from the serialized object stream, passes
 it through factory `0x422580` and NCAR constructor `0x438E40`, into `0x42FF90`
 and then `0x43E490`. Since the quick-race session currently starts from a setup

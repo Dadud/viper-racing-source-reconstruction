@@ -114,6 +114,9 @@ int main()
         require(std::fabs(body_plan.scaled_dimensions_0x1f0_to_0x1fc[0] -
                     body_observation->source_values_0x08_to_0x14[0] * 0.4545F) <
                     1.0e-6F &&
+                std::fabs(body_plan.reciprocal_dimensions_0x200_to_0x20c[0] -
+                    1.0F / body_plan.scaled_dimensions_0x1f0_to_0x1fc[0]) <
+                    1.0e-6F &&
                 std::none_of(body_plan.inherited_base_writes_0x4375c0.begin(),
                     body_plan.inherited_base_writes_0x4375c0.end(),
                     [](const viper::NcarObjectFieldWrite& write) {

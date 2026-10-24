@@ -1096,6 +1096,7 @@ struct WindowState {
     // are reconstructed.
     std::vector<std::byte> player_runtime_car_record;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
+    std::optional<float> player_body_inverse_mass_0x200;
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
     std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
@@ -1147,6 +1148,8 @@ struct WindowState {
         }
         player_body_constructor_plan =
             viper::plan_ncar_body_constructor(*body_observation);
+        player_body_inverse_mass_0x200 =
+            player_body_constructor_plan->reciprocal_dimensions_0x200_to_0x20c[0];
         player_wheel_core_initialization =
             viper::initialize_ncar_four_wheel_core({
                 player_runtime_car_record, model_vertices,
@@ -1464,6 +1467,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << "body dimension scale "
               << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
               << " at +0x1F0, "
+              << "inverse mass " << *state.player_body_inverse_mass_0x200
+              << " at +0x200, "
               << state.player_wheel_anchors->vertex_indices.size()
               << " FNIM anchors and four wheel core setups, plus four axle-selected "
               << "tire response objects. Inherited constructor argument 2 is unknown "
