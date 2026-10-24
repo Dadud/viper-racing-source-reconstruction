@@ -115,7 +115,10 @@ parent `+0x634`, with `0x1A4` bytes between wheels. When the signed raw DWORD at
 `+0xDE8` exceeds `0x3DCCCCCD`, buffer entries 2 and 3 are negated before the
 stores. `advance_ncar_integrator_wheel_scalars` takes the callback-mutated
 buffer as an observation, applies that pairwise sign gate, and exposes the
-four direct wheel stores.
+four direct wheel stores. When the reconstructed spin-preprojection stage is
+enabled, each stored wheel `+0xE0` now feeds `advance_wheel_spin_preprojection`,
+which consumes its absolute value in the response and rate blend. The rest of
+the external wheel callback remains unmodeled.
 
 Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x431150`), `ev_561bda702abc7970b5b820be76dc22cedb78968c7da2d82ede95809777fcf6c1`
@@ -124,7 +127,9 @@ Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x4C8640` constant bytes). The five-record bundle is retained at
 [`ncar_integrator_signal.evidence.json`](ncar_integrator_signal.evidence.json).
 The adjacent `+0x4C` callback and four strided wheel stores are in the caller's
-same assembly evidence.
+same assembly evidence. `ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7`
+(`0x442530` pseudocode, including the `ABS(+0xE0)` consumption) is retained at
+[`wheel_update_value_e0.evidence.json`](wheel_update_value_e0.evidence.json).
 
 ## PCAR callback at `0x4384D0`
 

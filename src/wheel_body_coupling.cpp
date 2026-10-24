@@ -913,6 +913,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         auto wheel_application_point = input.wheel_application_points_0xc8[wheel];
         if (input.wheel_spin_preprojection_enabled) {
             auto spin_input = input.wheel_spin_preprojection_inputs[wheel];
+            spin_input.value_0xe0 =
+                result.integrator_wheel_scalars.wheel_values_0xe0[wheel];
             spin_input.damage_flag_0x20 =
                 result.wheel_collisions.wheel_damage_flags[wheel];
             if (input.wheel_update_prefix_enabled) {
