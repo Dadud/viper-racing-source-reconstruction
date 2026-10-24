@@ -711,6 +711,14 @@ offset to each rectangle's left edge and aligns left down to a multiple of 4;
 it adds the offset plus 3 to the right edge and aligns right down to a multiple
 of 4. The three rows at `0x4CF9F0` are unconditional. The nine rows beginning
 at `0x4CFA20` are selected by mask bits `1` through `0x100`. The
+renderer reads the dirty mask directly: an exact value of `0xFFFF` enters the
+full-redraw path, and each later row is gated by its corresponding single bit.
+When the state-0 core callback is also composed, `plan_race_loop_shared_overlay`
+now takes that mask from the callback's updated `redraw_mask_0x4eb40c` state;
+the standalone render plan likewise derives full redraw from the mask instead of
+accepting a separate boolean. This prevents the geometry, bitmap calls, and
+full-surface fill from using stale or contradictory redraw inputs. Instruction
+evidence is retained in `dashboard_render_dirty_mask.evidence.json`.
 `scene_dashboard_viewport_plan` emits just the resulting `0x4498A0` calls,
 preserving row addresses and required bits. `scene_dashboard_render_plan`
 composes the observed order around them: on a full redraw with nonzero

@@ -173,7 +173,6 @@ enum class SceneDashboardRenderOperationKind : std::uint8_t {
 struct SceneDashboardRenderObservation {
     std::int32_t surface_width{};
     std::uint32_t dashboard_mask{};
-    bool redraw_all{};
     std::int32_t full_surface_bottom_0x4eb3dc{};
     std::int32_t full_surface_fill_argument_0x4eb27c{};
     std::int32_t background_bitmap_width{};

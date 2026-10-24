@@ -486,7 +486,7 @@ std::vector<SceneDashboardRenderOperation> scene_dashboard_render_plan(
         });
     };
 
-    if (observation.redraw_all) {
+    if (observation.dashboard_mask == 0xFFFFU) {
         if (horizontal_offset != 0) {
             operations.push_back({
                 SceneDashboardRenderOperationKind::full_surface_fill_0x44a1b0,
@@ -785,7 +785,7 @@ scene_dashboard_full_surface_fill_projection(
          observation.surface_width == 0x140)) {
         horizontal_offset = -0xC0;
     }
-    if (!observation.redraw_all || horizontal_offset == 0) {
+    if (observation.dashboard_mask != 0xFFFFU || horizontal_offset == 0) {
         return std::nullopt;
     }
 

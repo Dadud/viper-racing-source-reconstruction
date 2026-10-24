@@ -106,11 +106,17 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
         plan.dashboard_gear_display = scene_dashboard_gear_display_plan(
             gear_observation);
         if (plan.optional_dashboard_branch_enabled) {
+            auto render_observation = observation.state0_dashboard_render;
+            if (plan.dashboard_core_callback_reached) {
+                render_observation.dashboard_mask =
+                    plan.dashboard_core_callback.next_state
+                        .redraw_mask_0x4eb40c;
+            }
             plan.state0_dashboard_render_operations = scene_dashboard_render_plan(
-                observation.state0_dashboard_render);
+                render_observation);
             plan.state0_dashboard_fill_projection =
                 scene_dashboard_full_surface_fill_projection(
-                    observation.state0_dashboard_render);
+                    render_observation);
             for (std::size_t index = 0;
                  index < plan.state0_dashboard_render_operations.size();
                  ++index) {
@@ -129,9 +135,9 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     static_cast<std::uint8_t>(
                         operation.renderer_mode_0x4d7a48);
                 blit_observation.destination_context =
-                    observation.state0_dashboard_render.render_context;
+                    render_observation.render_context;
                 blit_observation.destination_base_address =
-                    observation.state0_dashboard_render.framebuffer_base_value;
+                    render_observation.framebuffer_base_value;
                 RaceLoopSharedOverlayPlan::State0BitmapProjection projection{};
                 projection.render_operation_index = index;
                 projection.blit = scene_dashboard_background_bitmap_blit_plan(
