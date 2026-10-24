@@ -316,6 +316,12 @@ remains a caller/runtime input. The regression checks all 16 destination slots
 for a nondegenerate synthetic TIRE record. The object is not yet owned by the
 live game wheel state.
 
+`initialize_ncar_wheel_tire_setup` now composes the loader argument per wheel
+from runtime `+0x130` (front) or `+0x13C` (rear), matching the axle branch in
+`0x441C10`. It applies the `0x435B50` divide by TIRE float 0 through the
+explicit FDIV-compatibility input and places that result in object `+0x2C`.
+The other `0x435B50` arguments do not feed stores in `0x435BF0`.
+
 ### Car-to-wheel update path and runtime curve consumers
 
 The base constructor's body initializer `0x43E490` calls `0x4375C0`, initializes

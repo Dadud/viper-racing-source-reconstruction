@@ -49,7 +49,7 @@ int main()
 
         viper::TireDefinition tire_definition{};
         tire_definition.parameters = {
-            0.0F, 0.0F, 0.0F, 2.0F, 3.0F, 0.1F, 0.2F, 0.3F, 0.4F,
+            200.0F, 60.0F, 15.0F, 2.0F, 3.0F, 0.1F, 0.2F, 0.3F, 0.4F,
             2.0F, 4.0F, 4.0F, 10.0F, 2.0F, 8.0F, 5.0F, 30.0F,
             7.0F, 8.0F, 9.0F, 30.0F, 11.0F};
         const auto tire_object = viper::initialize_tire_response_object(
@@ -231,6 +231,25 @@ int main()
         write_float(0x13cU, 6.0F);
         write_float(0x140U, 8.0F);
         write_float(0x144U, 4.0F);
+        const auto front_tire_setup = viper::initialize_ncar_wheel_tire_setup(
+            wheel_record, 0U, tire_definition, false);
+        const auto rear_tire_setup = viper::initialize_ncar_wheel_tire_setup(
+            wheel_record, 2U, tire_definition, false);
+        require(front_tire_setup.has_value() && rear_tire_setup.has_value() &&
+                std::fabs(front_tire_setup->loader_dimension_argument - 5.0F) < 1.0e-5F &&
+                std::fabs(rear_tire_setup->loader_dimension_argument - 6.0F) < 1.0e-5F &&
+                std::fabs(front_tire_setup->tire_response_object_0x2c - 0.025F) < 1.0e-6F &&
+                std::fabs(rear_tire_setup->tire_response_object_0x2c - 0.03F) < 1.0e-6F &&
+                front_tire_setup->tire_response_object_0x2c ==
+                    front_tire_setup->response_object.words[11] &&
+                rear_tire_setup->tire_response_object_0x2c ==
+                    rear_tire_setup->response_object.words[11] &&
+                !viper::initialize_ncar_wheel_tire_setup(
+                    std::span<const std::byte>(wheel_record).first(0x13fU),
+                    2U, tire_definition, false) &&
+                !viper::initialize_ncar_wheel_tire_setup(
+                    wheel_record, 4U, tire_definition, false),
+            "wheel tire setup must select axle-specific scale and initialize TIRE slot +0x2C");
         const std::array<float, 3> front_anchor{-0.4F, -0.254F, 3.81F};
         const auto front_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 0U, front_anchor, 0.5F, false});

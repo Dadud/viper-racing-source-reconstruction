@@ -610,6 +610,22 @@ struct NcarFourWheelCoreInitialization {
 [[nodiscard]] NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
     const NcarFourWheelCoreInitializationInput& input) noexcept;
 
+struct NcarWheelTireSetup {
+    std::size_t wheel_index{};
+    float loader_dimension_argument{};
+    float tire_response_object_0x2c{};
+    TireResponseObject response_object{};
+};
+
+// Reconstructs 0x441C10's axle setup scale and 0x435B50's division by TIRE
+// float 0, then initializes the complete 0x40-byte response object.
+[[nodiscard]] std::optional<NcarWheelTireSetup>
+initialize_ncar_wheel_tire_setup(
+    std::span<const std::byte> runtime_record,
+    std::size_t wheel_index,
+    const TireDefinition& tire,
+    bool fdiv_compatibility_enabled) noexcept;
+
 struct NcarIntegratorWheelScalarInput {
     std::uint32_t selector_bits_0x4f8{};
     float angle_0xdcc{};

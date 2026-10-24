@@ -393,6 +393,34 @@ NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
     return result;
 }
 
+std::optional<NcarWheelTireSetup> initialize_ncar_wheel_tire_setup(
+    const std::span<const std::byte> runtime_record,
+    const std::size_t wheel_index,
+    const TireDefinition& tire,
+    const bool fdiv_compatibility_enabled) noexcept
+{
+    if (wheel_index >= 4U) return std::nullopt;
+    const std::size_t scale_offset = wheel_index < 2U ? 0x130U : 0x13cU;
+    if (runtime_record.size() < scale_offset + sizeof(std::uint32_t))
+        return std::nullopt;
+    std::uint32_t scale_bits{};
+    for (std::size_t byte = 0; byte < sizeof(scale_bits); ++byte) {
+        scale_bits |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+            runtime_record[scale_offset + byte])) << (byte * 8U);
+    }
+    const float loader_dimension_argument =
+        std::bit_cast<float>(scale_bits) * 0.001F * 999.99994F;
+    const float tire_response_object_0x2c = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(
+            loader_dimension_argument, tire.parameters[0],
+            fdiv_compatibility_enabled));
+    return NcarWheelTireSetup{
+        wheel_index,
+        loader_dimension_argument,
+        tire_response_object_0x2c,
+        initialize_tire_response_object(tire, tire_response_object_0x2c)};
+}
+
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept
 {
