@@ -180,6 +180,8 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << "Parsed " << assets.car_name() << " CARF: version " << assets.player_car().car_file->resource_version
               << ", " << assets.player_car().car_file->raw_words.size() << " configuration words\n"
               << "Loaded shared tire " << assets.default_tire().label << " from common.res\n"
+              << "Loaded " << assets.car_name() << " human setup record: "
+              << assets.player_car_setup().size() << " bytes (CCS v2)\n"
               << "Parsed " << assets.car_name() << " level-0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
               << assets.player_model().material_groups.size() << " material groups, "
               << assets.player_model().section_counts[2] << " triangles; validated "

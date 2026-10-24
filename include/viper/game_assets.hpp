@@ -8,6 +8,7 @@
 #include "viper/world_track_objects.hpp"
 
 #include <array>
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -32,6 +33,7 @@ public:
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
     [[nodiscard]] const TireDefinition& default_tire() const noexcept { return default_tire_; }
+    [[nodiscard]] const std::array<std::byte, 0x8c>& player_car_setup() const noexcept { return player_car_setup_; }
     [[nodiscard]] std::size_t model_resource_count() const noexcept { return model_resource_count_; }
 
 private:
@@ -46,6 +48,7 @@ private:
     CarFileResourcePayloads player_car_;
     ModelResource player_model_;
     TireDefinition default_tire_;
+    std::array<std::byte, 0x8c> player_car_setup_{};
     std::size_t model_resource_count_{};
 };
 

@@ -1,6 +1,7 @@
 #include "viper/game_assets.hpp"
 
 #include <array>
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -84,6 +85,20 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     if (!parsed_default_tire)
         throw std::runtime_error("common.res default tire resource def_tire.tir is invalid");
     assets.default_tire_ = *parsed_default_tire;
+    constexpr std::uint32_t car_setup_type = 0x43435330U;
+    const auto& car_bundle = assets.bundle(assets.bundle_names_[3]);
+    const auto* car_setup_entry = car_bundle.find(
+        assets.car_name_ + ".ccs", car_setup_type);
+    if (car_setup_entry == nullptr)
+        throw std::runtime_error(assets.car_name_ +
+            " human car setup resource is missing");
+    const auto car_setup_payload = car_bundle.payload(*car_setup_entry);
+    if (car_setup_entry->attributes != 2U || car_setup_payload.size() !=
+            assets.player_car_setup_.size())
+        throw std::runtime_error(assets.car_name_ +
+            " human car setup resource has an unsupported version or size");
+    std::copy(car_setup_payload.begin(), car_setup_payload.end(),
+        assets.player_car_setup_.begin());
     const auto language_path = root / "english.lng";
     std::error_code ec;
     if (!std::filesystem::is_regular_file(language_path, ec) || ec) {
@@ -120,7 +135,6 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
             " track.ild could not be normalized");
     }
     assets.ideal_line_ = *normalized_ideal_line;
-    const auto& car_bundle = assets.bundle(assets.bundle_names_[3]);
     assets.player_car_ = parse_car_file_resources(car_bundle, assets.car_name_, true);
     if (!assets.player_car_.car_file) {
         throw std::runtime_error(assets.car_name_ +
