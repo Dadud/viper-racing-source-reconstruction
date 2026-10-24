@@ -3084,6 +3084,14 @@ SceneSharedResultsRasterPlan raster_scene_shared_results_rows(
     const auto call_count = std::min(row_draws.size(), per_call_renderers.size());
     for (std::size_t index = 0; index < call_count; ++index) {
         const auto& draw = row_draws[index];
+        std::string integer_text;
+        std::string_view formatted_text = draw.text_argument;
+        if (draw.format_source == 0x004CFF38U) {
+            // The first results-row call uses the observed `%d` format handle;
+            // its variadic integer argument is the displayed ordinal.
+            integer_text = std::to_string(draw.integer_argument);
+            formatted_text = integer_text;
+        }
         const SceneDashboardTextCall call{
             draw.call_site,
             draw.x,
@@ -3094,7 +3102,7 @@ SceneSharedResultsRasterPlan raster_scene_shared_results_rows(
             draw.flags,
         };
         const auto layout = layout_scene_dashboard_text(
-            call, draw.text_argument, layout_font);
+            call, formatted_text, layout_font);
         const auto raster = raster_scene_dashboard_text(
             layout, atlas_font, per_call_renderers[index]);
         ++result.row_calls_rasterized;

@@ -559,6 +559,11 @@ masks without traversing or drawing rows.
 `0x44DC70` font layout and `0x44D0C0` atlas rasterizer. It consumes the loaded
 font tables and RLE atlas plus one renderer/palette observation per call, and
 emits pixel writes in the same order as the three calls per selected row.
+The `0x4CFF38` ordinal format is `%d`; its signed `integer_argument` is now
+formatted as decimal before glyph layout, while the `0x4CFF3C` record text and
+`0x4CFF40` time calls use their supplied string arguments. This ensures the
+ordinal column contributes glyphs to the raster output instead of passing an
+empty string to the layout stage.
 Incomplete palette or glyph data remains reported rather than guessed.
 `apply_scene_shared_results_raster` refuses incomplete plans, then delegates
 to the existing all-ranges-validated text-write applier so the row batch is

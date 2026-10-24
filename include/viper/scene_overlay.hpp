@@ -1658,6 +1658,8 @@ struct SceneSharedResultsRasterPlan {
 // Connects selected results-row calls through 0x44DC70 font layout and the
 // 0x44D0C0 atlas rasterizer. Each call has a corresponding runtime renderer
 // observation so color palettes, clipping, and surface addresses stay explicit.
+// The observed ordinal format handle 0x4CFF38 formats integer_argument as
+// signed decimal; the record-text and time handles consume text_argument.
 [[nodiscard]] SceneSharedResultsRasterPlan
 raster_scene_shared_results_rows(
     std::span<const SceneSharedResultRowDraw> row_draws,

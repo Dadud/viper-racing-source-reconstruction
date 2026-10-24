@@ -221,7 +221,8 @@ files were present.
   two raw-flag text setup sequences, the results heading/prompt setup, and
   results record selection, conditional formatted time values, and per-row text
   calls are modeled in `scene_overlay.cpp` with all row and heading positions
-  derived from the surface dimensions; other
+  derived from the surface dimensions. Row rasterization formats the ordinal
+  integer argument before glyph layout; other
   renderer effects, and the exact Pentium FDIV compatibility correction remain
   partial.
 - `metadata/frontend_dispatch.md` records the recovered routing evidence and
