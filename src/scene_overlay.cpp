@@ -160,6 +160,53 @@ std::vector<SceneOverlayTextCall> scene_overlay_text_plan(
     return calls;
 }
 
+std::vector<std::uint16_t> scene_dashboard_color_resource_palette(
+    const std::uint32_t first_color,
+    const std::uint32_t second_color)
+{
+    const auto channels = [](const std::uint32_t color) {
+        return std::array<std::int32_t, 3>{
+            static_cast<std::int32_t>((color >> 7U) & 0xF8U),
+            static_cast<std::int32_t>((color >> 2U) & 0xF8U),
+            static_cast<std::int32_t>((color << 3U) & 0xFFU)};
+    };
+    const auto first = channels(first_color);
+    const auto second = channels(second_color);
+    constexpr auto interpolation_scale =
+        std::bit_cast<float>(std::uint32_t{0x3B808081U});
+    constexpr auto half = std::bit_cast<float>(std::uint32_t{0x3F000000U});
+
+    std::vector<std::uint16_t> palette(512U);
+    for (std::uint32_t index = 0; index < 256U; ++index) {
+        const auto t = static_cast<long double>(index) *
+            static_cast<long double>(interpolation_scale);
+        std::array<std::uint32_t, 3> value{};
+        for (std::size_t component = 0; component < value.size(); ++component) {
+            const auto delta = static_cast<float>(
+                second[component] - first[component]);
+            const auto interpolated = static_cast<long double>(delta) * t +
+                static_cast<long double>(first[component]) +
+                static_cast<long double>(half);
+            value[component] = static_cast<std::uint32_t>(
+                truncate_to_low_i32(interpolated)) & 0xFFU;
+        }
+
+        const auto red5 = value[0] >> 3U;
+        const auto green_raw = value[1];
+        const auto green6 = green_raw >> 2U;
+        const auto green5 = green_raw >> 3U;
+        const auto blue5 = value[2] >> 3U;
+        auto target_packed = (green6 << 16U) | (red5 << 16U) |
+            (red5 << 5U) | green5;
+        target_packed <<= 5U;
+        target_packed |= (blue5 << 16U) | blue5;
+        const auto offset = static_cast<std::size_t>(index);
+        palette[offset] = static_cast<std::uint16_t>(target_packed);
+        palette[offset + 256U] = static_cast<std::uint16_t>(target_packed >> 16U);
+    }
+    return palette;
+}
+
 bool handle_scene_physics_overlay_key(
     ScenePhysicsOverlayFlags& flags,
     const std::uint16_t key) noexcept

@@ -508,7 +508,6 @@ struct SceneDashboardGearDisplayObservation {
     const LanguageResource* language_resource{};
     std::uint32_t gear_label_font_context_value_0x4eb28c{};
     std::uint32_t gear_label_font_resource_value_0x4eb314{};
-    std::vector<std::uint16_t> gear_label_palette_0x4eb314;
     // Scalar compatibility input used only when the bounded byte views do not
     // resolve the pointer chain.
     float selected_record_value_0x34{};
@@ -621,6 +620,12 @@ struct SceneDashboardGearDisplayResult {
         rotating_gear_triangle_fill_writes;
     std::vector<SceneDashboardGearOperation> operations;
 };
+
+// Reconstructs the 256-entry split-plane color resource written by 0x44D530.
+// Each returned plane contains 256 16-bit words, matching the 0x44D4F0 store.
+[[nodiscard]] std::vector<std::uint16_t> scene_dashboard_color_resource_palette(
+    std::uint32_t first_color,
+    std::uint32_t second_color);
 
 // Models the width- and mode-gated dashboard branch in 0x404970. Renderer
 // helpers and their pixel/device effects remain represented as call operations.

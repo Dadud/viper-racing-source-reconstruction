@@ -393,7 +393,10 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             renderer.framebuffer_pitch_bytes =
                 gear_observation.render_context.row_pitch_0x10;
             renderer.framebuffer_base = gear_observation.framebuffer_base_value;
-            renderer.explicit_palette = gear_observation.gear_label_palette_0x4eb314;
+            if (gear_observation.gear_label_font_resource_value_0x4eb314 != 0U) {
+                renderer.explicit_palette = scene_dashboard_color_resource_palette(
+                    0xFFE67FE6U, 0x18E30C63U);
+            }
             auto label_raster = raster_scene_dashboard_text(
                 layout, observation.state0_dashboard_raster->atlas_font,
                 renderer);

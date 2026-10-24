@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Reconstructed the dashboard's
+  `0x44D530` color-resource gradient for gear-label palette `0x4EB314`.
+  The composer now derives the 256 packed color DWORDs from the observed
+  endpoints and lays them out into the two 256-word planes written by
+  `0x44D4F0`; the raster stage no longer requires a caller-supplied palette.
+  Evidence and precision details are in `metadata/simulation_loop.md`.
+  Release build and `git diff --check` pass; no tests were run.
+
 - **2026-10-24 continuation:** Removed the race-loop's second TestTrack,
   Best/Last metric, and auxiliary-readout evaluation pass. These outputs now
   alias the state-0 core callback result, so caches and resource-registration

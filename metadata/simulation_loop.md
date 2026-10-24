@@ -1021,9 +1021,15 @@ returns `R` and `N`. When the selected text and state-0 font/atlas observations
 are supplied, the race-loop composer passes the string through the existing
 `0x44DC70` layout and `0x44D0C0` atlas
 rasterizer, preserving draw order with the mode-0 fill, RPM image, and rotating
-geometry. The `0x4EB314` palette pointer selects the explicit palette plane;
-when it is non-null, its bounded palette data is required for a complete
-raster. Missing text, palette, font, or atlas inputs keep the frame incomplete.
+geometry. When `0x4EB314` is non-null, the raster path now generates its
+two-plane 512-word palette from endpoints `0xFFE67FE6` and `0x18E30C63`.
+This projects `0x44D530`'s 256 interpolated entries, including its extracted
+RGB channels, single-precision scale/bias constants, truncating conversion,
+target's packed DWORD construction, and `0x44D4F0`'s low/high 16-bit plane
+stores. Missing text, font, or atlas inputs still keep the frame incomplete.
+Evidence: `0x40339C`/`0x44D530` (`ev_07fdfe6f398ba88206388ba6a8d2976907fa1f0a92850ae919aeb21ad1fece88`),
+`0x44D4D0` (`ev_35f13ff16c1d7618b133559f32cecfe4f634a09a619b5fa0bab7cd5b6f3c8220`),
+and disassembly for `0x44D4F0`.
 Helper layout evidence is `ev_ccbcc893f64ac589352c9f038c356fbad734e92ae8b8dc4986d8e80125a54a7e`.
 The portable plan now also projects the filled triangle vertices and its two
 colored tip-to-base edges: center `(80, height-80)`, tip offset
