@@ -65,6 +65,17 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-24, provisional opponent route motion:** `WindowState` now keeps a
+  separate `RouteMotionState` for each non-player grid car, projects its spawn
+  onto the ideal line, and advances it with the same provisional route
+  kinematics as the player. All car transforms are uploaded in one batch per
+  frame. The Windows Release build succeeded and all 41 configured CTest cases
+  passed, including asset validation and WARP startup coverage. No interactive
+  race was run for this change. These are placeholder route followers, not
+  reconstructed native AI; passing, collision response, lane choice, and AI
+  behavior comparison are absent. The Viper/Bemidji completed-race acceptance
+  remains unmet.
+
 - **2026-10-24, commit `44f221f`:** Release MSVC build of target
   `viper_game` succeeded on Windows. CTest `game_warp_render_smoke` passed
   using the external `../game_install/GameData` install and WARP for three

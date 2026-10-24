@@ -406,10 +406,27 @@ public:
         return update_car_buffer();
     }
 
+    bool set_car_poses(const std::span<const std::array<float, 4>> poses)
+    {
+        if (poses.size() != car_poses_.size()) return false;
+        for (std::size_t index = 0; index < poses.size(); ++index) {
+            const auto& pose = poses[index];
+            car_poses_[index] = {pose[0], pose[1], pose[2], pose[3]};
+        }
+        return update_car_buffer();
+    }
+
+    std::size_t car_count() const noexcept { return car_poses_.size(); }
+
     std::array<float, 2> car_position(const std::size_t car_index) const
     {
         if (car_index >= car_poses_.size()) return {};
         return {car_poses_[car_index].x, car_poses_[car_index].z};
+    }
+
+    float car_yaw(const std::size_t car_index) const
+    {
+        return car_index < car_poses_.size() ? car_poses_[car_index].yaw : 0.0F;
     }
 
 private:
@@ -885,6 +902,8 @@ struct WindowState {
     std::vector<std::array<float, 2>> route;
     std::size_t player_car_index{};
     viper::RouteMotionState motion{};
+    std::vector<viper::RouteMotionState> opponent_motions;
+    std::vector<std::array<float, 4>> pose_buffer;
     bool accelerate{};
     bool brake{};
     bool left{};
@@ -951,6 +970,41 @@ struct WindowState {
         return true;
     }
 
+    bool initialize_opponents()
+    {
+        if (route.size() < 2U || terrain == nullptr) return false;
+        opponent_motions.resize(graphics.car_count());
+        pose_buffer.resize(graphics.car_count());
+        for (std::size_t car = 0; car < graphics.car_count(); ++car) {
+            if (car == player_car_index) continue;
+            const auto spawn = graphics.car_position(car);
+            auto& ai = opponent_motions[car];
+            float nearest = std::numeric_limits<float>::infinity();
+            for (std::size_t segment = 0; segment < route.size(); ++segment) {
+                const auto& a = route[segment];
+                const auto& b = route[(segment + 1U) % route.size()];
+                const float dx = b[0] - a[0], dz = b[1] - a[1];
+                const float length_sq = dx * dx + dz * dz;
+                if (!(length_sq > 1.0e-8F)) continue;
+                const float fraction = std::clamp(
+                    ((spawn[0] - a[0]) * dx + (spawn[1] - a[1]) * dz) / length_sq,
+                    0.0F, 1.0F);
+                const float ex = spawn[0] - (a[0] + dx * fraction);
+                const float ez = spawn[1] - (a[1] + dz * fraction);
+                const float distance = ex * ex + ez * ez;
+                if (distance < nearest) {
+                    nearest = distance;
+                    ai.route_segment = segment;
+                    ai.route_fraction = fraction;
+                }
+            }
+            if (!std::isfinite(nearest)) return false;
+            ai.speed = 8.0F + static_cast<float>(car % 5U) * 1.5F;
+            viper::initialize_race_progression(ai.race, ai.route_segment);
+        }
+        return true;
+    }
+
     bool advance(float delta_seconds)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
@@ -964,10 +1018,25 @@ struct WindowState {
         const auto surface = viper::sample_terrain_resource(
             *terrain, {route_result.x, 1000.0f, route_result.z}, true);
         if (!surface.query_succeeded) { motion.speed = 0.0f; return true; }
-        if (!graphics.set_car_pose(player_car_index,
-                route_result.x, surface.sampled_position[1], route_result.z,
-                route_result.yaw))
-            return false;
+        for (std::size_t car = 0; car < graphics.car_count(); ++car) {
+            const auto position = graphics.car_position(car);
+            pose_buffer[car] = {position[0], 0.0F, position[1], graphics.car_yaw(car)};
+        }
+        pose_buffer[player_car_index] = {route_result.x, surface.sampled_position[1],
+            route_result.z, route_result.yaw};
+        for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
+            if (car == player_car_index) continue;
+            auto& ai = opponent_motions[car];
+            const auto ai_result = viper::advance_route_motion(ai, route, false, false,
+                true, false, delta_seconds, target_laps);
+            if (!ai_result.valid) continue;
+            const auto ai_surface = viper::sample_terrain_resource(
+                *terrain, {ai_result.x, 1000.0F, ai_result.z}, true);
+            if (!ai_surface.query_succeeded) continue;
+            pose_buffer[car] = {ai_result.x, ai_surface.sampled_position[1],
+                ai_result.z, ai_result.yaw};
+        }
+        if (!graphics.set_car_poses(pose_buffer)) return false;
         audio.update(motion.speed, accelerate);
         refresh_title();
         return true;
@@ -1117,6 +1186,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
         std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
+        DestroyWindow(hwnd);
+        return 1;
+    }
+    if (!state.initialize_opponents()) {
+        std::cerr << "Could not initialize provisional opponent route states.\n";
         DestroyWindow(hwnd);
         return 1;
     }
