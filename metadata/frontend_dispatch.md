@@ -232,6 +232,27 @@ name helper `ev_f2d8bc04d351fa0e2a8164739a333819f94e99fb0c89309b48b13e94e5065eed
 missing-key copy `ev_9d0227840abca22637fd2424b9e8443693a4a04701b8a2462d85690511827773`;
 bounded-copy helper `ev_62d5fb44d570e3c6520a0bd58bc770e6a87d42beaffdccea6198964ddec2bfd8`.
 
+For a fresh session, `0x41C8E0` fills the 16 DWORD driver-order table with
+the identity sequence `0..15` and stores count 16. The career event path in
+`0x4AA5E0` calls this initializer and then calls `0x40A850` with the Viper
+car stem and argument 7, which creates eight rows. That observed eight-row
+case places the human in participant row 7 (the eighth row); AI rows 0..6 use
+driver slots 0..6. `0x41C900` can replace the order from a caller-provided
+sequence after a range/duplicate check, so the identity sequence is not
+assumed for career or other paths. Evidence:
+`0x41C8E0`
+`ev_14fb822efadc331467abe4ae50019e3276ac1f375ec2a75435d82965827067a8`,
+`0x41C900`
+`ev_8b918bddb3c21644c040c196f88ebcc06dff27dc3ac9f544c81438b854e881cd`,
+`0x41C930`
+`ev_fb4e1deabff9e5e42dcb6d09ef298e2effa5799183e0e47e8d8f5e762cf6e4ef`,
+`0x41C9B0`
+`ev_1e3266a650f510722d6562fbceab9dc83ebb430a7f802fcfb9e80e4cb999604d`,
+and the caller path in `0x4AA5E0`
+`ev_d306de34923170ef0beb22248da3f0dcdf2e921f857330c74a56e38c66a8e3a3`.
+The runtime uses this fresh-session order and parsed `GAME/car_count` with
+`build_single_race_entrants` to choose the controlled grid slot.
+
 The human initializer `0x45EFD0` calls `0x45EE40` to load its setup record.
 That loader constructs a `<0x4EF0C0>\setups\<param_3>.csu` path, opens it via
 `0x411430`, and accepts only a `0xD4`-byte file. It reads `0xD4` bytes, then

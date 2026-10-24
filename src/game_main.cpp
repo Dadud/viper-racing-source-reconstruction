@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 
 #include "viper/game_assets.hpp"
+#include "viper/race_participants.hpp"
 
 #include <array>
 #include <algorithm>
@@ -360,18 +361,18 @@ public:
         return SUCCEEDED(swap_chain_->Present(1, 0));
     }
 
-    bool set_car_pose(const float anchor_x, const float anchor_y,
+    bool set_car_pose(const std::size_t car_index, const float anchor_x, const float anchor_y,
                       const float anchor_z, const float yaw)
     {
-        if (car_poses_.empty()) return false;
-        car_poses_.front() = {anchor_x, anchor_y, anchor_z, yaw};
+        if (car_index >= car_poses_.size()) return false;
+        car_poses_[car_index] = {anchor_x, anchor_y, anchor_z, yaw};
         return update_car_buffer();
     }
 
-    std::array<float, 2> car_position() const
+    std::array<float, 2> car_position(const std::size_t car_index) const
     {
-        if (car_poses_.empty()) return {};
-        return {car_poses_.front().x, car_poses_.front().z};
+        if (car_index >= car_poses_.size()) return {};
+        return {car_poses_[car_index].x, car_poses_[car_index].z};
     }
 
 private:
@@ -671,6 +672,7 @@ struct WindowState {
     D3DWindow graphics;
     const viper::TerrainSurfaceResourcePayload* terrain{};
     std::vector<std::array<float, 2>> route;
+    std::size_t player_car_index{};
     std::size_t route_segment{};
     float route_fraction{};
     float steering{};
@@ -702,7 +704,7 @@ struct WindowState {
         const auto& b = route[(route_segment + 1U) % route.size()];
         const float yaw = std::atan2(b[0] - a[0], b[1] - a[1]);
         const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
-        return surface.query_succeeded && graphics.set_car_pose(
+        return surface.query_succeeded && graphics.set_car_pose(player_car_index,
             x, surface.sampled_position[1], z, yaw);
     }
 
@@ -742,7 +744,7 @@ struct WindowState {
         const float z = route_z - std::sin(tangent) * lateral;
         const auto surface = viper::sample_terrain_resource(*terrain, {x, 1000.0f, z}, true);
         if (!surface.query_succeeded) { speed = 0.0f; return true; }
-        return graphics.set_car_pose(
+        return graphics.set_car_pose(player_car_index,
             x, surface.sampled_position[1], z, tangent + steering * 0.35f);
     }
 };
@@ -789,6 +791,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 }
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
+               const std::size_t player_car_index,
                const std::string_view track_name,
                const std::string_view car_name,
                const viper::TerrainSurfaceResourcePayload& terrain,
@@ -810,6 +813,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     WindowState state;
     state.terrain = &terrain;
     state.route = extract_ideal_line_points(ideal_line);
+    state.player_car_index = player_car_index;
     const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
         " & " + std::string(car_name) + " Driving Prototype (WASD / Arrows)";
     const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
@@ -829,7 +833,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         DestroyWindow(hwnd);
         return 1;
     }
-    const auto spawn = state.graphics.car_position();
+    const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
         std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
         DestroyWindow(hwnd);
@@ -915,7 +919,26 @@ int wmain(int argc, wchar_t** argv)
             std::move(configured_options));
         report_start_grid(assets);
         if (options.validate_assets) return 0;
+        const auto driver_order = viper::initialize_single_race_driver_order();
+        constexpr std::array<std::string_view, 7> ai_names{};
+        viper::SingleRaceEntrantObservation entrant_observation{};
+        entrant_observation.configured_car_count = assets.options()
+            .integer("GAME", "car_count").value_or(8);
+        entrant_observation.driver_order_values = driver_order;
+        entrant_observation.ai_names_by_slot = ai_names;
+        entrant_observation.player_car_resource_name = assets.car_name();
+        entrant_observation.resolved_player_name =
+            assets.options().get("GLOBAL", "player_name");
+        entrant_observation.player_paintjob_value =
+            assets.options().integer("GLOBAL", "player_paintjob");
+        const auto entrants = viper::build_single_race_entrants(entrant_observation);
+        if (!entrants.player_record_index)
+            throw std::runtime_error("single-race setup could not resolve the human participant row");
+        std::cout << "Selected human grid slot: "
+                  << (*entrants.player_record_index + 1U) << " of "
+                  << entrants.participant_count << " (fresh single-race driver order)\n";
         return run_window(options.software, options.smoke_frames,
+            *entrants.player_record_index,
             assets.track_name(), assets.car_name(), assets.terrain(),
             assets.ideal_line(), assets.player_model(), assets.track_objects());
     } catch (const std::exception& e) {

@@ -201,7 +201,7 @@ if(WIN32)
         viper_ai_resources viper_resource_bundle viper_model_resource
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
-        viper_scene_model d3d11 dxgi user32)
+        viper_scene_model viper_race_setup_model d3d11 dxgi user32)
 endif()
 
 include(CTest)
@@ -258,6 +258,12 @@ if(BUILD_TESTING)
     add_executable(viper_ai_resources_regression tests/ai_resources_regression.cpp)
     target_link_libraries(viper_ai_resources_regression PRIVATE viper_ai_resources)
     add_test(NAME ai_resources_regression COMMAND viper_ai_resources_regression)
+    add_executable(viper_race_participants_regression
+        tests/race_participants_regression.cpp)
+    target_link_libraries(viper_race_participants_regression PRIVATE
+        viper_race_setup_model)
+    add_test(NAME race_participants_regression
+        COMMAND viper_race_participants_regression)
 endif()
 
 if(MSVC)

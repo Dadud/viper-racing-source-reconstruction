@@ -13,6 +13,11 @@
 
 namespace viper {
 
+inline constexpr std::size_t single_race_driver_order_capacity = 16;
+// Reconstructs 0x41C8E0's fresh-session initialization of 0x503D40.
+[[nodiscard]] std::array<std::int32_t, single_race_driver_order_capacity>
+initialize_single_race_driver_order() noexcept;
+
 struct SingleRaceEntrantObservation {
     // 0x40A180 reads this value from the car_count field and passes count - 1
     // to 0x40A850, which sets +0xCA8 to (count - 1) + 1.

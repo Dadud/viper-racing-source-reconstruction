@@ -16,6 +16,15 @@ std::string c_string_prefix(const std::string_view value)
 
 } // namespace
 
+std::array<std::int32_t, single_race_driver_order_capacity>
+initialize_single_race_driver_order() noexcept
+{
+    std::array<std::int32_t, single_race_driver_order_capacity> values{};
+    for (std::size_t index = 0; index < values.size(); ++index)
+        values[index] = static_cast<std::int32_t>(index);
+    return values;
+}
+
 SingleRaceEntrantPlan build_single_race_entrants(
     const SingleRaceEntrantObservation& observation)
 {

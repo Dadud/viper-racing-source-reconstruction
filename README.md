@@ -11,11 +11,12 @@ mesh, and draws them in a top-down Direct3D
 development view. It loads the selected track's `track.obt` placement table and
 renders a selected-model copy at each valid `obj car` start position, with
 height sampled from terrain data and heading approximated from the nearest
-ideal-line segment. Arrow keys or WASD move the first car mesh along the
-ideal-line route using provisional kinematic controls; Escape exits. Other
-grid meshes remain parked. This is a top-down development scene and motion
-prototype, not a race simulation; a 3D track scene, moving opponents, HUD, and
-race results are not implemented.
+ideal-line segment. The entrant planner chooses the human grid row; in the
+fresh default eight-car setup, slot 8 is controlled. Arrow keys or WASD move
+that mesh along the ideal-line route using provisional kinematic controls;
+Escape exits. Other grid meshes remain parked. This is a top-down development
+scene and motion prototype, not a race simulation; a 3D track scene, moving
+opponents, HUD, and race results are not implemented.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell
