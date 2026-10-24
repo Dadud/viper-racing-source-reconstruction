@@ -1085,7 +1085,9 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
     const bool palette_fade = callback_address == 0x004569C0U;
     const bool palette_lighting = callback_address == 0x00456230U;
     const bool dual_palette = callback_address == 0x004563E0U;
-    const bool palette_callback = palette_fade || palette_lighting || dual_palette;
+    const bool environment_pre_lit = callback_address == 0x00456660U;
+    const bool palette_callback = palette_fade || palette_lighting || dual_palette ||
+        environment_pre_lit;
     if (!alpha_fill && !color_mask && !depth_fade && !palette_callback) {
         result.status = SceneRenderScanlineConversionStatus::unsupported_callback;
         return result;
@@ -1174,6 +1176,28 @@ SceneRenderScanlineConversionPlan plan_scene_render_scanline_conversion(
                 return result;
             }
             write(0x14U, observation.secondary_lighting_words[secondary_index]);
+            ++result.rows_processed;
+            ++result.row_counter_increments;
+            continue;
+        }
+        if (environment_pre_lit) {
+            if (observation.descriptor_mode == 2U) {
+                write(0x14U, 0xFF000000U);
+            }
+            if (!observation.environment_mapping_mode_2_enabled.has_value()) {
+                result.status = SceneRenderScanlineConversionStatus::environment_mapping_mode_observation_exhausted;
+                return result;
+            }
+            if (*observation.environment_mapping_mode_2_enabled) {
+                if (row_index >= observation.transformed_tail_words.size()) {
+                    result.status = SceneRenderScanlineConversionStatus::transformed_tail_observation_exhausted;
+                    return result;
+                }
+                const auto& tail = observation.transformed_tail_words[row_index];
+                write(0x18U, tail[0]);
+                write(0x1CU, tail[1]);
+                ++result.environment_mapping_transform_rows;
+            }
             ++result.rows_processed;
             ++result.row_counter_increments;
             continue;

@@ -716,6 +716,32 @@ and mode-2 ordered writes/counter (`ev_5d01648eca1c070731f49276331b01507d876f347
 `ev_2ea5358720268173fd25911e09876f4614cb4a5d16b4cfcbe6c20489ad879d9e`,
 `ev_acec99eb35253ec60ebd9c65cad803ae3e88bd595b22a1b18aa000030ea2672c`,
 `ev_c7171b93c2ab8b9e6fe923568af3a7dcbc81f6ed83db2f9469090086e1f0cc7e`).
+Callback `0x456660` is the prelit-object variant paired with diagnostic stub
+`0x455F30`. Modes 0–1 copy the same five row words and select the masked
+`0x50C890` palette color for `+0x10`. Mode 2 writes `0xFFFFFFFF` at `+0x10`
+and `0xFF000000` at `+0x14`, then calls `0x457460` for the row. In all three
+modes, `DAT_0050D2DC == 2` gates the extra environment-mapping transform;
+when enabled, it overwrites destination `+0x18/+0x1C`. The plan accepts the
+final binary32 tail words as observations, preserves copied fields when the
+gate is false, and reports incomplete observations after writes already
+established by the instruction order. Evidence: callback entry/mode gate
+(`ev_18a597454de1d8fc3499316ff9e5f9b31f13f197747407f5012ea8d4e7d3fc14`,
+`ev_03e8f972bcd2a5280ffd7c8694e309d618e243a8fed25a2bbeba86fb0a5408d5`),
+palette/copy stores (`ev_213f39e418aabf5a29e076117f1d6da3e60b8d3a8e37e37736bc957c4733892b`,
+`ev_2f6f07c3fda497c74d8623f1cfde4a4d4b510427db4cba7cd5702942b1a74cf9`,
+`ev_07cc3c65da39728787499e19e7cd6ba46ef32085713d0ddd7a1f451fea140b40`,
+`ev_eee3e1e2fd9a5bd56b0cd3fcf22a5dd4b34203b54c5817043448f4074e065bfb`,
+`ev_0d0a819fa673a0bf9222605dcb911673bc94b7b1e4d7c834c86e1258b52d8b76`),
+mode-0/1 gate (`ev_0f49dec0d75a298593651c166a876a59c4b39cec2f5f1774736c9f065cd720b6`,
+`ev_bc0cdb256f3fad080ce7751e555fa2cc51f0827e440f1ac480e48b8d66e9de4e`,
+`ev_0a7f82764b5e139fac6a9bf5d27c1cc9d62b329e288260896d097fbfae37b175`,
+`ev_93621b893cad1a35394bbe58f64eb0e0e19cd61a5aa32c3a179428dc752efc84`),
+and mode-2 sentinel/helper (`ev_a82622673e0af3c5eec2c52e74ea3052f63e6e51134dd5b3e93965f1f40540f9`,
+`ev_03e35ef53c218418aadb8cad12eb78a0c1e801319b93831b4bf41aa33f45a614`,
+`ev_7f1fa902bda3bf07e7b19f576b313b0491e9bafd1dadb87363dc2a52e950bf68`,
+`ev_f5d55d05ae7d34a3b31b02bc36be91495425dcd168ef71a3d43d10286a9d1611`,
+`ev_ab0ba35dc704eb1003fe75c338e46f86ebf385ac5b84a036ff8bf85536cf1c65`,
+`ev_ba9ad55dc560c4c93f0406e6667bada727cfaa51a5242a630f429048562aae18`).
 The primary callback `0x4569C0`, selected with secondary callback
 `0x455F40`, now uses the same bounded row planner. All modes copy the five
 source words at `+0,+4,+8,+0x18,+0x1C`; modes 0 and 1 derive a palette index

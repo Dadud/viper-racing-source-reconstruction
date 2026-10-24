@@ -829,6 +829,8 @@ enum class SceneRenderScanlineConversionStatus : std::uint8_t {
     lighting_palette_observation_exhausted,
     secondary_lighting_index_observation_exhausted,
     secondary_lighting_table_observation_exhausted,
+    environment_mapping_mode_observation_exhausted,
+    transformed_tail_observation_exhausted,
 };
 
 struct SceneRenderScanlineConversionObservation {
@@ -843,6 +845,10 @@ struct SceneRenderScanlineConversionObservation {
     // Effective [0x50D320 + index*4] lookup for the secondary color channel.
     std::span<const std::uint32_t> secondary_lighting_indices;
     std::span<const std::uint32_t> secondary_lighting_words;
+    // DAT_0050D2DC == 2 gates the environment-mapping transform in 0x456660.
+    std::optional<bool> environment_mapping_mode_2_enabled;
+    // Final binary32 words for destination +0x18/+0x1C when that transform runs.
+    std::span<const std::array<std::uint32_t, 2>> transformed_tail_words;
     // Output byte of the x87 distance-fade branch, indexed by absolute row.
     std::span<const std::uint8_t> distance_fade_alpha_bytes;
     std::span<const SceneRenderRowRecord> source_rows;
@@ -860,6 +866,7 @@ struct SceneRenderScanlineConversionPlan {
     std::uint32_t callback_address{};
     std::size_t rows_processed{};
     std::size_t row_counter_increments{}; // DAT_0050D304
+    std::size_t environment_mapping_transform_rows{};
     std::vector<SceneRenderRowRecord> destination_after;
     std::vector<SceneRenderScanlineWrite> writes;
 };

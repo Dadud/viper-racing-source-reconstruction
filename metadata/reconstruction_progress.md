@@ -1,5 +1,9 @@
 # Reconstruction progress
 
+- **2026-10-24:** Added the prelit-object callback `0x456660` with its three
+  descriptor modes, shared palette path, `DAT_0050D2DC == 2` transform gate,
+  and mode-2 helper route through `0x457460`. Transformed `+0x18/+0x1C` words
+  remain observations where x87 and helper effects determine their values.
 - **2026-10-24:** Added the dual-table callback `0x4563E0`. The planner now
   records both palette lookups and mode-2's ordered `+0x14` initialization
   followed by replacement from the second table. x87-derived indices remain
