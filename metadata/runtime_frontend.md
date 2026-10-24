@@ -59,12 +59,14 @@ Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to
 show slots 1–5 as empty/invalid or display the stored player-name bytes for a
 valid slot. Enter repeats header, payload, XOR, and checksum validation and
-reports whether the slot passed. Escape returns to race setup. This screen is
-deliberately a slot browser and validator: the original career action loop,
-event setup, upgrades, and result progression are not connected, so passing a
-slot does not launch a quick race or claim to continue a career. `--config-dir`
-can point the screen at an explicit Config directory; if no Config directory
-can be resolved, the career hotkey is unavailable.
+reports whether the slot passed. Press D and confirm with Y to delete only the
+selected slot; N or Escape cancels, and the row refreshes to empty after
+removal. Escape returns to race setup. This screen remains a slot browser and
+validator: the original career action loop, event setup, upgrades, and result
+progression are not connected, so passing a slot does not launch a quick race
+or claim to continue a career. `--config-dir` can point the screen at an
+explicit Config directory; if no Config directory can be resolved, the career
+hotkey is unavailable.
 
 ## Acceptance still open
 

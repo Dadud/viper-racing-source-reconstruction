@@ -169,4 +169,25 @@ CareerSlotSaveResult save_career_slot(
     return result;
 }
 
+CareerSlotDeleteResult delete_career_slot(
+    const std::filesystem::path& config_directory, const int slot)
+{
+    CareerSlotDeleteResult result{};
+    try {
+        result.path = slot_path(config_directory, slot);
+    } catch (const std::exception& error) {
+        result.error = error.what();
+        return result;
+    }
+
+    std::error_code error;
+    result.deleted = std::filesystem::remove(result.path, error);
+    if (error) {
+        result.error = "could not delete career slot: " + error.message();
+        return result;
+    }
+    result.already_missing = !result.deleted;
+    return result;
+}
+
 } // namespace viper

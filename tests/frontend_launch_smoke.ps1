@@ -52,6 +52,21 @@ $process = $null
 $configDir = Join-Path $env:TEMP ("viper-frontend-config-" + [Guid]::NewGuid().ToString('N'))
 try {
     [void](New-Item -ItemType Directory -Path $configDir)
+    $careerDir = Join-Path $configDir 'career'
+    [void](New-Item -ItemType Directory -Path $careerDir)
+    $careerPath = Join-Path $careerDir 'career0.dat'
+    $payload = [byte[]]::new(0x674)
+    $name = [System.Text.Encoding]::ASCII.GetBytes('QA Delete Test')
+    [Array]::Copy($name, 0, $payload, 0, $name.Length)
+    [uint32]$checksum = 0
+    foreach ($value in $payload) { $checksum = [uint32]($checksum + $value) }
+    $careerImage = [System.Collections.Generic.List[byte]]::new()
+    $careerImage.AddRange([BitConverter]::GetBytes([uint32]0x43494E46))
+    $careerImage.AddRange([BitConverter]::GetBytes([uint32]2))
+    $careerImage.AddRange([BitConverter]::GetBytes([uint32]0x674))
+    $careerImage.AddRange([BitConverter]::GetBytes($checksum))
+    foreach ($value in $payload) { $careerImage.Add([byte]($value -bxor 0xA4)) }
+    [System.IO.File]::WriteAllBytes($careerPath, $careerImage.ToArray())
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
     $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software"
@@ -63,6 +78,28 @@ try {
         throw 'Could not submit C to open the career slot screen'
     }
     Start-Sleep -Milliseconds 250
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]68, [IntPtr]::Zero)) {
+        throw 'Could not request deletion of the selected career slot'
+    }
+    Start-Sleep -Milliseconds 150
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]78, [IntPtr]::Zero)) {
+        throw 'Could not cancel career slot deletion'
+    }
+    Start-Sleep -Milliseconds 150
+    if (-not (Test-Path -LiteralPath $careerPath)) {
+        throw 'Cancelling career slot deletion removed the selected file'
+    }
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]68, [IntPtr]::Zero)) {
+        throw 'Could not reopen career slot deletion confirmation'
+    }
+    Start-Sleep -Milliseconds 150
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]89, [IntPtr]::Zero)) {
+        throw 'Could not confirm career slot deletion'
+    }
+    Start-Sleep -Milliseconds 150
+    if (Test-Path -LiteralPath $careerPath) {
+        throw 'Confirming career slot deletion left the selected file in place'
+    }
     $process.Refresh()
     if ($process.HasExited) { throw 'Career slot screen closed the setup process unexpectedly' }
     if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]27, [IntPtr]::Zero)) {
@@ -82,7 +119,7 @@ try {
     if (-not $process.WaitForExit(15000)) { throw 'Race window did not shut down after Escape' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "viper_game exited with code $($process.ExitCode)" }
-    Write-Output 'Setup opened career slots, returned to setup, loaded the selected race, and exited cleanly.'
+    Write-Output 'Career deletion cancel and confirmation, setup-to-race loading, and clean exit passed.'
 } catch {
     throw
 } finally {

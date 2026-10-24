@@ -64,6 +64,21 @@ int main()
     const auto replaced = viper::save_career_slot(root, 2, payload);
     check(replaced.saved, "replaces an existing slot after writing a complete image");
 
+    const auto deleted = viper::delete_career_slot(root, 2);
+    check(deleted.deleted && deleted.path == saved.path,
+        "deletes only the selected native career slot");
+    check(!std::filesystem::exists(saved.path),
+        "removes the selected career file from disk");
+    const auto deleted_load = viper::load_career_slot(root, 2);
+    check(deleted_load.file.status == viper::CareerFileLoadStatus::open_failed,
+        "deleted career slot reloads as empty");
+    const auto missing_delete = viper::delete_career_slot(root, 2);
+    check(missing_delete.already_missing && missing_delete.error.empty(),
+        "deleting a missing slot is a safe no-op");
+    const auto negative_delete = viper::delete_career_slot(root, -1);
+    check(!negative_delete.deleted && !negative_delete.error.empty(),
+        "rejects negative career slot numbers for deletion");
+
     const auto invalid = viper::save_career_slot(root, 3,
         std::span<const std::uint8_t>(payload.data(), payload.size() - 1U));
     check(!invalid.saved, "rejects payloads with non-native size");

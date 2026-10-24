@@ -423,6 +423,7 @@ struct SetupWindowState {
     std::array<std::string, 5> career_rows{};
     int career_slot{};
     bool career_screen{};
+    bool career_delete_confirmation{};
     std::string career_message;
     bool accepted{};
 };
@@ -473,7 +474,7 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
     }
     if (state.career_screen) {
         SetTextColor(dc, RGB(118, 208, 155));
-        write(L"CAREER SLOT VALIDATION", 74, 120, 34);
+        write(L"CAREER SLOTS", 74, 120, 34);
         SetTextColor(dc, RGB(238, 244, 240));
         for (std::size_t index = 0; index < state.career_rows.size(); ++index) {
             std::wstring row = index == static_cast<std::size_t>(state.career_slot)
@@ -483,10 +484,15 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
             write(row, 100, 190 + static_cast<int>(index) * 44, 36);
         }
         SetTextColor(dc, RGB(190, 205, 198));
-        write(L"UP / DOWN: SELECT     ENTER: VALIDATE", 100, 430, 30);
+        if (state.career_delete_confirmation) {
+            SetTextColor(dc, RGB(255, 194, 112));
+            write(L"DELETE THIS SLOT?  Y: DELETE   N / ESC: CANCEL", 100, 430, 30);
+        } else {
+            write(L"UP / DOWN: SELECT   ENTER: VALIDATE   D: DELETE", 100, 430, 30);
+            write(L"ESC: BACK", 100, 500, 30);
+        }
         if (!state.career_message.empty())
             write(ascii_to_wide(state.career_message), 100, 462, 30);
-        write(L"ESC: BACK", 100, 500, 30);
     }
     SelectObject(dc, old_font);
     EndPaint(hwnd, &paint);
@@ -511,6 +517,27 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
     case WM_KEYDOWN:
         if (state && (lparam & (1LL << 30)) == 0) {
             if (state->career_screen) {
+                if (state->career_delete_confirmation) {
+                    if (wparam == 'Y') {
+                        const auto deleted = viper::delete_career_slot(
+                            state->config_directory, state->career_slot);
+                        if (deleted.error.empty()) {
+                            state->career_rows[static_cast<std::size_t>(state->career_slot)] =
+                                "EMPTY OR INVALID";
+                            state->career_message = deleted.deleted
+                                ? "CAREER SLOT DELETED"
+                                : "SLOT WAS ALREADY EMPTY";
+                        } else {
+                            state->career_message = "DELETE FAILED: " + deleted.error;
+                        }
+                        state->career_delete_confirmation = false;
+                    } else if (wparam == 'N' || wparam == VK_ESCAPE) {
+                        state->career_delete_confirmation = false;
+                        state->career_message = "DELETE CANCELLED";
+                    }
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
                 if (wparam == VK_UP || wparam == VK_DOWN) {
                     state->career_slot = (state->career_slot +
                         (wparam == VK_UP ? 4 : 1)) % 5;
@@ -532,6 +559,12 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                         state->career_rows[static_cast<std::size_t>(state->career_slot)] = "EMPTY OR INVALID";
                         state->career_message = "SLOT FAILED NATIVE VALIDATION";
                     }
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam == 'D') {
+                    state->career_delete_confirmation = true;
+                    state->career_message = "CONFIRM DELETION OF SELECTED SLOT";
                     InvalidateRect(hwnd, nullptr, FALSE);
                     return 0;
                 }

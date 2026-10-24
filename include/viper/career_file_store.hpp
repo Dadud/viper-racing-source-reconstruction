@@ -21,6 +21,13 @@ struct CareerSlotSaveResult {
     std::string error;
 };
 
+struct CareerSlotDeleteResult {
+    bool deleted{};
+    bool already_missing{};
+    std::filesystem::path path;
+    std::string error;
+};
+
 // Reads a native career slot from Config/career/careerN.dat and applies the
 // reconstructed header, XOR, and checksum validation.
 [[nodiscard]] CareerSlotLoadResult load_career_slot(
@@ -31,5 +38,10 @@ struct CareerSlotSaveResult {
 [[nodiscard]] CareerSlotSaveResult save_career_slot(
     const std::filesystem::path& config_directory, int slot,
     std::span<const std::uint8_t> decoded_payload);
+
+// Removes one native career slot from Config/career/careerN.dat. A missing
+// slot is reported separately and is not treated as a filesystem error.
+[[nodiscard]] CareerSlotDeleteResult delete_career_slot(
+    const std::filesystem::path& config_directory, int slot);
 
 } // namespace viper
