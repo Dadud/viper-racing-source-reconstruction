@@ -48,13 +48,25 @@ to `0x45E4B0`; this confirms that the first 0x8C bytes of the active setup
 payload are the mapper's 35 words in this path. The new
 `prepare_car_file_runtime_mapping_from_setup_payload` adapter consumes that
 bounded payload directly. UPGS selection flags and FDIV mode remain explicit
-inputs. This does not establish how the separate single-race configured row
-gets its `+0x34..+0xBC` words. The single-race setup owner
+inputs. The single-race configured-row words are populated after the menu
+builder: `0x40A5D0` calls `0x40A7B0`, `0x40A710`, then `0x40A620`;
+`0x40A620` walks 0xC8-byte rows and dispatches marker 0 to the human
+initializer `0x45EFD0` with `row + 0x34`, and marker 1 to the AI initializer
+`0x41A000` with the same row offset. Thus `0x40A850` leaving those words
+unwritten is expected; it does not leave the configured row uninitialized.
+The entry dispatch plan and regression now cover this order and the two
+initializer calls. The human initializer loads the active `.csu`/CCS and uses
+its car name; the AI initializer starts with track `aidef.ccs` (or numeric
+fallbacks) and applies entrant, driver, and difficulty inputs. The exact
+field-by-field AI mutations and the resulting configured words are not yet
+integrated into live runtime rows. Evidence for the post-read caller is
+`0x40A5D0` `ev_c62745c06d284358d84017187404fd05c8ee70061d4d007510a611a51c31d280`
+and for the row dispatch is `0x40A620`
+`ev_975a3cf2e208f3080f652baa79972d58265218201781eed5a8f8690b445e8630`.
+The single-race setup owner
 `0x45C5B0` clears its complete 0x335-DWORD object before the menu callback;
 `0x40A850` then writes marker, display name, car stem, and the words at
-`+0xC0/+0xC4` while leaving `+0x34..+0xBC` unwritten in that builder. This
-rules out that callback as the source of the single-race row's mapping words,
-but does not rule out later setup mutation or a different owning row. Evidence:
+`+0xC0/+0xC4`; setup dispatch follows afterward. Evidence:
 `0x48AC20` `ev_65957331b5b8c2fc010ff52677e05f3e445d64945de3207032abafa50a4a4a81`,
 `0x45EC20` `ev_d180d832414b860ca1b05f8b253f39249f194104a7d5658e5205575f73d68958`,
 `0x45C5B0`
@@ -72,10 +84,10 @@ selected driver record, and difficulty table to update the AI setup through
 `0x41A0C0` and several direct scalar writes. All eight shipped `.trk` bundles
 contain `aidef.ccs` as CCS0 version 2 with a 0x8C-byte payload; the runtime now
 owns this raw payload from the selected track bundle in `GameAssets`. This is
-the AI initializer's base setup and is not evidence that the resource supplies
-the separate CARF mapper's configured-row words. The runtime has not yet
-applied the AI difficulty/driver mutations or passed the setup into an
-initialized physics vehicle. Evidence: `0x41A000`
+the AI initializer's base setup; it is then mutated before the configured row
+is passed to the CARF mapper. The runtime has not yet applied the AI
+difficulty/driver mutations or passed the setup into an initialized physics
+vehicle. Evidence: `0x41A000`
 `ev_67a3cffd701fba3131c3793b441c8ae76089194d822832bebb5902ef73ac6b54`,
 `0x41A0C0` `ev_85870aa4ba6b470ea3e074c852c0ac3a55794497857bea8dd0235a0a713f8549`.
 
