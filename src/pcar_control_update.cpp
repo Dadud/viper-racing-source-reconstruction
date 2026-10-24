@@ -127,6 +127,16 @@ void set_pcar_callback_globals_0x43b880(PcarCallbackGlobals& globals,
     globals.value_0x5093a4 = value_0x5093a4;
 }
 
+PcarCallbackMultiplierResult evaluate_pcar_callback_multiplier(
+    const PcarCallbackMultiplierObservation& observation) noexcept
+{
+    if (!observation.override_gate_0x4d10fc) {
+        return {false, false, 1.0F};
+    }
+    const bool selector_is_one = observation.selector_0x4e322c == 1U;
+    return {true, selector_is_one, selector_is_one ? 1.0F : 0.0F};
+}
+
 void update_pcar_callback_scalar_prefix(
     PcarScalarFields& fields,
     const PcarCallbackGlobals& globals,
@@ -153,9 +163,11 @@ PcarCallbackControlResult advance_pcar_callback_control_prefix(
         projection, observation.globals.value_0x509358,
         observation.globals.gate_0x5093fc);
     update_pcar_control(state.smoother, request);
+    const auto multiplier =
+        evaluate_pcar_callback_multiplier(observation.multiplier);
     update_pcar_callback_scalar_prefix(state.scalar_prefix,
-        observation.globals, observation.value_from_0x40d270);
-    return {projection, request};
+        observation.globals, multiplier.value);
+    return {projection, request, multiplier};
 }
 
 float pcar_global_scale_0x43b8c0(const float input,

@@ -1151,6 +1151,24 @@ The conditional block at `0x431DDF..0x431E5B` writes four target projections at 
 The callback at `0x439200` obtains the physics object, calls `0x43E050` with a time pointer, then passes that captured scratch record into `0x4393B0`. `0x43E050` writes current time at record `+0x04`; body `+0xDE4`, `+0x500`, `+0xC34`, `+0xD64`, and `+0xD70` to record `+0x08..+0x18`; body position `+0x5C..+0x64` to record `+0x1C..+0x24`; normalized-matrix quaternion to record `+0x28..+0x34`; body flag `+0xE28` and one-shot flag `+0xEC0` to `+0x38/+0x39`; and four damage bytes from `+0x574 + i*0x1A4` to `+0x3A..+0x3D`. It clears body `+0xEC0` after capture. Orientation normalization at `0x422C90` rebuilds the basis by normalizing its first vector, normalizing the cross of its original third and first vectors, and deriving the final vector by cross product; the producer then calls the matrix-to-quaternion conversion. `capture_ncar_sample_record` models these scratch-record writes and the orientation/flag side effects. Its regression covers field bytes, untouched leading record data, orthonormalization, one-shot clearing, and no partial mutation on degenerate input. This is the producer scratch record, not the later packed 24-byte payload or the final expanded ring record; in particular, the downstream packing/expansion path has distinct preservation behavior for `+0x10`. Live runtime still lacks the mutable NCAR body integrator state needed to call this helper from gameplay, so no autonomous physics is implied. Evidence: callback `ev_92e0c1eb69aa42416641bb656cd657db97f32e1ef5f18508619044efedad558c`; capture `ev_2280812bbc52a838c46cbdc795957f97830f8121182f5f2e8eed7a921b37b7f1`; basis normalization `ev_7b41c60c024f9b6e54f0b04d6ab723a5bc25b493fd070a223d2d6ef55b8634ac`; packed/expanded path `ev_e29c46085d1e4d91b60df137a84e34b1465e5696d01fa8ac36bfe5a959b78f11`, `ev_2158d715ce59b4079ea402f08416d2e327fdac4a2ef2b9b64ff4c6c9dfce16bb`, and `ev_3b67cac8275fe0a398f9a6b12ff5dc99e762ad20592fb48a23a450b630a8b3f0`.
 ### Live input to PCAR callback scalar prefix
 
+The multiplier used by the initial `+0xDE0` store is now modeled at its
+producer, `0x40D270`, instead of remaining an unexplained float input. The
+function returns the float at `0x4C72E4` (observed bytes `00 00 80 3F`, 1.0)
+unless byte `0x4D10FC` is nonzero. With that gate set it calls `0x49BE40`,
+which returns whether DWORD `0x4E322C` is exactly one; selector one returns
+1.0, other values return the float at `0x4ECC60` (bytes `00 00 00 00`, 0.0).
+`PcarCallbackMultiplierObservation` keeps the mutable gate and selector
+explicit, and `advance_pcar_callback_control_prefix` now computes the
+multiplier before writing `+0xDE0`. Evidence: `0x40D270`
+`ev_2d15c0a885891fcf248190882242031626ef2f733f06cce618aea2d0b5fdb382`,
+`0x49BE40` `ev_3880fbc859089f05482ecfc0c35f2c3f5d00a58b9d157278aff09a5f1b3123d2`,
+and constant/global reads `ev_ff88ee3fb2ab77d839288892cb88ff837277257f3d0a49dbc480f08a514bb6a5`,
+`ev_4a859c6a98d058ad0d3dca6117e102262a0af3f1a07d05efa8a5f74da5889c6a`,
+`ev_7a62919447bcaa6df0a2ab1e88cc38dce5da0b279e7e7946aab438eb6aa1f7ac`,
+`ev_fd6b3fe06010d8e36eb070f0c6ca5d6e3dee2a63edc06150fec12e657a0ec757`.
+The runtime still does not own these callback globals or use the modeled prefix
+to drive body physics.
+
 The live race session now projects the reconstructed `0x43B290` throttle,
 brake, clutch-like, steering, and control-state outputs into the selected raw
 `PcarCallbackGlobals` fields, then applies the four initial stores observed at

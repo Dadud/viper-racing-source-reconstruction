@@ -69,7 +69,6 @@ int main()
     callback_observation.globals = globals;
     callback_observation.globals.value_0x509358 = 0.8F;
     callback_observation.globals.value_0x5093f4 = 0.5F;
-    callback_observation.value_from_0x40d270 = 2.0F;
     const auto callback_result = viper::advance_pcar_callback_control_prefix(
         callback_state, callback_observation);
     const float expected_scaled_request =
@@ -82,12 +81,38 @@ int main()
         callback_state.smoother.output_0x7d4 != 0.48F ||
         callback_state.smoother.output_0x978 != 9.0F ||
         callback_state.smoother.output_0xb1c != 8.0F ||
-        std::abs(callback_state.scalar_prefix.value_0xde0 - 1.0F) > 1.0e-6F ||
+        callback_result.callback_multiplier.value != 1.0F ||
+        callback_result.callback_multiplier.selector_helper_called ||
+        std::abs(callback_state.scalar_prefix.value_0xde0 - 0.5F) > 1.0e-6F ||
         std::abs(callback_state.scalar_prefix.value_0xde4 - globals.value_0x509320) >
             1.0e-6F ||
         std::abs(callback_state.scalar_prefix.value_0xde8 - globals.value_0x5093b8) >
             1.0e-6F) {
         std::cerr << "PCAR callback control prefix did not preserve native call order/dataflow.\n";
+        return EXIT_FAILURE;
+    }
+    auto multiplier_observation = callback_observation;
+    viper::PcarCallbackControlState multiplier_state{};
+    multiplier_observation.multiplier = {true, 0U};
+    const auto disabled_multiplier_result =
+        viper::advance_pcar_callback_control_prefix(multiplier_state,
+            multiplier_observation);
+    if (!disabled_multiplier_result.callback_multiplier.selector_helper_called ||
+        disabled_multiplier_result.callback_multiplier.selector_is_one ||
+        disabled_multiplier_result.callback_multiplier.value != 0.0F ||
+        multiplier_state.scalar_prefix.value_0xde0 != 0.0F) {
+        std::cerr << "PCAR callback multiplier did not apply the disabled selector branch.\n";
+        return EXIT_FAILURE;
+    }
+    multiplier_observation.multiplier.selector_0x4e322c = 1U;
+    const auto selected_multiplier_result =
+        viper::advance_pcar_callback_control_prefix(multiplier_state,
+            multiplier_observation);
+    if (!selected_multiplier_result.callback_multiplier.selector_helper_called ||
+        !selected_multiplier_result.callback_multiplier.selector_is_one ||
+        selected_multiplier_result.callback_multiplier.value != 1.0F ||
+        multiplier_state.scalar_prefix.value_0xde0 != globals.value_0x5093f4) {
+        std::cerr << "PCAR callback multiplier did not match selector value one.\n";
         return EXIT_FAILURE;
     }
     callback_state.smoother.mode_0xbe4 = true;

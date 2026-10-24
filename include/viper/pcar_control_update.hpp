@@ -121,6 +121,22 @@ void set_pcar_callback_globals_0x43b880(PcarCallbackGlobals& globals,
                                          std::uint32_t value_0x509388,
                                          std::uint32_t value_0x5093a4) noexcept;
 
+struct PcarCallbackMultiplierObservation {
+    bool override_gate_0x4d10fc{};
+    std::uint32_t selector_0x4e322c{};
+};
+
+struct PcarCallbackMultiplierResult {
+    bool selector_helper_called{};
+    bool selector_is_one{};
+    float value{};
+};
+
+// Models 0x40D270. When the override gate is clear it returns the observed
+// 1.0 constant; when set it returns 1.0 only for selector value exactly one.
+[[nodiscard]] PcarCallbackMultiplierResult evaluate_pcar_callback_multiplier(
+    const PcarCallbackMultiplierObservation& observation) noexcept;
+
 // Projects the initial scalar setter sequence in the 0x4384D0 callback.
 // Later state-dependent callback branches may overwrite +0xDE0/+0xDE4.
 void update_pcar_callback_scalar_prefix(
@@ -134,7 +150,7 @@ struct PcarCallbackControlObservation {
     std::array<float, 3> body_velocity_0x234{};
     std::array<float, 3> body_basis_0x50{};
     PcarCallbackGlobals globals{};
-    float value_from_0x40d270{};
+    PcarCallbackMultiplierObservation multiplier{};
 };
 
 struct PcarCallbackControlState {
@@ -145,6 +161,7 @@ struct PcarCallbackControlState {
 struct PcarCallbackControlResult {
     float absolute_velocity_projection{};
     float scaled_smoother_request{};
+    PcarCallbackMultiplierResult callback_multiplier{};
 };
 
 // Composes the observed opening sequence of 0x4384D0: absolute body
