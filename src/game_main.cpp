@@ -681,7 +681,7 @@ public:
                     observation.configured_car_count = spawns.size();
                     observation.raw_subtype = is_player
                         ? static_cast<std::uint32_t>(viper::TrackCarSubtype::pcar)
-                        : static_cast<std::uint32_t>(viper::TrackCarSubtype::ncar);
+                        : static_cast<std::uint32_t>(viper::TrackCarSubtype::acar);
                     observation.model_name = std::string(is_player
                         ? player_car_name : std::string_view("viper"));
                     observation.x = spawn[0];

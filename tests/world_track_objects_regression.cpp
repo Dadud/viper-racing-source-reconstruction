@@ -70,6 +70,30 @@ int main()
                     !without_tail->category_labels_normalized,
                 "missing single-row overread input was not reported");
 
+        viper::CarTrackLineObservation participant_car{};
+        participant_car.configured_car_index = 0U;
+        participant_car.configured_car_count = 2U;
+        participant_car.raw_subtype =
+            static_cast<std::uint32_t>(viper::TrackCarSubtype::pcar);
+        participant_car.model_name = "viper";
+        participant_car.force_default_placement_0x4dc1b0 = true;
+        const auto player_car = viper::plan_car_track_line(participant_car);
+        require(player_car.disposition ==
+                    viper::CarTrackLineDisposition::construction_ready &&
+                    player_car.record_tag == 0x50434152U &&
+                    player_car.subtype == viper::TrackCarSubtype::pcar,
+                "human participant marker must select the configured PCAR class");
+        participant_car.configured_car_index = 1U;
+        participant_car.raw_subtype =
+            static_cast<std::uint32_t>(viper::TrackCarSubtype::acar);
+        const auto ai_car = viper::plan_car_track_line(participant_car);
+        require(ai_car.disposition ==
+                    viper::CarTrackLineDisposition::construction_ready &&
+                    ai_car.record_tag == 0x41434152U &&
+                    ai_car.subtype == viper::TrackCarSubtype::acar &&
+                    ai_car.calls_acar_helper_0x41a2a0,
+                "AI participant marker must select the configured ACAR class");
+
         std::cout << "world track objects regression passed\n";
         return 0;
     } catch (const std::exception& error) {

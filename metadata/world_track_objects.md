@@ -102,6 +102,10 @@ evidence is in `metadata/car_runtime_config.evidence.json`: `0x45B6B0`
 `0x45C630` (`ev_1e02fa626e73cc42ec58fdf1faf4249d64af77ef9b94a2578ab2f93659368d65`),
 and `0x45CAB0` (`ev_b748b4977d8abda132693c53331855d0237041041feb52d637cba35902b07381`);
 the row writer is `0x40A850` (`ev_e54fa22bb11fb18061986c36b87bdd42131208f2bb6dcd1aa84d850bef29cdb0`).
+The runtime's display placement planner now uses the same class distinction:
+the human row is planned as PCAR and configured AI rows as ACAR. This fixes
+class identity in the retained placement plans; it does not yet create complete
+AI runtime records or task-stream entries.
 
 The loader's first-token loop recognizes `end` as an early stop, ignores lines
 whose first token begins with `;`, accepts `map` and `ai`, and sends `obj` lines
