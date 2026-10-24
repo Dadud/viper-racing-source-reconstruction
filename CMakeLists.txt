@@ -198,6 +198,15 @@ if(BUILD_TESTING)
     add_test(NAME inspection_help COMMAND viper_reconstruction --help)
     if(WIN32)
         add_test(NAME game_help COMMAND viper_game --help)
+        set(VIPER_EXTERNAL_DATA_DIR "${CMAKE_SOURCE_DIR}/../game_install/GameData")
+        if(EXISTS "${VIPER_EXTERNAL_DATA_DIR}/common.res")
+            add_test(NAME game_original_asset_validation
+                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
+            add_test(NAME game_warp_render_smoke
+                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3)
+            set_tests_properties(game_original_asset_validation game_warp_render_smoke
+                PROPERTIES TIMEOUT 30)
+        endif()
     endif()
 endif()
 

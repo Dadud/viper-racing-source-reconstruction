@@ -5,8 +5,9 @@
 The completion plan is tracked in [the feature ledger](metadata/completion_ledger.md)
 and [reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
-parses Bemidji's terrain and ideal line, and draws the ideal line in a Direct3D
-development view. It does not yet render the track surface or run a race.
+parses Bemidji's terrain and ideal line, and draws the recovered terrain
+triangles with an ideal-line overlay in a top-down Direct3D development view.
+It does not yet render a 3D track scene or run a race.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell
@@ -20,7 +21,9 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 
 Public CI runs without original assets. Runtime checks use an external data
-directory, also configurable through `VIPER_DATA_DIR`. Passing these checks
+directory, also configurable through `VIPER_DATA_DIR`. On Windows, CTest adds
+asset validation and a three-frame WARP render smoke when
+`../game_install/GameData/common.res` exists beside the checkout. Passing these checks
 does not establish gameplay fidelity; original-game comparisons remain required.
 
 Project percentages, scoring rules, and acceptance checks are tracked in

@@ -28,6 +28,7 @@ namespace {
 using Microsoft::WRL::ComPtr;
 
 struct IdealLineVertex { float x; float y; };
+struct SurfaceVertex { float x; float y; float r; float g; float b; };
 
 std::uint32_t read_u32_le(const std::byte* bytes)
 {
@@ -159,10 +160,13 @@ viper::GameAssets load_assets(const std::filesystem::path& root)
 
 class D3DWindow {
 public:
-    bool create(HWND hwnd, bool software, const viper::IdealLineTrackData& ideal_line)
+    bool create(HWND hwnd, bool software,
+                const viper::TerrainSurfaceResourcePayload& terrain,
+                const viper::IdealLineTrackData& ideal_line)
     {
         try {
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
+            extract_terrain_points(terrain);
         } catch (const std::exception& e) {
             OutputDebugStringA(e.what());
             return false;
@@ -186,7 +190,8 @@ public:
             nullptr, 0, levels, static_cast<UINT>(std::size(levels)), D3D11_SDK_VERSION,
             &desc, &swap_chain_, &device_, &selected, &context_);
         if (FAILED(hr)) return false;
-        return create_target() && create_line_pipeline() && update_line_buffer();
+        return create_target() && create_surface_pipeline() && create_line_pipeline() &&
+            update_surface_buffer() && update_line_buffer();
     }
 
     bool resize(UINT width, UINT height)
@@ -197,7 +202,7 @@ public:
         if (FAILED(swap_chain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0))) return false;
         width_ = width;
         height_ = height;
-        return create_target() && update_line_buffer();
+        return create_target() && update_surface_buffer() && update_line_buffer();
     }
 
     bool render()
@@ -209,6 +214,17 @@ public:
                                 static_cast<float>(height_), 0.0f, 1.0f};
         context_->RSSetViewports(1, &viewport);
         context_->ClearRenderTargetView(target_.Get(), color);
+        if (!surface_buffer_ || surface_vertex_count_ == 0U) return false;
+        const UINT surface_stride = sizeof(SurfaceVertex);
+        constexpr UINT surface_offset = 0;
+        context_->RSSetState(surface_rasterizer_.Get());
+        context_->IASetInputLayout(surface_input_layout_.Get());
+        context_->IASetVertexBuffers(0, 1, surface_buffer_.GetAddressOf(),
+            &surface_stride, &surface_offset);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0);
+        context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0);
+        context_->Draw(surface_vertex_count_, 0);
         if (!line_buffer_ || ideal_line_vertex_count_ < 2U) return false;
         const UINT stride = sizeof(IdealLineVertex);
         constexpr UINT offset = 0;
@@ -222,6 +238,111 @@ public:
     }
 
 private:
+    void extract_terrain_points(const viper::TerrainSurfaceResourcePayload& terrain)
+    {
+        if (terrain.planes.empty())
+            throw std::runtime_error("Bemidji terrain has no surface triangles");
+        terrain_points_.reserve(terrain.planes.size() * 3U);
+        for (const auto& plane : terrain.planes) {
+            const auto& corners = plane.trailing_values;
+            for (std::size_t vertex = 0; vertex < 3U; ++vertex) {
+                const float x = corners[vertex * 3U];
+                const float y = corners[vertex * 3U + 1U];
+                const float z = corners[vertex * 3U + 2U];
+                if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+                    throw std::runtime_error("Bemidji terrain has a non-finite triangle corner");
+                terrain_points_.push_back({x, y, z});
+            }
+        }
+        map_bounds_ = {terrain_points_.front()[0], terrain_points_.front()[0],
+            terrain_points_.front()[2], terrain_points_.front()[2]};
+        for (const auto& point : terrain_points_) {
+            map_bounds_[0] = (std::min)(map_bounds_[0], point[0]);
+            map_bounds_[1] = (std::max)(map_bounds_[1], point[0]);
+            map_bounds_[2] = (std::min)(map_bounds_[2], point[2]);
+            map_bounds_[3] = (std::max)(map_bounds_[3], point[2]);
+        }
+        for (const auto& point : ideal_line_points_) {
+            map_bounds_[0] = (std::min)(map_bounds_[0], point[0]);
+            map_bounds_[1] = (std::max)(map_bounds_[1], point[0]);
+            map_bounds_[2] = (std::min)(map_bounds_[2], point[1]);
+            map_bounds_[3] = (std::max)(map_bounds_[3], point[1]);
+        }
+        const auto [min_y, max_y] = std::minmax_element(terrain_points_.begin(), terrain_points_.end(),
+            [](const auto& left, const auto& right) { return left[1] < right[1]; });
+        min_height_ = (*min_y)[1];
+        max_height_ = (*max_y)[1];
+        if (!(map_bounds_[1] > map_bounds_[0]) || !(map_bounds_[3] > map_bounds_[2]))
+            throw std::runtime_error("Bemidji terrain has degenerate horizontal bounds");
+    }
+
+    std::array<float, 2> map_to_clip(const float x, const float z) const
+    {
+        const float range = (std::max)(map_bounds_[1] - map_bounds_[0],
+            map_bounds_[3] - map_bounds_[2]);
+        const float pixels_per_unit = 0.88f * static_cast<float>((std::min)(width_, height_)) / range;
+        const float center_x = (map_bounds_[0] + map_bounds_[1]) * 0.5f;
+        const float center_z = (map_bounds_[2] + map_bounds_[3]) * 0.5f;
+        return {2.0f * (x - center_x) * pixels_per_unit / static_cast<float>(width_),
+            -2.0f * (z - center_z) * pixels_per_unit / static_cast<float>(height_)};
+    }
+
+    bool create_surface_pipeline()
+    {
+        static constexpr char vertex_source[] =
+            "struct V { float2 p : POSITION; float3 c : COLOR; };\n"
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
+            "O VSMain(V v) { O o; o.p=float4(v.p,0.5,1); o.c=v.c; return o; }\n";
+        static constexpr char pixel_source[] =
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
+            "float4 PSMain(O i) : SV_TARGET { return float4(i.c,1); }\n";
+        ComPtr<ID3DBlob> vertex_code;
+        ComPtr<ID3DBlob> pixel_code;
+        if (FAILED(compile_shader(vertex_source, "VSMain", "vs_4_0", vertex_code)) ||
+            FAILED(compile_shader(pixel_source, "PSMain", "ps_4_0", pixel_code))) return false;
+        if (FAILED(device_->CreateVertexShader(vertex_code->GetBufferPointer(),
+                vertex_code->GetBufferSize(), nullptr, &surface_vertex_shader_)) ||
+            FAILED(device_->CreatePixelShader(pixel_code->GetBufferPointer(),
+                pixel_code->GetBufferSize(), nullptr, &surface_pixel_shader_))) return false;
+        const D3D11_INPUT_ELEMENT_DESC elements[]{
+            {"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 2U * sizeof(float), D3D11_INPUT_PER_VERTEX_DATA, 0}};
+        if (FAILED(device_->CreateInputLayout(elements, static_cast<UINT>(std::size(elements)),
+                vertex_code->GetBufferPointer(), vertex_code->GetBufferSize(), &surface_input_layout_)))
+            return false;
+        D3D11_RASTERIZER_DESC raster{};
+        raster.FillMode = D3D11_FILL_SOLID;
+        raster.CullMode = D3D11_CULL_NONE;
+        raster.DepthClipEnable = TRUE;
+        return SUCCEEDED(device_->CreateRasterizerState(&raster, &surface_rasterizer_));
+    }
+
+    bool update_surface_buffer()
+    {
+        if (!width_ || !height_ || terrain_points_.empty()) return true;
+        std::vector<SurfaceVertex> vertices;
+        vertices.reserve(terrain_points_.size());
+        const float height_range = (std::max)(max_height_ - min_height_, 1.0e-5f);
+        for (const auto& point : terrain_points_) {
+            const auto pos = map_to_clip(point[0], point[2]);
+            const float elevation = std::clamp((point[1] - min_height_) / height_range, 0.0f, 1.0f);
+            vertices.push_back({pos[0], pos[1], 0.11f + 0.20f * elevation,
+                0.22f + 0.35f * elevation, 0.16f + 0.17f * elevation});
+        }
+        if (vertices.size() > std::numeric_limits<UINT>::max() / sizeof(SurfaceVertex)) return false;
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(SurfaceVertex));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA data{};
+        data.pSysMem = vertices.data();
+        ComPtr<ID3D11Buffer> buffer;
+        if (FAILED(device_->CreateBuffer(&desc, &data, &buffer))) return false;
+        surface_buffer_ = std::move(buffer);
+        surface_vertex_count_ = static_cast<UINT>(vertices.size());
+        return true;
+    }
+
     bool create_line_pipeline()
     {
         static constexpr char vertex_source[] =
@@ -249,27 +370,11 @@ private:
     bool update_line_buffer()
     {
         if (!width_ || !height_ || ideal_line_points_.size() < 2U) return true;
-        float min_x = ideal_line_points_.front()[0];
-        float max_x = min_x;
-        float min_z = ideal_line_points_.front()[1];
-        float max_z = min_z;
-        for (const auto& point : ideal_line_points_) {
-            min_x = (std::min)(min_x, point[0]);
-            max_x = (std::max)(max_x, point[0]);
-            min_z = (std::min)(min_z, point[1]);
-            max_z = (std::max)(max_z, point[1]);
-        }
-        const float range = (std::max)(max_x - min_x, max_z - min_z);
-        if (!(range > 0.0f) || !std::isfinite(range)) return false;
-        const float pixels_per_unit = 0.88f * static_cast<float>((std::min)(width_, height_)) / range;
-        const float center_x = (min_x + max_x) * 0.5f;
-        const float center_z = (min_z + max_z) * 0.5f;
         std::vector<IdealLineVertex> vertices;
         vertices.reserve(ideal_line_points_.size() + 1U);
         for (const auto& point : ideal_line_points_) {
-            vertices.push_back({
-                2.0f * (point[0] - center_x) * pixels_per_unit / static_cast<float>(width_),
-                -2.0f * (point[1] - center_z) * pixels_per_unit / static_cast<float>(height_)});
+            const auto pos = map_to_clip(point[0], point[1]);
+            vertices.push_back({pos[0], pos[1]});
         }
         // The normalized ideal line carries circular next-row links. Close the visual strip.
         vertices.push_back(vertices.front());
@@ -297,12 +402,22 @@ private:
     ComPtr<ID3D11DeviceContext> context_;
     ComPtr<IDXGISwapChain> swap_chain_;
     ComPtr<ID3D11RenderTargetView> target_;
+    ComPtr<ID3D11VertexShader> surface_vertex_shader_;
+    ComPtr<ID3D11PixelShader> surface_pixel_shader_;
+    ComPtr<ID3D11InputLayout> surface_input_layout_;
+    ComPtr<ID3D11RasterizerState> surface_rasterizer_;
+    ComPtr<ID3D11Buffer> surface_buffer_;
     ComPtr<ID3D11VertexShader> line_vertex_shader_;
     ComPtr<ID3D11PixelShader> line_pixel_shader_;
     ComPtr<ID3D11InputLayout> line_input_layout_;
     ComPtr<ID3D11Buffer> line_buffer_;
     std::vector<std::array<float, 2>> ideal_line_points_;
+    std::vector<std::array<float, 3>> terrain_points_;
+    std::array<float, 4> map_bounds_{};
+    float min_height_{};
+    float max_height_{};
     UINT ideal_line_vertex_count_{};
+    UINT surface_vertex_count_{};
     UINT width_{};
     UINT height_{};
 };
@@ -337,6 +452,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 }
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
+               const viper::TerrainSurfaceResourcePayload& terrain,
                const viper::IdealLineTrackData& ideal_line)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -351,11 +467,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
-    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Bemidji Ideal-Line Development View",
+    HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Bemidji Terrain Development View",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
-    if (!state.graphics.create(hwnd, software, ideal_line)) {
+    if (!state.graphics.create(hwnd, software, terrain, ideal_line)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
         DestroyWindow(hwnd);
@@ -399,7 +515,7 @@ int wmain(int argc, wchar_t** argv)
         if (options.help) { usage(std::cout); return 0; }
         auto assets = load_assets(options.data_dir);
         if (options.validate_assets) return 0;
-        return run_window(options.software, options.smoke_frames, assets.ideal_line());
+        return run_window(options.software, options.smoke_frames, assets.terrain(), assets.ideal_line());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;
