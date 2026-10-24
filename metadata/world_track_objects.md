@@ -397,7 +397,13 @@ the `0x426000` physics-track service factory, so
 controls this parser's branch, while values 0/1/3/5 select service classes in
 the factory. The shipped image initializes the field to zero, but runtime
 writes remain an observation. `plan_checkpoint_track_line` builds the verified
-record and branch plan. See `physics_task_objects.md` and
+record and branch plan. `produce_checkpoint_task_record_from_line` now adapts a
+raw object line, obtains both heights through `terrain_height_or_zero`, and
+serializes the complete 0x20-byte CHKP record on the selector-zero route. It
+reports the visual route without emitting physics bytes when the selector is
+nonzero. This is an individual record producer; it is not inserted into the
+runtime task stream because ordered world-object and entrant record production
+is still unresolved. See `physics_task_objects.md` and
 `physics_track_selector_source.evidence.json` for the accessor and initial
 value trace.
 

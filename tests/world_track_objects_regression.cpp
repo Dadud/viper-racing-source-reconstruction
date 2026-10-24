@@ -1,8 +1,12 @@
 #include "viper/world_track_objects.hpp"
+#include "viper/terrain_surface.hpp"
 
+#include <bit>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <span>
 #include <stdexcept>
 
 namespace {
@@ -18,6 +22,15 @@ std::uint8_t byte_at(const viper::IdealLineTrackData::Record& row,
     return std::to_integer<std::uint8_t>(row[offset]);
 }
 
+std::uint32_t read_u32_le(const std::span<const std::byte> bytes,
+                          const std::size_t offset)
+{
+    return std::to_integer<std::uint32_t>(bytes[offset]) |
+        (std::to_integer<std::uint32_t>(bytes[offset + 1U]) << 8U) |
+        (std::to_integer<std::uint32_t>(bytes[offset + 2U]) << 16U) |
+        (std::to_integer<std::uint32_t>(bytes[offset + 3U]) << 24U);
+}
+
 void set_byte(viper::IdealLineResourcePayload::Record& row,
               const std::size_t offset, const std::uint8_t value)
 {
@@ -29,6 +42,50 @@ void set_byte(viper::IdealLineResourcePayload::Record& row,
 int main()
 {
     try {
+        viper::TerrainSurfaceResourcePayload checkpoint_terrain{};
+        checkpoint_terrain.root_node_index = 0;
+        viper::TerrainPartitionNode checkpoint_leaf{};
+        checkpoint_leaf.negative_leaf_index = 0;
+        checkpoint_terrain.partition_nodes.push_back(checkpoint_leaf);
+        viper::TerrainSurfacePlane checkpoint_plane{};
+        checkpoint_plane.normal_y = 1.0F;
+        checkpoint_plane.offset = -7.0F;
+        checkpoint_terrain.planes.push_back(checkpoint_plane);
+        const auto checkpoint = viper::produce_checkpoint_task_record_from_line(
+            "obj checkpoint finish 1,2 3,4", checkpoint_terrain, 0U, false);
+        require(checkpoint.status ==
+                    viper::CheckpointTaskRecordProductionStatus::serialized_record_ready &&
+                    checkpoint.construction.has_value() &&
+                    checkpoint.serialized_record_bytes.has_value(),
+                "selector-zero checkpoint did not produce task record bytes");
+        const std::span<const std::byte> checkpoint_bytes(
+            *checkpoint.serialized_record_bytes);
+        require(read_u32_le(checkpoint_bytes, 0U) == 0x43484B50U &&
+                    read_u32_le(checkpoint_bytes, 4U) == 0x20U,
+                "checkpoint task record header is incorrect");
+        const std::array<float, 6> expected_checkpoint_fields{
+            1.0F, 7.0F, 2.0F, 3.0F, 7.0F, 4.0F};
+        for (std::size_t index = 0U; index < expected_checkpoint_fields.size();
+             ++index) {
+            require(read_u32_le(checkpoint_bytes, 8U + index * 4U) ==
+                        std::bit_cast<std::uint32_t>(expected_checkpoint_fields[index]),
+                    "checkpoint endpoint fields are incorrect");
+        }
+        const auto visual_checkpoint =
+            viper::produce_checkpoint_task_record_from_line(
+                "obj checkpoint finish 1,2 3,4", checkpoint_terrain, 1U, false);
+        require(visual_checkpoint.status ==
+                    viper::CheckpointTaskRecordProductionStatus::visual_scene_object &&
+                    visual_checkpoint.construction.has_value() &&
+                    !visual_checkpoint.serialized_record_bytes.has_value(),
+                "nonzero selector did not select the visual checkpoint route");
+        const auto malformed_checkpoint =
+            viper::produce_checkpoint_task_record_from_line(
+                "obj checkpoint finish 1,2 broken", checkpoint_terrain, 0U, false);
+        require(malformed_checkpoint.status ==
+                    viper::CheckpointTaskRecordProductionStatus::malformed_line,
+                "malformed checkpoint line was not rejected");
+
         viper::IdealLineResourcePayload payload;
         payload.resource_version =
             viper::IdealLineResourcePayload::supported_resource_version;

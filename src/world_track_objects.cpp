@@ -1,11 +1,13 @@
 #include "viper/world_track_objects.hpp"
 #include "viper/physics_task_stream.hpp"
 #include "viper/resource_bundle.hpp"
+#include "viper/terrain_surface.hpp"
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <limits>
 #include <utility>
 
@@ -1831,6 +1833,84 @@ std::optional<CheckpointConstructionPlan> plan_checkpoint_track_line(
         ? CheckpointConstructionRoute::visual_scene_object
         : CheckpointConstructionRoute::serialized_object_record;
     return plan;
+}
+
+CheckpointTaskRecordProduction produce_checkpoint_task_record_from_line(
+    const std::string_view object_line,
+    const TerrainSurfaceResourcePayload& terrain,
+    const std::uint32_t track_state_selector_0x53b194,
+    const bool compatibility_division_enabled)
+{
+    CheckpointTaskRecordProduction result{};
+    const auto directive = classify_track_directive(object_line);
+    if (directive.kind != TrackDirectiveKind::object) return result;
+
+    auto line = directive.object_line;
+    const auto is_space = [](const char value) {
+        return value == ' ' || value == '\t' || value == '\r' || value == '\n';
+    };
+    while (!line.empty() && is_space(line.front())) line.remove_prefix(1U);
+    if (line.size() < 3U ||
+        !equals_ascii_case_insensitive(line.substr(0U, 3U), "obj")) return result;
+    line.remove_prefix(3U);
+    while (!line.empty() && is_space(line.front())) line.remove_prefix(1U);
+    const auto type_end = std::find_if(line.begin(), line.end(), is_space);
+    const std::string_view object_type(line.data(),
+        static_cast<std::size_t>(type_end - line.begin()));
+    if (!equals_ascii_case_insensitive(object_type, "checkpoint")) return result;
+    result.status = CheckpointTaskRecordProductionStatus::malformed_line;
+
+    std::string nul_terminated_line(object_line);
+    std::array<char, 256> name{};
+    float start_x{}, start_z{}, end_x{}, end_z{};
+    const auto conversion_count = std::sscanf(nul_terminated_line.c_str(),
+        "obj checkpoint %255s %f,%f %f,%f", name.data(),
+        &start_x, &start_z, &end_x, &end_z);
+    if (conversion_count != 5) return result;
+
+    const auto start_height = terrain_height_or_zero(terrain, start_x,
+        start_z, compatibility_division_enabled);
+    const auto end_height = terrain_height_or_zero(terrain, end_x,
+        end_z, compatibility_division_enabled);
+    CheckpointTrackLineObservation observation{};
+    observation.name = name.data();
+    observation.scanf_conversion_count =
+        static_cast<std::uint32_t>(conversion_count);
+    observation.start_x = start_x;
+    observation.start_z = start_z;
+    observation.end_x = end_x;
+    observation.end_z = end_z;
+    observation.start_terrain_height = start_height;
+    observation.end_terrain_height = end_height;
+    observation.track_state_selector_0x53b194 =
+        track_state_selector_0x53b194;
+    result.construction = plan_checkpoint_track_line(observation);
+    if (!result.construction.has_value()) {
+        result.status = CheckpointTaskRecordProductionStatus::malformed_line;
+        return result;
+    }
+    if (result.construction->route ==
+        CheckpointConstructionRoute::visual_scene_object) {
+        result.status = CheckpointTaskRecordProductionStatus::visual_scene_object;
+        return result;
+    }
+
+    static_assert(sizeof(float) == sizeof(std::uint32_t));
+    std::array<std::byte, sizeof(CheckpointTrackRecord)> bytes{};
+    const std::span<std::byte> output(bytes);
+    write_u32_le(output, 0U, result.construction->record.object_tag);
+    write_u32_le(output, 4U, result.construction->record.record_size);
+    const auto& record = result.construction->record;
+    const std::array<float, 6> fields{
+        record.start.x, record.start.terrain_height, record.start.z,
+        record.end.x, record.end.terrain_height, record.end.z};
+    for (std::size_t index = 0U; index < fields.size(); ++index) {
+        write_u32_le(output, 8U + index * sizeof(std::uint32_t),
+            std::bit_cast<std::uint32_t>(fields[index]));
+    }
+    result.serialized_record_bytes = bytes;
+    result.status = CheckpointTaskRecordProductionStatus::serialized_record_ready;
+    return result;
 }
 
 std::optional<WobbleTrackRecord> make_wobble_track_record(

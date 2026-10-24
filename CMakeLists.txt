@@ -91,6 +91,7 @@ add_library(viper_scene_model
 )
 target_include_directories(viper_scene_model PUBLIC include)
 target_compile_features(viper_scene_model PUBLIC cxx_std_20)
+target_link_libraries(viper_scene_model PUBLIC viper_terrain_model)
 
 add_library(viper_race_scene_flow src/race_scene_render_flow.cpp)
 target_include_directories(viper_race_scene_flow PUBLIC include)

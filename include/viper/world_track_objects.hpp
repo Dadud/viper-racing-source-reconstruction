@@ -12,6 +12,7 @@
 namespace viper {
 
 class ResourceBundle;
+struct TerrainSurfaceResourcePayload;
 
 struct TrackObjectTextTable {
     static constexpr std::uint32_t bats_resource_type_code = 0x53544142U;
@@ -815,6 +816,31 @@ struct CheckpointTrackLineObservation {
 [[nodiscard]] std::optional<CheckpointConstructionPlan>
 plan_checkpoint_track_line(
     const CheckpointTrackLineObservation& observation);
+
+enum class CheckpointTaskRecordProductionStatus {
+    not_checkpoint_line,
+    malformed_line,
+    visual_scene_object,
+    serialized_record_ready,
+};
+
+struct CheckpointTaskRecordProduction {
+    CheckpointTaskRecordProductionStatus status{
+        CheckpointTaskRecordProductionStatus::not_checkpoint_line};
+    std::optional<CheckpointConstructionPlan> construction;
+    std::optional<std::array<std::byte, sizeof(CheckpointTrackRecord)>>
+        serialized_record_bytes;
+};
+
+// Parses a raw track.obt object line, samples the two endpoint heights using
+// the native height-or-zero helper, and emits complete CHKP bytes only when
+// the observed selector chooses the serialized-record route.
+[[nodiscard]] CheckpointTaskRecordProduction
+produce_checkpoint_task_record_from_line(
+    std::string_view object_line,
+    const TerrainSurfaceResourcePayload& terrain,
+    std::uint32_t track_state_selector_0x53b194,
+    bool compatibility_division_enabled);
 
 enum class WobbleType : std::uint32_t {
     pole = 0,
