@@ -669,3 +669,12 @@ candidate takes either the signed threshold/near-zero-auxiliary `0.9` steering
 floor or the guarded quotient-derived floor; the model preserves raw DWORD
 comparisons and the `0x4D52BC` message call. Evidence: `0x42B450`
 `ev_c87026ab2af0c0804aa374fae72a416a83460f626bb9c2adfba092b4da9287e5`.
+
+`plan_acar_control_response` projects helper `0x42B570`, which runs between
+route steering and forward-candidate steering in `0x42B7B0`. It models the
+direction-change squeeze path, auxiliary response decay, conditional edge
+brake, lateral-slam gate/response, `+0x1074` write, ordered message calls, and
+the final response accumulation. It reuses the reconstructed directional
+candidate state; remaining per-car fields and the two float-pointer values
+are supplied observations. Evidence: `0x42B570`
+`ev_7c889b8b95e832018a5ac6d0c64f371d6077e6ee8129fd9de744f350ff258e0c`.

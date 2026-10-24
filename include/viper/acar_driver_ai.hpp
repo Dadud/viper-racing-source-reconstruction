@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace viper {
 
@@ -233,6 +234,43 @@ struct AcarForwardCandidateSteeringPlan {
 [[nodiscard]] AcarForwardCandidateSteeringPlan
 plan_acar_forward_candidate_steering(
     const AcarForwardCandidateSteeringObservation& observation) noexcept;
+
+enum class AcarControlResponseMessageCall : std::uint8_t {
+    none,
+    message_0x4d52ac,
+    message_0x4d52b0,
+    message_0x4d52b4,
+    message_0x4d52b8,
+    message_0x4d52c0,
+};
+
+struct AcarControlResponseObservation {
+    float state_0xef0{};
+    float steering_output_0{};
+    float accumulator_input_1{};
+    float route_value_0xf14{};
+    float lateral_value_0xf18{};
+    std::uint32_t lateral_sign_reference_bits_0xf20{};
+    std::uint32_t steering_relation_bits_0xf1c{};
+};
+
+struct AcarControlResponsePlan {
+    std::vector<AcarControlResponseMessageCall> message_calls;
+    float next_state_0xef0{};
+    float accumulator_output_1{};
+    std::optional<float> steering_output_0;
+    std::optional<float> state_0x1074;
+    bool edge_brake_gate_passed{};
+    bool lateral_slam_gate_passed{};
+    bool lateral_slam_state_written{};
+    bool state_decay_branch_reached{};
+    bool output_1_written{};
+};
+
+// Projects control-response and lateral-slam helper 0x42B570.
+[[nodiscard]] AcarControlResponsePlan plan_acar_control_response(
+    const AcarDriverAiState& driver_state,
+    const AcarControlResponseObservation& observation) noexcept;
 
 struct AcarComposedDriverCallbackPlan {
     AcarDriverAiPlan route_candidate_plan{};

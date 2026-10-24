@@ -604,6 +604,117 @@ AcarForwardCandidateSteeringPlan plan_acar_forward_candidate_steering(
     return plan;
 }
 
+AcarControlResponsePlan plan_acar_control_response(
+    const AcarDriverAiState& driver_state,
+    const AcarControlResponseObservation& observation) noexcept
+{
+    AcarControlResponsePlan plan{};
+    auto response = observation.state_0xef0;
+    if (driver_state.direction_changed_0xef5) {
+        if (observation.steering_output_0 <= 0.8F) {
+            plan.steering_output_0 = 0.8F;
+        } else {
+            plan.steering_output_0 = observation.steering_output_0;
+        }
+        response = static_cast<float>(
+            static_cast<long double>(response) * 0.96L);
+        plan.message_calls.push_back(
+            AcarControlResponseMessageCall::message_0x4d52b8);
+    } else if (!driver_state.directional_candidate_valid_0xef4 ||
+               driver_state.directional_mode_0xeec) {
+        response = static_cast<float>(
+            static_cast<long double>(response) * 0.992L);
+        plan.state_decay_branch_reached = true;
+    } else {
+        const auto directional_value = std::bit_cast<float>(
+            driver_state.directional_value_bits_0xedc);
+        if (((std::bit_cast<std::uint32_t>(-directional_value) ^
+              std::bit_cast<std::uint32_t>(response)) & 0x80000000U) != 0U) {
+            response = 0.0F;
+        }
+
+        const auto ee8_gate =
+            driver_state.directional_aux_0xee8 <= 0xc0d55555U;
+        const auto route_signs_match =
+            ((std::bit_cast<std::uint32_t>(observation.lateral_value_0xf18) ^
+              observation.lateral_sign_reference_bits_0xf20) &
+             0x80000000U) == 0U;
+        const auto route_lateral_gate =
+            static_cast<long double>(observation.route_value_0xf14) -
+                1.61925L <
+            std::fabs(static_cast<long double>(
+                observation.lateral_value_0xf18));
+        const auto steering_signs_differ =
+            ((observation.steering_relation_bits_0xf1c ^
+              driver_state.directional_value_bits_0xedc) &
+             0x80000000U) != 0U;
+        if (ee8_gate && route_signs_match && route_lateral_gate &&
+            steering_signs_differ) {
+            plan.edge_brake_gate_passed = true;
+            plan.steering_output_0 = 0.6F;
+            plan.message_calls.push_back(
+                AcarControlResponseMessageCall::message_0x4d52c0);
+            response = static_cast<float>(
+                static_cast<long double>(response) * 0.97L);
+        }
+
+        const auto opposite_scores =
+            ((std::bit_cast<std::uint32_t>(
+                  driver_state.directional_score_0xee0) ^
+              driver_state.directional_value_bits_0xedc) &
+             0x80000000U) != 0U;
+        const auto small_lateral_values =
+            std::fabs(directional_value) < 2.8575F &&
+            std::fabs(std::bit_cast<float>(
+                driver_state.directional_aux_0xee4)) < 4.6939197F;
+        const auto slam_gate = opposite_scores || small_lateral_values;
+        plan.lateral_slam_gate_passed = slam_gate;
+        plan.state_0x1074 = 0.0F;
+        if (!slam_gate) {
+            plan.message_calls.push_back(
+                AcarControlResponseMessageCall::message_0x4d52ac);
+        } else {
+            const auto score_magnitude = std::fabs(
+                static_cast<long double>(driver_state.directional_score_0xee0));
+            const auto excess = score_magnitude - 0.9525L;
+            const auto scaled_excess = static_cast<float>(excess * 0.20997375L);
+            float response_scale{};
+            if (scaled_excess >= 0.0F) {
+                if (std::bit_cast<std::int32_t>(scaled_excess) <=
+                    0x3f800000) {
+                    response_scale = static_cast<float>(
+                        excess * 0.839895L +
+                        (excess * -0.20997375L + 1.0L) * 0.5L);
+                } else {
+                    response_scale = 4.0F;
+                }
+            } else {
+                response_scale = 0.5F;
+            }
+
+            plan.state_0x1074 = driver_state.directional_score_0xee0;
+            const auto lateral_step =
+                std::bit_cast<std::int32_t>(
+                    driver_state.directional_value_bits_0xedc) < 1
+                    ? 0.0029F : -0.0029F;
+            response = static_cast<float>(
+                static_cast<long double>(response_scale) * lateral_step +
+                response);
+            plan.lateral_slam_state_written = true;
+            plan.message_calls.push_back(
+                std::bit_cast<std::int32_t>(response) > 0
+                    ? AcarControlResponseMessageCall::message_0x4d52b0
+                    : AcarControlResponseMessageCall::message_0x4d52b4);
+        }
+    }
+
+    plan.next_state_0xef0 = response;
+    plan.accumulator_output_1 = static_cast<float>(
+        static_cast<long double>(observation.accumulator_input_1) + response);
+    plan.output_1_written = true;
+    return plan;
+}
+
 AcarComposedDriverCallbackPlan evaluate_acar_driver_callback_with_fallback(
     AcarDriverAiState& driver_state,
     AcarFallbackState& fallback_state,
