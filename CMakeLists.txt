@@ -124,6 +124,11 @@ target_include_directories(viper_ncar_model PUBLIC include)
 target_compile_features(viper_ncar_model PUBLIC cxx_std_20)
 target_link_libraries(viper_vehicle_model PUBLIC viper_ncar_model)
 
+add_library(viper_ncar_sample_pipeline src/ncar_sample_pipeline.cpp)
+target_include_directories(viper_ncar_sample_pipeline PUBLIC include)
+target_compile_features(viper_ncar_sample_pipeline PUBLIC cxx_std_20)
+target_link_libraries(viper_ncar_sample_pipeline PUBLIC viper_ncar_model)
+
 add_library(viper_wheel_body_coupling src/wheel_body_coupling.cpp)
 target_include_directories(viper_wheel_body_coupling PUBLIC include)
 target_compile_features(viper_wheel_body_coupling PUBLIC cxx_std_20)
@@ -348,6 +353,12 @@ if(BUILD_TESTING)
         viper_ncar_model viper_model_resource)
     add_test(NAME ncar_geometry_regression
         COMMAND viper_ncar_geometry_regression)
+    add_executable(viper_ncar_sample_pipeline_regression
+        tests/ncar_sample_pipeline_regression.cpp)
+    target_link_libraries(viper_ncar_sample_pipeline_regression PRIVATE
+        viper_ncar_sample_pipeline)
+    add_test(NAME ncar_sample_pipeline_regression
+        COMMAND viper_ncar_sample_pipeline_regression)
     add_executable(viper_human_car_setup_regression
         tests/human_car_setup_regression.cpp)
     target_link_libraries(viper_human_car_setup_regression PRIVATE
