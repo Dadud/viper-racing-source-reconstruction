@@ -73,24 +73,26 @@ static BOOL module_directory_data_fallback(char *out, DWORD capacity)
     return strcat_s(out, capacity, "Data") == 0;
 }
 
-/*
- * Helper 0x401840 calls GetDriveTypeA (IAT 0x4091CC); the original receives a
- * formatted candidate path and tests whether its drive type is known. This
- * resolver uses that observed predicate for the registry branch and retains
- * the executable-directory fallback when registry resolution fails.
+/* VA 0x401840 returns true exactly when GetFileAttributesA(path) succeeds.
+ * The import table also contains GetDriveTypeA, but this helper does not call it.
  */
-static BOOL candidate_is_usable_drive(const char *path)
+static BOOL candidate_path_exists(const char *path)
 {
-    UINT type = GetDriveTypeA(path);
-    return type != DRIVE_UNKNOWN && type != DRIVE_NO_ROOT_DIR;
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
 }
 
-/* VA 0x401880 checks the formatted registry path, then calls the fallback. */
+/* VA 0x401880 formats registry value + "common.res", checks that file with
+ * 0x401840, then falls back to the executable-directory Data path. */
 static BOOL resolve_data_directory(char *out, DWORD capacity)
 {
-    if (query_registry_data_directory(out, capacity) &&
-        candidate_is_usable_drive(out))
-        return TRUE;
+    char common_resource[MAX_PATH];
+    if (query_registry_data_directory(out, capacity)) {
+        int n = snprintf(common_resource, sizeof common_resource,
+                         "%s%s", out, "common.res");
+        if (n > 0 && (size_t)n < sizeof common_resource &&
+            candidate_path_exists(common_resource))
+            return TRUE;
+    }
     return module_directory_data_fallback(out, capacity);
 }
 
@@ -98,12 +100,11 @@ static BOOL resolve_data_directory(char *out, DWORD capacity)
  * VA 0x4017C0 asks a translation/resource helper for IDs 0x41 through 0x5A,
  * formats "%sdata\\%s" (0x40656C), and passes each candidate to helper
  * 0x401840. If no candidate succeeds, it formats the message at 0x406578.
- * Resource-ID meanings and helper 0x401840's exact predicate are unresolved.
+ * Resource-ID meanings remain unresolved; 0x401840 checks path existence.
  */
 static BOOL disc_volume_check_reconstruction(const char *candidate_path)
 {
-    UINT type = GetDriveTypeA(candidate_path);
-    return type != DRIVE_UNKNOWN && type != DRIVE_NO_ROOT_DIR;
+    return candidate_path_exists(candidate_path);
 }
 
 /* VA 0x401730 calls GetDiskFreeSpaceA only when global byte 0x406038 is set.

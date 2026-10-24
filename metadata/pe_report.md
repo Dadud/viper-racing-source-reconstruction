@@ -18,6 +18,16 @@
 
 ### Imports
 
+The launcher imports both `GetDriveTypeA` and `GetFileAttributesA`. Ghidra
+decompilation of VA `0x401840` shows the helper calls `GetFileAttributesA`
+and returns whether the result differs from `INVALID_FILE_ATTRIBUTES`; the
+import list alone does not identify which startup helper uses each import.
+At VA `0x401880`, the launcher formats the registry `DataDirectory` with
+`common.res`, applies that existence check, and uses an executable-directory
+`Data` fallback if the registry candidate is unavailable. Evidence IDs:
+`ev_43e05ce6a61dd9164d9cbfc83e24dfb8407e01c7e350828c5483a772bd85a29c`
+and `ev_20191935c98d5b6b0a2405967a849ae2593559308e20f4bd26b85184c12f49a9`.
+
 - `KERNEL32.dll`: `GetExitCodeProcess`, `CreateProcessA`, `GetLastError`, `CreateSemaphoreA`, `GetVersion`, `WaitForSingleObject`, `Sleep`, `GetDriveTypeA`, `GetFileAttributesA`, `GetModuleFileNameA`, `GetSystemDirectoryA`, `WinExec`, `GetDiskFreeSpaceA`, `GlobalMemoryStatus`, `ExitProcess`, `GetCPInfo`, `HeapCreate`, `GetEnvironmentStringsW`, `FreeEnvironmentStringsW`, `WideCharToMultiByte`, `FreeEnvironmentStringsA`, `GetEnvironmentStrings`, `RtlUnwind`, `SetStdHandle`, `LoadLibraryA`, `GetProcAddress`, `HeapAlloc`, `HeapFree`, `SetFilePointer`, `FlushFileBuffers`, `CloseHandle`, `WriteFile`, `GetCommandLineA`, `UnhandledExceptionFilter`, `GetStdHandle`, `GetFileType`, `SetHandleCount`, `GetOEMCP`, `GetACP`, `GetModuleHandleA`, `GetStartupInfoA`
 - `USER32.dll`: `GetDlgItem`, `InvalidateRect`, `MessageBoxA`, `UpdateWindow`, `GetSystemMetrics`, `SetWindowLongA`, `EnableWindow`, `FindWindowA`, `ShowWindow`, `GetWindowLongA`
 - `ADVAPI32.dll`: `RegCloseKey`, `RegQueryValueExA`, `RegOpenKeyExA`
