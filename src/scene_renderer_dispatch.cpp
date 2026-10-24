@@ -39,6 +39,48 @@ SceneRendererObjectObservation observe_scene_smoke_effect_object(
         0x00461D10U, std::nullopt, active_byte_0x3c};
 }
 
+SceneSmokeEffectDrawPlan plan_scene_smoke_effect_draw(
+    const SceneSmokeEffectDrawInput& input)
+{
+    SceneSmokeEffectDrawPlan result{};
+    std::copy_n(input.camera_transform_0x53a480.begin(), 9U,
+        result.submitted_transform.begin());
+    std::copy(input.object_position_0x28.begin(), input.object_position_0x28.end(),
+        result.submitted_transform.begin() + 9);
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::copy_camera_basis,
+        0x00461D23U, 9U, 0U, result.submitted_transform});
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::configure_renderer_parameter,
+        0x00450B80U, input.renderer_parameter_bits_0x54});
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::read_render_config,
+        0x00451890U, 1U, 0U, {}, input.render_config_value_0x51890});
+    if (input.render_config_value_0x51890.has_value()) {
+        if (*input.render_config_value_0x51890 != 0U) {
+            result.actions.push_back({SceneSmokeEffectDrawActionKind::enable_render_flag,
+                0x00451610U, 1U});
+        }
+    } else {
+        result.input_complete = false;
+    }
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::enable_render_flag,
+        0x00451610U, 0x100U});
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::enable_render_flag,
+        0x00451940U, 0x10U});
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::draw_model,
+        0x0044F7D0U, 0U, input.model_pointer_0x38, result.submitted_transform});
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::disable_render_flag,
+        0x00451940U, 1U});
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::cleanup_render_state,
+        0x004513A0U, 0x100U});
+    if (input.render_config_value_0x51890.has_value()
+        && *input.render_config_value_0x51890 != 0U) {
+        result.actions.push_back({SceneSmokeEffectDrawActionKind::cleanup_render_state,
+            0x004513A0U, 1U});
+    }
+    result.actions.push_back({SceneSmokeEffectDrawActionKind::renderer_cleanup,
+        0x00450BB0U});
+    return result;
+}
+
 namespace {
 
 std::array<float, 12> make_scene_view_transform(

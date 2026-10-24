@@ -37,6 +37,14 @@
   were run. Evidence:
   `metadata/scene_car_update.md`.
 
+- **2026-10-24 continuation:** Added `plan_scene_smoke_effect_draw` for the
+  `0x461D10` callback: camera-basis copy, object position retention, renderer
+  parameter setup, optional config-gated render flag, `0x44F7D0` model
+  submission, and ordered state cleanup. The model traversal's descriptor and
+  device calls remain a separate gap. The Release `viper_race_scene_flow`
+  target builds and `git diff --check` passes; no tests were run. Evidence:
+  `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** The composed wheel-manager frame now sources the
   nested texture-binding request from manager field `+0x10`, matching its
   observed `0x448E30` call and preventing a conflicting duplicate handle input.

@@ -543,6 +543,26 @@ and update clears `0x461C0F/0x461D02`
 (`ev_cf83255023389ccfa23fc01cb89f26ed5693b660077e6473a2056ab71aaf0e1e`,
 `ev_775218195a45a0197a79ad568fe700daa70f570b97b89e1620c1be716dac4a69`).
 
+`plan_scene_smoke_effect_draw` now projects the selected `0x461D10` callback
+through its shared model submission call. It copies the nine camera-basis
+words from `0x53A480` into the object transform while retaining its instance
+position at `+0x28..+0x30`, configures the renderer from instance `+0x54`,
+queries render configuration key 1, and preserves the conditional `0x51610(1)`
+setup/`0x513A0(1)` cleanup around the always-issued `0x51610(0x100)`,
+`0x51940(0x10)`, `0x44F7D0(+0x38, transform)`, and state restoration calls.
+Missing config outcome marks the plan incomplete but keeps the known ordered
+calls. `0x44F7D0` performs its own transform/culling and alpha gates before
+calling model traversal `0x44FC80`; its inner descriptor/device loop remains a
+separate renderer gap. Evidence: copy and setup from `0x461D10`
+(`ev_a4a4a2d073b9a755c6bff9559873afd61b7ab1c59281513e7030812e5740a946`,
+`ev_2f4824439dec4e2aa0bfa5ae78086075ff01fe4d14b6b098e1c6f1331625ea1c`,
+`ev_cc884629cf5b7fe86370cb5565d2b8a829880978a5afb2564655417343929319`,
+`ev_3de4c6361feca208833151132086c78e6486cf7612f3bfdc631db4bd0cbcf3f1`,
+`ev_fd67b270534cb1d31e6aa990d75f8e6b6fd73159161a2ca011aa6e3b025d683d`),
+submission `0x44F7D0` `ev_677f9b19abca30d5f14c3d0e498fd737e63ce57b504385e7b0f456c784bf4d9c`,
+and its model traversal `0x44FC80`
+`ev_b7dbe6ec2281426ff24a33134a53fd108e956e75ad007ac709a3c7f44b1bab92`.
+
 ### Scene-car virtual `+0x18` callout
 
 `plan_scene_car_callout` projects the scene-car entry at `0x4648A0`, reached

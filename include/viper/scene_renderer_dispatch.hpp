@@ -44,6 +44,45 @@ struct SceneRendererObjectObservation {
     bool pointer_present,
     std::optional<std::uint8_t> active_byte_0x3c) noexcept;
 
+enum class SceneSmokeEffectDrawActionKind : std::uint8_t {
+    copy_camera_basis,
+    configure_renderer_parameter,
+    read_render_config,
+    enable_render_flag,
+    disable_render_flag,
+    draw_model,
+    cleanup_render_state,
+    renderer_cleanup,
+};
+
+struct SceneSmokeEffectDrawAction {
+    SceneSmokeEffectDrawActionKind kind{};
+    std::uint32_t address{};
+    std::uint32_t argument{};
+    std::uint32_t model_pointer{};
+    std::array<float, 12> transform{};
+    std::optional<std::uint8_t> result;
+};
+
+struct SceneSmokeEffectDrawInput {
+    std::array<float, 12> camera_transform_0x53a480{};
+    std::array<float, 3> object_position_0x28{};
+    std::uint32_t renderer_parameter_bits_0x54{};
+    std::uint32_t model_pointer_0x38{};
+    std::optional<std::uint8_t> render_config_value_0x51890;
+};
+
+struct SceneSmokeEffectDrawPlan {
+    bool input_complete{true};
+    std::array<float, 12> submitted_transform{};
+    std::vector<SceneSmokeEffectDrawAction> actions;
+};
+
+// Projects the callback at 0x461D10 through its shared model submitter 0x44F7D0.
+// Call only after generic dispatch selects the smoke object's +0x14 slot.
+[[nodiscard]] SceneSmokeEffectDrawPlan plan_scene_smoke_effect_draw(
+    const SceneSmokeEffectDrawInput& input);
+
 inline constexpr std::size_t scene_texture_cache_entry_count = 250U;
 inline constexpr std::size_t scene_texture_cache_entry_size = 0x28U;
 
