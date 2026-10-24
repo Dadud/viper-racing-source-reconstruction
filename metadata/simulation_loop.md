@@ -957,10 +957,15 @@ transparent pixels preserve the prior staging contents. That base is known:
 and calls `0x449AA0(0)` before drawing the image. `0x449AA0` fills the complete
 reset viewport, so the transparent pixels are zero and the full source can be
 derived without caller-supplied initial bytes. The enhanced `--inspect-image`
-output reports mode-4 palette-write count and raster completeness. The original
-`race.res` remains outside this source repository. Automatic STMP-to-staging
-conversion currently supports 16-bit renderer modes 3 and 4; mode 5 still
-needs its STMP pixel writer.
+output reports mode-4 and mode-5 palette-write counts and raster completeness.
+Both recovered projections emit 40,933 writes for this image. The original
+`race.res` remains outside this source repository. `0x44D0C0` selects palette
+plane zero only for renderer tag 3, otherwise plane one, and writes each
+palette entry as a 16-bit word through `0x449D70`. The source-image projection
+therefore supports tags 3, 4, and 5 while retaining the descriptor pitch even
+for tag 5's four-byte-per-pixel allocation. Evidence: `0x44D0C0`
+(`ev_1529bfff7812fb1e8cf0f6a584d8a17052574ba9467fee969d94a4db58dd19c0`) and
+`0x449D70` (`ev_b6817f1a89392b1b89e45c5c880868635c9e2682258bb68eeb978a08a8145ab0`).
 Evidence: `0x403000` (`ev_55a1de5280d59dc142f147f2499a1260a546d35ff5b3cac79851a365ca577ba6`),
 `0x4031F0` (`ev_150bcb339cb567a82921879c0a511ebdccc8714a4557be04340fe326792dbea9`),
 `0x449AA0` (`ev_be7f4edcec14fa1add5ab0385980ebefad63dfb1f83697dc57d1bcdfee455176`),

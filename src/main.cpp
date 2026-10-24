@@ -302,14 +302,19 @@ int inspect_stamp_image(const std::filesystem::path& path,
     for (const auto& frame : image->encoded_rows) {
         for (const auto& row : frame) encoded_bytes += row.size();
     }
-    viper::SceneDashboardRasterObservation raster_observation{};
-    raster_observation.renderer_mode = 4U;
-    raster_observation.clip_right = image->width;
-    raster_observation.clip_bottom = image->height;
-    raster_observation.framebuffer_pitch_bytes = image->width * 2;
-    const auto first_frame = viper::raster_scene_stamp_image(
-        {true, 0x0044D0C0U, 0, 0, 0},
-        {true, *image, raster_observation});
+    const auto first_frame_for_mode = [&](const std::uint8_t mode) {
+        viper::SceneDashboardRasterObservation raster_observation{};
+        raster_observation.renderer_mode = mode;
+        raster_observation.clip_right = image->width;
+        raster_observation.clip_bottom = image->height;
+        raster_observation.framebuffer_pitch_bytes =
+            image->width * (mode == 5U ? 4 : 2);
+        return viper::raster_scene_stamp_image(
+            {true, 0x0044D0C0U, 0, 0, 0},
+            {true, *image, raster_observation});
+    };
+    const auto first_frame_mode4 = first_frame_for_mode(4U);
+    const auto first_frame_mode5 = first_frame_for_mode(5U);
     std::cout << "bundle\t" << path.string() << '\n'
               << "resource\t" << entry->name << '\n'
               << "width\t" << image->width << '\n'
@@ -322,11 +327,16 @@ int inspect_stamp_image(const std::filesystem::path& path,
               << "rows_complete\t" << image->rows_complete << '\n'
               << "encoded_row_bytes\t" << encoded_bytes << '\n'
               << "frame_0_palette_pixels_mode4\t"
-              << first_frame.raster.pixel_writes.size() << '\n'
+              << first_frame_mode4.raster.pixel_writes.size() << '\n'
               << "frame_0_raster_complete_mode4\t"
-              << first_frame.input_complete << '\n';
+              << first_frame_mode4.input_complete << '\n'
+              << "frame_0_palette_pixels_mode5\t"
+              << first_frame_mode5.raster.pixel_writes.size() << '\n'
+              << "frame_0_raster_complete_mode5\t"
+              << first_frame_mode5.input_complete << '\n';
     return image->pointer_table_complete && image->rows_complete &&
-            first_frame.input_complete
+            first_frame_mode4.input_complete &&
+            first_frame_mode5.input_complete
         ? 0
         : 2;
 }

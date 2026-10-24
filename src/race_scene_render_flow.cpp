@@ -13,9 +13,11 @@ std::optional<std::vector<std::uint8_t>> raster_status_image_source_pixels(
     const std::int32_t pitch_bytes)
 {
     if (image.width <= 0 || image.height <= 0 || pitch_bytes <= 0 ||
-        (renderer_mode != 3U && renderer_mode != 4U)) {
+        (renderer_mode != 3U && renderer_mode != 4U && renderer_mode != 5U)) {
         return std::nullopt;
     }
+    // 0x44D0C0 writes 16-bit palette words through 0x449D70 even when tag 5
+    // selects the second palette plane; keep the descriptor's row pitch.
     constexpr auto bytes_per_pixel = 2U;
     const auto minimum_pitch = static_cast<std::uint64_t>(image.width) *
         bytes_per_pixel;
