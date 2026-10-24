@@ -37,6 +37,14 @@ struct MainMenuLabelRegistration {
 struct MainMenuScreenObservation {
     // Low eight bits are the one-time registration flags at DAT_00561008.
     std::uint32_t initialized_label_mask{};
+    // When available, derive cache invalidation from DAT_004D3868 and the
+    // cached +0x08 words in each three-word localized-string object.
+    bool resource_generations_available{};
+    std::uint32_t current_language_generation{};
+    std::uint32_t default_player_name_generation{};
+    // SingleRace, Career, Multiplayer, Replay, Options, Exit object +0x08.
+    std::array<std::uint32_t, 6> label_resource_generations{};
+    // Legacy direct gates are used only when generation values are absent.
     bool default_player_name_resource_stale{};
     // SingleRace, Career, Multiplayer, Replay, Options, Exit cache tests.
     std::array<bool, 6> label_resources_stale{};

@@ -73,10 +73,16 @@ MainMenuScreenPlan plan_main_menu_screen(
             plan.initialized_label_mask_after |= label.initialized_mask_bit;
         }
     }
-    plan.refresh_default_player_name =
-        observation.default_player_name_resource_stale;
+    plan.refresh_default_player_name = observation.resource_generations_available
+        ? observation.current_language_generation !=
+            observation.default_player_name_generation
+        : observation.default_player_name_resource_stale;
     for (std::size_t index = 0; index < menu_label_objects.size(); ++index) {
-        if (observation.label_resources_stale[index]) {
+        const bool stale = observation.resource_generations_available
+            ? observation.current_language_generation !=
+                observation.label_resource_generations[index]
+            : observation.label_resources_stale[index];
+        if (stale) {
             plan.refreshed_resource_objects.push_back(menu_label_objects[index]);
         }
     }

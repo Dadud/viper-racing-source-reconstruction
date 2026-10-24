@@ -1,5 +1,12 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Replaced the main menu's supplied stale-label
+  gates with direct comparisons when language-generation data is available:
+  `DAT_004D3868` versus each localized string object's cached `+0x08` word.
+  Explicit stale flags remain a fallback when those raw values were not
+  captured. Native lookup failure/warning effects remain modeled separately.
+  Evidence: `ev_1389e249a360954552d9c9b02125e93746c3a870077ef404bdff9ae44f0478a6`.
+
 - **2026-10-24 continuation:** Connected the parsed LANGRES0 table to
   `plan_main_menu_screen`; it can now resolve all eight `Main_Menu:*` keys
   registered by `0x4805C0` and returns a resolution bit mask alongside the

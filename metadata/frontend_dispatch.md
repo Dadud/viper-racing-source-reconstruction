@@ -83,8 +83,11 @@ records the player-name prepare/save helper addresses `0x46B020` and
 `0x4805C0` normalization. If a parsed `LanguageResource` is supplied, the plan
 resolves the eight registered keys in registration order (default name, player
 name, then the six visible labels) and records a bit mask for keys found.
-Resource-manager side effects and menu-control callback execution remain
-outside this projection.
+When the current language generation and cached `+0x08` words are supplied,
+the plan derives the default-name and six menu-label refresh gates from those
+generation values. It falls back to direct stale/not-stale observations when
+the cache words were not captured. Resource-manager side effects and
+menu-control callback execution remain outside this projection.
 Shipped-image evidence for the main-menu routine is
 `ev_46296befbc4dd8fa5baf76ce27d21d870878fd89e0817e31afeb7087f4d97e0e`.
 
