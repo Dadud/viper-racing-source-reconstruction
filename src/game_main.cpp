@@ -340,9 +340,37 @@ std::string configured_track_stem(const std::filesystem::path& data_dir,
     return std::string(*stem);
 }
 
+std::vector<std::string> selectable_track_stems(
+    const std::filesystem::path& data_dir)
+{
+    const auto common = viper::ResourceBundle::open(data_dir / "common.res");
+    const auto payload = common.find_payload("tracks.tab",
+        viper::TrackObjectTextTable::bats_resource_type_code);
+    if (!payload) throw std::runtime_error("common.res tracks.tab is missing");
+    const auto table = viper::parse_track_object_text_table(*payload);
+    if (!table) throw std::runtime_error("common.res tracks.tab is invalid");
 
-std::string configured_car_stem(const std::filesystem::path& data_dir,
-                                const viper::GameOptions& options)
+    std::vector<std::string> tracks;
+    for (std::size_t index = 0; index < table->line_count; ++index) {
+        const auto name = viper::track_object_text_line(*table, index, 0U);
+        if (!name || name->empty()) continue;
+        std::string stem(*name);
+        std::transform(stem.begin(), stem.end(), stem.begin(), [](const char value) {
+            return static_cast<char>(std::tolower(static_cast<unsigned char>(value)));
+        });
+        if (stem == "random") continue;
+        std::error_code error;
+        if (!std::filesystem::is_regular_file(data_dir / (stem + ".trk"), error) || error)
+            continue;
+        tracks.push_back(std::move(stem));
+    }
+    if (tracks.empty()) throw std::runtime_error(
+        "tracks.tab contains no installed selectable track bundles");
+    return tracks;
+}
+
+std::vector<std::string> selectable_car_stems(
+    const std::filesystem::path& data_dir)
 {
     const auto wildcard = (data_dir / L"*.car").wstring();
     WIN32_FIND_DATAW file{};
@@ -354,10 +382,21 @@ std::string configured_car_stem(const std::filesystem::path& data_dir,
         ~SearchHandle() { if (value != INVALID_HANDLE_VALUE) FindClose(value); }
     } close_search{search};
 
-    std::vector<std::string> stems;
+    std::vector<std::string> cars;
     do {
-        stems.push_back(std::filesystem::path(file.cFileName).stem().string());
+        if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0U) continue;
+        const auto stem = std::filesystem::path(file.cFileName).stem().string();
+        if (!stem.empty()) cars.push_back(stem);
     } while (FindNextFileW(search, &file));
+    if (cars.empty()) throw std::runtime_error("no usable .car bundles found");
+    return cars;
+}
+
+
+std::string configured_car_stem(const std::filesystem::path& data_dir,
+                                const viper::GameOptions& options)
+{
+    const auto stems = selectable_car_stems(data_dir);
     auto index = options.integer("GLOBAL", "car_no").value_or(0);
     // The original constructor resets a selector at or above the enumerated
     // car count to zero. The enumeration order is the native *.car order.
@@ -365,6 +404,162 @@ std::string configured_car_stem(const std::filesystem::path& data_dir,
         throw std::runtime_error("options.def car_no selects an empty car entry");
     if (static_cast<std::size_t>(index) >= stems.size()) index = 0;
     return stems[static_cast<std::size_t>(index)];
+}
+
+struct FrontendSelection {
+    std::string track;
+    std::string car;
+};
+
+struct SetupWindowState {
+    std::vector<std::string> tracks;
+    std::vector<std::string> cars;
+    std::size_t track_index{};
+    std::size_t car_index{};
+    bool accepted{};
+};
+
+std::wstring ascii_to_wide(const std::string_view text)
+{
+    return std::wstring(text.begin(), text.end());
+}
+
+void draw_setup_window(HWND hwnd, const SetupWindowState& state)
+{
+    PAINTSTRUCT paint{};
+    const HDC dc = BeginPaint(hwnd, &paint);
+    RECT client{};
+    GetClientRect(hwnd, &client);
+    const auto background = CreateSolidBrush(RGB(8, 20, 24));
+    FillRect(dc, &client, background);
+    DeleteObject(background);
+
+    const auto old_font = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, RGB(238, 244, 240));
+    const auto write = [dc](const std::wstring& text, const int x, const int y,
+                            const int height, const UINT format = DT_LEFT) {
+        RECT rect{x, y, 850, y + height};
+        DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &rect,
+            format | DT_SINGLELINE | DT_VCENTER);
+    };
+    write(L"VIPER RACING", 56, 42, 54);
+    SetTextColor(dc, RGB(118, 208, 155));
+    write(L"RACE SETUP", 58, 110, 34);
+    SetTextColor(dc, RGB(238, 244, 240));
+    const auto track = state.tracks.empty() ? L"(no tracks)" :
+        ascii_to_wide(state.tracks[state.track_index]);
+    const auto car = state.cars.empty() ? L"(no cars)" :
+        ascii_to_wide(state.cars[state.car_index]);
+    write(L"TRACK", 74, 190, 30);
+    write(L"<  " + track + L"  >", 74, 228, 42);
+    write(L"CAR", 490, 190, 30);
+    write(L"<  " + car + L"  >", 490, 228, 42);
+    SetTextColor(dc, RGB(190, 205, 198));
+    write(L"UP / DOWN: CHOOSE TRACK", 74, 332, 30);
+    write(L"LEFT / RIGHT: CHOOSE CAR", 74, 370, 30);
+    write(L"ENTER: START RACE", 74, 426, 30);
+    write(L"ESC: EXIT", 74, 464, 30);
+    SelectObject(dc, old_font);
+    EndPaint(hwnd, &paint);
+}
+
+LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
+                                    const WPARAM wparam, const LPARAM lparam)
+{
+    auto* state = reinterpret_cast<SetupWindowState*>(
+        GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    switch (message) {
+    case WM_NCCREATE: {
+        const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA,
+            reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+        return TRUE;
+    }
+    case WM_PAINT:
+        if (state) draw_setup_window(hwnd, *state);
+        else { PAINTSTRUCT paint{}; BeginPaint(hwnd, &paint); EndPaint(hwnd, &paint); }
+        return 0;
+    case WM_KEYDOWN:
+        if (state && (lparam & (1LL << 30)) == 0) {
+            if (wparam == VK_UP && !state->tracks.empty())
+                state->track_index = (state->track_index + state->tracks.size() - 1U) % state->tracks.size();
+            else if (wparam == VK_DOWN && !state->tracks.empty())
+                state->track_index = (state->track_index + 1U) % state->tracks.size();
+            else if (wparam == VK_LEFT && !state->cars.empty())
+                state->car_index = (state->car_index + state->cars.size() - 1U) % state->cars.size();
+            else if (wparam == VK_RIGHT && !state->cars.empty())
+                state->car_index = (state->car_index + 1U) % state->cars.size();
+            else if (wparam == VK_RETURN && !state->tracks.empty() && !state->cars.empty()) {
+                state->accepted = true;
+                DestroyWindow(hwnd);
+                return 0;
+            } else if (wparam == VK_ESCAPE) {
+                DestroyWindow(hwnd);
+                return 0;
+            } else {
+                return 0;
+            }
+            InvalidateRect(hwnd, nullptr, FALSE);
+        }
+        return 0;
+    case WM_CLOSE:
+        DestroyWindow(hwnd);
+        return 0;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
+    return DefWindowProcW(hwnd, message, wparam, lparam);
+}
+
+std::optional<FrontendSelection> show_setup_frontend(
+    std::vector<std::string> tracks, std::vector<std::string> cars,
+    const std::string_view initial_track, const std::string_view initial_car)
+{
+    if (tracks.empty() || cars.empty())
+        throw std::runtime_error("frontend cannot show an empty track or car inventory");
+    SetupWindowState state{std::move(tracks), std::move(cars)};
+    const auto track = std::find(state.tracks.begin(), state.tracks.end(), initial_track);
+    if (track != state.tracks.end())
+        state.track_index = static_cast<std::size_t>(track - state.tracks.begin());
+    const auto car = std::find_if(state.cars.begin(), state.cars.end(),
+        [initial_car](const std::string& value) {
+            if (value.size() != initial_car.size()) return false;
+            return std::equal(value.begin(), value.end(), initial_car.begin(),
+                [](const char left, const char right) {
+                    return std::tolower(static_cast<unsigned char>(left)) ==
+                        std::tolower(static_cast<unsigned char>(right));
+                });
+        });
+    if (car != state.cars.end())
+        state.car_index = static_cast<std::size_t>(car - state.cars.begin());
+
+    constexpr wchar_t class_name[] = L"ViperRaceSetupFrontendWindow";
+    WNDCLASSW wc{};
+    wc.lpfnWndProc = setup_window_proc;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.lpszClassName = class_name;
+    if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+        throw std::runtime_error("could not register the setup frontend window");
+    const HWND hwnd = CreateWindowExW(0, class_name, L"Viper Racing — Race Setup",
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 920, 590,
+        nullptr, nullptr, wc.hInstance, &state);
+    if (!hwnd) throw std::runtime_error("could not create the setup frontend window");
+    ShowWindow(hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(hwnd);
+    MSG message{};
+    int message_result{};
+    while ((message_result = GetMessageW(&message, nullptr, 0, 0)) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+    if (message_result < 0)
+        throw std::runtime_error("setup frontend message loop failed");
+    if (!state.accepted) return std::nullopt;
+    return FrontendSelection{
+        state.tracks[state.track_index], state.cars[state.car_index]};
 }
 
 class D3DWindow {
@@ -1167,6 +1362,7 @@ struct WindowState {
     bool left{};
     bool right{};
     bool playback_active{};
+    bool return_to_frontend{};
     // CONTROL order: steer_left, steer_right, throttle, braking.
     std::array<UINT, 4> control_keys{
         VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN};
@@ -1389,7 +1585,7 @@ struct WindowState {
         return true;
     }
 
-    std::string hud_text() const
+    bool results_ready() const noexcept
     {
         bool every_entrant_finished = motion.race.finished;
         for (std::size_t index = 0; index < opponent_motions.size() &&
@@ -1399,7 +1595,12 @@ struct WindowState {
                 every_entrant_finished = false;
             }
         }
-        if (every_entrant_finished) {
+        return every_entrant_finished;
+    }
+
+    std::string hud_text() const
+    {
+        if (results_ready()) {
             const auto standings = viper::build_route_race_standings(
                 motion, opponent_motions, player_car_index);
             std::string results = "RACE RESULTS";
@@ -1418,7 +1619,7 @@ struct WindowState {
                     (seconds < 10U ? "0" : "") + std::to_string(seconds) + "." +
                     (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
             }
-            results += "\nESC TO EXIT";
+            results += "\nENTER: SETUP / ESC: EXIT";
             return results;
         }
         const auto minutes = static_cast<unsigned>(motion.race.elapsed_seconds / 60.0F);
@@ -1504,7 +1705,15 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
             if (!state->graphics.resize(LOWORD(lparam), HIWORD(lparam))) PostQuitMessage(1);
         return 0;
     case WM_KEYDOWN:
-        if (wparam == VK_ESCAPE) { DestroyWindow(hwnd); return 0; }
+        if (wparam == VK_ESCAPE) {
+            DestroyWindow(hwnd);
+            return 0;
+        }
+        if (wparam == VK_RETURN && state && state->results_ready()) {
+            state->return_to_frontend = true;
+            DestroyWindow(hwnd);
+            return 0;
+        }
         if (state && !state->playback_active && (lparam & (1LL << 30)) == 0) {
             update_control_key(*state, static_cast<UINT>(wparam), true);
         }
@@ -1723,7 +1932,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             }
         }
     }
-    return static_cast<int>(msg.wParam);
+    return state.return_to_frontend ? 10 : static_cast<int>(msg.wParam);
 }
 
 void report_start_grid(const viper::GameAssets& assets)
@@ -1743,6 +1952,90 @@ void report_start_grid(const viper::GameAssets& assets)
         std::cout << "  grid row " << row << ": " << directive.object_line << '\n';
     }
     std::cout << "  observed car placement directives: " << car_directives << '\n';
+}
+
+int run_selected_race(const Options& options, const std::string_view track,
+                     const std::string_view car,
+                     const std::vector<TraceInputFrame>* playback_trace)
+{
+    const auto config_path = options.data_dir / "options.def";
+    viper::GameOptions configured_options;
+    std::error_code config_error;
+    if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
+        configured_options = viper::GameOptions::load(config_path);
+    const auto setup_config_directory = options.setup_config_directory
+        ? *options.setup_config_directory
+        : resolve_setup_config_directory(options.data_dir);
+    auto assets = load_assets(options.data_dir, track, car,
+        std::move(configured_options), setup_config_directory);
+    if (assets.player_setup_version_warning())
+        std::cerr << "Warning: player CSU version is not 1; native loader continues with its first 0x8c bytes\n";
+    report_start_grid(assets);
+    if (options.validate_assets) return 0;
+    const auto driver_order = viper::initialize_single_race_driver_order();
+    constexpr std::array<std::string_view, 7> ai_names{
+        "AI slot 0", "AI slot 1", "AI slot 2", "AI slot 3",
+        "AI slot 4", "AI slot 5", "AI slot 6"};
+    viper::SingleRaceEntrantObservation entrant_observation{};
+    entrant_observation.configured_car_count = assets.options()
+        .integer("GAME", "car_count").value_or(8);
+    entrant_observation.driver_order_values = driver_order;
+    entrant_observation.ai_names_by_slot = ai_names;
+    entrant_observation.player_car_resource_name = assets.car_name();
+    entrant_observation.resolved_player_name =
+        assets.options().get("GLOBAL", "player_name");
+    entrant_observation.player_paintjob_value =
+        assets.options().integer("GLOBAL", "player_paintjob");
+    const auto entrants = viper::build_single_race_entrants(entrant_observation);
+    if (!entrants.player_record_index)
+        throw std::runtime_error("single-race setup could not resolve the human participant row");
+    std::cout << "Selected human grid slot: "
+              << (*entrants.player_record_index + 1U) << " of "
+              << entrants.participant_count << " (fresh single-race driver order)\n";
+    std::vector<viper::SingleRaceAISetupPlan> ai_setup_variants;
+    if (entrants.participant_count > 1) {
+        if (!assets.track_index())
+            throw std::runtime_error("selected track has no matching tracks.tab row for AI setup");
+        ai_setup_variants.reserve(viper::ai_driver_group_count * 2U);
+        std::size_t complete_setup_records = 0;
+        for (std::size_t group = 0; group < viper::ai_driver_group_count; ++group) {
+            for (std::uint8_t mode = 0; mode <= 1U; ++mode) {
+                viper::SingleRaceAISetupObservation ai_observation{};
+                ai_observation.entrants = &entrants;
+                ai_observation.drivers = &assets.ai_drivers();
+                ai_observation.driver_group =
+                    static_cast<viper::AIDriverGroup>(group);
+                ai_observation.track_index = *assets.track_index();
+                ai_observation.tuning_mode = mode;
+                ai_observation.base_setup_payload = assets.ai_vehicle_setup();
+                ai_observation.configuration_data_available = true;
+                ai_observation.loaded_car_file = assets.ai_car().car_file;
+                ai_observation.compatibility_division_helper_enabled = false;
+                auto plan = viper::prepare_single_race_ai_setups(ai_observation);
+                complete_setup_records += static_cast<std::size_t>(std::count_if(
+                    plan.ai_setups.begin(), plan.ai_setups.end(),
+                    [](const auto& record) { return record.input_complete; }));
+                ai_setup_variants.push_back(std::move(plan));
+            }
+        }
+        std::size_t prepared_records = 0;
+        for (const auto& variant : ai_setup_variants)
+            prepared_records += variant.ai_setups.size();
+        std::cout << "Prepared " << prepared_records
+                  << " AI setup variants across all AIDR profiles and tuning modes ("
+                  << complete_setup_records
+                  << " numerically complete with the current FDIV model)\n";
+    }
+    return run_window(options.software, options.smoke_frames, options.audio_smoke,
+        options.record_trace, playback_trace, *entrants.player_record_index,
+        static_cast<std::uint32_t>(std::clamp(
+            assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
+        assets.track_name(), assets.car_name(), assets.terrain(),
+        assets.ideal_line(), assets.player_model(), assets.ai_model(),
+        assets.track_objects(),
+        assets.bundle(std::string(assets.car_name()) + ".car"),
+        assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
+        options.grid_mode, assets.options());
 }
 
 } // namespace
@@ -1767,82 +2060,26 @@ int wmain(int argc, wchar_t** argv)
         const auto car = options.car
             ? *options.car
             : configured_car_stem(options.data_dir, configured_options);
-        const auto setup_config_directory = options.setup_config_directory
-            ? *options.setup_config_directory
-            : resolve_setup_config_directory(options.data_dir);
-        auto assets = load_assets(options.data_dir, track, car,
-            std::move(configured_options), setup_config_directory);
-        if (assets.player_setup_version_warning())
-            std::cerr << "Warning: player CSU version is not 1; native loader continues with its first 0x8c bytes\n";
-        report_start_grid(assets);
-        if (options.validate_assets) return 0;
-        const auto driver_order = viper::initialize_single_race_driver_order();
-        constexpr std::array<std::string_view, 7> ai_names{
-            "AI slot 0", "AI slot 1", "AI slot 2", "AI slot 3",
-            "AI slot 4", "AI slot 5", "AI slot 6"};
-        viper::SingleRaceEntrantObservation entrant_observation{};
-        entrant_observation.configured_car_count = assets.options()
-            .integer("GAME", "car_count").value_or(8);
-        entrant_observation.driver_order_values = driver_order;
-        entrant_observation.ai_names_by_slot = ai_names;
-        entrant_observation.player_car_resource_name = assets.car_name();
-        entrant_observation.resolved_player_name =
-            assets.options().get("GLOBAL", "player_name");
-        entrant_observation.player_paintjob_value =
-            assets.options().integer("GLOBAL", "player_paintjob");
-        const auto entrants = viper::build_single_race_entrants(entrant_observation);
-        if (!entrants.player_record_index)
-            throw std::runtime_error("single-race setup could not resolve the human participant row");
-        std::cout << "Selected human grid slot: "
-                  << (*entrants.player_record_index + 1U) << " of "
-                  << entrants.participant_count << " (fresh single-race driver order)\n";
-        std::vector<viper::SingleRaceAISetupPlan> ai_setup_variants;
-        if (entrants.participant_count > 1) {
-            if (!assets.track_index())
-                throw std::runtime_error("selected track has no matching tracks.tab row for AI setup");
-            ai_setup_variants.reserve(viper::ai_driver_group_count * 2U);
-            std::size_t complete_setup_records = 0;
-            for (std::size_t group = 0; group < viper::ai_driver_group_count; ++group) {
-                for (std::uint8_t mode = 0; mode <= 1U; ++mode) {
-                    viper::SingleRaceAISetupObservation ai_observation{};
-                    ai_observation.entrants = &entrants;
-                    ai_observation.drivers = &assets.ai_drivers();
-                    ai_observation.driver_group =
-                        static_cast<viper::AIDriverGroup>(group);
-                    ai_observation.track_index = *assets.track_index();
-                    ai_observation.tuning_mode = mode;
-                    ai_observation.base_setup_payload = assets.ai_vehicle_setup();
-                    ai_observation.configuration_data_available = true;
-                    ai_observation.loaded_car_file = assets.ai_car().car_file;
-                    // The helper-mode selector is not reconstructed. Use the
-                    // explicitly modeled base division path for preparation.
-                    ai_observation.compatibility_division_helper_enabled = false;
-                    auto plan = viper::prepare_single_race_ai_setups(ai_observation);
-                    complete_setup_records += static_cast<std::size_t>(std::count_if(
-                        plan.ai_setups.begin(), plan.ai_setups.end(),
-                        [](const auto& record) { return record.input_complete; }));
-                    ai_setup_variants.push_back(std::move(plan));
-                }
+        const bool interactive_frontend = !options.validate_assets &&
+            !options.track && !options.car && !options.smoke_frames &&
+            !options.audio_smoke && !options.record_trace && !options.play_trace;
+        auto selected_track = track;
+        auto selected_car = car;
+        while (true) {
+            if (interactive_frontend) {
+                const auto selection = show_setup_frontend(
+                    selectable_track_stems(options.data_dir),
+                    selectable_car_stems(options.data_dir),
+                    selected_track, selected_car);
+                if (!selection) return 0;
+                selected_track = selection->track;
+                selected_car = selection->car;
             }
-            std::size_t prepared_records = 0;
-            for (const auto& variant : ai_setup_variants)
-                prepared_records += variant.ai_setups.size();
-            std::cout << "Prepared " << prepared_records
-                      << " AI setup variants across all AIDR profiles and tuning modes ("
-                      << complete_setup_records
-                      << " numerically complete with the current FDIV model)\n";
+            const auto result = run_selected_race(options, selected_track,
+                selected_car, playback_trace ? &*playback_trace : nullptr);
+            if (result != 10) return result;
+            if (!interactive_frontend) return 0;
         }
-        return run_window(options.software, options.smoke_frames, options.audio_smoke,
-            options.record_trace,
-            playback_trace ? &*playback_trace : nullptr,
-            *entrants.player_record_index,
-            static_cast<std::uint32_t>(std::clamp(
-                assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
-            assets.track_name(), assets.car_name(), assets.terrain(),
-            assets.ideal_line(), assets.player_model(), assets.ai_model(), assets.track_objects(),
-            assets.bundle(std::string(assets.car_name()) + ".car"),
-            assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
-            options.grid_mode, assets.options());
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
         return 2;

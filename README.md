@@ -37,9 +37,14 @@ ctest --test-dir build -C Release --output-on-failure
 
 `--track NAME` and `--car NAME` select a `.trk` and `.car` bundle by filename
 stem. The original `-grid`/`/grid` switch selects the default track-basis car
-placement path; normal startup attempts native ILD spline placement. The current development view can load and validate the eight shipped
-track bundles and five shipped car bundles; this is asset selection and loading,
-not yet the game's frontend roster or a playable race. When the original data
+placement path; normal startup attempts native ILD spline placement. Starting
+without CLI asset overrides opens a keyboard setup window: up/down selects a
+track, left/right selects a car, and Enter loads the race. After the current
+race prototype displays results, Enter returns to setup. Escape exits. This is
+a basic runtime selector and session loop, not the original frontend or a full
+settings editor. Explicit `--track`/`--car`, validation, smoke, and trace
+commands bypass the selector. The runtime can load and validate the eight
+shipped track bundles and five shipped car bundles. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each
 shipped track and car, plus a WARP rendering smoke for each selected track/car.
 
