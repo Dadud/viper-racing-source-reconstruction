@@ -55,11 +55,17 @@ existing wheel/body update compositions, and `WindowState`. Introduce a
 session-owned physics type and fixed-step update at the Win32 boundary; replace
 the player's call to `advance_route_motion` only when that update produces the
 rendered pose. Record every still-observed external callback/input in a
-machine-readable trace. The original control update `0x43B290` is now confirmed
-to sample bindings into steering/throttle/brake globals, and the PCAR callback
-consumes the throttle/brake accessors before `0x431150`; the actual drivetrain
-path from those values into longitudinal wheel force is still untraced. Trace
-and model that producer before making throttle move the physics-owned car.
+machine-readable trace. The live session now composes modeled `0x43B290` from
+keyboard samples and configured `CONTROL` sensitivities/ranges/rates; its
+outputs at `0x509358`, `0x5093F4`, and `0x509320` drive the current route
+adapter. The PCAR callback reads the throttle/brake accessors, places
+transformed values on the car through setter helpers, and reaches the
+`0x431150` integrator, whose four `0x442530` wheel updates accumulate contact
+forces through `0x43E6F0`. This establishes the control-to-wheel-update call
+chain, but the live PCAR setter state, complete wheel/contact inputs, force
+collector, and body-integrator state are still not owned by `WindowState`.
+Build those persistent inputs and connect them to the existing wheel/body
+compositions before replacing route motion as the rendered pose authority.
 
 ### 2. Close the physical race loop: terrain, collision, damage, and finish
 

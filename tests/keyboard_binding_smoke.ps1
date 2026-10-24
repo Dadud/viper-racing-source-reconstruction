@@ -83,18 +83,32 @@ try {
 
     $rows = [System.IO.File]::ReadAllLines($trace)
     if ($rows.Count -lt 3) { throw 'Input trace did not capture enough race frames' }
+    $header = $rows[0].Split(',')
+    $nativeThrottleColumn = [Array]::IndexOf($header, 'control_0x5093f4')
+    if ($nativeThrottleColumn -lt 0) { throw 'Trace omitted the native throttle control output' }
     $throttle = @($rows | Select-Object -Skip 1 | ForEach-Object { $_.Split(',')[5] })
+    $nativeThrottle = @($rows | Select-Object -Skip 1 | ForEach-Object {
+        [single]::Parse($_.Split(',')[$nativeThrottleColumn], [cultureinfo]::InvariantCulture)
+    })
     $pressedIndex = -1
     for ($index = 0; $index -lt $throttle.Count; ++$index) {
         if ($throttle[$index] -eq '1') { $pressedIndex = $index; break }
     }
     if ($pressedIndex -lt 0) { throw 'The live trace never recorded throttle while Up was held' }
+    if (-not ($nativeThrottle | Where-Object { $_ -gt 0.0 })) {
+        throw 'The 0x43B290 control update did not raise its native throttle output'
+    }
     $releasedAfterPress = $false
     for ($index = $pressedIndex + 1; $index -lt $throttle.Count; ++$index) {
         if ($throttle[$index] -eq '0') { $releasedAfterPress = $true; break }
     }
     if (-not $releasedAfterPress) { throw 'The live trace never recorded throttle release' }
-    Write-Output 'VK_UP reached the live DIK binding evaluator as throttle and cleared on focus loss.'
+    $nativeReleased = $false
+    for ($index = $pressedIndex + 1; $index -lt $nativeThrottle.Count; ++$index) {
+        if ($nativeThrottle[$index] -eq 0.0) { $nativeReleased = $true; break }
+    }
+    if (-not $nativeReleased) { throw 'The native throttle response did not decay to zero after focus loss' }
+    Write-Output 'VK_UP reached the live DIK binding evaluator; the reconstructed 0x43B290 throttle response rose and decayed on focus loss.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

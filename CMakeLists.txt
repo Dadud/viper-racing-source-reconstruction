@@ -223,6 +223,7 @@ if(WIN32)
     endif()
     target_link_libraries(viper_game PRIVATE
         viper_race_progression
+        viper_race_loop_model
         viper_ai_resources viper_resource_bundle viper_model_resource
         viper_sound_resource
         viper_language_resource viper_terrain_model

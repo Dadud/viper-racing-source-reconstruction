@@ -47,6 +47,35 @@ returns value, active, and ramped-path samples in this slot order:
 `0x509430`, `0x5093D0`, `0x509398`, `0x5093E8`, `0x509400`, `0x509378`,
 `0x5093E0`, `0x5093D8`, `0x509418`.
 
+## Runtime control update
+
+The Windows race session now owns `RaceLoop43B290State` and calls
+`update_race_loop_43b290` once per simulation frame. It supplies the live
+keyboard snapshot for the four configured actions currently supported by the
+runtime (left, right, throttle, and brake). Trace playback uses separate
+synthetic selectors for those four recorded logical actions, so duplicate
+physical key assignments do not alter a recorded input schedule.
+
+Sensitivity, range, and rate values are read from the parsed `CONTROL` section
+of the external `options.def`. Missing values use the same 1.0 initialization
+observed in `0x43AF60`/`0x43B030`; `game_pad` defaults false. These values feed
+the model fields corresponding to `0x509428`, `0x509390`, `0x5093A8`,
+`0x50934C`, `0x509370`, `0x509350`, `0x509330`, `0x509380`, and `0x509348`.
+The model's outputs at `0x509358`, `0x5093F4`, and `0x509320` are now retained
+in session state and appended to race traces. The existing keyboard smoke
+reaches throttle through VK-to-DIK mapping, the binding evaluator, and the
+reconstructed throttle ramp; after focus loss the output decays to zero.
+
+This connects the recovered input update and its sensitivity controls to the
+live session. The route-motion adapter still thresholds those analog outputs
+at 0.2 because it accepts digital controls; its pose remains non-physical.
+Only the first four of the native 15 binding slots are presently populated
+from options, and native DirectInput controller polling remains absent.
+Evidence: `race_loop_update_43b290.evidence.json` (`0x43B290`,
+`ev_db358c27101404ca5eb5166ee5eab7df3a38f2a0eca453f836021a79b14d5b46`),
+`0x43B030` (`ev_9f472cb0b20c3269ba355274742e77b7b98756a1039d5d2a46f604a7fd8fa491`),
+and `0x43AF60` (`ev_2614052db9f481c424405ce0829f4cdff2fa304f248eb04a85baeb8e480f310d`).
+
 The input snapshot must represent values after the caller's input-refresh
 boundary. This keeps platform polling outside the model while allowing the
 recovered frame logic to consume the same sampled values for both raw and

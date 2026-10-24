@@ -1508,6 +1508,18 @@ struct WindowState {
     std::array<std::uint8_t, 256> keyboard_button_states{};
     std::array<viper::RaceInputBinding, 4> control_bindings{{
         {1U, 0xcbU}, {1U, 0xcdU}, {1U, 0xc8U}, {1U, 0xd0U}}};
+    viper::RaceLoop43B290State control_update_state{};
+    float control_steering_smoothing{1.0F};
+    float control_steering_range{1.0F};
+    float control_steering_speed{1.0F};
+    float control_throttle_range{1.0F};
+    float control_throttle_sensitivity{1.0F};
+    float control_throttle_speed{1.0F};
+    float control_brake_range{1.0F};
+    float control_brake_sensitivity{1.0F};
+    float control_brake_speed{1.0F};
+    bool control_game_pad{};
+    viper::RaceLoop43B290Plan last_control_update{};
     HWND window{};
     std::wstring title_base;
     std::uint32_t target_laps{1U};
@@ -1821,6 +1833,7 @@ struct WindowState {
     bool advance(float delta_seconds, const bool update_graphics = true)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
+        update_native_control_state(delta_seconds);
         auto candidate_motion = motion;
         const auto route_result = viper::advance_route_motion(candidate_motion, route,
             left, right, accelerate, brake, delta_seconds, target_laps);
@@ -1871,6 +1884,52 @@ struct WindowState {
             !motion.race.finished && accelerate);
         refresh_title();
         return true;
+    }
+
+    void update_native_control_state(const float delta_seconds)
+    {
+        viper::RaceLoop43B290Observation observation{};
+        observation.simulation_delta = delta_seconds;
+        std::copy(control_bindings.begin(), control_bindings.end(),
+            observation.bindings.begin());
+        observation.force_ramped_path_0x5093a0 = control_game_pad;
+        observation.steering_smoothing_0x509428 = control_steering_smoothing;
+        observation.steering_gain_0x509390 = control_steering_range;
+        observation.steering_response_rate_0x5093a8 = control_steering_speed;
+        observation.analog_0x5093f4_scale_0x50934c = control_throttle_range;
+        observation.analog_0x5093f4_bias_0x509370 = control_throttle_sensitivity;
+        observation.analog_0x5093f4_rate_0x509350 = control_throttle_speed;
+        observation.analog_0x509320_scale_0x509330 = control_brake_range;
+        observation.analog_0x509320_bias_0x509380 = control_brake_sensitivity;
+        observation.analog_0x509320_rate_0x509348 = control_brake_speed;
+
+        auto input = viper::RaceInputBindingObservation{};
+        if (playback_active) {
+            // Trace files store logical actions. Give those actions isolated
+            // synthetic selectors so duplicate user key bindings cannot
+            // change a previously recorded schedule during playback.
+            observation.bindings[0] = {1U, 0U};
+            observation.bindings[1] = {1U, 1U};
+            observation.bindings[2] = {1U, 2U};
+            observation.bindings[3] = {1U, 3U};
+            input.device_button_states[0] = static_cast<std::uint8_t>(left);
+            input.device_button_states[1] = static_cast<std::uint8_t>(right);
+            input.device_button_states[2] = static_cast<std::uint8_t>(accelerate);
+            input.device_button_states[3] = static_cast<std::uint8_t>(brake);
+        } else {
+            input.device_button_states = keyboard_button_states;
+        }
+        observation.post_refresh_inputs = {input, input};
+        last_control_update = viper::update_race_loop_43b290(
+            control_update_state, observation);
+
+        // The current route motion model accepts digital inputs. Preserve the
+        // recovered analog values in session state and trace; this threshold
+        // is only the adapter into that provisional route API.
+        left = control_update_state.steering.value_0x509358 < -0.2F;
+        right = control_update_state.steering.value_0x509358 > 0.2F;
+        accelerate = control_update_state.analog_0x5093f4.value > 0.2F;
+        brake = control_update_state.analog_0x509320.value > 0.2F;
     }
 
     bool results_ready() const noexcept
@@ -1973,6 +2032,28 @@ std::optional<std::uint8_t> directinput_key_selector(const UINT virtual_key)
 void load_keyboard_bindings(WindowState& state,
                             const viper::GameOptions& options)
 {
+    // 0x43B030 resets these CONTROL values to 1.0, then reads saved overrides.
+    state.control_steering_smoothing =
+        options.real("CONTROL", "steer_sensitivity").value_or(1.0F);
+    state.control_steering_range =
+        options.real("CONTROL", "steer_range").value_or(1.0F);
+    state.control_steering_speed =
+        options.real("CONTROL", "steer_speed").value_or(1.0F);
+    state.control_throttle_range =
+        options.real("CONTROL", "throttle_range").value_or(1.0F);
+    state.control_throttle_sensitivity =
+        options.real("CONTROL", "throttle_sensitivity").value_or(1.0F);
+    state.control_throttle_speed =
+        options.real("CONTROL", "throttle_speed").value_or(1.0F);
+    state.control_brake_range =
+        options.real("CONTROL", "brake_range").value_or(1.0F);
+    state.control_brake_sensitivity =
+        options.real("CONTROL", "brake_sensitivity").value_or(1.0F);
+    state.control_brake_speed =
+        options.real("CONTROL", "brake_speed").value_or(1.0F);
+    state.control_game_pad =
+        options.boolean("CONTROL", "game_pad").value_or(false);
+
     constexpr std::array<std::string_view, 4> action_names{
         "steer_left", "steer_right", "throttle", "braking"};
     for (std::size_t index = 0; index < action_names.size(); ++index) {
@@ -2223,6 +2304,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_normal_x,wheel" << wheel << "_normal_y,wheel" << wheel
                   << "_normal_z";
         }
+        trace << ",control_0x509358,control_0x5093f4,control_0x509320";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2318,6 +2400,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                           << ',' << observation.query_contact_normal.y
                           << ',' << observation.query_contact_normal.z;
                 }
+                trace << ',' << state.control_update_state.steering.value_0x509358
+                      << ',' << state.control_update_state.analog_0x5093f4.value
+                      << ',' << state.control_update_state.analog_0x509320.value;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";
