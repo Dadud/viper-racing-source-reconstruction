@@ -1247,13 +1247,19 @@ the callback resolves the `TRY`, `TIME`, and `DIST` labels from the exact
 `Dashboard:TestTrack:DistanceAbbreviated` keys before applying the TestTrack
 plan. When `SceneDashboardCoreCallbackObservation::locale_state` is also
 supplied, it binds the distance scale, decimal marker, and null suffix from the
-selected table produced by `initialize_scene_dashboard_locale`; otherwise
-those values remain supplied observations. Generation matches remain separate
-runtime inputs. The key addresses are confirmed at `0x4CFCF0`, `0x4CFD08`, and
+selected table produced by `initialize_scene_dashboard_locale`; the same
+locale state is bound into LapTime, supplemental, Best/Last, and auxiliary
+readout observations before those projections run. Otherwise those values
+remain supplied observations. Generation matches remain separate runtime
+inputs. The key addresses are confirmed at `0x4CFCF0`, `0x4CFD08`, and
 `0x4CFD24` by string evidence
 `ev_bb72e4563d1e233a8c2f3b6161be56993c7dfde3b1f23787ed864efbfbcc396b`,
 `ev_5aa526aff8909e8c9188bc7870749404053fb90646b5b56c9c285ef804035b9a`, and
 `ev_ad17e14bf8192a87b55570db21c647d7b093db859447942fa3194424babd71bf`.
+The composed callback carries its computed LapTime, TestTrack, supplemental,
+Best/Last, and numeric auxiliary strings on matching text-call descriptors
+when their source values are available. Its raster stage prefers those derived
+arguments and uses caller-formatted strings only at still-unresolved sites.
 On the type-0/global-`+0x40`-false branch, the flow also composes the
 supplemental `+0x24`/`+0x1C` rows before the paths converge at `0x403F7E`.
 Their position and count gates use the common `+0x140` Position result and
@@ -1376,16 +1382,17 @@ supplied observations.
 The result also exposes `ordered_text_calls`, concatenating the recovered
 Position/Lap/final-time sites, the reached selected branch, supplemental rows,
 both metrics, and the auxiliary rows in callback order. Formatted arguments
-remain separate because several values come from runtime resources or raw
-stack state.
+remain separate for values that still depend on runtime resources or raw
+stack state; helper-derived arguments are carried by their call descriptors.
 
-`raster_scene_dashboard_core_callback` now consumes that ordered list together
-with one formatted text observation and renderer context per call. It applies
-the existing font layout and atlas rasterizer in callback order, concatenates
-their projected pixel writes, and marks missing or extra arguments/contexts as
-incomplete. This composes the state-0 dashboard's reached text effects through
-to framebuffer write addresses without claiming surface ownership or device
-submission.
+`raster_scene_dashboard_core_callback` consumes that ordered list with one
+renderer context per call. It prefers a recovered call descriptor's formatted
+argument, then uses the aligned caller observation for unresolved text. Missing
+required arguments or renderer contexts mark the projection incomplete. It
+applies the existing font layout and atlas rasterizer in callback order and
+concatenates their projected pixel writes. This composes the state-0 dashboard's
+reached text effects through to framebuffer write addresses without claiming
+surface ownership or device submission.
 
 The null-font fallback in `0x44DC70` has a distinct renderer path: it invokes
 `0x44D6A0` twice at `(x+1,y+1)` and `(x,y)` with separate global colors.

@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Extended callback-owned text arguments across
+  LapTime, TestTrack, supplemental rows, Best/Last metrics, and the auxiliary
+  numeric readout. The core also binds the observed locale table into these
+  projections and resolves the LapTime/Best/Last language resources before
+  formatting. The raster path uses recovered strings when available, leaving
+  runtime inputs for unresolved sites. The full Release build and
+  `git diff --check` pass; no tests were run. See
+  `metadata/simulation_loop.md`.
+
 - **2026-10-24 continuation:** Carried resolved dashboard row strings on their
   text-call descriptors. The core callback now resolves Position, RaceTime,
   and Lap labels from the supplied language table and derives both numeric

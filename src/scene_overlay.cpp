@@ -2105,6 +2105,17 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     if (observation.selected_object_type_0x18 == 0 &&
         !global_method_0x40_result) {
         auto lap_time_observation = observation.lap_time;
+        if (observation.locale_state != nullptr) {
+            bind_scene_dashboard_locale(
+                lap_time_observation, *observation.locale_state);
+        }
+        if (observation.language_resource != nullptr) {
+            const auto text = observation.language_resource->find(
+                "Dashboard:LapTime");
+            if (text.has_value()) {
+                lap_time_observation.resource_text_0x4eb2b4.assign(*text);
+            }
+        }
         if (record != nullptr) {
             lap_time_observation.record_value_0x0c_bits = record_bits(
                 record->value_0x0c_bits,
@@ -2150,6 +2161,10 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         !global_method_0x40_result &&
         result.position.displayed_count > 1) {
         auto supplemental_observation = observation.supplemental_time;
+        if (observation.locale_state != nullptr) {
+            bind_scene_dashboard_locale(
+                supplemental_observation, *observation.locale_state);
+        }
         if (record != nullptr) {
             supplemental_observation.record_value_0x1c_bits = record_bits(
                 record->value_0x1c_bits,
@@ -2169,11 +2184,25 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
 
     for (std::size_t i = 0; i < result.metrics.size(); ++i) {
         auto metric_observation = observation.metrics[i];
+        if (observation.locale_state != nullptr) {
+            bind_scene_dashboard_locale(
+                metric_observation, *observation.locale_state);
+        }
         metric_observation.slot = i == 0
             ? SceneDashboardMetricSlot::value_0x10
             : SceneDashboardMetricSlot::value_0x14;
         metric_observation.selected_object_type_0x18 =
             observation.selected_object_type_0x18;
+        if (observation.language_resource != nullptr) {
+            const auto key = i == 0
+                ? std::string_view{"Dashboard:Best"}
+                : std::string_view{"Dashboard:Last"};
+            const auto text = observation.language_resource->find(key);
+            if (text.has_value()) {
+                metric_observation.prefix_text_from_0x4eb344_or_0x4eb334
+                    .assign(*text);
+            }
+        }
         if (record != nullptr) {
             const auto metric_bits = i == 0
                 ? record->value_0x10_bits
@@ -2189,6 +2218,10 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
     }
 
     auto auxiliary_observation = observation.auxiliary_readout;
+    if (observation.locale_state != nullptr) {
+        bind_scene_dashboard_locale(
+            auxiliary_observation, *observation.locale_state);
+    }
     if (record != nullptr && record->value_0x4c_bits.has_value()) {
         auxiliary_observation.record_value_0x4c_bits =
             *record->value_0x4c_bits;
@@ -2264,6 +2297,53 @@ SceneDashboardCoreCallbackPlan scene_dashboard_core_callback_plan(
         attach_text(0x00403972, format_pair(
             result.lap.displayed_lap,
             std::bit_cast<std::int32_t>(result.lap.displayed_lap_count)));
+    }
+    const auto attach_if_nonempty = [&](const std::uint32_t call_site,
+                                        const std::string& text) {
+        if (!text.empty()) {
+            attach_text(call_site, text);
+        }
+    };
+    if (observation.selected_object_type_0x18 == 0 &&
+        !global_method_0x40_result) {
+        attach_if_nonempty(0x00403A3F, result.lap_time.first_line_text);
+        attach_if_nonempty(0x00403A66, result.lap_time.second_line_text);
+        attach_if_nonempty(0x00403AB1, result.lap_time.first_line_text);
+        attach_if_nonempty(0x00403AD8, result.lap_time.second_line_text);
+    }
+    if (result.test_track_branch_reached) {
+        attach_if_nonempty(0x00403DA8, result.test_track.try_label_text);
+        attach_if_nonempty(0x00403E53,
+                           result.test_track.time_resource_label_text);
+        attach_if_nonempty(0x00403EC1, result.test_track.time_value_text);
+        attach_if_nonempty(0x00403E90, result.test_track.time_value_text);
+        attach_if_nonempty(0x00403F12,
+                           result.test_track.distance_resource_label_text);
+        attach_if_nonempty(0x00403F76,
+                           result.test_track.distance_value_text);
+    }
+    if (result.supplemental_time_branch_reached) {
+        attach_if_nonempty(0x00403BAC,
+            result.supplemental_time.formatted_negative_value_0x24);
+        attach_if_nonempty(0x00403BD7,
+            result.supplemental_time.record_text_0x28_plus_5);
+        attach_if_nonempty(0x00403C63,
+            result.supplemental_time.formatted_positive_value_0x1c);
+        attach_if_nonempty(0x00403C8E,
+            result.supplemental_time.record_text_0x20_plus_5);
+    }
+    for (const auto& metric : result.metrics) {
+        if (!metric.calls.empty()) {
+            attach_if_nonempty(metric.calls.front().call_site,
+                               metric.displayed_text);
+        }
+    }
+    attach_text(0x004043E8, result.auxiliary_readout.numeric_text);
+    if (result.position.redraw_all) {
+        attach_if_nonempty(0x0040434A,
+                           result.auxiliary_readout.heading_text);
+        attach_if_nonempty(0x00404418,
+                           result.auxiliary_readout.secondary_text);
     }
     return result;
 }
