@@ -9,9 +9,13 @@ parses the selected track's terrain and ideal line plus the selected car's
 human setup, the track bundle's AI default setup, and the car's level-0 indexed
 mesh, and draws them in a top-down Direct3D
 development view. It loads the selected track's `track.obt` placement table and
-anchors the preview car at its first `obj car` start position, with height
-sampled from terrain data. The preview heading still follows the ideal line.
-It does not yet render a 3D track scene or run a race.
+renders a selected-model copy at each valid `obj car` start position, with
+height sampled from terrain data and heading approximated from the nearest
+ideal-line segment. Arrow keys or WASD move the first car mesh along the
+ideal-line route using provisional kinematic controls; Escape exits. Other
+grid meshes remain parked. This is a top-down development scene and motion
+prototype, not a race simulation; a 3D track scene, moving opponents, HUD, and
+race results are not implemented.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell

@@ -267,15 +267,17 @@ public:
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
             extract_terrain_points(terrain);
             player_model_ = &player_model;
-            const auto spawn = first_car_spawn(track_objects);
-            if (!spawn) throw std::runtime_error("track.obt has no usable obj car start position");
-            car_anchor_x_ = (*spawn)[0];
-            car_anchor_z_ = (*spawn)[1];
-            car_anchor_y_ = viper::terrain_height_or_zero(
-                terrain, car_anchor_x_, car_anchor_z_, false);
-            car_yaw_ = std::atan2(
-                ideal_line_points_[1][1] - ideal_line_points_[0][1],
-                ideal_line_points_[1][0] - ideal_line_points_[0][0]);
+            const auto spawns = car_spawns(track_objects);
+            if (spawns.empty()) throw std::runtime_error("track.obt has no usable obj car start position");
+            car_poses_.reserve(spawns.size());
+            for (const auto& spawn : spawns) {
+                const float yaw = route_yaw(spawn[0], spawn[1]);
+                const auto surface = viper::sample_terrain_resource(
+                    terrain, {spawn[0], 1000.0f, spawn[1]}, true);
+                if (!surface.query_succeeded)
+                    throw std::runtime_error("track.obt car start position has no terrain surface");
+                car_poses_.push_back({spawn[0], surface.sampled_position[1], spawn[1], yaw});
+            }
         } catch (const std::exception& e) {
             OutputDebugStringA(e.what());
             return false;
@@ -361,14 +363,16 @@ public:
     bool set_car_pose(const float anchor_x, const float anchor_y,
                       const float anchor_z, const float yaw)
     {
-        car_anchor_x_ = anchor_x;
-        car_anchor_y_ = anchor_y;
-        car_anchor_z_ = anchor_z;
-        car_yaw_ = yaw;
+        if (car_poses_.empty()) return false;
+        car_poses_.front() = {anchor_x, anchor_y, anchor_z, yaw};
         return update_car_buffer();
     }
 
-    std::array<float, 2> car_position() const { return {car_anchor_x_, car_anchor_z_}; }
+    std::array<float, 2> car_position() const
+    {
+        if (car_poses_.empty()) return {};
+        return {car_poses_.front().x, car_poses_.front().z};
+    }
 
 private:
     void extract_terrain_points(const viper::TerrainSurfaceResourcePayload& terrain)
@@ -491,9 +495,10 @@ private:
         return true;
     }
 
-    static std::optional<std::array<float, 2>> first_car_spawn(
+    static std::vector<std::array<float, 2>> car_spawns(
         const viper::TrackObjectTextTable& table)
     {
+        std::vector<std::array<float, 2>> result;
         for (std::size_t row = 1; row < table.line_count; ++row) {
             const auto line = viper::track_object_text_line(table, row);
             if (!line) continue;
@@ -502,42 +507,64 @@ private:
                 !directive.object_line.starts_with("obj car ")) continue;
             float x{}, z{};
             if (sscanf_s(directive.object_line.data(), "obj car %f, %f", &x, &z) == 2 &&
-                std::isfinite(x) && std::isfinite(z)) return std::array<float, 2>{x, z};
+                std::isfinite(x) && std::isfinite(z)) result.push_back({x, z});
         }
-        return std::nullopt;
+        return result;
+    }
+
+    float route_yaw(const float x, const float z) const
+    {
+        float nearest = std::numeric_limits<float>::infinity();
+        float result = 0.0f;
+        for (std::size_t index = 0; index < ideal_line_points_.size(); ++index) {
+            const auto& a = ideal_line_points_[index];
+            const auto& b = ideal_line_points_[(index + 1U) % ideal_line_points_.size()];
+            const float dx = b[0] - a[0], dz = b[1] - a[1];
+            const float length_sq = dx * dx + dz * dz;
+            if (!(length_sq > 1.0e-8f)) continue;
+            const float fraction = std::clamp(((x - a[0]) * dx + (z - a[1]) * dz) /
+                length_sq, 0.0f, 1.0f);
+            const float ex = x - (a[0] + dx * fraction);
+            const float ez = z - (a[1] + dz * fraction);
+            const float distance = ex * ex + ez * ez;
+            if (distance < nearest) { nearest = distance; result = std::atan2(dx, dz); }
+        }
+        return result;
     }
 
     bool update_car_buffer()
     {
         if (!width_ || !height_ || player_model_ == nullptr || player_model_->vertices.empty()) return true;
-        if (ideal_line_points_.size() < 2U) return false;
-        const float sin_yaw = std::sin(car_yaw_);
-        const float cos_yaw = std::cos(car_yaw_);
+        if (ideal_line_points_.size() < 2U || car_poses_.empty()) return false;
         std::vector<SurfaceVertex> vertices;
         std::vector<CarDrawGroup> groups;
-        for (const auto& model_group : player_model_->material_groups) {
-            CarDrawGroup draw_group{};
-            draw_group.first_vertex = static_cast<UINT>(vertices.size());
-            const auto material = model_group.material_name;
-            const std::array<float, 3> color = material.find("WHEEL") != std::string::npos
-                ? std::array<float, 3>{0.10f, 0.11f, 0.12f}
-                : material.find("EFFECT") != std::string::npos
-                    ? std::array<float, 3>{0.95f, 0.57f, 0.12f}
-                    : material.find("UCAR") != std::string::npos
-                        ? std::array<float, 3>{0.18f, 0.48f, 0.82f}
-                        : std::array<float, 3>{0.78f, 0.20f, 0.12f};
-            for (const auto local_index : model_group.local_indices) {
-                const auto vertex_index = static_cast<std::size_t>(model_group.first_vertex) + local_index;
-                if (vertex_index >= player_model_->vertices.size()) return false;
-                const auto& model_vertex = player_model_->vertices[vertex_index].fields;
-                // FNIM stores vehicle-local XYZ; this overview projects local X/Z onto the map.
-                const float world_x = car_anchor_x_ + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
-                const float world_z = car_anchor_z_ - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
-                const auto pos = map_to_clip(world_x, world_z);
-                vertices.push_back({pos[0], pos[1], color[0], color[1], color[2]});
+        for (const auto& pose : car_poses_) {
+            const float sin_yaw = std::sin(pose.yaw);
+            const float cos_yaw = std::cos(pose.yaw);
+            for (const auto& model_group : player_model_->material_groups) {
+                CarDrawGroup draw_group{};
+                draw_group.first_vertex = static_cast<UINT>(vertices.size());
+                const auto material = model_group.material_name;
+                const std::array<float, 3> color = material.find("WHEEL") != std::string::npos
+                    ? std::array<float, 3>{0.10f, 0.11f, 0.12f}
+                    : material.find("EFFECT") != std::string::npos
+                        ? std::array<float, 3>{0.95f, 0.57f, 0.12f}
+                        : material.find("UCAR") != std::string::npos
+                            ? std::array<float, 3>{0.18f, 0.48f, 0.82f}
+                            : std::array<float, 3>{0.78f, 0.20f, 0.12f};
+                for (const auto local_index : model_group.local_indices) {
+                    const auto vertex_index = static_cast<std::size_t>(model_group.first_vertex) + local_index;
+                    if (vertex_index >= player_model_->vertices.size()) return false;
+                    const auto& model_vertex = player_model_->vertices[vertex_index].fields;
+                    // FNIM stores vehicle-local XYZ; this overview projects local X/Z onto the map.
+                    const float world_x = pose.x + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
+                    const float world_z = pose.z - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
+                    const auto pos = map_to_clip(world_x, world_z);
+                    vertices.push_back({pos[0], pos[1], color[0], color[1], color[2]});
+                }
+                draw_group.vertex_count = static_cast<UINT>(vertices.size()) - draw_group.first_vertex;
+                groups.push_back(draw_group);
             }
-            draw_group.vertex_count = static_cast<UINT>(vertices.size()) - draw_group.first_vertex;
-            groups.push_back(draw_group);
         }
         if (vertices.size() > std::numeric_limits<UINT>::max() / sizeof(SurfaceVertex)) return false;
         D3D11_BUFFER_DESC desc{};
@@ -554,6 +581,7 @@ private:
     }
 
     struct CarDrawGroup { UINT first_vertex{}; UINT vertex_count{}; };
+    struct CarPose { float x{}; float y{}; float z{}; float yaw{}; };
 
     bool create_line_pipeline()
     {
@@ -628,14 +656,11 @@ private:
     std::vector<std::array<float, 3>> terrain_points_;
     std::vector<std::array<float, 3>> terrain_normals_;
     const viper::ModelResource* player_model_{};
+    std::vector<CarPose> car_poses_;
     std::vector<CarDrawGroup> car_draw_groups_;
     std::array<float, 4> map_bounds_{};
     float min_height_{};
     float max_height_{};
-    float car_anchor_x_{};
-    float car_anchor_y_{};
-    float car_anchor_z_{};
-    float car_yaw_{};
     UINT ideal_line_vertex_count_{};
     UINT surface_vertex_count_{};
     UINT width_{};

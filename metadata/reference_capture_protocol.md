@@ -5,11 +5,14 @@ record, not expected values or tolerances. No comparison recording is claimed
 by this document. Original binaries and assets remain external; do not commit
 private captures or payloads to the public source repository.
 
-Current reconstruction evidence is limited to `viper_game` loading five
-original bundles and 822 language entries with `--validate-assets`, plus a
-three-frame D3D11 WARP smoke run that exits cleanly. Record these as startup and
-asset-validation runs only; they do not constitute a gameplay comparison or
-replace the paired playable scenario below.
+Current reconstruction evidence includes `viper_game` loading six original
+bundles and 822 language entries with `--validate-assets`, plus a three-frame
+D3D11 WARP smoke run that exits cleanly. The top-down scene renders every
+parsed `obj car` grid position and supports provisional keyboard-driven
+kinematic motion for the first mesh; smoke coverage does not replay input.
+Record these as startup, asset-validation, and bounded rendering evidence only;
+they do not constitute a gameplay comparison or replace the paired playable
+scenario below.
 
 A private original-client startup attempt is recorded at
 `../analysis/reference_captures/original_graphics_failure.json`. The extracted
