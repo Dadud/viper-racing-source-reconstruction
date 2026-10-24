@@ -334,12 +334,34 @@ struct AcarSteeringHistoryTailPlan {
     float steering_target,
     const AcarSteeringHistoryTailObservation& observation) noexcept;
 
+struct AcarAlternateRouteThrottleObservation {
+    bool alternate_route_mode_0xf30{};
+    std::optional<float> route_value_0xf0c;
+    std::optional<float> route_scalar_0xfbc;
+    std::optional<float> existing_throttle_limit_0x103c;
+};
+
+struct AcarAlternateRouteThrottlePlan {
+    std::optional<float> effective_throttle_limit_0x103c;
+    float scaled_route_delta{};
+    bool throttle_limit_written{};
+    bool input_incomplete{};
+};
+
+// Projects the callback's alternate-route write to +0x103C.
+[[nodiscard]] AcarAlternateRouteThrottlePlan
+plan_acar_alternate_route_throttle_limit(
+    const AcarAlternateRouteThrottleObservation& observation) noexcept;
+
 struct AcarBehaviorControlChainObservation {
     AcarBehaviorGeometryObservation geometry{};
     AcarRouteSteeringObservation route_steering{};
     AcarControlResponseObservation control_response{};
     AcarForwardCandidateSteeringObservation forward_steering{};
     AcarSteeringHistoryTailObservation steering_history{};
+    std::optional<float> route_value_0xf0c;
+    std::optional<float> route_scalar_0xfbc;
+    std::optional<float> existing_throttle_limit_0x103c;
     float clamp_value_0x1018{};
     float speed_0x1020{};
 };
@@ -350,6 +372,7 @@ struct AcarBehaviorControlChainPlan {
     std::optional<AcarForwardCandidateSteeringPlan> forward_steering_plan;
     AcarBehaviorGeometryPlan geometry_plan{};
     std::optional<AcarSteeringHistoryTailPlan> steering_history_plan;
+    AcarAlternateRouteThrottlePlan alternate_route_throttle_plan{};
     std::vector<AcarBehaviorControlTailCall> tail_call_order;
     float local_output_0{};
     float local_output_1{};

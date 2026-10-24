@@ -682,8 +682,9 @@ are supplied observations. Evidence: `0x42B570`
 `compose_acar_behavior_control_chain` now carries the two stack outputs
 through `0x42A6D0`, `0x42B570`, and `0x42B450` in callback order, applies the
 observed `+0x1018` comparison, and records the six subsequent helper calls
-through `0x4331C0`. Incomplete `0x42A6D0` inputs stop the composition before
-dependent calls; tail-helper effects remain explicit follow-up work.
+through `0x4331C0`. Missing `0x42A6D0` observations mark the plan incomplete,
+while the callback still proceeds with the unchanged local outputs, as the
+machine code does; later tail-helper effects remain explicit follow-up work.
 
 `plan_acar_behavior_geometry_seed` now resolves that vector/angle seed from
 the `+0xF80` signed gate, `+0xF74/+0xF78` vector, the `2^-23` unit-length
@@ -705,3 +706,11 @@ speed, and scale are explicit observations. Evidence:
 `0x428CD0` `ev_79e703e41d739bc81a42eec4fb785446b74af8830a2245fdd8cdd4824aba92be`.
 Effects of the later brake/throttle setters and the nested `0x43FDD0` work
 called from `0x433230` remain open.
+
+`plan_acar_alternate_route_throttle_limit` also reconstructs the callback's
+independent `+0xF30` write to `+0x103C`: it preserves the existing value when
+alternate mode is off, and otherwise follows the observed `1.0`, `0.2`, or
+linear route-delta branches. The composed callback retains the true call flow
+when route-helper observations are missing, carrying unchanged local values
+forward and marking the plan incomplete instead of stopping execution.
+Evidence: callback bytes `ev_b038b8489dcad25a2edb9f7bb71e9ca7c2ece24d4467baccad8114e6913e8f93`.

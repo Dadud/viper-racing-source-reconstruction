@@ -823,6 +823,52 @@ AcarSteeringHistoryTailPlan plan_acar_steering_history_tail(
     return plan;
 }
 
+AcarAlternateRouteThrottlePlan plan_acar_alternate_route_throttle_limit(
+    const AcarAlternateRouteThrottleObservation& observation) noexcept
+{
+    AcarAlternateRouteThrottlePlan plan{};
+    plan.effective_throttle_limit_0x103c =
+        observation.existing_throttle_limit_0x103c;
+    if (!observation.alternate_route_mode_0xf30) {
+        plan.input_incomplete =
+            !observation.existing_throttle_limit_0x103c.has_value();
+        return plan;
+    }
+    if (!observation.route_value_0xf0c.has_value() ||
+        !observation.route_scalar_0xfbc.has_value()) {
+        plan.input_incomplete = true;
+        return plan;
+    }
+
+    const auto route_delta = static_cast<float>(
+        static_cast<long double>(*observation.route_value_0xf0c) -
+        *observation.route_scalar_0xfbc);
+    constexpr auto scale_bits = std::uint32_t{0x3d088889U};
+    const auto scaled_delta = static_cast<float>(
+        static_cast<long double>(route_delta) *
+        std::bit_cast<float>(scale_bits));
+    plan.scaled_route_delta = scaled_delta;
+    if (scaled_delta < 1.0F) {
+        plan.effective_throttle_limit_0x103c = 1.0F;
+    } else if (std::bit_cast<std::int32_t>(scaled_delta) >
+               0x3f800000) {
+        plan.effective_throttle_limit_0x103c = 0.2F;
+    } else {
+        constexpr auto slope_a =
+            std::bit_cast<float>(std::uint32_t{0xbd088889U});
+        constexpr auto slope_b =
+            std::bit_cast<float>(std::uint32_t{0x3bda740eU});
+        const auto route_term_a = static_cast<long double>(route_delta) *
+            slope_a;
+        const auto route_term_b = static_cast<long double>(route_delta) *
+            slope_b;
+        plan.effective_throttle_limit_0x103c = static_cast<float>(
+            route_term_a + 1.0L + route_term_b);
+    }
+    plan.throttle_limit_written = true;
+    return plan;
+}
+
 AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     const AcarDriverAiState& driver_state,
     const AcarBehaviorControlChainObservation& observation)
@@ -850,11 +896,15 @@ AcarBehaviorControlChainPlan compose_acar_behavior_control_chain(
     if (plan.route_steering_plan->output_1.has_value()) {
         plan.local_output_1 = *plan.route_steering_plan->output_1;
     }
-    if (plan.route_steering_plan->input_incomplete &&
-        !plan.route_steering_plan->output_written) {
-        plan.input_incomplete = true;
-        return plan;
-    }
+    plan.input_incomplete = plan.route_steering_plan->input_incomplete;
+    plan.alternate_route_throttle_plan =
+        plan_acar_alternate_route_throttle_limit({
+            observation.route_steering.alternate_route_mode_0xf30,
+            observation.route_value_0xf0c,
+            observation.route_scalar_0xfbc,
+            observation.existing_throttle_limit_0x103c});
+    plan.input_incomplete = plan.input_incomplete ||
+        plan.alternate_route_throttle_plan.input_incomplete;
 
     auto response_observation = observation.control_response;
     response_observation.steering_output_0 = plan.local_output_1;
