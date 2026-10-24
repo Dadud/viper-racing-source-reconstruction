@@ -140,6 +140,7 @@ add_library(viper_physics_scheduler src/physics_scheduler.cpp)
 target_sources(viper_physics_scheduler PRIVATE
     src/physics_task_factory.cpp
     src/acar_curve_tracker.cpp
+    src/acar_driver_ai.cpp
 )
 target_include_directories(viper_physics_scheduler PUBLIC include)
 target_compile_features(viper_physics_scheduler PUBLIC cxx_std_20)

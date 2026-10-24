@@ -580,3 +580,23 @@ native registration target and runtime invocation are still external inputs.
 Evidence: `0x42AD20`
 `ev_c2d39ffcfd59d893ca7728fa13e858caae86a3962e967ae6233a1450b625eccb`,
 `0x41D3A0` `ev_631cd4c82a9fbea5316c43d028233aa692352fb60df19af0264577d9376e064a`.
+
+`update_acar_driver_ai_candidates` models the analyzed `0x42ADB0` route-relative
+candidate routine. No direct code callers were observed; the registered
+`0x42AD80` address is a separate entry whose body/call relationship remains
+unresolved. The model applies the raw signed `+0xF10` threshold, resolves the
+two route vectors through the sign-selecting `0x41F0A0`/`0x41F0E0` accessors,
+normalizes the car's XZ velocity, and uses `0x42A630`'s `(x,z) -> (z,-x)`
+rotation for lateral projection. The `0x42B320` stateful directional candidate
+arbitration and `0x42B2E0` forward maximum update are applied to an explicit
+state object. `0x41B050`'s global registry lookup result remains an input; the
+projection also reports the selected lookup index. Exceptional float encodings
+and x87/FDIV precision remain approximate. Evidence: `0x42ADB0`
+`ev_ee52cfef3c65309b0c2f076b3e9dfbf236dd69da033939ddfc6563d3e7a20407`,
+caller query `ev_789a3d59c544672d0999d5cb6936ed19a57c3adb71fb3275324a09e6fae3db84`,
+`0x42B320` `ev_1bfaaf935fc2a8875249c5e2a09ad93fd52f8f9735a719570ffc9913a9b0831`,
+`0x42B2E0` `ev_6243204e406a2c5f93f17fafc8df3ad2d4ad60cbb31f582599cd5463d48a10c9`,
+`0x42A630` `ev_ee340f9fd04c639504bdf5f8df1695d4203229c416704574d0dc7773ba75183b`,
+`0x41F0A0` `ev_468b3e59ecafd5890c7c64c5a7f41829f26efd1cdddfa0ab637ec81742d1f76`,
+`0x41F0E0` `ev_204234122e042862454f8ded6d9907c797f279c85edb9ac9655fcabfa2bc0701`,
+and `0x41B050` `ev_278b8fb16ac39bb1b38acaa720b2ca9490c3e235c60d947151f3c3b41f16bccf`.
