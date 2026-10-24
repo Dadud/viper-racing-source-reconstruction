@@ -91,6 +91,20 @@ vehicle. Evidence: `0x41A000`
 `ev_67a3cffd701fba3131c3793b441c8ae76089194d822832bebb5902ef73ac6b54`,
 `0x41A0C0` `ev_85870aa4ba6b470ea3e074c852c0ac3a55794497857bea8dd0235a0a713f8549`.
 
+`build_ai_configured_setup` now composes the validated 0x8C-byte base payload,
+the three documented driver/track writes, and `0x41A0C0`'s coefficient outputs
+into the 35-word AI setup. It writes setup word 1 from track-row `+0` times
+driver-record `+0x20`, scales words `0x12` and `0x13` by track-row `+0xC`
+times driver-record `+0x6C`, and merges the seven exact fallback coefficients
+or the loaded CARF coefficient loop at words `0x14..0x1A`. The existing
+coefficient planner retains the X87/FDIV numeric approximation caveat.
+Regression coverage exercises both coefficient branches, preserved base words,
+scalar destinations, and short-payload rejection. This is a reusable setup
+composition; the runtime still does not resolve each AI's difficulty group,
+track mode, CARF resource/fallback block, or merge this setup into a live row
+and vehicle constructor. Missing inputs therefore remain explicit at the API
+boundary.
+
 ## World car variant tags at `0x45CAE0`
 
 The world parser reads a numeric subtype from each `obj_car` record and writes

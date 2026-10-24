@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "viper/ai_driver_resource.hpp"
 #include "viper/world_track_objects.hpp"
 
 namespace viper {
@@ -214,5 +215,29 @@ struct AiVehicleConfigurationPlan {
 // operands are retained as binary32 inputs because their source records vary.
 [[nodiscard]] AiVehicleConfigurationPlan plan_ai_vehicle_configuration(
     const AiVehicleConfigurationObservation& observation);
+
+struct AiConfiguredSetupObservation {
+    // Validated aidef.ccs payload or the caller-provided native fallback block.
+    std::span<const std::byte> base_setup_payload;
+    AIDriverTrackTuning driver_tuning;
+    // False selects 0x41A0C0's seven exact numeric fallback coefficients.
+    std::optional<bool> configuration_data_available;
+    std::optional<CarFilePayload> loaded_car_file;
+    // Required only when a configuration resource is available.
+    std::optional<bool> compatibility_division_helper_enabled;
+};
+
+struct AiConfiguredSetupPlan {
+    bool input_complete{};
+    std::array<std::uint32_t, 35> setup_words{};
+    AiVehicleConfigurationPlan coefficient_plan;
+    bool track_driver_scalars_written{};
+};
+
+// Composes the observed aidef/driver mutation and 0x41A0C0 coefficient writes
+// into one 35-word AI setup. Group/slot/track-mode selection, fallback block
+// acquisition, and the runtime consumer remain caller responsibilities.
+[[nodiscard]] AiConfiguredSetupPlan build_ai_configured_setup(
+    const AiConfiguredSetupObservation& observation);
 
 } // namespace viper

@@ -424,4 +424,74 @@ AiVehicleConfigurationPlan plan_ai_vehicle_configuration(
     return result;
 }
 
+AiConfiguredSetupPlan build_ai_configured_setup(
+    const AiConfiguredSetupObservation& observation)
+{
+    AiConfiguredSetupPlan result{};
+    constexpr auto setup_size = result.setup_words.size() * sizeof(std::uint32_t);
+    if (observation.base_setup_payload.size() != setup_size) {
+        return result;
+    }
+    for (std::size_t index = 0; index < result.setup_words.size(); ++index) {
+        const auto offset = index * sizeof(std::uint32_t);
+        result.setup_words[index] =
+            std::to_integer<std::uint32_t>(observation.base_setup_payload[offset]) |
+            (std::to_integer<std::uint32_t>(observation.base_setup_payload[offset + 1U]) << 8U) |
+            (std::to_integer<std::uint32_t>(observation.base_setup_payload[offset + 2U]) << 16U) |
+            (std::to_integer<std::uint32_t>(observation.base_setup_payload[offset + 3U]) << 24U);
+    }
+
+    result.setup_words[1U] = std::bit_cast<std::uint32_t>(
+        observation.driver_tuning.track_value_0x90 *
+        observation.driver_tuning.record_scale_0x20);
+    const float setup_scale = observation.driver_tuning.track_value_0x9c *
+        observation.driver_tuning.record_scale_0x6c;
+    for (const std::size_t index : {0x12U, 0x13U}) {
+        result.setup_words[index] = std::bit_cast<std::uint32_t>(
+            std::bit_cast<float>(result.setup_words[index]) * setup_scale);
+    }
+    result.track_driver_scalars_written = true;
+
+    AiVehicleConfigurationObservation coefficient_observation{};
+    coefficient_observation.configuration_data_available =
+        observation.configuration_data_available;
+    coefficient_observation.loaded_car_file = observation.loaded_car_file;
+    coefficient_observation.vehicle_scalar_0x00 =
+        std::bit_cast<float>(result.setup_words[0]);
+    coefficient_observation.call_scale =
+        observation.driver_tuning.track_value_0x94;
+    coefficient_observation.compatibility_division_helper_enabled =
+        observation.compatibility_division_helper_enabled;
+    result.coefficient_plan =
+        plan_ai_vehicle_configuration(coefficient_observation);
+    if (!result.coefficient_plan.input_complete) {
+        return result;
+    }
+
+    constexpr std::size_t coefficient_start = 0x14U;
+    if (result.coefficient_plan.fallback_coefficients_written) {
+        for (std::size_t index = 0;
+             index < result.coefficient_plan.fallback_coefficient_bits.size();
+             ++index) {
+            result.setup_words[coefficient_start + index] =
+                result.coefficient_plan.fallback_coefficient_bits[index];
+        }
+    } else {
+        if (result.coefficient_plan.coefficient_values.size() !=
+                static_cast<std::size_t>(
+                    result.coefficient_plan.coefficient_writes) ||
+            result.coefficient_plan.coefficient_values.size() >
+                result.setup_words.size() - coefficient_start) {
+            return result;
+        }
+        for (std::size_t index = 0;
+             index < result.coefficient_plan.coefficient_values.size(); ++index) {
+            result.setup_words[coefficient_start + index] = std::bit_cast<std::uint32_t>(
+                result.coefficient_plan.coefficient_values[index]);
+        }
+    }
+    result.input_complete = true;
+    return result;
+}
+
 } // namespace viper
