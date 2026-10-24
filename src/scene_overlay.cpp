@@ -2092,6 +2092,30 @@ SceneDashboardLapTimeResult update_scene_dashboard_lap_time(
     return result;
 }
 
+SceneDashboardFontProjection scene_dashboard_font_projection(
+    const StampFontIndex& index,
+    const std::int32_t top_metric,
+    const std::int32_t bottom_metric) noexcept
+{
+    SceneDashboardFontProjection result{};
+    result.input_complete = index.glyph_table_complete;
+    result.font.glyph_index.fill(-1);
+    result.font.top_metric = top_metric;
+    result.font.bottom_metric = bottom_metric;
+    for (std::size_t character = 0;
+         character < index.characters.size(); ++character) {
+        const auto& source = index.characters[character];
+        if (!source.populated) {
+            continue;
+        }
+        result.font.glyph_index[character] = std::bit_cast<std::int16_t>(
+            source.glyph_index);
+        result.font.glyph_advance[character] = source.metric_0x204;
+        result.font.glyph_x_offset[character] = source.metric_0x404;
+    }
+    return result;
+}
+
 SceneDashboardTestTrackResult update_scene_dashboard_test_track(
     SceneDashboardState& state,
     const SceneDashboardTestTrackObservation& observation)

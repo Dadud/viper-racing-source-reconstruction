@@ -166,6 +166,8 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             observation.dashboard_callback_geometry);
     }
     if (plan.shared_callback_reached) {
+        auto paused_banner_raster_observation =
+            observation.shared_paused_banner_raster;
         plan.dashboard_gear_display_reached = true;
         auto gear_observation = observation.dashboard_gear_display;
         gear_observation.dashboard_path_enabled =
@@ -238,21 +240,32 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             shared_overlay_observation.framebuffer_base_value =
                 observation.state0_dashboard_render.framebuffer_base_value;
         }
-        if (observation.shared_paused_banner_raster.has_value() &&
-            observation.shared_paused_banner_raster->resource_image.has_value()) {
+        if (paused_banner_raster_observation.has_value() &&
+            paused_banner_raster_observation->resource_image.has_value()) {
             auto& paused_render =
                 shared_overlay_observation.paused_banner.render;
-            const auto& resource_image = *observation
-                .shared_paused_banner_raster->resource_image;
+            const auto& resource_image =
+                *paused_banner_raster_observation->resource_image;
             paused_render.resource_text_width = resource_image.width;
             paused_render.resource_text_height = resource_image.height;
             if (!paused_render.load_stp_resource_lookup.has_value()) {
                 paused_render.load_stp_resource_found = true;
             }
         }
-        if (observation.shared_paused_banner_raster.has_value()) {
+        if (paused_banner_raster_observation.has_value()) {
             const auto& banner_raster =
-                *observation.shared_paused_banner_raster;
+                *paused_banner_raster_observation;
+            auto layout_font = banner_raster.layout_font;
+            auto parsed_font_complete = true;
+            if (banner_raster.parsed_layout_font.has_value()) {
+                const auto projection = scene_dashboard_font_projection(
+                    *banner_raster.parsed_layout_font,
+                    banner_raster.layout_font_top_metric_0x44dbc0.value_or(0),
+                    banner_raster.layout_font_bottom_metric_0x44dc00.value_or(0));
+                layout_font = projection.font;
+                parsed_font_complete = projection.input_complete;
+                paused_banner_raster_observation->layout_font = layout_font;
+            }
             const auto& text_observation = banner_raster.text;
             const auto gates = scene_shared_overlay_gates(
                 shared_overlay_observation.overlay_globals);
@@ -276,11 +289,16 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                 const auto style = scene_paused_banner_style14_plan(
                     *text_observation.style14);
                 const auto text_layout = layout_scene_dashboard_text(
-                    style.text_style, text, banner_raster.layout_font);
+                    style.text_style, text, layout_font);
                 plan.shared_paused_banner_fallback_measure =
                     scene_paused_banner_style14_measure_width(
                         style, text_observation.text_pointer_nonnull,
                         text_layout.measured_width);
+                if (text_observation.text_pointer_nonnull &&
+                    !parsed_font_complete) {
+                    plan.shared_paused_banner_fallback_measure
+                        ->input_complete = false;
+                }
                 if (plan.shared_paused_banner_fallback_measure->input_complete) {
                     shared_overlay_observation.paused_banner.render
                         .fallback_text_width = plan
@@ -295,10 +313,9 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             plan.shared_overlay.paused_banner.inner_render.input_complete =
                 false;
         }
-        if (observation.shared_paused_banner_raster.has_value() &&
+        if (paused_banner_raster_observation.has_value() &&
             plan.shared_overlay.paused_banner.inner_render.draws_text_handle) {
-            auto raster_observation =
-                *observation.shared_paused_banner_raster;
+            auto raster_observation = *paused_banner_raster_observation;
             std::vector<SceneDashboardRasterObservation> line_renderers(
                 raster_observation.text.per_line_renderers.begin(),
                 raster_observation.text.per_line_renderers.end());
@@ -347,12 +364,16 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     raster_observation.text,
                     raster_observation.layout_font,
                     raster_observation.atlas_font);
+            if (raster_observation.parsed_layout_font.has_value() &&
+                !raster_observation.parsed_layout_font->glyph_table_complete) {
+                plan.shared_paused_banner_text_raster->input_complete = false;
+            }
         }
-        if (observation.shared_paused_banner_raster.has_value() &&
+        if (paused_banner_raster_observation.has_value() &&
             plan.shared_overlay.paused_banner.inner_render.draws_resource_text &&
-            observation.shared_paused_banner_raster->resource_image.has_value()) {
+            paused_banner_raster_observation->resource_image.has_value()) {
             auto resource_renderer =
-                observation.shared_paused_banner_raster->resource_renderer;
+                paused_banner_raster_observation->resource_renderer;
             const auto apply_resource_context = [&] (
                 const RenderContextViewport& context,
                 const std::uint8_t renderer_mode,
@@ -392,7 +413,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             }
             const ScenePausedBannerResourceRasterObservation resource_observation{
                 true,
-                *observation.shared_paused_banner_raster->resource_image,
+                *paused_banner_raster_observation->resource_image,
                 std::move(resource_renderer),
             };
             plan.shared_paused_banner_resource_raster =

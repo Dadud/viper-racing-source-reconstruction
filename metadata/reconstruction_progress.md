@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added `scene_dashboard_font_projection` to
+  convert the decoded STMP character map into the runtime's 256-entry glyph
+  index, advance, and x-offset tables. The race-loop paused-banner input can
+  now accept the parsed font directly and uses it for layout and text raster
+  projection; incomplete glyph maps propagate as incomplete output. `euro12.fnt`
+  in `common.res` has 222 populated character records. Baseline metrics remain
+  explicit helper outputs. Evidence: `0x44DA00`
+  (`ev_7d05e719008e658a35c6e70c8faeef220798081bf3d6f01e67cd1b65744b9fc2`).
+
 - **2026-10-24 continuation:** Modeled the state-4 style-14 `0x479450`
   fallback-width rule and connected it to the race-loop composer. It invokes
   text measurement, but the zero alignment flags mean non-null text returns
