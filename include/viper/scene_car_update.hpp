@@ -502,6 +502,23 @@ struct SceneRendererDrawBindingObservation {
     SceneRendererBindingNode fields;
 };
 
+// Runtime selector state read by 0x455C80 for the two indirect submit slots.
+struct SceneRendererSubmitTargetSelectionInput {
+    std::optional<bool> enabled_0x50d0a8;
+    std::optional<bool> mode_0x50d119;
+    std::optional<bool> mode_0x50d118;
+    std::optional<std::int32_t> raster_mode_0x50d2dc;
+};
+
+struct SceneRendererSubmitTargetSelection {
+    bool complete{};
+    std::optional<std::uint32_t> target_0x4db744;
+    std::optional<std::uint32_t> target_0x4db748;
+};
+
+[[nodiscard]] SceneRendererSubmitTargetSelection plan_scene_renderer_submit_targets(
+    const SceneRendererSubmitTargetSelectionInput& input) noexcept;
+
 enum class SceneRendererModelDrawActionKind : std::uint8_t {
     apply_renderer_state,
     enqueue_alternate_draw,
@@ -520,6 +537,7 @@ struct SceneRendererModelDrawAction {
     std::uint32_t binding_address{};
     std::uint32_t handle{};
     std::array<std::uint32_t, 4> integer_arguments{};
+    std::optional<std::uint32_t> indirect_target;
 };
 
 enum class SceneRendererModelDrawStatus : std::uint8_t {
@@ -541,6 +559,7 @@ struct SceneRendererModelDrawInput {
     std::span<const SceneRendererDescriptor> descriptors{};
     // Bounded in linked-list order, one node per descriptor row.
     std::span<const SceneRendererDrawBindingObservation> bindings{};
+    SceneRendererSubmitTargetSelectionInput submit_targets;
 };
 
 struct SceneRendererModelDrawPlan {
@@ -655,6 +674,7 @@ struct SceneRendererDeferredDrainAction {
     std::array<std::uint32_t, 4> integer_arguments{};
     std::optional<std::uint32_t> pool_free_head_before;
     std::optional<std::uint32_t> pool_free_head_after;
+    std::optional<std::uint32_t> indirect_target;
 };
 
 struct SceneRendererDeferredDrainInput {
@@ -664,6 +684,7 @@ struct SceneRendererDeferredDrainInput {
     bool pool_manager_present{true}; // DAT_00509ED8
     std::optional<std::uint32_t> pool_free_head_address;
     std::optional<std::int32_t> active_pool_allocations;
+    SceneRendererSubmitTargetSelectionInput submit_targets;
 };
 
 struct SceneRendererDeferredDrainPlan {

@@ -721,6 +721,52 @@ SceneRendererRefreshPlan plan_scene_renderer_refresh(
     return result;
 }
 
+SceneRendererSubmitTargetSelection plan_scene_renderer_submit_targets(
+    const SceneRendererSubmitTargetSelectionInput& input) noexcept
+{
+    SceneRendererSubmitTargetSelection result{};
+    if (!input.enabled_0x50d0a8.has_value()) {
+        return result;
+    }
+    if (!*input.enabled_0x50d0a8) {
+        result.target_0x4db744 = 0x00455D90U;
+        result.target_0x4db748 = 0x00455D90U;
+        result.complete = true;
+        return result;
+    }
+    if (!input.mode_0x50d119.has_value()
+        || !input.raster_mode_0x50d2dc.has_value()) {
+        return result;
+    }
+
+    if (*input.raster_mode_0x50d2dc != 0) {
+        if (*input.mode_0x50d119) {
+            result.target_0x4db744 = 0x00457090U;
+            result.target_0x4db748 = 0x00456220U;
+        } else {
+            result.target_0x4db744 = 0x00456660U;
+            result.target_0x4db748 = 0x00455F30U;
+        }
+    } else {
+        if (!input.mode_0x50d118.has_value()) {
+            return result;
+        }
+        if (*input.mode_0x50d119) {
+            result.target_0x4db744 = *input.mode_0x50d118
+                ? 0x00456D00U : 0x004569C0U;
+            result.target_0x4db748 = *input.mode_0x50d118
+                ? 0x00456210U : 0x00455F40U;
+        } else {
+            result.target_0x4db744 = *input.mode_0x50d118
+                ? 0x004563E0U : 0x00456230U;
+            result.target_0x4db748 = *input.mode_0x50d118
+                ? 0x00455F20U : 0x00455E00U;
+        }
+    }
+    result.complete = true;
+    return result;
+}
+
 SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
     const SceneRendererModelDrawInput& input)
 {
@@ -736,6 +782,7 @@ SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
         return input.descriptor_block_address + 0x0CU
             + static_cast<std::uint32_t>(index * 0x20U);
     };
+    const auto submit_targets = plan_scene_renderer_submit_targets(input.submit_targets);
 
     if (!input.queued_draw_path_0x4d9fdc) {
         result.actions.push_back({
@@ -805,6 +852,8 @@ SceneRendererModelDrawPlan plan_scene_renderer_model_draw(
             {current_descriptor_address, input.vertex_data_address,
                 input.texture_data_base_0x4d9fec, 0U},
         });
+        result.actions.back().indirect_target = input.renderer_mode_0x15 == 0U
+            ? submit_targets.target_0x4db744 : submit_targets.target_0x4db748;
         result.actions.push_back({
             SceneRendererModelDrawActionKind::draw_descriptor_range,
             0x004525B0U,
@@ -922,7 +971,9 @@ SceneRendererDeferredDrainPlan plan_scene_renderer_deferred_drain(
     // 0x450DA0 resets the deferred flag and synchronizes renderer state.
     add_helper(0x00457AF0U, 0U, -1);
 
+    const auto submit_targets = plan_scene_renderer_submit_targets(input.submit_targets);
     const auto drain_bucket = [&input, &result, &add_issue, &add_helper,
+        &submit_targets,
         &bucket_drained, &bucket_failed](const std::size_t slot) {
         const auto& bucket = input.buckets[slot];
         if (!bucket.head_address.has_value()) {
@@ -973,6 +1024,7 @@ SceneRendererDeferredDrainPlan plan_scene_renderer_deferred_drain(
             submit.texture_handle = handle;
             submit.integer_arguments = {node.descriptor_row_address,
                 node.vertex_data_address, input.texture_data_base_0x4d9fec, 0U};
+            submit.indirect_target = submit_targets.target_0x4db748;
             result.actions.push_back(submit);
 
             SceneRendererDeferredDrainAction draw{};

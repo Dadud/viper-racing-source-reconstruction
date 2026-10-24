@@ -1,5 +1,13 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Added `plan_scene_renderer_submit_targets`
+  for selector `0x455C80`, including both function-pointer slots, the four
+  renderer selector globals, and incomplete results when required observations
+  are missing. Normal and deferred submit actions now include their resolved
+  target when available. Transformation semantics and Direct3D execution
+  remain open. Release build and `git diff --check` pass; no tests were run.
+  Evidence: `metadata/scene_car_update.md`.
+
 - **2026-10-24 continuation:** Added `plan_scene_renderer_deferred_drain` for
   `0x450DA0` plus its unconditional `0x450E50` remainder pass. It projects the
   gate-ordered first pass, second state sync, LIFO node draw order, per-node

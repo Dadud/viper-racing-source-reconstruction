@@ -574,7 +574,27 @@ and records the `0x4525E0` no-op. When `0x4D9FDC` is nonzero, the alternate
 path queues each descriptor/node pair through `0x450EE0`; its native do-while
 behavior visits one row even when the signed descriptor count is nonpositive.
 The plan bounds both spans and reports missing or null binding nodes. The
-indirect backend function pointer targets remain explicit boundaries. Evidence: traversal
+submit wrappers call through slots `0x4DB744` (`0x455D50`) and `0x4DB748`
+(`0x455D70`). Selector `0x455C80` chooses the concrete target pair from
+`0x50D0A8`, `0x50D119`, `0x50D118`, and `0x50D2DC`; the portable
+`plan_scene_renderer_submit_targets` records those choices when the required
+state observations are supplied. With `0x50D0A8 == 0`, both slots select
+`0x455D90`. Otherwise, nonzero `0x50D2DC` selects either
+`(0x456660, 0x455F30)` or `(0x457090, 0x456220)` according to
+`0x50D119`; zero raster mode uses `0x50D118` to select one of the remaining
+pairs. The selected targets are observed vertex/scanline transformation
+routines in the static disassembly; their full rendering semantics and the
+Direct3D device execution remain open. Evidence: selector `0x455C80`
+`ev_c1b3adcff80f5fb2344c743967b07aba9b93232dbbf09c3ba36965eaddd831a0`,
+slot references `0x4DB744`/`0x4DB748`
+(`ev_9f840f43edb95237d0174948ac2d910bdd9e934a9929045b47d15ceb68648b4b`,
+`ev_203360fc5f5893ad98acb8e6921cd4723434e1c78c6ccb4dd89009cda8240921`),
+and state setters `0x455A50`/`0x455A60`/`0x455A70`/`0x455A80`
+(`ev_9c6511a43b8594c80e65ddb4d422c126cb15ed0e87c954103ed3badcf3c7f5b2`,
+`ev_19123d0966a8fcc61545c19408401ba24d08670fa554e80ff9abc9a0be7ebff2`,
+`ev_923be301e7415d3617d27d462252e9399f35eca4fd2ba9e460401345a93b46be`,
+`ev_7f5bbbb0fa438710e7013cfbd94331c44ebdf7e45d036a0c888ac6bf90fea105`).
+Evidence: traversal
 `0x44FC80` `ev_c9d9f0ad32331cd592c97d4535f98d7555b0d045309af35d166a1caf4000be2d`,
 alternate queue helper `0x450EE0`
 `ev_e2244cc17b523c18715e0ff1b1a7cad2833103234314c83d572faa804719929a`,
@@ -631,8 +651,9 @@ chain. Evidence: first pass
 unconditional drain `0x450E50` `ev_fe7127a557a131f4be4d6899e7301a5b0c8ec70b91c110ecb95b5d716fd250bc`,
 gate `0x4540E0` `ev_cf04f42b829b5299ec30d322202c94128ff598a559bb372e0cee19e0403a5c4b`,
 and pool return `0x419870` `ev_1b5f360f31d2e576841b3878ab44ca1eb7c8549803ddea1ab94b423cb23c0e67`.
-Actual indirect renderer backends and device execution remain outside this
-projection.
+Target selection is now projected through `plan_scene_renderer_submit_targets`;
+the transformation routines' full semantics and actual device execution remain
+outside this projection.
 
 ### Scene-car virtual `+0x18` callout
 
