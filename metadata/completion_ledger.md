@@ -70,6 +70,20 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-24, session-owned constructor state materialization:** The player
+  `WindowState` now materializes and retains the complete source-derived
+  3x3-plus-translation placement transform and four initial wheel world
+  anchors from the active CARF/setup, FNIM wheel constructors, and track
+  placement plan. This preserves the native full placement basis at session
+  creation instead of reconstructing wheel positions from yaw. A separate
+  Release build in `build/runtime-check` succeeded; external asset validation
+  and a three-frame WARP Viper/Bemidji smoke launch both exited successfully.
+  The existing game process held the usual output executable open, so the
+  clean build used a separate output directory. This state is constructor
+  initialization only: route motion still owns the live pose, and wheel
+  contacts still do not feed body dynamics. No physics-ownership acceptance
+  criterion has been met by this slice.
+
 - **2026-10-24, Viper/Bemidji route-lap completion:** Extended race traces with
   every opponent's lap/finish fields and kept opponent simulation running after
   the player finishes. The Windows CTest feeds a 1,800-frame throttle trace to

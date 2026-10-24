@@ -1458,6 +1458,15 @@ private:
     bool initialized_{};
 };
 
+// Persistent subset of the native car object that can be populated without
+// inventing the unobserved integrator, force, collision, and tire fields.
+// The source placement is row-major 3x3 plus translation at [9..11].
+struct MaterializedNcarRuntimeState {
+    std::array<float, 12> placement_transform{};
+    std::array<std::array<float, 3>, 4> initial_wheel_world_positions{};
+    bool constructor_outputs_materialized{};
+};
+
 struct WindowState {
     DirectSoundAudio audio;
     D3DWindow graphics;
@@ -1477,6 +1486,7 @@ struct WindowState {
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
+    MaterializedNcarRuntimeState player_runtime_state{};
     std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
     // Per-wheel observations use the current renderer's route pose and the
@@ -1600,6 +1610,42 @@ struct WindowState {
             player_wheel_anchors.reset();
             return false;
         }
+        player_runtime_state.placement_transform = construction.transform;
+        if (!std::all_of(player_runtime_state.placement_transform.begin(),
+                player_runtime_state.placement_transform.end(),
+                [](const float value) { return std::isfinite(value); })) {
+            player_runtime_state = {};
+            return false;
+        }
+        for (std::size_t wheel = 0; wheel < player_runtime_state
+                .initial_wheel_world_positions.size(); ++wheel) {
+            const auto& core = player_wheel_core_initialization->wheels[wheel];
+            if (!core.has_value()) {
+                player_runtime_state = {};
+                return false;
+            }
+            // 0x441C10 stores wheel position relative to its selected vertex;
+            // the parent transform then maps the reconstructed local point.
+            const std::array<float, 3> local{
+                core->position_relative_to_selected_vertex[0] +
+                    core->selected_model_vertex[0],
+                core->position_relative_to_selected_vertex[1] +
+                    core->selected_model_vertex[1],
+                core->position_relative_to_selected_vertex[2] +
+                    core->selected_model_vertex[2]};
+            const auto& t = player_runtime_state.placement_transform;
+            auto& world = player_runtime_state.initial_wheel_world_positions[wheel];
+            world = {
+                t[0] * local[0] + t[3] * local[1] + t[6] * local[2] + t[9],
+                t[1] * local[0] + t[4] * local[1] + t[7] * local[2] + t[10],
+                t[2] * local[0] + t[5] * local[1] + t[8] * local[2] + t[11]};
+            if (!std::all_of(world.begin(), world.end(),
+                    [](const float value) { return std::isfinite(value); })) {
+                player_runtime_state = {};
+                return false;
+            }
+        }
+        player_runtime_state.constructor_outputs_materialized = true;
         for (std::size_t wheel = 0; wheel < player_wheel_tire_setups.size(); ++wheel) {
             player_wheel_tire_setups[wheel] =
                 viper::initialize_ncar_wheel_tire_setup(
@@ -1612,7 +1658,8 @@ struct WindowState {
                 return false;
             }
         }
-        player_constructor_inputs_ready = true;
+        player_constructor_inputs_ready =
+            player_runtime_state.constructor_outputs_materialized;
         return true;
     }
 
@@ -2136,7 +2183,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << "; derived body scale "
               << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
               << ", inverse mass " << *state.player_body_inverse_mass_0x200
-              << ", four wheel anchors/core setups and axle-selected tire responses.\n";
+              << ", four materialized initial wheel world anchors, core setups, and "
+              << "axle-selected tire responses.\n";
     if (playback_trace != nullptr) state.graphics.set_vsync(false);
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
