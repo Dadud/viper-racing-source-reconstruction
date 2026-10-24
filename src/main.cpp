@@ -6,6 +6,7 @@
 #include "viper/world_track_objects.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cstdlib>
 #include <cstddef>
 #include <filesystem>
@@ -248,8 +249,10 @@ int inspect_font(const std::filesystem::path& path,
                                  std::string(resource_name));
     }
     const auto font = viper::parse_stamp_font_index(bundle.payload(*entry));
-    if (!font || !font->glyph_table_complete) {
-        throw std::runtime_error("STMP font glyph table is missing or truncated");
+    if (!font || !font->glyph_table_complete ||
+        !font->header_metrics_complete) {
+        throw std::runtime_error(
+            "STMP font metrics or glyph table are missing or truncated");
     }
     std::size_t populated_count = 0;
     for (const auto& character : font->characters) {
@@ -258,6 +261,16 @@ int inspect_font(const std::filesystem::path& path,
     std::cout << "bundle\t" << path.string() << '\n'
               << "resource\t" << entry->name << '\n'
               << "glyph_record_count\t" << font->glyph_record_count << '\n'
+              << "font_height_0x04\t" << font->font_height_0x04 << '\n'
+              << "header_metric_0x08\t" << font->header_metric_0x08 << '\n'
+              << "header_metric_0x0c\t" << font->header_metric_0x0c << '\n'
+              << "layout_top_metric_0x44dbc0\t"
+              << font->header_metric_0x0c << '\n'
+              << "layout_bottom_metric_0x44dc00\t"
+              << std::bit_cast<std::int32_t>(
+                     static_cast<std::uint32_t>(font->font_height_0x04) -
+                     static_cast<std::uint32_t>(font->header_metric_0x0c))
+              << '\n'
               << "populated_character_count\t" << populated_count << '\n';
     for (std::size_t code = 0; code < font->characters.size(); ++code) {
         const auto& character = font->characters[code];

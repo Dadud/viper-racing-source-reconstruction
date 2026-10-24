@@ -727,12 +727,10 @@ struct SceneDashboardFontProjection {
     SceneDashboardFontObservation font{};
 };
 
-// Converts the decoded 0x44DA00 STMP character map into the three runtime
-// layout tables. Baseline helper results remain explicit observations.
+// Converts the decoded 0x44DA00 STMP character map and 44DBC0/44DC00 header
+// metrics into the runtime layout tables.
 [[nodiscard]] SceneDashboardFontProjection scene_dashboard_font_projection(
-    const StampFontIndex& index,
-    std::int32_t top_metric,
-    std::int32_t bottom_metric) noexcept;
+    const StampFontIndex& index) noexcept;
 
 struct SceneDashboardGlyphCall {
     std::uint32_t call_site{};

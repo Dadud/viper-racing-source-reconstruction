@@ -2093,15 +2093,16 @@ SceneDashboardLapTimeResult update_scene_dashboard_lap_time(
 }
 
 SceneDashboardFontProjection scene_dashboard_font_projection(
-    const StampFontIndex& index,
-    const std::int32_t top_metric,
-    const std::int32_t bottom_metric) noexcept
+    const StampFontIndex& index) noexcept
 {
     SceneDashboardFontProjection result{};
-    result.input_complete = index.glyph_table_complete;
+    result.input_complete = index.header_metrics_complete &&
+        index.glyph_table_complete;
     result.font.glyph_index.fill(-1);
-    result.font.top_metric = top_metric;
-    result.font.bottom_metric = bottom_metric;
+    result.font.top_metric = index.header_metric_0x0c;
+    result.font.bottom_metric = std::bit_cast<std::int32_t>(
+        static_cast<std::uint32_t>(index.font_height_0x04) -
+        static_cast<std::uint32_t>(index.header_metric_0x0c));
     for (std::size_t character = 0;
          character < index.characters.size(); ++character) {
         const auto& source = index.characters[character];

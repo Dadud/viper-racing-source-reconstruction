@@ -4,10 +4,16 @@
   convert the decoded STMP character map into the runtime's 256-entry glyph
   index, advance, and x-offset tables. The race-loop paused-banner input can
   now accept the parsed font directly and uses it for layout and text raster
-  projection; incomplete glyph maps propagate as incomplete output. `euro12.fnt`
-  in `common.res` has 222 populated character records. Baseline metrics remain
-  explicit helper outputs. Evidence: `0x44DA00`
-  (`ev_7d05e719008e658a35c6e70c8faeef220798081bf3d6f01e67cd1b65744b9fc2`).
+  projection; incomplete font maps propagate as incomplete output. The parser
+  now also reads header height and metric fields, allowing it to derive the
+  `0x44DBC0` top metric and `0x44DC00` bottom metric used by layout. Shipped
+  `euro12.fnt` reports height 16, top 13, bottom 3, and 222 populated records.
+  Evidence: `0x44DA00`
+  (`ev_7d05e719008e658a35c6e70c8faeef220798081bf3d6f01e67cd1b65744b9fc2`),
+  `0x44D460` (`ev_09f7b129c2801b51a9e11c7d8851fee08efd7a59ecd1b3f35d7fced94dc5e318`),
+  `0x44D480` (`ev_5aede7efdadbfe09f814eb67c4b0cd0d26fc5d2ad6e9ff005a08695d786d8d8d`),
+  `0x44DBC0` (`ev_cec4a590ed6c06a30ddb4ae060b2ef75db678e018800f7828e65f4c5da32a8e0`),
+  and `0x44DC00` (`ev_7e1c5e7f809dd9f3d20fb7162b68127059bbdd3b59da126cc4762ad41de07bec`).
 
 - **2026-10-24 continuation:** Modeled the state-4 style-14 `0x479450`
   fallback-width rule and connected it to the race-loop composer. It invokes

@@ -220,9 +220,9 @@ files were present.
   overlay gates, cheater-banner placement, paused-banner resource refresh and
   centered/fallback layout, a recovered style-14 descriptor, line-by-line text
   rasterization, and optional loaded-resource frame rasterization from decoded
-  STMP image and renderer observations. Parsed STMP font maps can be converted
-  into the runtime glyph-index, advance, and horizontal-offset tables used by
-  text layout; baseline metrics remain explicit helper outputs. The model also
+  STMP image and renderer observations. Parsed STMP fonts project their header
+  baseline metrics and 256-entry glyph-index, advance, and horizontal-offset
+  tables into text layout. The model also
   covers two raw-flag text setup sequences, the results heading/prompt setup, and
   results record selection, conditional formatted time values, and per-row text
   calls are modeled in `scene_overlay.cpp` with all row and heading positions

@@ -122,12 +122,16 @@ struct StampFontCharacterEntry {
 
 struct StampFontIndex {
     std::int32_t glyph_record_count{};
+    std::int32_t font_height_0x04{};
+    std::int32_t header_metric_0x08{};
+    std::int32_t header_metric_0x0c{};
+    bool header_metrics_complete{};
     bool glyph_table_complete{};
     std::array<StampFontCharacterEntry, 256> characters{};
 };
 
-// Projects the 0x44DA00 character-map build from the STMP dword at +0x10 and
-// encoded glyph records beginning at +0x414. Metric fields remain unlabeled.
+// Projects the 0x44DA00 character-map build from STMP header metrics and the
+// encoded glyph records beginning at +0x414. The +0x08 field remains unlabeled.
 [[nodiscard]] std::optional<StampFontIndex> parse_stamp_font_index(
     std::span<const std::byte> payload);
 

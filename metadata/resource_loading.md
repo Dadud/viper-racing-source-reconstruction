@@ -88,13 +88,22 @@ character slots, then reads the signed glyph-record count at the STMP payload's
 character from its low byte, stores the loop index in that character's
 16-bit glyph slot, stores the signed sum of bytes 1 through 3 in the field at
 object `+0x204`, and stores signed byte 1 at `+0x404`. Duplicate character
-codes overwrite earlier entries, matching the loop. The portable
-`parse_stamp_font_index` reconstructs those three tables while retaining the
-two metrics as raw fields. `--inspect-font BUNDLE RESOURCE` prints populated
-rows. Evidence: `0x44DA00`
+codes overwrite earlier entries, matching the loop. The font's height at STMP
+`+0x04` and header metrics at `+0x08/+0x0C` are also retained. `0x44D480`
+copies the latter two fields; `0x44DBC0` returns `+0x0C` as the top layout
+metric, while `0x44DC00` returns `height - +0x0C` as the bottom metric. The
+portable `parse_stamp_font_index` reconstructs the three lookup tables and
+captures those header values; `scene_dashboard_font_projection` converts them
+into the renderer's 256-entry tables and baseline metrics.
+`--inspect-font BUNDLE RESOURCE` prints the header values, derived layout
+metrics, and populated character rows. Evidence: `0x44DA00`
 (`ev_4d95bea32a566762f91f581a174b2b9c3919d92416e39659afdfe44913a3bbee`),
 `0x44D470` (`ev_9c87753a7b96dd2eab7167774892dd8c6877748cc1df5c8cabe67c4f1dd8917f`),
-and `0x44D4B0` (`ev_257c3693e424fe89f3867434404a21c4e59f14182207e0decf39e99206b74e4d`).
+and `0x44D4B0` (`ev_257c3693e424fe89f3867434404a21c4e59f14182207e0decf39e99206b74e4d`),
+`0x44D460` (`ev_09f7b129c2801b51a9e11c7d8851fee08efd7a59ecd1b3f35d7fced94dc5e318`),
+`0x44D480` (`ev_5aede7efdadbfe09f814eb67c4b0cd0d26fc5d2ad6e9ff005a08695d786d8d8d`),
+`0x44DBC0` (`ev_cec4a590ed6c06a30ddb4ae060b2ef75db678e018800f7828e65f4c5da32a8e0`),
+and `0x44DC00` (`ev_7e1c5e7f809dd9f3d20fb7162b68127059bbdd3b59da126cc4762ad41de07bec`).
 
 ## STMP indexed images
 

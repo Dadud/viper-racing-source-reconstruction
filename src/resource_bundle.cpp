@@ -138,10 +138,21 @@ std::optional<StampFontIndex> parse_stamp_font_index(
                    std::to_integer<std::uint8_t>(payload[offset + 3U])) << 24U);
     };
     const auto raw_count = read_payload_u32(glyph_count_offset);
-    if (!raw_count) return std::nullopt;
+    const auto raw_height = read_payload_u32(0x04U);
+    const auto raw_metric_0x08 = read_payload_u32(0x08U);
+    const auto raw_metric_0x0c = read_payload_u32(0x0cU);
+    if (!raw_count || !raw_height || !raw_metric_0x08 || !raw_metric_0x0c) {
+        return std::nullopt;
+    }
 
     StampFontIndex result{};
     result.glyph_record_count = std::bit_cast<std::int32_t>(*raw_count);
+    result.font_height_0x04 = std::bit_cast<std::int32_t>(*raw_height);
+    result.header_metric_0x08 =
+        std::bit_cast<std::int32_t>(*raw_metric_0x08);
+    result.header_metric_0x0c =
+        std::bit_cast<std::int32_t>(*raw_metric_0x0c);
+    result.header_metrics_complete = true;
     if (result.glyph_record_count <= 0) {
         result.glyph_table_complete = true;
         return result;

@@ -37,8 +37,6 @@ struct RaceLoopSharedPausedBannerRasterObservation {
     // When present, this shipped STMP character map supplies the glyph index,
     // advance, and x-offset tables instead of a manually projected font.
     std::optional<StampFontIndex> parsed_layout_font;
-    std::optional<std::int32_t> layout_font_top_metric_0x44dbc0;
-    std::optional<std::int32_t> layout_font_bottom_metric_0x44dc00;
     SceneDashboardAtlasFontObservation atlas_font{};
     std::optional<StampImage> resource_image;
     SceneDashboardRasterObservation resource_renderer{};

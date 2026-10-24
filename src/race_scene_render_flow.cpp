@@ -259,9 +259,7 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
             auto parsed_font_complete = true;
             if (banner_raster.parsed_layout_font.has_value()) {
                 const auto projection = scene_dashboard_font_projection(
-                    *banner_raster.parsed_layout_font,
-                    banner_raster.layout_font_top_metric_0x44dbc0.value_or(0),
-                    banner_raster.layout_font_bottom_metric_0x44dc00.value_or(0));
+                    *banner_raster.parsed_layout_font);
                 layout_font = projection.font;
                 parsed_font_complete = projection.input_complete;
                 paused_banner_raster_observation->layout_font = layout_font;
@@ -365,7 +363,8 @@ RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
                     raster_observation.layout_font,
                     raster_observation.atlas_font);
             if (raster_observation.parsed_layout_font.has_value() &&
-                !raster_observation.parsed_layout_font->glyph_table_complete) {
+                (!raster_observation.parsed_layout_font->glyph_table_complete ||
+                 !raster_observation.parsed_layout_font->header_metrics_complete)) {
                 plan.shared_paused_banner_text_raster->input_complete = false;
             }
         }
