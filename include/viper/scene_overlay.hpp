@@ -501,6 +501,11 @@ struct SceneDashboardGearDisplayObservation {
     std::span<const std::uint8_t> selected_record_base_bytes;
     std::uint32_t selected_record_value_object_address{};
     std::span<const std::uint8_t> selected_record_value_object_bytes;
+    // Runtime entries addressed by [0x4CFAB4 + selector*4] for the
+    // 0x44DC70 selected-gear label call.
+    std::span<const std::uint32_t> gear_label_resource_addresses_0x4cfab4;
+    std::uint32_t gear_label_font_context_value_0x4eb28c{};
+    std::uint32_t gear_label_font_resource_value_0x4eb314{};
     // Scalar compatibility input used only when the bounded byte views do not
     // resolve the pointer chain.
     float selected_record_value_0x34{};
@@ -585,6 +590,20 @@ struct SceneDashboardGearDisplayResult {
     bool initialized_geometry_constants{};
     std::optional<std::uint32_t> selected_record_value_bits;
     bool selected_record_value_resolved_from_bytes{};
+    std::optional<std::uint32_t> selected_gear_label_selector;
+    std::optional<std::uint32_t> selected_gear_label_resource_address;
+    struct GearLabelCall {
+        std::uint32_t selector{};
+        std::optional<std::uint32_t> selected_resource_address;
+        std::uint32_t text_source{0x004CFEB8U};
+        std::uint32_t font_context_value{};
+        std::uint32_t font_resource_value{};
+        std::int32_t x{0x0c};
+        std::int32_t y{};
+        std::uint32_t raw_width_argument{0x1eU};
+        std::uint32_t raw_height_argument{0x0cU};
+    };
+    std::optional<GearLabelCall> selected_gear_label_call;
     std::optional<SceneDashboardGearGeometry> rotating_gear_geometry;
     // Half-open scanline spans, bounded by the target's 1024-row edge arrays.
     std::vector<SceneDashboardTriangleSpan> rotating_gear_triangle_spans;

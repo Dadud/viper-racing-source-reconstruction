@@ -1292,6 +1292,29 @@ SceneDashboardGearDisplayResult scene_dashboard_gear_display_plan(
                 (static_cast<std::uint32_t>(bytes[offset + 2U]) << 16U) |
                 (static_cast<std::uint32_t>(bytes[offset + 3U]) << 24U);
         };
+        if (const auto selector_bits =
+                read_u32(observation.selected_record_value_object_bytes,
+                         0x48U);
+            selector_bits.has_value()) {
+            result.selected_gear_label_selector = *selector_bits;
+            if (*selector_bits <
+                observation.gear_label_resource_addresses_0x4cfab4.size()) {
+                result.selected_gear_label_resource_address =
+                    observation.gear_label_resource_addresses_0x4cfab4[
+                        *selector_bits];
+            }
+            result.selected_gear_label_call =
+                SceneDashboardGearDisplayResult::GearLabelCall{
+                    *selector_bits,
+                    result.selected_gear_label_resource_address,
+                    0x004CFEB8U,
+                    observation.gear_label_font_context_value_0x4eb28c,
+                    observation.gear_label_font_resource_value_0x4eb314,
+                    0x0c,
+                    observation.surface_height - 0x28,
+                    0x1eU,
+                    0x0cU};
+        }
         if (const auto target_address =
                 read_u32(observation.selected_record_base_bytes,
                          pointer_field_offset);
