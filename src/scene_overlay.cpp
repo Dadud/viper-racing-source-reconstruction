@@ -3521,7 +3521,9 @@ SceneSharedResultsHeadingPlan scene_shared_results_heading_plan(
 }
 
 std::vector<SceneSharedResultRowSelection> scene_shared_result_rows(
-    const std::span<const SceneSharedResultsRecordObservation> records)
+    const std::span<const SceneSharedResultsRecordObservation> records,
+    const std::optional<SceneDashboardGlobalObjectObservation>&
+        global_object_dispatch)
 {
     std::vector<SceneSharedResultRowSelection> selected_rows;
     for (std::size_t ordinal_pass = 0;
@@ -3538,6 +3540,19 @@ std::vector<SceneSharedResultRowSelection> scene_shared_result_rows(
                 record.ordinal_at_0x140 != expected_ordinal) {
                 continue;
             }
+            auto emit_time_value = record.virtual_method_0x40_result;
+            if (global_object_dispatch.has_value() &&
+                record_index <= static_cast<std::size_t>(
+                    std::numeric_limits<std::int32_t>::max())) {
+                auto method_observation = *global_object_dispatch;
+                method_observation.selected_ordinal =
+                    static_cast<std::int32_t>(record_index);
+                const auto projection = scene_dashboard_global_object_projection(
+                    method_observation);
+                if (projection.method_0x40_resolved) {
+                    emit_time_value = projection.method_0x40_result;
+                }
+            }
             selected_rows.push_back({
                 ordinal_pass,
                 record_index,
@@ -3545,7 +3560,7 @@ std::vector<SceneSharedResultRowSelection> scene_shared_result_rows(
                 record.row_helper_global_0x4dc19c ==
                     static_cast<std::uint32_t>(record_index),
                 record.text_at_0x05,
-                record.virtual_method_0x40_result,
+                emit_time_value,
                 static_cast<std::uint8_t>(record_index & 0xFFU),
             });
         }
@@ -3557,9 +3572,12 @@ std::vector<SceneSharedResultRowDisplay> scene_shared_result_row_displays(
     const std::span<const SceneSharedResultsRecordObservation> records,
     const std::span<const std::uint8_t> result_time_records,
     const std::size_t result_time_record_count,
-    const char marker)
+    const char marker,
+    const std::optional<SceneDashboardGlobalObjectObservation>&
+        global_object_dispatch)
 {
-    const auto selected_rows = scene_shared_result_rows(records);
+    const auto selected_rows = scene_shared_result_rows(
+        records, global_object_dispatch);
     std::vector<SceneSharedResultRowDisplay> displays;
     displays.reserve(selected_rows.size());
     for (const auto& selection : selected_rows) {
@@ -3629,7 +3647,8 @@ SceneSharedResultsBranchPlan scene_shared_results_branch_plan(
 
     result.row_displays = scene_shared_result_row_displays(
         observation.records, observation.result_time_records,
-        observation.result_time_record_count, observation.time_marker);
+        observation.result_time_record_count, observation.time_marker,
+        observation.global_object_dispatch);
     result.row_draws = scene_shared_result_row_draws(
         observation.records, result.row_displays,
         observation.heading.surface_height, observation.heading.surface_width);

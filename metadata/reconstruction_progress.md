@@ -1,5 +1,14 @@
 # Reconstruction progress
 
+- **2026-10-24 continuation:** Connected the shared-results row gate to the
+  existing factory-selected `DAT_00508A04` virtual-method projection. With a
+  bounded global-object byte view, each eligible result-record index now
+  derives virtual `+0x40` and controls whether its formatted time row is drawn;
+  unsupported selectors or truncated bytes retain the explicit per-record
+  fallback. Release `viper_race_scene_flow` build and `git diff --check` pass;
+  no tests were run. Evidence and boundaries: `metadata/simulation_loop.md`
+  and `metadata/physics_task_objects.md`.
+
 - **2026-10-24 continuation:** Tightened scene-car callout pixel fidelity from
   the instruction sequence at `0x46499B`-`0x464A1E`: projected Z minus 32 now
   reaches FTOL without an intervening binary32 rounding, and secondary text

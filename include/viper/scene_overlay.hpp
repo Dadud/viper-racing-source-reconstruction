@@ -1613,6 +1613,8 @@ struct SceneSharedResultsHeadingPlan {
 struct SceneSharedResultsRecordObservation {
     std::int32_t type_at_0x00{};
     std::int32_t ordinal_at_0x140{};
+    // Fallback observation used when the factory-backed object projection
+    // cannot resolve virtual +0x40 for this record index.
     bool virtual_method_0x40_result{};
     // Raw return from 0x45C230, which loads global 0x4DC19C.
     std::uint32_t row_helper_global_0x4dc19c{};
@@ -1632,7 +1634,9 @@ struct SceneSharedResultRowSelection {
 // Projects the nested record-selection loops in the 0x404940 results path.
 [[nodiscard]] std::vector<SceneSharedResultRowSelection>
 scene_shared_result_rows(
-    std::span<const SceneSharedResultsRecordObservation> records);
+    std::span<const SceneSharedResultsRecordObservation> records,
+    const std::optional<SceneDashboardGlobalObjectObservation>&
+        global_object_dispatch = std::nullopt);
 
 struct SceneSharedResultRowDisplay {
     SceneSharedResultRowSelection selection;
@@ -1647,7 +1651,9 @@ scene_shared_result_row_displays(
     std::span<const SceneSharedResultsRecordObservation> records,
     std::span<const std::uint8_t> result_time_records,
     std::size_t result_time_record_count,
-    char marker);
+    char marker,
+    const std::optional<SceneDashboardGlobalObjectObservation>&
+        global_object_dispatch = std::nullopt);
 
 struct SceneSharedResultRowDraw {
     std::size_t ordinal_pass{};
@@ -1680,6 +1686,10 @@ struct SceneSharedResultsBranchObservation {
     SceneSharedOverlayObservation overlay_globals{};
     SceneSharedResultsHeadingObservation heading{};
     std::span<const SceneSharedResultsRecordObservation> records{};
+    // When supplied, projects virtual +0x40 for each result-record index
+    // from the factory-selected object at DAT_00508A04.
+    std::optional<SceneDashboardGlobalObjectObservation>
+        global_object_dispatch;
     std::span<const std::uint8_t> result_time_records{};
     std::size_t result_time_record_count{};
     char time_marker{};

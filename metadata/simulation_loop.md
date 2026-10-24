@@ -636,6 +636,16 @@ and two `0x44DC70` calls, then invokes the global object's virtual `+0x40`
 method with its record index. A true result additionally looks up time using
 the record index truncated to a byte, formats it through `0x425A40` with the
 second argument set to 1, and issues another `0x44DC70` call.
+When `SceneSharedResultsBranchObservation::global_object_dispatch` contains
+the factory selector and bounded bytes for `DAT_00508A04`, the same recovered
+factory-vtable projection now derives that per-record `+0x40` result before
+selecting the time call. Selector 0 reads its flag byte at `+0x68 + index*0x74`;
+selectors 1, 3, and 5 resolve to the observed false-return stubs. If the
+selector or byte range is unresolved, the prior per-record result remains the
+fallback observation. The core dashboard and race-results paths therefore use
+one implementation for the shared object method. Factory method evidence and
+the bounded record mapping are documented above and in
+`metadata/physics_task_objects.md`.
 `scene_shared_result_row_displays` carries the selected rows through the
 existing ordinal lookup and time formatter. `scene_shared_result_row_draws` now
 projects the three text calls per selected row: ordinal `%d`, record text at
