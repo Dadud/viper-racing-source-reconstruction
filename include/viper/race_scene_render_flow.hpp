@@ -58,8 +58,8 @@ struct RaceLoopSharedOverlayObservation {
     SceneDashboardAuxiliaryReadoutObservation dashboard_auxiliary_readout{};
     SceneDashboardCallbackGeometryObservation dashboard_callback_geometry{};
     SceneDashboardGearDisplayObservation dashboard_gear_display{};
-    // Decoded image selected by the caller for the 0x4EB420 gear resource.
-    // Runtime resource-handle resolution remains an explicit input.
+    // Decoded image for the registered 0x4EB420 resource. Populate with
+    // parse_state0_dashboard_gear_image(race_res) when that bundle is loaded.
     std::optional<StampImage> state0_dashboard_gear_resource_image;
     SceneState5OverlayObservation state5_overlay{};
     SceneSharedOverlayFrameObservation shared_overlay{};
@@ -128,6 +128,11 @@ struct RaceLoopSharedOverlayPlan {
     std::optional<ScenePausedBannerFrameRasterPlan>
         shared_paused_banner_frame_raster;
 };
+
+// Resolves the statically registered race.res image used by the state-0 gear
+// resource handle DAT_004EB420 (resource key at 0x004CFBDC: "rpm.stp").
+[[nodiscard]] std::optional<StampImage>
+parse_state0_dashboard_gear_image(const ResourceBundle& race_bundle);
 
 struct RaceLoopPausedBannerSurfaceWriteResult {
     bool frame_submitted{};

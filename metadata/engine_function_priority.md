@@ -50,7 +50,7 @@ pixel-write projections. Actual device/surface ownership and remaining
 callback gates are still open.
 The state-0 `0x405100` fill/bitmap stream and gear resource/geometry writes now
 apply in observed order inside the submitted `0x4052D0`-to-unlock interval when
-complete source bytes and the caller-resolved gear image are supplied; mode 0
+complete source bytes and the `race.res::rpm.stp` image are supplied; mode 0
 uses its projected rectangle instead. Next, connect other `0x4052D0`
 renderer effects without mixing in the pre-acquisition `0x4035E0` callback;
 actual viewport/device execution and native surface ownership remain open.

@@ -824,11 +824,13 @@ The mode-0 gear rectangle's position and raw color come from the already
 recovered gear branch (`ev_ca260757f720e3c0ff9c2abc12db97068c2470e44c8709aac9e856d753979e7d`);
 the race-loop composer now supplies the acquired context to that pixel
 projection. For nonzero, non-12 gear mode, callers can provide the decoded
-`StampImage` corresponding to the runtime `0x4EB420` resource; the composer
-rasterizes it at the observed resource coordinates, then appends the triangle
-fill and edge pixels after it. Missing image input leaves the submitted surface
-batch unapplied as incomplete, and this does not infer which bundle image maps
-to that runtime handle. Rotating-gear x87/FDIV exactness remains unvalidated.
+`StampImage` returned by `parse_state0_dashboard_gear_image(race_bundle)`; the
+function resolves `rpm.stp`, the key at `0x4CFBDC` registered into `0x4EB420` by
+`scene_dashboard_initialization_plan`. `race.res` contains that complete STMP
+image (128x128, one frame). The composer rasterizes it at the observed resource
+coordinates, then appends triangle-fill and edge pixels after it. Missing
+bundle/image input leaves the submitted surface batch unapplied as incomplete.
+Rotating-gear x87/FDIV exactness remains unvalidated.
 `scene_dashboard_viewport_plan` emits just the resulting `0x4498A0` calls,
 preserving row addresses and required bits. `scene_dashboard_render_plan`
 composes the observed order around them: on a full redraw with nonzero
@@ -898,6 +900,10 @@ resource registration and the final redraw-cache sentinels (`-1` and float
 `-1.0`) plus the initialized byte. Resource handles and helper effects remain
 runtime outputs. Evidence: `0x4031F0`
 (`ev_f63a1c54ee77e2b07363968872ef6738bfdb9961d2540c41da139ef5d11fa6e8`).
+The registration table maps string `rpm.stp` at `0x4CFBDC` to destination
+`0x4EB420`; `parse_state0_dashboard_gear_image` resolves that exact STMP entry
+from the caller's `race.res` bundle. The extracted entry parses as a complete
+128x128, one-frame image. String evidence is recorded at `metadata/strings.md`.
 `plan_race_setup` exposes this operation plan at its `0x4031F0` call site.
 The `0x44CFD0` registration helper requests the `STMP` type through shared
 loader `0x417CB0`; for a present resource it requires the returned metadata

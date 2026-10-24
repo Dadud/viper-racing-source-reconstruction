@@ -6,6 +6,17 @@
 
 namespace viper {
 
+std::optional<StampImage> parse_state0_dashboard_gear_image(
+    const ResourceBundle& race_bundle)
+{
+    const auto payload = race_bundle.find_payload(
+        "rpm.stp", resource_type_code('S', 'T', 'M', 'P'));
+    if (!payload.has_value()) {
+        return std::nullopt;
+    }
+    return parse_stamp_image(*payload, true);
+}
+
 RaceLoopSharedOverlayPlan plan_race_loop_shared_overlay(
     const RaceLoopSharedOverlayObservation& observation)
 {
