@@ -41,6 +41,7 @@ using Microsoft::WRL::ComPtr;
 
 struct IdealLineVertex { float x; float y; };
 struct SurfaceVertex { float x; float y; float r; float g; float b; };
+struct CameraConstants { float center_x{}; float center_y{}; float zoom{1.0F}; float padding{}; };
 
 std::uint32_t read_u32_le(const std::byte* bytes)
 {
@@ -424,7 +425,8 @@ public:
         return create_target() && update_surface_buffer() && update_car_buffer() && update_line_buffer();
     }
 
-    bool render(const std::string_view hud_text)
+    bool render(const std::string_view hud_text,
+                const float focus_x, const float focus_z)
     {
         if (!target_ || !context_ || !swap_chain_) return false;
         constexpr float color[]{0.035f, 0.055f, 0.075f, 1.0f};
@@ -433,6 +435,11 @@ public:
                                 static_cast<float>(height_), 0.0f, 1.0f};
         context_->RSSetViewports(1, &viewport);
         context_->ClearRenderTargetView(target_.Get(), color);
+        const auto focus = map_to_clip(focus_x, focus_z);
+        camera_constants_ = {focus[0], focus[1], 1.6F, 0.0F};
+        context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
+            &camera_constants_, 0U, 0U);
+        context_->VSSetConstantBuffers(0U, 1U, camera_buffer_.GetAddressOf());
         if (!surface_buffer_ || surface_vertex_count_ == 0U) return false;
         const UINT surface_stride = sizeof(SurfaceVertex);
         constexpr UINT surface_offset = 0;
@@ -574,6 +581,11 @@ private:
         const UINT stride = sizeof(SurfaceVertex);
         constexpr UINT offset = 0U;
         context_->IASetInputLayout(surface_input_layout_.Get());
+        camera_constants_ = {};
+        camera_constants_.zoom = 1.0F;
+        context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
+            &camera_constants_, 0U, 0U);
+        context_->VSSetConstantBuffers(0U, 1U, camera_buffer_.GetAddressOf());
         context_->IASetVertexBuffers(0U, 1U, hud_buffer_.GetAddressOf(), &stride, &offset);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0U);
@@ -644,7 +656,8 @@ private:
         static constexpr char vertex_source[] =
             "struct V { float2 p : POSITION; float3 c : COLOR; };\n"
             "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
-            "O VSMain(V v) { O o; o.p=float4(v.p,0.5,1); o.c=v.c; return o; }\n";
+            "cbuffer Camera : register(b0) { float2 center; float zoom; float pad; };\n"
+            "O VSMain(V v) { O o; o.p=float4((v.p-center)*zoom,0.5,1); o.c=v.c; return o; }\n";
         static constexpr char pixel_source[] =
             "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
             "float4 PSMain(O i) : SV_TARGET { return float4(i.c,1); }\n";
@@ -673,7 +686,14 @@ private:
         hud_desc.Usage = D3D11_USAGE_DYNAMIC;
         hud_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
         hud_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        return SUCCEEDED(device_->CreateBuffer(&hud_desc, nullptr, &hud_buffer_));
+        if (FAILED(device_->CreateBuffer(&hud_desc, nullptr, &hud_buffer_))) return false;
+        D3D11_BUFFER_DESC camera_desc{};
+        camera_desc.ByteWidth = sizeof(CameraConstants);
+        camera_desc.Usage = D3D11_USAGE_DEFAULT;
+        camera_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        D3D11_SUBRESOURCE_DATA camera_data{};
+        camera_data.pSysMem = &camera_constants_;
+        return SUCCEEDED(device_->CreateBuffer(&camera_desc, &camera_data, &camera_buffer_));
     }
 
     bool update_surface_buffer()
@@ -805,7 +825,8 @@ private:
     {
         static constexpr char vertex_source[] =
             "struct V { float2 p : POSITION; };\n"
-            "float4 VSMain(V v) : SV_POSITION { return float4(v.p, 0.0, 1.0); }\n";
+            "cbuffer Camera : register(b0) { float2 center; float zoom; float pad; };\n"
+            "float4 VSMain(V v) : SV_POSITION { return float4((v.p-center)*zoom, 0.0, 1.0); }\n";
         static constexpr char pixel_source[] =
             "float4 PSMain() : SV_TARGET { return float4(1.0, 0.66, 0.12, 1.0); }\n";
         ComPtr<ID3DBlob> vertex_code;
@@ -866,6 +887,7 @@ private:
     ComPtr<ID3D11RasterizerState> surface_rasterizer_;
     ComPtr<ID3D11Buffer> surface_buffer_;
     ComPtr<ID3D11Buffer> hud_buffer_;
+    ComPtr<ID3D11Buffer> camera_buffer_;
     ComPtr<ID3D11Buffer> car_buffer_;
     ComPtr<ID3D11VertexShader> line_vertex_shader_;
     ComPtr<ID3D11PixelShader> line_pixel_shader_;
@@ -887,6 +909,7 @@ private:
     UINT width_{};
     UINT height_{};
     UINT vsync_interval_{1U};
+    CameraConstants camera_constants_{};
 };
 
 class DirectSoundAudio {
@@ -1479,7 +1502,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 if ((trace_frame % 120U) == 0U) trace.flush();
             }
-            if (render_frame && !state.graphics.render(state.hud_text())) {
+            const auto camera_focus =
+                state.graphics.car_position(state.player_car_index);
+            if (render_frame && !state.graphics.render(state.hud_text(),
+                    camera_focus[0], camera_focus[1])) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
