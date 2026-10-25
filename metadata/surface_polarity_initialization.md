@@ -59,11 +59,11 @@ descriptor-driven `fmod` CRT dispatcher at `0x4C0580`; the adjacent
 operands without popping them, then selects class- and exception-specific
 handlers through the descriptor table. Its first handler pointer at
 `0x4E98E0` targets `0x4BD464`, whose `FPREM` loop ends with `FSTP ST(1),ST`,
-leaving one remainder and reducing stack depth by one. This is a likely normal
-finite-input path, but the status-class index selecting that slot has not been
-verified; therefore the initializer's complete x87 stack trace and exact
-`std::fmod` equivalence remain unresolved. The startup precision path is also
-partly resolved: CRT entry `0x4BD690` calls
+leaving one remainder and reducing stack depth by one. The status-class index
+selecting that slot has not been verified, and the regular finite-input handler
+has not been identified; therefore the initializer's complete x87 stack trace
+and exact `std::fmod` equivalence remain unresolved. The startup precision path
+is also partly resolved: CRT entry `0x4BD690` calls
 `0x4BF720`, which invokes `__fpmath` and `__setdefaultprecision` (`0x4BE300`).
 Its `__controlfp(0x10000,0x30000)` call sets x87 precision control to 53
 significand bits. The pre-initializer game setup `0x415C60` changes
