@@ -270,16 +270,44 @@ int main()
                 kinematics_input->angular_transform_matrix_0x99 == angular_matrix_input &&
                 kinematics_input->body_matrix_0x210 == body_matrix_input,
             "body kinematics adapter must read the exact 0x43ECE0 offsets");
+        const auto diagnostic_kinematics =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                kinematics_body);
+        require(diagnostic_kinematics.input.has_value() &&
+                diagnostic_kinematics.missing_float_count == 0U &&
+                !diagnostic_kinematics.contains_non_finite_value,
+            "kinematics diagnostic reader must expose a complete finite snapshot");
         auto incomplete_kinematics_body = kinematics_body;
         incomplete_kinematics_body.initialized_bytes[0x210U + 8U * 4U] = 0U;
         require(!viper::read_ncar_body_integration_kinematics_input(
                     incomplete_kinematics_body).has_value(),
             "kinematics input must stay unavailable when any consumed matrix byte is unknown");
+        const auto incomplete_kinematics_diagnostic =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                incomplete_kinematics_body);
+        require(!incomplete_kinematics_diagnostic.input.has_value() &&
+                incomplete_kinematics_diagnostic.missing_float_count == 1U &&
+                incomplete_kinematics_diagnostic.missing_float_offsets[0] ==
+                    0x210U + 8U * 4U,
+            "kinematics diagnostics must identify every missing source lane");
         auto missing_gravity_mass_body = kinematics_body;
         missing_gravity_mass_body.initialized_bytes[0x1f0U] = 0U;
         require(!viper::read_ncar_body_integration_kinematics_input(
                     missing_gravity_mass_body).has_value(),
             "kinematics input must stay unavailable when the constructor gravity-mass source is unknown");
+        auto non_finite_kinematics_body = kinematics_body;
+        const std::array<viper::NcarObjectFieldWrite, 1> infinite_velocity{{
+            {0x234U, 4U, 0x7f800000U}}};
+        require(viper::apply_ncar_body_object_writes(
+                    non_finite_kinematics_body, infinite_velocity),
+            "test body must accept the explicit infinite input fixture");
+        const auto non_finite_diagnostic =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                non_finite_kinematics_body);
+        require(!non_finite_diagnostic.input.has_value() &&
+                non_finite_diagnostic.missing_float_count == 0U &&
+                non_finite_diagnostic.contains_non_finite_value,
+            "kinematics diagnostics must reject non-finite initialized floats");
 
         viper::BodyIntegrationKinematicsResult kinematics_result{};
         kinematics_result.linear.position = {101.0F, 102.0F, 103.0F};

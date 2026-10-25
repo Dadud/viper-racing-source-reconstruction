@@ -2,9 +2,10 @@
 
 #include <bit>
 #include <algorithm>
-#include <cstddef>
 #include <cmath>
+#include <cstddef>
 #include <limits>
+#include <utility>
 
 namespace viper {
 
@@ -2144,6 +2145,53 @@ read_ncar_body_integration_kinematics_input(
     input.angular_transform_matrix_0x99 = *angular_transform;
     input.body_matrix_0x210 = *body_matrix;
     return input;
+}
+
+BodyKinematicsInputReadResult
+read_ncar_body_integration_kinematics_input_diagnostic(
+    const NcarBodyRuntimeObjectState& body) noexcept
+{
+    BodyKinematicsInputReadResult result{};
+    constexpr std::array<std::pair<std::uint32_t, std::size_t>, 10> fields{{
+        {0x05cU, 3U}, {0x234U, 3U}, {0x24cU, 3U}, {0x200U, 1U},
+        {0x1f0U, 1U}, {0x240U, 3U}, {0x258U, 3U}, {0x038U, 9U},
+        {0x264U, 9U}, {0x210U, 9U}}};
+    for (const auto& [base, count] : fields) {
+        for (std::size_t index = 0U; index < count; ++index) {
+            const auto offset = base + static_cast<std::uint32_t>(index * 4U);
+            if (!read_ncar_body_object_u32(body, offset)) {
+                result.missing_float_offsets[result.missing_float_count++] = offset;
+            }
+        }
+    }
+    if (result.missing_float_count != 0U) return result;
+
+    const auto input = read_ncar_body_integration_kinematics_input(body);
+    if (!input) {
+        // The offset inventory above mirrors the legacy reader. Keep failure
+        // closed if either definition changes without this inventory changing.
+        result.reader_inventory_mismatch = true;
+        return result;
+    }
+    const auto finite = [](const float value) { return std::isfinite(value); };
+    const auto finite_vector = [&finite](const PhysicsVector3& value) {
+        return finite(value.x) && finite(value.y) && finite(value.z);
+    };
+    const auto finite_array = [&finite](const auto& values) {
+        return std::all_of(values.begin(), values.end(), finite);
+    };
+    result.contains_non_finite_value =
+        !finite_vector(input->position) ||
+        !finite_vector(input->linear_velocity) ||
+        !finite_vector(input->accumulated_linear_force) ||
+        !finite(input->inverse_mass) || !finite(input->gravity_mass_0x7c) ||
+        !finite_vector(input->angular_velocity) ||
+        !finite_vector(input->accumulated_angular_moment) ||
+        !finite_array(input->orientation_matrix_0x0e) ||
+        !finite_array(input->angular_transform_matrix_0x99) ||
+        !finite_array(input->body_matrix_0x210);
+    if (!result.contains_non_finite_value) result.input = *input;
+    return result;
 }
 
 bool apply_ncar_body_integration_kinematics_result(

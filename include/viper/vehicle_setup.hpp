@@ -1080,6 +1080,16 @@ struct BodyIntegrationKinematicsInput {
     std::array<float, 9> body_matrix_0x210{};
 };
 
+struct BodyKinematicsInputReadResult {
+    std::optional<BodyIntegrationKinematicsInput> input;
+    // One entry per unavailable four-byte lane among the exact 44 floats read
+    // by 0x43ECE0. This keeps missing native ownership actionable to callers.
+    std::array<std::uint32_t, 44> missing_float_offsets{};
+    std::size_t missing_float_count{};
+    bool contains_non_finite_value{};
+    bool reader_inventory_mismatch{};
+};
+
 struct BodyIntegrationKinematicsResult {
     BodyLinearStep linear{};
     BodyAngularVelocityStep angular{};
@@ -1218,6 +1228,12 @@ advance_body_integration_kinematics(
 // object. Returns unavailable if any input byte has no observed initializer.
 [[nodiscard]] std::optional<BodyIntegrationKinematicsInput>
 read_ncar_body_integration_kinematics_input(
+    const NcarBodyRuntimeObjectState& body) noexcept;
+
+// Diagnostic form of the same read. It reports every unavailable source lane
+// and rejects non-finite values before exposing a physics input snapshot.
+[[nodiscard]] BodyKinematicsInputReadResult
+read_ncar_body_integration_kinematics_input_diagnostic(
     const NcarBodyRuntimeObjectState& body) noexcept;
 
 // Persists the observed 0x43ECE0 kinematics outputs into the same body object:
