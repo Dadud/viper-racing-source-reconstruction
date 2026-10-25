@@ -8,7 +8,7 @@
 
 namespace viper::net {
 
-inline constexpr std::uint16_t protocol_version = 2;
+inline constexpr std::uint16_t protocol_version = 3;
 inline constexpr std::size_t maximum_state_bytes = 64 * 1024;
 
 struct StateSnapshot {

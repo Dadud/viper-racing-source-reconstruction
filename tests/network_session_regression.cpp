@@ -1,5 +1,5 @@
 #include "viper/network_session.hpp"
-#include "viper/network_race_input.hpp"
+#include "viper/network_race_state.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,26 +10,57 @@
 
 int main() {
     using namespace viper::net;
-    const RaceInput expected_input{-0.5F, 0.75F, 0.125F};
-    const auto encoded_input = encode_race_input(expected_input);
-    const std::array<std::uint8_t, race_input_payload_size> expected_wire_bytes{
-        0xbf, 0x00, 0x00, 0x00, 0x3f, 0x40,
-        0x00, 0x00, 0x3e, 0x00, 0x00, 0x00};
-    RaceInput decoded_input{};
-    if (encoded_input != expected_wire_bytes ||
-        !decode_race_input(encoded_input, decoded_input) ||
-        decoded_input.steering != expected_input.steering ||
-        decoded_input.throttle != expected_input.throttle ||
-        decoded_input.brake != expected_input.brake ||
-        decode_race_input(std::span<const std::uint8_t>{}, decoded_input)) {
-        std::cerr << "race input codec did not preserve bounded controls\n";
+    viper::RouteMotionState expected_race_state{};
+    expected_race_state.route_segment = 2U;
+    expected_race_state.race.lap_start_segment = 1U;
+    expected_race_state.route_fraction = 0.25F;
+    expected_race_state.steering = -0.5F;
+    expected_race_state.speed = 12.5F;
+    expected_race_state.race.completed_laps = 2U;
+    expected_race_state.race.elapsed_seconds = 123.5F;
+    expected_race_state.route_distance_travelled = -42.25F;
+    expected_race_state.race.finished = true;
+    const auto encoded_race_state = encode_race_state(expected_race_state);
+    const std::array<std::uint8_t, race_state_payload_size>
+        expected_race_state_bytes{
+            'V', 'R', 'S', '1',
+            0, 0, 0, 2, 0, 0, 0, 1,
+            0x3e, 0x80, 0, 0, 0xbf, 0, 0, 0,
+            0x41, 0x48, 0, 0, 0, 0, 0, 2,
+            0x42, 0xf7, 0, 0, 0xc2, 0x29, 0, 0,
+            1, 0, 0, 0};
+    viper::RouteMotionState decoded_race_state{};
+    if (encoded_race_state != expected_race_state_bytes ||
+        !decode_race_state(encoded_race_state, decoded_race_state) ||
+        decoded_race_state.route_segment != expected_race_state.route_segment ||
+        decoded_race_state.race.lap_start_segment !=
+            expected_race_state.race.lap_start_segment ||
+        decoded_race_state.route_fraction != expected_race_state.route_fraction ||
+        decoded_race_state.steering != expected_race_state.steering ||
+        decoded_race_state.speed != expected_race_state.speed ||
+        decoded_race_state.race.completed_laps !=
+            expected_race_state.race.completed_laps ||
+        decoded_race_state.race.elapsed_seconds !=
+            expected_race_state.race.elapsed_seconds ||
+        decoded_race_state.route_distance_travelled !=
+            expected_race_state.route_distance_travelled ||
+        decoded_race_state.race.finished != expected_race_state.race.finished) {
+        std::cerr << "race state codec did not preserve route and finish state\n";
         return 1;
     }
-    bool rejected_out_of_range = false;
-    try { (void)encode_race_input({1.1F, 0.0F, 0.0F}); }
-    catch (const std::invalid_argument&) { rejected_out_of_range = true; }
-    if (!rejected_out_of_range) {
-        std::cerr << "race input codec accepted out-of-range steering\n";
+    auto malformed_race_state = encoded_race_state;
+    malformed_race_state[36] = 2U;
+    if (decode_race_state(malformed_race_state, decoded_race_state)) {
+        std::cerr << "race state codec accepted unknown flag bits\n";
+        return 1;
+    }
+    auto out_of_range_race_state = expected_race_state;
+    out_of_range_race_state.speed = 39.0F;
+    bool rejected_invalid_race_state = false;
+    try { (void)encode_race_state(out_of_range_race_state); }
+    catch (const std::invalid_argument&) { rejected_invalid_race_state = true; }
+    if (!rejected_invalid_race_state) {
+        std::cerr << "race state codec accepted speed outside route model bounds\n";
         return 1;
     }
     const RaceConfiguration expected_configuration{

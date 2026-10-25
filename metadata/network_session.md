@@ -1,16 +1,36 @@
 # Reconstructed multiplayer session slice
 
-`viper_network_session` provides the reconstructed client's TCP host/join transport. `viper_game --host PORT` and `viper_game --join HOST PORT` connect one peer before entering the selected race. After each local runtime update, each side sends normalized steering, throttle, and brake values; the peer's latest controls drive the first non-player route entrant on the next local update. This owns transport through the runtime argument/control path, while the route integrator remains provisional reconstructed-client behavior.
+`viper_network_session` provides the reconstructed client's TCP host/join
+transport. `viper_game --host PORT` and `viper_game --join HOST PORT` connect
+one peer before entering the selected race. Each client sends its own complete
+route-motion state after its local runtime update. The receiver replaces the
+peer-owned route entrant with that snapshot and projects its pose onto the
+shared ideal line; it does not re-simulate the peer from locally received
+controls. This is replicated state for the route-motion prototype, not native
+rigid-body state or original-client protocol compatibility.
 
-## Protocol v2
+## Protocol v3
 
-All multibyte values are unsigned big-endian. A client sends a 12-byte hello (`VRN2`, u16 version 2, role byte 0, three reserved bytes); the host validates it and returns the same record with role/status byte 1. Version mismatch or an unexpected role aborts the connection.
+All multibyte values are unsigned big-endian. A client sends a 12-byte hello
+(`VRN3`, u16 version 3, role byte 0, three reserved bytes); the host validates
+it and returns the same record with role/status byte 1. Version mismatch or an
+unexpected role aborts the connection.
 
-Each snapshot is a TCP frame: u32 body length, u8 type (`1` = state snapshot), u32 sequence, u32 simulation tick, then 0–65536 payload bytes. The length counts the body. Complete snapshots are reliable and ordered by TCP. The receiver accepts only strictly newer 32-bit sequence values, using serial-number arithmetic so wraparound works; stale or repeated frames are consumed and reported as `false`. The provisional race-input payload is exactly three IEEE-754 binary32 values (steering, throttle, brake) in big-endian byte order, with ranges `[-1,1]`, `[0,1]`, and `[0,1]`. Other payloads remain caller-defined.
+Each snapshot is a TCP frame: u32 body length, u8 type (`1` = state snapshot),
+u32 sequence, u32 simulation tick, then 0–65536 payload bytes. The length
+counts the body. Complete snapshots are reliable and ordered by TCP. The
+receiver accepts only strictly newer 32-bit sequence values, using
+serial-number arithmetic so wraparound works; stale or repeated frames are
+consumed and reported as `false`.
 
-`Session::host(port)` blocks for one client; `Session::join(host, port)` performs connect and handshake. Each side may send and receive snapshots after connect. Transport failures and malformed frames throw `std::runtime_error`.
-
-## Pre-race setup agreement
+The race-state payload is exactly 40 bytes: `VRS1`; u32 route segment; u32 lap
+start segment; binary32 route fraction, steering, speed; u32 completed laps;
+binary32 elapsed seconds and signed route distance; one finished flag; and
+three reserved zero bytes. Segment bounds are checked against the receiving
+track, lap counts against the agreed race setup, and the decoded state must
+remain inside the route adapter's finite value ranges. The receiver also
+rejects a simulation tick that moves backwards under 32-bit serial arithmetic,
+while allowing repeated ticks when no fixed update occurred.
 
 Before opening the race window, both clients send a `VRC1` configuration as
 state sequence 0 and compare the peer's record with their own. The bounded
@@ -19,11 +39,26 @@ profile, and entrant count. Both clients abort before entering gameplay if
 the payload is malformed or any field differs. Resource stems are restricted
 to 1–32 ASCII letters, digits, `_`, or `-`; laps must be 1–99; the profile must
 be one of the eight parsed AIDR groups; and entrant count must be 2–64. The
-first per-update control exchange begins at sequence 1. This agrees on the
+first per-update state exchange begins at sequence 1. This agrees on the
 race fields currently owned by the runtime; it does not prove identical asset
-hashes, participant identities, controls, physics state, or deterministic
-simulation.
+hashes, participant identities, controls, or deterministic physical simulation.
+
+`Session::host(port)` blocks for one client; `Session::join(host, port)`
+performs connect and handshake. The runtime still exchanges once per rendered
+frame synchronously, so a slow peer can stall both clients. There is no pose
+interpolation, lag/loss recovery, reconnection, multiple-peer host, lobby, or
+original-client compatibility. Because the replicated state is still the
+route-motion prototype, this is not accepted gameplay multiplayer.
 
 ## Regression coverage and limits
 
-`network_session_regression` opens a localhost host and client, checks handshake, bidirectional snapshot transfer, tick/payload preservation, stale sequence rejection, and the normalized race-input and race-configuration codec round-trip/bounds checks. It uses a fixed local port (39173), so parallel copies of the regression should not run simultaneously. When original assets are installed, `game_network_race_smoke` first verifies that Viper/Bemidji and Dundas/Viper clients reject the mismatch, then launches two matching Viper/Bemidji clients and verifies both complete a short route-runtime smoke. The runtime path is one peer only and blocks once per rendered frame for input exchange. There is still no authoritative physics simulation, remote full-state replication, interpolation, lag handling, reconnection, multiple peers, or legacy-client compatibility. The paired smoke verifies setup agreement, process connection, and bounded route-runtime completion only; it does not verify sustained interactive play or matching physics.
+`network_session_regression` checks handshake, bidirectional framing, tick and
+payload preservation, stale sequence rejection and wraparound, exact race
+state/configuration bytes, malformed state flags, bounded state values, and
+configuration bounds. `race_progression_regression` verifies that projecting
+a replicated route state reproduces its pose without advancing it. With
+external game assets installed, `game_network_race_smoke` verifies mismatched
+setup rejection and connects two matching Viper/Bemidji clients through the
+snapshot exchange and bounded route-runtime lifecycle. It does not verify
+sustained interactive play, peer pose convergence under unequal frame rates,
+disconnect behavior, or physical parity.

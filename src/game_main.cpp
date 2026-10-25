@@ -26,7 +26,7 @@
 #include "viper/setup_preferences.hpp"
 #include "viper/track_selection.hpp"
 #include "viper/replay_file.hpp"
-#include "viper/network_race_input.hpp"
+#include "viper/network_race_state.hpp"
 #include "directinput_keyboard_service.h"
 
 #include <array>
@@ -1962,9 +1962,9 @@ struct WindowState {
     std::vector<viper::RouteOpponentAiState> opponent_ai_states;
     std::vector<viper::RouteOpponentAiDecision> last_opponent_ai_decisions;
     viper::net::Session* network_session{};
-    std::optional<viper::net::RaceInput> remote_race_input;
+    std::optional<std::uint32_t> remote_simulation_tick;
     // Sequence zero is reserved for the pre-race configuration agreement.
-    std::uint32_t network_input_sequence{1U};
+    std::uint32_t network_state_sequence{1U};
     std::vector<std::array<float, 4>> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
     // session. The complete ordered stream is validated and the recovered
@@ -2821,6 +2821,29 @@ struct WindowState {
         }
     }
 
+    bool apply_remote_race_state(const viper::RouteMotionState& remote_state)
+    {
+        const auto remote_car_index = player_car_index == 0U ? 1U : 0U;
+        if (terrain == nullptr || remote_car_index >= opponent_motions.size() ||
+            remote_car_index >= opponent_simulated_poses.size() ||
+            remote_state.route_segment >= route.size() ||
+            remote_state.race.lap_start_segment >= route.size() ||
+            remote_state.race.completed_laps > target_laps ||
+            remote_state.race.finished !=
+                (remote_state.race.completed_laps >= target_laps)) return false;
+
+        const auto projected = viper::project_route_motion_state(remote_state, route);
+        if (!projected.valid) return false;
+        const auto surface = viper::sample_terrain_resource(*terrain,
+            {projected.x, 1000.0F, projected.z}, true);
+        if (!surface.query_succeeded) return false;
+
+        opponent_motions[remote_car_index] = remote_state;
+        opponent_simulated_poses[remote_car_index] = std::array<float, 4>{
+            projected.x, surface.sampled_position[1], projected.z, projected.yaw};
+        return true;
+    }
+
     bool advance(float delta_seconds, const std::int32_t observed_clock_milliseconds,
                  const bool update_graphics = true,
                  const bool simulation_enabled = true)
@@ -2919,28 +2942,11 @@ struct WindowState {
                 if (car == player_car_index) continue;
                 auto& ai = opponent_motions[car];
                 const bool remote_controlled = network_session != nullptr &&
-                    remote_race_input.has_value() &&
                     car == (player_car_index == 0U ? 1U : 0U);
                 if (remote_controlled) {
-                    auto candidate_remote = ai;
-                    const auto remote_result = viper::advance_route_motion(
-                        candidate_remote, route,
-                        remote_race_input->steering < -0.2F,
-                        remote_race_input->steering > 0.2F,
-                        remote_race_input->throttle, remote_race_input->brake,
-                        0.016F, target_laps);
-                    if (!remote_result.valid && !remote_result.finished) continue;
-                    if (remote_result.valid) {
-                        const auto remote_surface = viper::sample_terrain_resource(
-                            *terrain, {remote_result.x, 1000.0f, remote_result.z}, true);
-                        if (!remote_surface.query_succeeded ||
-                            !viper::commit_route_motion_after_terrain_query(
-                                ai, candidate_remote, remote_surface.query_succeeded))
-                            continue;
-                        opponent_simulated_poses[car] = std::array<float, 4>{
-                            remote_result.x, remote_surface.sampled_position[1],
-                            remote_result.z, remote_result.yaw};
-                    }
+                    // This entrant is owned by the connected peer. Its route,
+                    // lap, clock, and finish state arrive as complete snapshots;
+                    // never advance it from a locally replayed control sample.
                     continue;
                 }
                 const auto decision = viper::decide_route_opponent_action(
@@ -4432,24 +4438,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.last_tick = now;
             if (state.network_session != nullptr) {
                 try {
-                    const viper::net::RaceInput local_input{
-                        std::clamp(state.control_update_state.steering.value_0x509358,
-                            -1.0F, 1.0F),
-                        std::clamp(state.control_update_state.analog_0x5093f4.value,
-                            0.0F, 1.0F),
-                        std::clamp(state.control_update_state.analog_0x509320.value,
-                            0.0F, 1.0F)};
-                    const auto payload = viper::net::encode_race_input(local_input);
-                    state.network_session->send_state(state.network_input_sequence++,
+                    const auto payload = viper::net::encode_race_state(state.motion);
+                    state.network_session->send_state(state.network_state_sequence++,
                         state.physics_step_count, payload);
                     viper::net::StateSnapshot remote_snapshot;
                     if (!state.network_session->receive_state(remote_snapshot))
-                        throw std::runtime_error("stale multiplayer race input snapshot");
-                    viper::net::RaceInput remote_input;
-                    if (!viper::net::decode_race_input(remote_snapshot.payload,
-                            remote_input))
-                        throw std::runtime_error("invalid multiplayer race input payload");
-                    state.remote_race_input = remote_input;
+                        throw std::runtime_error("stale multiplayer race state snapshot");
+                    if (state.remote_simulation_tick.has_value()) {
+                        const auto tick_delta = remote_snapshot.simulation_tick -
+                            *state.remote_simulation_tick;
+                        if (tick_delta != 0U &&
+                            tick_delta >= (std::uint32_t{1} << 31U))
+                            throw std::runtime_error(
+                                "multiplayer race state tick moved backwards");
+                    }
+                    viper::RouteMotionState remote_state{};
+                    if (!viper::net::decode_race_state(remote_snapshot.payload,
+                            remote_state) ||
+                        !state.apply_remote_race_state(remote_state))
+                        throw std::runtime_error(
+                            "invalid multiplayer route state or terrain projection");
+                    state.remote_simulation_tick = remote_snapshot.simulation_tick;
                 } catch (const std::exception& error) {
                     std::cerr << "Multiplayer session failed: " << error.what() << '\n';
                     DestroyWindow(hwnd);
@@ -4918,7 +4927,7 @@ int run_selected_race(const Options& options, const std::string_view track,
     std::optional<viper::net::Session> network_session;
     if (options.network_mode) {
         if (participant_names.size() < 2U)
-            throw std::runtime_error("multiplayer control exchange needs at least two race entrants");
+            throw std::runtime_error("multiplayer state replication needs at least two race entrants");
         std::cout << (*options.network_mode == Options::NetworkMode::host
             ? "Waiting for reconstructed client on TCP port "
             : "Connecting to reconstructed client at " + options.network_host + ":")
@@ -4951,7 +4960,7 @@ int run_selected_race(const Options& options, const std::string_view track,
             throw std::runtime_error(
                 "multiplayer clients selected different tracks, cars, laps, "
                 "opponent profiles, or entrant counts");
-        std::cout << "Reconstructed clients agreed on race setup; exchanging provisional route controls.\n";
+        std::cout << "Reconstructed clients agreed on race setup; replicating route-race state.\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
         options.record_trace, options.record_physics_tick_trace,

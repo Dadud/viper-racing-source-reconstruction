@@ -76,6 +76,13 @@ void advance_race_clock(
     std::uint32_t target_laps,
     bool reverse = false) noexcept;
 
+// Projects an already-authoritative route-motion snapshot onto the ideal-line
+// adapter. Used by reconstructed-client multiplayer to render the peer's
+// replicated state without advancing a second simulation locally.
+[[nodiscard]] RouteMotionResult project_route_motion_state(
+    const RouteMotionState& state,
+    std::span<const std::array<float, 2>> route) noexcept;
+
 // Commits a staged route update only after its runtime terrain query succeeds.
 // A failed query leaves lap time, route progress, steering, and speed untouched.
 [[nodiscard]] bool commit_route_motion_after_terrain_query(

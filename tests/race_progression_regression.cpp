@@ -158,6 +158,19 @@ int main()
         require(std::abs(steering_motion.steering - 0.25F) < 1.0e-6F &&
                 std::abs(right_input.yaw - (1.57079632679F + 0.0875F)) < 1.0e-6F,
             "digital steering must use the recovered native response rate");
+        const auto projected_peer_state =
+            viper::project_route_motion_state(steering_motion, straight_route);
+        require(projected_peer_state.valid &&
+                projected_peer_state.x == right_input.x &&
+                projected_peer_state.z == right_input.z &&
+                projected_peer_state.yaw == right_input.yaw &&
+                projected_peer_state.finished == steering_motion.race.finished,
+            "projecting a replicated route state must reproduce its rendered pose without advancing it");
+        auto invalid_peer_state = steering_motion;
+        invalid_peer_state.route_segment = straight_route.size();
+        require(!viper::project_route_motion_state(invalid_peer_state,
+                    straight_route).valid,
+            "replicated route states must reject segments outside the local route");
         (void)viper::advance_route_motion(steering_motion, straight_route,
             false, false, false, false, 0.05F, 1U);
         require(std::abs(steering_motion.steering - 0.125F) < 1.0e-6F,

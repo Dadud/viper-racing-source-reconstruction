@@ -6,7 +6,7 @@ project(viper_racing_reconstruction
     LANGUAGES CXX
 )
 
-add_library(viper_network_session src/network_session.cpp src/network_race_input.cpp)
+add_library(viper_network_session src/network_session.cpp src/network_race_state.cpp)
 target_include_directories(viper_network_session PUBLIC include)
 target_compile_features(viper_network_session PUBLIC cxx_std_20)
 if(WIN32)
@@ -232,6 +232,7 @@ add_library(viper_race_progression
 target_include_directories(viper_race_progression PUBLIC include)
 target_compile_features(viper_race_progression PUBLIC cxx_std_20)
 target_link_libraries(viper_race_progression PUBLIC viper_race_loop_model)
+target_link_libraries(viper_network_session PUBLIC viper_race_progression)
 
 if(WIN32)
     add_executable(viper_game

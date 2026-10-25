@@ -133,6 +133,24 @@ RouteMotionResult advance_route_motion(
         }
     }
     state.route_distance_travelled += route_distance_delta;
+    const bool lap_completed = result.lap_completed;
+    result = project_route_motion_state(state, route);
+    result.lap_completed = lap_completed;
+    return result;
+}
+
+RouteMotionResult project_route_motion_state(
+    const RouteMotionState& state,
+    const std::span<const std::array<float, 2>> route) noexcept
+{
+    RouteMotionResult result{};
+    result.finished = state.race.finished;
+    if (route.size() < 2U || state.route_segment >= route.size() ||
+        !std::isfinite(state.route_fraction) || state.route_fraction < 0.0F ||
+        state.route_fraction > 1.0F || !std::isfinite(state.steering) ||
+        !std::isfinite(state.speed) ||
+        !std::isfinite(state.route_distance_travelled)) return result;
+
     const auto& a = route[state.route_segment];
     const auto& b = route[(state.route_segment + 1U) % route.size()];
     const float dx = b[0] - a[0];
@@ -145,9 +163,7 @@ RouteMotionResult advance_route_motion(
     result.z = route_z - std::sin(tangent) * lateral;
     result.yaw = tangent + state.steering * 0.35F;
     result.valid = std::isfinite(result.x) && std::isfinite(result.z) &&
-        std::isfinite(result.yaw) &&
-        std::isfinite(state.route_distance_travelled);
-    result.finished = state.race.finished;
+        std::isfinite(result.yaw);
     return result;
 }
 
