@@ -84,6 +84,9 @@ PcarConstructorControls initialize_pcar_constructor_controls(
     result.yaw_control = yaw_control.value_or(0);
     result.game_mode_0x4f4 = game_mode_0x4f4;
     result.value_0xd74 = value_0xd74;
+    // The constructor calls 0x43BA90 twice without changing either global
+    // input between calls, so the second helper result is identical.
+    result.wheel_helper_value_0x6b4 = value_0xd74;
     if (result.auto_shifting) {
         result.auto_clutch_forced_by_auto_shift = !result.auto_clutch;
         result.auto_clutch = true;

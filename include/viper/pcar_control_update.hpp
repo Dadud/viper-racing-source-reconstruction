@@ -44,6 +44,8 @@ struct PcarConstructorControls {
     bool auto_clutch{true};
     bool auto_clutch_0x534{true};
     std::int32_t yaw_control{};
+    // The second 0x43BA90 constructor call gates byte stores at wheel +0x6B4.
+    std::optional<std::uint8_t> wheel_helper_value_0x6b4;
     // 0x4330B0 writes +0x6B0 to four wheel objects; 0x4330D0 writes +0x6B8.
     std::array<std::uint32_t, 4> wheel_traction_0x6b0{};
     std::array<std::uint32_t, 4> wheel_abs_0x6b8{};

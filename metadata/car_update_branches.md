@@ -1520,15 +1520,22 @@ unresolved selected-mode value. Evidence: `0x425420`
 `ev_0c5ca75a39ac6b15a40b00d86be2b955b101b06c42c52c7e135dff0c69a2d767`,
 `0x45B6B0` `ev_7f5111ab5f3e72ba4f690fb4ec50b70f5e1de9255f5349ba386db51f29e7d78a`,
 and `0x401EA0` `ev_91167368d5f946d8c4d6403b32fa6e846847a3f686bd0fe7f7d8992776bd1f20`.
-`0x43BA90` returns 1 when gate `0x5093A0` is set. Otherwise it calls
-`0x446F90` on the DWORD at `0x509328` and returns 1 only for binding kinds 1,
-3, 4, and 6. The live session maps the gate from `CONTROL game_pad` and the
-DWORD from the configured analog binding slot at index 2; it now evaluates this
-helper and stores the exact byte at PCAR `+0xD74`. The second constructor helper
-result remains unresolved. Evidence: `0x4381E0`
+`0x43B030` loads `CONTROL game_pad` into global `0x5093A0` and loads the
+`CONTROL throttle` binding into record `0x509328`; `0x447060` copies the
+registered binding type and selector into that record. In the race update,
+`0x43B290` uses the same gate and throttle record. `0x43BA90` returns 1 when
+the gate is set; otherwise `0x446F90` tests the binding type and returns 1 only
+for kinds 1, 3, 4, and 6. The live session evaluates this helper from the
+parsed game-pad setting and its configured throttle binding, stores the first
+result at PCAR `+0xD74`, and applies the second identical result to wheel byte
+`+0x6B4` for each of four wheels. The two helper calls have no intervening
+input/global mutation. Evidence: `0x4381E0`
 `ev_365b74f41f3ffe8a5d0ca349ed3801a7069ccd56fe16be69203abbe524a123f4`,
 `0x43BA90` `ev_6991640ee7ade673ec561159ba28b69a9b6a9840ee8a995431389df6222db7bb`,
-and `0x446F90` `ev_e461f759908e3c7c52a551b606dbf92e92dcb224c33e2173c2e92a3058bc7893`.
+`0x446F90` `ev_e461f759908e3c7c52a551b606dbf92e92dcb224c33e2173c2e92a3058bc7893`,
+`0x43B030` `ev_3c0346de787e2dbdb286b93753943c6fb3dd1c2e3effcd0704af54cf8513415e`,
+`0x43B290` `ev_db358c27101404ca5eb5166ee5eab7df3a38f2a0eca453f836021a79b14d5b46`,
+and `0x447060` `ev_45231bdd53e610d79d3161582286196c759caa7dda600d01d0f7de31e211ca69`.
 
 ### Controlled PCAR shared-integrator state sample
 

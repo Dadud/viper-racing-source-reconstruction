@@ -2141,7 +2141,8 @@ struct WindowState {
             return false;
         }
         if (!player_pcar_constructor_controls.game_mode_0x4f4.has_value() ||
-            !player_pcar_constructor_controls.value_0xd74.has_value()) {
+            !player_pcar_constructor_controls.value_0xd74.has_value() ||
+            !player_pcar_constructor_controls.wheel_helper_value_0x6b4.has_value()) {
             player_runtime_car_record.clear();
             player_runtime_state = {};
             return false;
@@ -2193,7 +2194,9 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
-            const std::array<viper::NcarObjectFieldWrite, 2> pcar_wheel_control_writes{{
+            const std::array<viper::NcarObjectFieldWrite, 3> pcar_wheel_control_writes{{
+                {wheel_offset + 0x160U, 1U,
+                    *player_pcar_constructor_controls.wheel_helper_value_0x6b4},
                 {wheel_offset + 0x15cU, 4U,
                     player_pcar_constructor_controls.wheel_traction_0x6b0[wheel]},
                 {wheel_offset + 0x164U, 4U,
@@ -3922,8 +3925,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_traction_control,pcar_abs_braking"
               << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control"
               << ",pcar_body_0x4f4_entrant_count"
-              << ",pcar_body_0xd74"
-              << ",pcar_body_0xde0,pcar_body_0xde4"
+              << ",pcar_body_0xd74";
+        for (std::size_t wheel = 0U; wheel < 4U; ++wheel)
+            trace << ",wheel" << wheel << "_constructor_0x6b4";
+        trace << ",pcar_body_0xde0,pcar_body_0xde4"
               << ",pcar_body_0xde8,pcar_body_0xdec"
               << ",pcar_velocity_projection,pcar_scaled_smoother_request"
               << ",pcar_body_0x500,pcar_body_0xdcc,pcar_body_0xbe4"
@@ -4168,6 +4173,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     trace << ',' << static_cast<unsigned>(*constructor_helper_byte);
                 else
                     trace << ',';
+                for (const auto& wheel : state.player_runtime_state.wheel_objects) {
+                    const auto helper_flag = viper::read_ncar_wheel_object_u8(
+                        wheel, 0x160U);
+                    if (helper_flag.has_value())
+                        trace << ',' << static_cast<unsigned>(*helper_flag);
+                    else
+                        trace << ',';
+                }
                 for (const auto offset : {0xde0U, 0xde4U, 0xde8U, 0xdecU}) {
                     const auto bits = viper::read_ncar_body_object_u32(
                         state.player_runtime_state.body_object, offset);

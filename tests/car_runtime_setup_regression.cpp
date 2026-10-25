@@ -797,7 +797,8 @@ int main()
             require(wheel_plan.unknown_fill_offsets.empty() &&
                     has_write(wheel_base + 0x18cU, 0x44e10000U) &&
                     has_write(wheel_base + 0x194U, 0x43910000U) &&
-                    has_write(wheel_base + 0x150U, 0x3f800000U),
+                    has_write(wheel_base + 0x150U, 0x3f800000U) &&
+                    has_write(wheel_base + 0x160U, 0U),
                 "each persistent player wheel slot must retain its native constructor defaults");
             viper::NcarWheelRuntimeObjectState wheel_object{};
             require(viper::materialize_ncar_wheel_constructor(
@@ -824,6 +825,13 @@ int main()
                     !viper::read_ncar_wheel_object_u8(wheel_object, 0x1a3U) &&
                     !viper::read_ncar_wheel_object_u32(wheel_object, 0x1a1U),
                 "wheel readers must expose only fully initialized in-bounds bytes");
+            const std::array<viper::NcarObjectFieldWrite, 1> helper_byte{{
+                {wheel_base + 0x160U, 1U, 1U}}};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel_object, wheel_base, helper_byte) &&
+                    viper::read_ncar_wheel_object_u8(wheel_object, 0x160U) ==
+                        std::optional<std::uint8_t>{1U},
+                "the second PCAR constructor helper must be able to set wheel +0x6B4");
         }
         viper::NcarWheelRuntimeObjectState untouched_wheel{};
         const auto unresolved_wheel_plan = viper::plan_ncar_wheel_constructor(
