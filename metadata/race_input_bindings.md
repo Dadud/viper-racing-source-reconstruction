@@ -39,7 +39,9 @@ merged as a fallback, which also supports deterministic posted-event smokes.
 `game_keyboard_binding_smoke` confirms the binding/evaluator/control path and
 fallback behavior; it does not prove that a physical key was observed through
 the DirectInput buffer on this host. Device polling remains to be validated
-with a foreground held-key capture. Evidence: `0x412F90`
+with a foreground held-key capture. Race trace rows now include
+`directinput_keyboard_state_read` and `directinput_up_pressed` diagnostics for
+that capture. Evidence: `0x412F90`
 `ev_f1afb4146263e4c858ccb590428f2b21bdb16b8de7093427b63a76675c137001`,
 `0x4130D0` `ev_1ef0d1ce36204eea7927dd0bde9b4e425f3d473b4ff1cd9852f6bb807c0284d6`,
 and `0x413170` `ev_b9306522b3be005782bba4f9c3937d6c50a318d693aedc521d77a60d3836b011`.

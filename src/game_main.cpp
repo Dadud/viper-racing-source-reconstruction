@@ -1622,6 +1622,8 @@ struct WindowState {
     viper::DirectInputKeyboardService directinput_keyboard;
     std::array<std::uint8_t, 256> keyboard_button_states{};
     std::array<std::uint8_t, 256> window_message_button_states{};
+    bool directinput_keyboard_state_read{};
+    bool directinput_up_pressed{};
     std::array<viper::RaceInputBinding, viper::race_loop_binding_slot_count> control_bindings{{
         {1U, 0xcbU}, {1U, 0xcdU}, {1U, 0xc8U}, {1U, 0xd0U}}};
     viper::RaceLoop43B290State control_update_state{};
@@ -2340,10 +2342,16 @@ struct WindowState {
 
     bool update_native_control_state(const float delta_seconds)
     {
+        directinput_keyboard_state_read = false;
+        directinput_up_pressed = false;
         if (!playback_active) {
             keyboard_button_states = window_message_button_states;
             viper::DirectInputKeyboardService::KeyboardState native_keyboard{};
-            if (directinput_keyboard.poll(native_keyboard)) {
+            directinput_keyboard_state_read =
+                directinput_keyboard.poll(native_keyboard);
+            if (directinput_keyboard_state_read) {
+                directinput_up_pressed =
+                    (native_keyboard[0xc8U] & 0x80U) != 0U;
                 for (std::size_t key = 0; key < keyboard_button_states.size(); ++key) {
                     if ((native_keyboard[key] & 0x80U) != 0U)
                         keyboard_button_states[key] = 1U;
@@ -3225,6 +3233,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier"
               << ",physics_steps_scheduled,physics_step_count"
               << ",physics_simulation_time,physics_catchup_limited";
+        trace << ",directinput_keyboard_state_read,directinput_up_pressed";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -3393,7 +3402,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 trace << ',' << state.last_physics_step_schedule.steps
                       << ',' << state.physics_step_count
                       << ',' << static_cast<float>(state.physics_step_count) * 0.016F
-                      << ',' << state.last_physics_step_schedule.catchup_limited;
+                      << ',' << state.last_physics_step_schedule.catchup_limited
+                      << ',' << state.directinput_keyboard_state_read
+                      << ',' << state.directinput_up_pressed;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";
