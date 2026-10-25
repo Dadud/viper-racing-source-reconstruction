@@ -1447,6 +1447,20 @@ public:
         }
     }
 
+    void set_paused(const bool paused) noexcept
+    {
+        if (!initialized_ || paused_ == paused) return;
+        paused_ = paused;
+        for (auto& sound : sounds_) {
+            if (!sound.buffer) continue;
+            if (paused_) {
+                static_cast<void>(sound.buffer->Stop());
+            } else {
+                static_cast<void>(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
+            }
+        }
+    }
+
     [[nodiscard]] std::size_t sound_count() const noexcept
     {
         return sounds_.size();
@@ -1532,6 +1546,7 @@ private:
     std::map<unsigned, std::size_t> band_indices_;
     std::size_t idle_index_{};
     bool initialized_{};
+    bool paused_{};
 };
 
 // Persistent subset of the native car object that can be populated without
@@ -1610,6 +1625,7 @@ struct WindowState {
     bool left{};
     bool right{};
     bool playback_active{};
+    bool paused{};
     bool return_to_frontend{};
     viper::PhysicsStepAccumulator physics_step_accumulator{};
     viper::PhysicsStepSchedule last_physics_step_schedule{};
@@ -2258,10 +2274,36 @@ struct WindowState {
         return true;
     }
 
+    void set_paused(const bool value) noexcept
+    {
+        if (paused == value) return;
+        paused = value;
+        keyboard_button_states.fill(0U);
+        window_message_button_states.fill(0U);
+        left = right = accelerate = brake = false;
+        refresh_keyboard_controls(*this);
+        audio.set_paused(paused);
+        if (!paused) {
+            // The wall-clock frame and native fixed-step scheduler both need
+            // fresh anchors after a pause; otherwise the scheduler replays the
+            // entire paused interval as catch-up work.
+            last_tick = GetTickCount64();
+            physics_step_clock_initialized = false;
+            physics_step_accumulator = {};
+        }
+    }
+
     bool advance(float delta_seconds, const std::int32_t observed_clock_milliseconds,
-                 const bool update_graphics = true)
+                 const bool update_graphics = true,
+                 const bool simulation_enabled = true)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
+        if (!simulation_enabled) {
+            audio.set_paused(true);
+            refresh_title();
+            return true;
+        }
+        audio.set_paused(false);
         if (!update_native_control_state(delta_seconds)) return false;
         std::int32_t scheduler_clock = observed_clock_milliseconds;
         if (playback_active) {
@@ -2806,6 +2848,7 @@ struct WindowState {
             (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
         status += "\nSPEED " + std::to_string(static_cast<int>(
             std::lround(std::abs(motion.speed) * 3.6F))) + " KM/H";
+        if (paused) status += "\nPAUSED\nP: RESUME / ESC: EXIT";
         if (motion.race.finished) status += "\nRACE FINISHED";
         return status;
     }
@@ -2961,6 +3004,11 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
     case WM_KEYDOWN:
         if (wparam == VK_ESCAPE) {
             DestroyWindow(hwnd);
+            return 0;
+        }
+        if (wparam == 'P' && state && !state->playback_active &&
+            !state->results_ready() && (lparam & (1LL << 30)) == 0) {
+            state->set_paused(!state->paused);
             return 0;
         }
         if (wparam == VK_RETURN && state && state->results_ready()) {
@@ -3382,7 +3430,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_callback_task_stream_index"
               << ",pcar_task_projection_dispatch_steps"
               << ",physics_simulation_time,physics_catchup_limited";
-        trace << ",directinput_keyboard_state_read,directinput_up_pressed";
+        trace << ",directinput_keyboard_state_read,directinput_up_pressed,paused";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -3447,7 +3495,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             if ((replay != nullptr || state.last_tick != 0U) &&
                 !state.advance(delta_seconds,
                     std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(now)),
-                    render_frame)) {
+                    render_frame, !state.paused)) {
                 std::cerr << "Vehicle pose update failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
@@ -3582,7 +3630,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 trace << ',' << static_cast<float>(state.physics_step_count) * 0.016F
                       << ',' << state.last_physics_step_schedule.catchup_limited
                       << ',' << state.directinput_keyboard_state_read
-                      << ',' << state.directinput_up_pressed;
+                      << ',' << state.directinput_up_pressed
+                      << ',' << state.paused;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";

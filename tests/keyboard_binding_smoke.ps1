@@ -108,6 +108,32 @@ try {
     Start-Sleep -Milliseconds 150
     Send-RaceKey $window 67 'clutch'        # Key_C
     Send-RaceKey $window 32 'airlift'       # Key_SPACE
+    # Pause while throttle is held. Entering pause must clear the held input
+    # and freeze race time, player/opponent route state, and native fixed-step
+    # counts until P resumes the race.
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]0x26, [IntPtr]0)) {
+        throw 'Could not post throttle key-down for the pause check'
+    }
+    Start-Sleep -Milliseconds 400
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]80, [IntPtr]0)) {
+        throw 'Could not pause the race'
+    }
+    Start-Sleep -Milliseconds 650
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]0x26, [IntPtr]0)) {
+        throw 'Could not release throttle while paused'
+    }
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]80, [IntPtr]0)) {
+        throw 'Could not release the pause key'
+    }
+    Start-Sleep -Milliseconds 120
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]80, [IntPtr]0)) {
+        throw 'Could not resume the race'
+    }
+    Start-Sleep -Milliseconds 450
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]80, [IntPtr]0)) {
+        throw 'Could not release the resume key'
+    }
+    Start-Sleep -Milliseconds 120
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]27, [IntPtr]0)) {
         throw 'Could not close the race window'
     }
@@ -187,7 +213,56 @@ try {
         }
         if (-not $observed) { throw "The shipped keyboard binding never reached the traced $($action.Key) output" }
     }
-    Write-Output 'VK_UP throttle decayed after focus loss; VK_DOWN braked without reversing; Key_R produced backward route motion; configured action outputs remained traceable.'
+
+    $pausedColumn = [Array]::IndexOf($header, 'paused')
+    $elapsedColumn = [Array]::IndexOf($header, 'elapsed_seconds')
+    $segmentColumn = [Array]::IndexOf($header, 'player_segment')
+    $fractionColumn = [Array]::IndexOf($header, 'player_fraction')
+    $speedColumn = [Array]::IndexOf($header, 'player_speed')
+    $stepColumn = [Array]::IndexOf($header, 'physics_step_count')
+    $callbackColumn = [Array]::IndexOf($header, 'pcar_callback_step_count')
+    $dispatchColumn = [Array]::IndexOf($header, 'pcar_task_projection_dispatch_steps')
+    if (@($pausedColumn, $elapsedColumn, $segmentColumn, $fractionColumn, $speedColumn, $stepColumn, $callbackColumn, $dispatchColumn) -contains -1) {
+        throw 'Runtime trace omitted fields needed to verify pause/resume'
+    }
+    $traceRows = [System.Collections.Generic.List[object]]::new()
+    foreach ($line in $rows | Select-Object -Skip 1) {
+        [void]$traceRows.Add($line.Split(','))
+    }
+    $pausedRows = @($traceRows | Where-Object { $_[$pausedColumn] -eq '1' })
+    if ($pausedRows.Count -lt 3) { throw 'Trace did not capture a sustained paused interval' }
+    $frozenColumns = @($elapsedColumn, $segmentColumn, $fractionColumn, $speedColumn,
+        $stepColumn, $callbackColumn, $dispatchColumn)
+    foreach ($pausedRow in $pausedRows) {
+        foreach ($column in $frozenColumns) {
+            if ($pausedRow[$column] -ne $pausedRows[0][$column]) {
+                throw "Race state column '$($header[$column])' changed while paused"
+            }
+        }
+        if ($pausedRow[5] -eq '1') { throw 'Throttle remained active after pause cleared held controls' }
+        for ($column = 13; $column -lt $header.Count; ++$column) {
+            if ($header[$column] -match '^car\d+_' -and
+                $pausedRow[$column] -ne $pausedRows[0][$column]) {
+                throw "Opponent state column '$($header[$column])' changed while paused"
+            }
+        }
+    }
+    $lastPausedIndex = -1
+    for ($index = 0; $index -lt $traceRows.Count; ++$index) {
+        if ($traceRows[$index][$pausedColumn] -eq '1') { $lastPausedIndex = $index }
+    }
+    $resumedSteps = $false
+    for ($index = $lastPausedIndex + 1; $index -lt $traceRows.Count; ++$index) {
+        if ($traceRows[$index][$pausedColumn] -eq '0' -and
+            [uint32]::Parse($traceRows[$index][$stepColumn]) -gt
+                [uint32]::Parse($pausedRows[0][$stepColumn])) {
+            $resumedSteps = $true
+            break
+        }
+    }
+    if (-not $resumedSteps) { throw 'Fixed-step simulation did not resume after P was pressed again' }
+
+    Write-Output 'Configured controls, focus-loss release, braking/reverse, and P pause/resume passed; race state froze while paused and fixed-step simulation resumed.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

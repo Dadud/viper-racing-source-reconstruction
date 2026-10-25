@@ -15,8 +15,12 @@ to 99; its initial value comes from `GAME.laps`. Original GameData and
 `options.def` are not modified.
 
 Use Up/Down to choose a track, Left/Right to choose a car, and Enter to load
-the assets and start the existing race session. On race results, Enter returns
-to setup; Escape exits. Closing the race window exits the app. The loaded
+the assets and start the existing race session. During a race, press P to
+pause or resume. Pause clears held gameplay controls, freezes player/opponent
+simulation and race time, and stops the looping engine buffers. Resume resets
+the wall-clock and fixed-step anchors so paused time is not replayed as
+simulation catch-up. Escape exits the race; on results, Enter returns to setup.
+Closing the race window exits the app. The loaded
 `GameAssets` value owns resources through the race; returning from the race
 destroys it before the next setup selection and reload. CLI-selected car/track,
 asset validation, bounded smoke runs, audio smoke, and trace recording bypass
@@ -67,8 +71,10 @@ motion; braking reduces speed magnitude and no longer drives the car backward.
 This control mapping remains provisional kinematics, not a gearbox or physical
 simulation. A Windows smoke test records throttle while Up is held, confirms
 the control clears when focus is lost, and checks that Down brakes while R
-produces backward route motion. DirectInput polling, controller support, and
-control rebinding UI remain open.
+produces backward route motion. It also pauses while throttle is held and
+asserts that race time, player route state, opponent route state, and fixed-step
+count remain constant until resume. DirectInput polling, controller support,
+and control rebinding UI remain open.
 
 Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to
