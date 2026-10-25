@@ -245,9 +245,11 @@ asset-free regression now replays that transform before its four direct tire
 accumulator calls. The regression also checks the four captured suspension X
 compositions. The checked-in response probe has exact stage hooks for the
 suspension and tire callsites, but those additional stack rows have not yet
-been captured. This closes another wheel-to-accumulator stage; the pre-
-projection response inputs, suspension direction producers, native
-collision/query state, and live session ownership remain unresolved. See
+been captured. The regression now replays all 32 ordered direct tire writes
+from eight captured integrator updates, checking the known projection and
+accumulator stages for each wheel. This closes another wheel-to-accumulator
+stage; the pre-projection response inputs, suspension direction producers,
+native collision/query state, and live session ownership remain unresolved. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#corrected-wheel-scoped-force-callsites).
 
 ### State required before the live physics integration can be wired

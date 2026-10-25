@@ -27,6 +27,8 @@ struct CapturedSuspensionForceComposition {
 };
 
 struct CapturedTireForceWrite {
+    std::size_t integrator;
+    std::size_t wheel;
     std::array<float, 3> force;
     std::array<float, 3> tire_vector_0x100;
     std::array<float, 3> tire_response_vector_0xf4;
@@ -58,50 +60,13 @@ constexpr std::array<CapturedSuspensionForceComposition, 4>
          0.12266786396503448F},
     }};
 
-// First captured PCAR integrator, direct return 0x443C09, one row for each
-// wheel. The call vector matches the wheel's +0x100..+0x108 bytes exactly.
-constexpr std::array<CapturedTireForceWrite, 4> captured_tire_force_writes{{
-    {{244.78858947753906F, 0.31991028785705566F, 340.5751647949219F},
-     {244.78858947753906F, 0.31991028785705566F, 340.5751647949219F},
-     {244.7991943359375F, 0.0060527632012963295F, 340.5678405761719F},
-     {-0.033768028020858765F, 0.9991574287414551F, 0.023332256823778152F},
-     {127.27809143066406F, -4.048957347869873F, -297.0700378417969F},
-     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
-     {0.11652549356222153F, 3807.73095703125F, 3.512221097946167F},
-     {-148.46656799316406F, 5.183233261108398F, -5614.412109375F},
-     {244.90512084960938F, 3808.05078125F, 344.0873718261719F},
-     {-321.40850830078125F, 517.05615234375F, -5490.5908203125F}},
-    {{-222.8980255126953F, 1.0346245765686035F, -366.89886474609375F},
-     {-222.8980255126953F, 1.0346245765686035F, -366.89886474609375F},
-     {-222.86328125F, 0.0064383940771222115F, -366.9228820800781F},
-     {-0.033768028020858765F, 0.9991574287414551F, 0.023332256823778152F},
-     {128.1427459716797F, -4.050186634063721F, -295.7660217285156F},
-     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
-     {245.0271759033203F, 7796.6904296875F, 347.7664489746094F},
-     {-5678.15771484375F, 519.4635620117188F, -7922.83642578125F},
-     {22.129150390625F, 7797.72509765625F, -19.132415771484375F},
-     {-5492.80078125F, -3.80810546875F, -8036.919921875F}},
-    {{226.5311737060547F, -5.693071365356445F, 105.29019927978516F},
-     {226.5311737060547F, -5.693071365356445F, 105.29019927978516F},
-     {226.6313018798828F, -2.887934684753418F, 105.22645568847656F},
-     {0.03566182404756546F, 0.9991059899330139F, -0.0227042343467474F},
-     {129.30755615234375F, -4.050251007080078F, -298.4309387207031F},
-     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
-     {22.25668716430664F, 11965.259765625F, -15.288314819335938F},
-     {29.29638671875F, -6.128640174865723F, -5704.3486328125F},
-     {248.78785705566406F, 11959.56640625F, 90.00188446044922F},
-     {-31.828041076660156F, -363.9851379394531F, -5592.189453125F}},
-    {{-59.2712516784668F, -2.932826519012451F, -222.1579132080078F},
-     {-59.2712516784668F, -2.932826519012451F, -222.1579132080078F},
-     {-59.16529846191406F, 0.03558860346674919F, -222.22537231445312F},
-     {0.03566182404756546F, 0.9991059899330139F, -0.0227042343467474F},
-     {130.18624877929688F, -4.05150032043457F, -297.1057434082031F},
-     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
-     {250.23202514648438F, 15967.9921875F, 94.37833404541016F},
-     {-38.39976119995117F, -369.9322204589844F, 165.0107421875F},
-     {190.9607696533203F, 15965.0595703125F, -127.77957916259766F},
-     {74.97676086425781F, -51.737823486328125F, 130.5614776611328F}},
-}};
+// Eight selected PCAR integrator updates, four wheels each; all rows are
+// observed direct 0x443C09 calls derived from the external capture
+// pcar_wheel_response_input_probe_20261025.json (SHA-256
+// DEC4580293D4BCBAC4B6920597D65D3FBB0D60160D88C8E94F1540887FCA0264).
+// The test fixture contains only the values needed to replay known formulas,
+// never the raw wheel snapshots or private capture payload.
+#include "ncar_force_capture_wheel_samples.inc"
 
 // First fixed-step sample, captured at the original PCAR's 0x43E6F0 writer
 // for both nonzero wheel-force callsites on each of its four wheels.
@@ -217,7 +182,14 @@ int main()
             }
         }
 
-        for (const auto& sample : captured_tire_force_writes) {
+        static_assert(captured_tire_force_writes.size() == 8U * 4U);
+        for (std::size_t index = 0; index < captured_tire_force_writes.size(); ++index) {
+            const auto& sample = captured_tire_force_writes[index];
+            if (sample.integrator != index / 4U + 1U ||
+                sample.wheel != index % 4U) {
+                throw std::runtime_error(
+                    "captured tire writes must retain eight ordered four-wheel updates");
+            }
             if (sample.force != sample.tire_vector_0x100) {
                 throw std::runtime_error(
                     "captured 0x443C09 force must equal wheel +0x100 vector");
@@ -266,7 +238,8 @@ int main()
                 "captured zero-vector wheel call must preserve accumulators");
         }
 
-        std::cout << "Original PCAR wheel force samples match the accumulator model.\n";
+        std::cout << "Original PCAR wheel force samples match the accumulator model "
+                     "across eight integrator updates.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

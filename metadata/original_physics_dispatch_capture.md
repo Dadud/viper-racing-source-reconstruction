@@ -240,6 +240,15 @@ validates the basis projection stage from original object bytes. It does not
 derive the pre-projection tire response vector or collision normal and does
 not make the live runtime physics-owned.
 
+The asset-free regression now replays all 32 ordered direct tire writes from
+the eight selected integrator updates (four wheels each). Each derived fixture
+row checks the observed `+0xF4` vector and `+0x110` basis through the known
+projection, then verifies the direct `0x443C09` force and accumulator values.
+The scalar fixture is checked in at
+[`tests/ncar_force_capture_wheel_samples.inc`](../tests/ncar_force_capture_wheel_samples.inc);
+raw snapshots remain external. This expands validation of recovered stages
+without closing upstream producers or enabling production physics.
+
 The complete response capture is kept outside the repository at
 `../../analysis/reference_captures/pcar_wheel_response_input_probe_20261025.json`
 (SHA-256 `DEC4580293D4BCBAC4B6920597D65D3FBB0D60160D88C8E94F1540887FCA0264`,
