@@ -183,14 +183,18 @@ should record all four wheel slots and retain the upstream response inputs.
 
 Prepared [`tools/pcar_integrator_object_probe.js`](../tools/pcar_integrator_object_probe.js)
 as a read-only next probe. It hooks the existing `0x431150` entry, selects the
-PCAR vtable `0x4C8188`, and snapshots the full observed body object range
-`[+0,+0x105C)` before and after every 16th selected-PCAR call, capped at 160
-sample pairs. Each record includes the object pointer, vtable, call index,
-phase, wall-clock timestamp, and a binary snapshot. The 0x105C-byte range
-covers body state and the four 0x1A4-byte wheel subobjects; it is chosen from
-the observed offsets, not a recovered allocation-size declaration. The hook
-does not change target memory or inputs. The RPC status reports total calls,
-selected calls, samples, and read failures.
+PCAR vtable `0x4C8188`, and snapshots the factory-declared `0xEF0`-byte PCAR
+allocation before and after every 16th selected-PCAR call, capped at 64 sample
+pairs. The factory allocation bound comes from `0x422580`; it covers the four
+wheel subobjects (`+0x554 + 0x1A4*i`) and known body fields through `+0xECC`.
+Each record includes the object pointer, vtable, call index, phase, wall-clock
+timestamp, byte length, and a full snapshot encoded as a JSON `rawHex` field.
+No binary side channel is required; decode a snapshot with Node's
+`Buffer.from(rawHex, "hex")`. The hook does not change target memory or inputs.
+The RPC status reports total calls, selected calls, attempted samples,
+successful before/after pairs, and read failures. The ready event includes the
+module path/size and expected executable SHA-256; it does not hash loaded
+memory, so the caller must verify the on-disk executable before launch.
 
 Use it only in the launcher-owned child flow above, after confirming the
 executable, staged Data files, and `options.cfg` hashes. Install it while the
@@ -199,6 +203,5 @@ grid baseline, a short controlled throttle pulse, and a coast interval. Pair
 the snapshots with the existing PCAR control/body and `0x43ECE0` force-boundary
 hooks. Compare same-object before/after bytes and annotate four wheel bases at
 `+0x554 + 0x1A4*i`. The probe is syntax-checked only and has not been run; it
-provides no live-state result yet. Object size, internal field meanings,
-per-wheel force attribution, and a complete physics input mapping remain
-unverified.
+provides no live-state result yet. Internal field meanings, per-wheel force
+attribution, and a complete physics input mapping remain unverified.
