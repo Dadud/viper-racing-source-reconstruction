@@ -19,13 +19,15 @@ main entity-registry insertion routine.
 The live runtime now retains an ordered task-object inventory beside its
 validated full-stream readback. Each entry records stream index, FourCC,
 logical cursor, exact payload span, and recovered factory allocation size and
-constructor address. Inventory construction rejects an invalid readback,
-out-of-bounds payload, or unknown factory type atomically. Entries explicitly
+constructor address. Inventory construction rechecks the preceding cursor
+DWORD and each payload's FourCC/declared-size header against the decoded
+readback, and rejects an invalid readback, out-of-bounds payload, byte/header
+mismatch, or unknown factory type atomically. Entries explicitly
 report `native_object_materialized=false` and
 `fixed_step_callback_supported=false`: this is an identity/factory inventory,
 not native allocation, constructor execution, or fixed-step dispatch. A
-focused regression covers ordering, PCAR factory metadata, and malformed-span
-rejection.
+focused regression covers ordering, PCAR factory metadata, malformed-span
+rejection, and a same-size buffer with a mismatched cursor prefix.
 
 Before populating that object array, `0x420480` obtains the track-state record
 from `0x45C2C0` and passes it to `0x426000`. That helper switches on the DWORD

@@ -206,6 +206,15 @@ int main()
                     invalid_inventory.failed_record_index == 1U &&
                     invalid_inventory.entries.empty(),
                 "task inventory must reject malformed payload spans atomically");
+        auto mismatched_inventory_bytes = serialized.bytes;
+        mismatched_inventory_bytes[0] ^= std::byte{1U};
+        const auto mismatched_inventory = viper::inventory_physics_task_objects(
+            decoded, mismatched_inventory_bytes);
+        require(mismatched_inventory.status ==
+                    viper::PhysicsTaskObjectInventoryStatus::decoded_record_mismatch &&
+                    mismatched_inventory.failed_record_index == 0U &&
+                    mismatched_inventory.entries.empty(),
+                "task inventory must reject a same-size byte buffer whose stream cursor differs from decoded identity");
         const auto pcar_binding = viper::bind_player_pcar_task_record(
             decoded, serialized.bytes, car_record, 0x100U);
         require(pcar_binding.status ==

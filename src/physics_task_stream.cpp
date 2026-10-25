@@ -264,13 +264,34 @@ PhysicsTaskObjectInventory inventory_physics_task_objects(
         return inventory;
     }
 
+    const auto read_u32_le = [serialized_stream_bytes](
+        const std::size_t offset) noexcept {
+        return std::to_integer<std::uint32_t>(serialized_stream_bytes[offset])
+            | (std::to_integer<std::uint32_t>(serialized_stream_bytes[offset + 1U]) << 8U)
+            | (std::to_integer<std::uint32_t>(serialized_stream_bytes[offset + 2U]) << 16U)
+            | (std::to_integer<std::uint32_t>(serialized_stream_bytes[offset + 3U]) << 24U);
+    };
     inventory.entries.reserve(decoded_stream.records.size());
     for (std::size_t index = 0U; index < decoded_stream.records.size(); ++index) {
         const auto& record = decoded_stream.records[index];
-        if (record.record_bytes_offset > serialized_stream_bytes.size() ||
+        if (record.record_bytes_offset < sizeof(std::uint32_t) ||
+            record.record_bytes_offset > serialized_stream_bytes.size() ||
             record.record_size > serialized_stream_bytes.size() -
                 record.record_bytes_offset) {
             inventory.status = PhysicsTaskObjectInventoryStatus::record_out_of_bounds;
+            inventory.failed_record_index = index;
+            inventory.entries.clear();
+            return inventory;
+        }
+        if (record.record_bytes_offset - sizeof(std::uint32_t) >
+                serialized_stream_bytes.size() - sizeof(std::uint32_t) ||
+            read_u32_le(record.record_bytes_offset - sizeof(std::uint32_t)) !=
+                record.cursor_offset ||
+            record.record_size < 8U ||
+            read_u32_le(record.record_bytes_offset) != record.record_tag ||
+            read_u32_le(record.record_bytes_offset + sizeof(std::uint32_t)) !=
+                record.record_size) {
+            inventory.status = PhysicsTaskObjectInventoryStatus::decoded_record_mismatch;
             inventory.failed_record_index = index;
             inventory.entries.clear();
             return inventory;

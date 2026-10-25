@@ -199,6 +199,7 @@ enum class PhysicsTaskObjectInventoryStatus : std::uint8_t {
     complete,
     invalid_readback,
     record_out_of_bounds,
+    decoded_record_mismatch,
     unknown_factory_type,
 };
 
@@ -209,9 +210,9 @@ struct PhysicsTaskObjectInventory {
     std::optional<std::size_t> failed_record_index;
 };
 
-// Correlates each decoded record with the exact payload span and recovered
-// factory descriptor, rejecting malformed spans and unknown factory types.
-// No constructor is run by this inventory adapter.
+// Correlates each decoded record with the exact cursor prefix, payload header,
+// span, and recovered factory descriptor, rejecting mismatches and unknown
+// factory types. No constructor is run by this inventory adapter.
 [[nodiscard]] PhysicsTaskObjectInventory inventory_physics_task_objects(
     const PhysicsTaskRecordStreamRead& decoded_stream,
     std::span<const std::byte> serialized_stream_bytes);
