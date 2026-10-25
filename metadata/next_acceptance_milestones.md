@@ -18,11 +18,12 @@ still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
 body accumulators, collisions, or pose integration. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result,
-but the live query origin uses the last committed route-pose position when
-available and the constructor-initialized PCAR basis. It does not write route
-state into PCAR. The body remains static in the live session, so these queries
-do not use a physics-updated wheel/body transform and their results are still
-not connected to collision response, suspension force, or pose integration.
+but the live query origin previously used the last committed route-pose position
+when available. Contact queries now use only byte-backed PCAR position/basis and
+constructor wheel geometry; route pose no longer supplies their origin. The
+body remains static in the live session, so these queries do not use a
+physics-updated wheel/body transform and their results are still not connected
+to collision response, suspension force, or pose integration.
 This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
 [`completion_ledger.md`](completion_ledger.md). Existing portable physics
@@ -55,7 +56,8 @@ Next wire a complete observed body update and preserve paired per-tick physical
 state captures against the original.
 Four wheel contact projections now transform constructor wheel anchors through
 the initialized byte-backed PCAR body basis and position and project along its
-up axis. `trace_replay_regression.ps1` confirms the supported terrain query
+up axis. Route-renderer pose no longer substitutes for that body transform.
+`trace_replay_regression.ps1` confirms the supported terrain query
 samples remain valid through a deterministic full Viper/Bemidji race. This
 does not advance body pose, use a physics-updated native wheel/body query
 origin, produce native forces, or transfer pose authority from the route
@@ -64,10 +66,11 @@ The native wheel-query origin producer is now pinned to the exact inputs at
 `0x442530`: wheel local position `+0x04..+0x0C` plus the referenced point at
 `+0x10`, transformed by all twelve body floats `+0x38..+0x64` through
 `0x437BA0`, producing wheel `+0xC8..+0xD0` before `0x45F760`/`0x4672B0`.
-`transform_wheel_point_0xc8` models that affine operation, but the session only
-has constructor body placement; it has no physics-updated body transform.
-Its current route-pose terrain observations therefore cannot serve as native
-contact inputs to suspension. Keep the live contact/suspension transition
+`transform_wheel_point_0xc8` models that affine operation. The session now
+applies the byte-backed constructor transform to wheel geometry and queries
+terrain there, without route-pose substitution. The body matrix is not yet
+advanced by the physical integrator, and query direction/contact state are not
+yet composed into suspension. Keep live suspension and force integration
 disconnected until the body-transform producer is session-owned and its
 per-step wheel reference inputs are established. The native query dataflow is
 documented in [`vehicle_setup.md`](vehicle_setup.md#shared-terrain-surface-query).
@@ -210,8 +213,8 @@ still not called by the production race session. The four varying operands in
 the pair differential are now mapped to the four wheel `+0xE8` history fields.
 `0x431150` calls `0x442530` once per wheel before reading those values;
 `0x442530` consumes prior `+0xE8` and stores the next history value. The
-producer order is resolved, but the session's route-pose contact observation
-is not the native fixed-step body/query state. Native contact/query, spring,
+producer order is resolved, but the session's constructor-pose contact query
+is not a physics-updated body/query state. Native contact/query, spring,
 surface, and tire inputs are not yet owned by the production session, so these
 updates remain disconnected. The live producer of the actual wheel object's
 per-step `+0x158` is identified inside the integrator but remains disconnected

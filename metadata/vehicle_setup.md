@@ -670,9 +670,11 @@ three contact-point floats at `+0x130..+0x138` are copied only when the modeled
 branch reaches `0x443F00`; failed gates therefore preserve both the typed
 contact point and the corresponding object bytes. These stores use the
 four constructor-owned objects at car `+0x554 + 0x1A4*i` and mark only written
-bytes initialized. The runtime still uses its route pose and yaw-only terrain
-query, so these are persistent outputs of the existing contact model rather
-than full native body-contact simulation.
+bytes initialized. The runtime now uses the byte-backed PCAR constructor
+transform and full body basis for these terrain queries; it no longer substitutes
+the route pose. The body transform is still not advanced by physics, so these
+are persistent contact-model outputs rather than full dynamic body-contact
+simulation.
 
 The next scalar section is represented by `evaluate_wheel_suspension`. It
 subtracts the previous depth at `+0xE8`, scales travel by `62.5`, computes a
@@ -1590,11 +1592,11 @@ intersection plus the signed 16-bit feature at plane offset `+0x34`. The shared
 helper quantizes coordinates for partition lookup but uses the original X/Z to
 solve plane height; Y does not select the plane or affect that height. Thus the
 live `sample_terrain_surface` call uses the reconstructed terrain-query
-algorithm. Its remaining limitation is the supplied origin and missing
-downstream response: the current runtime derives the origin from route pose
-plus constructor wheel anchors and keeps the initial PCAR basis, rather than
-from an evolving native body transform, and does not feed query output into
-the live suspension/force/body step. Ghidra Evidence for the wrapper and
+algorithm. Its remaining limitation is the missing dynamic body transform and
+downstream response: the runtime derives the origin from byte-backed PCAR
+position/basis plus constructor wheel geometry, not route pose. The body is
+not yet evolving, and query output does not feed the live suspension/force/body
+step. Ghidra Evidence for the wrapper and
 sampler: `0x45F760` `ev_4acbfe6d2397810fe55e429197e8f54269e4440fad4631decd123f188e3a5652`;
 `0x4672B0` `ev_02a12b56b8da3a7c9bbd70acea0ae1696edd55d1a9b5d5edc3fa23baaf6dc868`.
 
@@ -1615,18 +1617,16 @@ output do not overlap. Evidence:
 `0x442530` assembly `0x00442A00..0x00442A40` and `0x00442C3F..0x00442C66`,
 plus `0x437BA0` assembly `0x00437BA0..0x00437C5D`.
 
-The Windows race loop now supplies live, bounded observations to the per-wheel
-contact state model. It reconstructs the candidate local anchor by adding the
-selected FNIM vertex back to the constructor's stored relative point, then
-projects local X/Z through the yaw-only pose used by the current renderer.
-Local Y is added to the terrain-following route height. The resulting point is
-queried against the loaded track terrain, with world-up as the contact axis and
-the ordinary quick-race reset-feature hook disabled. This matches the current
-runtime's available pose representation; it does not synthesize the missing
-native pitch/roll body matrix. `WindowState` retains each wheel's observation
-and contact-state result, and each race trace appends query success, contact
-gate, active byte, feature, projected depth, world-space query origin, sampled
-surface point, and terrain normal for all four wheels after the existing entrant
-columns. The observations do not yet feed suspension forces, collision handling,
-or vehicle motion. Regression coverage checks finite query origins and terrain
-samples and non-degenerate normals for all four wheels on Viper/Bemidji.
+The Windows race loop transforms each constructor-derived local wheel anchor
+through the byte-backed PCAR body basis and position and queries the loaded
+track terrain there. Route pose no longer supplies the contact origin; the PCAR
+constructor transform remains static until body integration is connected. The
+contact axis is the initialized body-up axis, and the ordinary quick-race
+reset-feature hook remains disabled. `WindowState` retains each wheel's
+observation and contact-state result, and each race trace appends query success,
+contact gate, active byte, feature, projected depth, world-space query origin,
+sampled surface point, and terrain normal for all four wheels after the
+existing entrant columns. The query results do not yet feed suspension forces,
+collision handling, or vehicle motion. Regression coverage checks finite query
+origins and terrain samples and non-degenerate normals for all four wheels on
+Viper/Bemidji.

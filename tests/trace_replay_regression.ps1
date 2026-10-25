@@ -539,7 +539,7 @@ try {
     $wheelQueryStart = 13 + 5 * 7
     $wheelQueriesObserved = [bool[]]::new(4)
     $wheelFirstQueryOrigins = [object[]]::new(4)
-    $wheelQueryOriginsMoved = [bool[]]::new(4)
+    $wheelQueryOriginsStable = [bool[]]::new(4)
     $wheelOriginStart = $wheelQueryStart + 5 * 4
     $wheelSurfaceStart = $wheelOriginStart + 3 * 4
     $wheelSurfaceSamplesObserved = [bool[]]::new(4)
@@ -574,8 +574,8 @@ try {
                     $dx = $origin[0] - $firstOrigin[0]
                     $dy = $origin[1] - $firstOrigin[1]
                     $dz = $origin[2] - $firstOrigin[2]
-                    if (($dx * $dx + $dy * $dy + $dz * $dz) -gt 0.0001) {
-                        $wheelQueryOriginsMoved[$wheel] = $true
+                    if (($dx * $dx + $dy * $dy + $dz * $dz) -le 0.0001) {
+                        $wheelQueryOriginsStable[$wheel] = $true
                     }
                 }
                 $sampleStart = $wheelSurfaceStart + 6 * $wheel
@@ -639,8 +639,8 @@ try {
         if (-not $wheelQueriesObserved[$wheel] -or -not $wheelSurfaceSamplesObserved[$wheel]) {
             throw "Wheel $wheel never produced a valid live terrain contact sample"
         }
-        if (-not $wheelQueryOriginsMoved[$wheel]) {
-            throw "Wheel $wheel terrain query origin did not follow the moving player route pose"
+        if (-not $wheelQueryOriginsStable[$wheel]) {
+            throw "Wheel $wheel terrain query origin changed without a physics-updated PCAR body transform"
         }
     }
     $lastRaceFields = $raceOutputLines[-1].Split(',')

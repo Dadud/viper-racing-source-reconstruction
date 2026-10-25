@@ -2571,8 +2571,7 @@ struct WindowState {
         return true;
     }
 
-    void update_player_wheel_contacts_from_body(
-        const std::optional<std::array<float, 4>>& route_pose)
+    void update_player_wheel_contacts_from_body()
     {
         player_wheel_terrain_queries_succeeded.fill(false);
         player_wheel_contact_observations = {};
@@ -2609,19 +2608,12 @@ struct WindowState {
                 state.contact_active_0x168 = 0U;
             return;
         }
-        auto body_position = viper::PhysicsVector3{*body_x, *body_y, *body_z};
-        auto body_up = viper::PhysicsVector3{
+        const viper::PhysicsVector3 body_position{*body_x, *body_y, *body_z};
+        const auto body_up = viper::PhysicsVector3{
             body_basis[3], body_basis[4], body_basis[5]};
-        // Route motion supplies position and yaw, not a native body
-        // transform. Keep the initialized basis and use the route pose only
-        // as the terrain-query origin; never write this projection to PCAR.
-        if (route_pose.has_value() && std::all_of(route_pose->begin(),
-                route_pose->end(), [](const float value) {
-                    return std::isfinite(value);
-                })) {
-            body_position = {(*route_pose)[0], (*route_pose)[1],
-                (*route_pose)[2]};
-        }
+        // Contact queries use the session-owned PCAR transform and wheel
+        // constructor geometry. The route-model pose is a separate renderer
+        // authority and must not stand in for native wheel query inputs.
         for (std::size_t wheel = 0; wheel < player_wheel_contact_states.size(); ++wheel) {
             const auto& core = player_wheel_core_initialization->wheels[wheel];
             if (!core.has_value()) {
@@ -2643,9 +2635,9 @@ struct WindowState {
             const auto wheel_world_point = viper::transform_body_local_point({
                 local_anchor, body_basis, body_position});
 
-            // This terrain projection now starts from the PCAR's initialized
-            // byte-backed pose and full basis. It remains a terrain sample,
-            // not the native collision-world query or a force update.
+            // This terrain query starts from the PCAR's byte-backed pose and
+            // full basis. It models the native wheel query but does not yet
+            // feed suspension forces, collision response, or body integration.
             viper::WheelContactObservation observation{};
             observation.body_query_enabled = true;
             observation.reset_feature_hook_active = false;
@@ -2928,7 +2920,7 @@ struct WindowState {
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
-            update_player_wheel_contacts_from_body(player_simulated_pose);
+            update_player_wheel_contacts_from_body();
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
