@@ -70,6 +70,16 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-24, per-wheel terrain query origins in race traces:** Extended
+  recorded race rows with the world-space query origin for each constructor-
+  derived wheel anchor, alongside existing contact and surface outputs. The
+  Viper/Bemidji trace replay regression verifies the four query-origin fields
+  are present and finite whenever terrain sampling succeeds; it also retains
+  finite contact samples and non-degenerate normals. Release `viper_game` build
+  and focused `game_trace_replay_regression` passed. This improves state-trace
+  evidence for native comparisons; route-pose ownership and unconnected wheel
+  forces remain unchanged.
+
 - **2026-10-25, original Quick Race reaches a rendered start scene:** Using
   the bounded first-query video-memory override, three controlled clicks opened
   Quick Race, retained its default Dodge Viper/Bemidji/Easy/Arcade/3-lap setup,

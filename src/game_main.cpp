@@ -2761,6 +2761,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_feature,wheel" << wheel << "_depth";
         }
         for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
+            trace << ",wheel" << wheel << "_query_x,wheel" << wheel
+                  << "_query_y,wheel" << wheel << "_query_z";
+        }
+        for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
             trace << ",wheel" << wheel << "_surface_x,wheel" << wheel
                   << "_surface_y,wheel" << wheel << "_surface_z,wheel" << wheel
                   << "_normal_x,wheel" << wheel << "_normal_y,wheel" << wheel
@@ -2869,6 +2873,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 state.player_wheel_contact_states[wheel].contact_active_0x168)
                           << ',' << state.player_wheel_contact_states[wheel].contact_feature_0x19c
                           << ',' << state.player_wheel_contact_results[wheel].projected_depth;
+                }
+                for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
+                    const auto& observation = state.player_wheel_contact_observations[wheel];
+                    trace << ',' << observation.contact_projection_origin.x
+                          << ',' << observation.contact_projection_origin.y
+                          << ',' << observation.contact_projection_origin.z;
                 }
                 for (std::size_t wheel = 0; wheel < state.player_wheel_contact_states.size(); ++wheel) {
                     const auto& observation = state.player_wheel_contact_observations[wheel];

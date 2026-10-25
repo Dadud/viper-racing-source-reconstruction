@@ -1555,8 +1555,8 @@ the ordinary quick-race reset-feature hook disabled. This matches the current
 runtime's available pose representation; it does not synthesize the missing
 native pitch/roll body matrix. `WindowState` retains each wheel's observation
 and contact-state result, and each race trace appends query success, contact
-gate, active byte, feature, projected depth, sampled surface point, and terrain
-normal for all four wheels after the existing entrant columns. The observations
-do not yet feed suspension forces, collision handling, or vehicle motion.
-Regression coverage checks finite terrain samples and non-degenerate normals
-for all four wheels on Viper/Bemidji.
+gate, active byte, feature, projected depth, world-space query origin, sampled
+surface point, and terrain normal for all four wheels after the existing entrant
+columns. The observations do not yet feed suspension forces, collision handling,
+or vehicle motion. Regression coverage checks finite query origins and terrain
+samples and non-degenerate normals for all four wheels on Viper/Bemidji.

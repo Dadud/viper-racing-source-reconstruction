@@ -113,10 +113,18 @@ try {
     $raceOutputLines = [System.IO.File]::ReadAllLines($raceOutput)
     $finishFrame = -1
     $finishElapsed = 0.0
+    $raceHeader = $raceOutputLines[0].Split(',')
     $wheelQueryStart = 13 + 5 * 7
     $wheelQueriesObserved = [bool[]]::new(4)
-    $wheelSurfaceStart = $wheelQueryStart + 5 * 4
+    $wheelOriginStart = $wheelQueryStart + 5 * 4
+    $wheelSurfaceStart = $wheelOriginStart + 3 * 4
     $wheelSurfaceSamplesObserved = [bool[]]::new(4)
+    if ($raceHeader[$wheelOriginStart] -ne 'wheel0_query_x' -or
+        $raceHeader[$wheelOriginStart + 1] -ne 'wheel0_query_y' -or
+        $raceHeader[$wheelOriginStart + 2] -ne 'wheel0_query_z' -or
+        $raceHeader[$wheelSurfaceStart] -ne 'wheel0_surface_x') {
+        throw 'Race trace is missing the per-wheel world-space terrain query origins'
+    }
     for ($index = 1; $index -lt $raceOutputLines.Count; ++$index) {
         $fields = $raceOutputLines[$index].Split(',')
         if ($fields.Count -lt ($wheelSurfaceStart + 6 * 4)) {
@@ -125,6 +133,16 @@ try {
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
             if ($fields[$wheelQueryStart + 5 * $wheel] -eq '1') {
                 $wheelQueriesObserved[$wheel] = $true
+                $originStart = $wheelOriginStart + 3 * $wheel
+                $origin = [single[]]::new(3)
+                for ($component = 0; $component -lt 3; ++$component) {
+                    $origin[$component] = [single]::Parse(
+                        $fields[$originStart + $component], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($origin[$component]) -or
+                        [single]::IsInfinity($origin[$component])) {
+                        throw "Wheel $wheel emitted a non-finite terrain query origin"
+                    }
+                }
                 $sampleStart = $wheelSurfaceStart + 6 * $wheel
                 $sample = [single[]]::new(6)
                 for ($component = 0; $component -lt 6; ++$component) {
