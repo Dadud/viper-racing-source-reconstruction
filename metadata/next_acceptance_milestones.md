@@ -63,6 +63,17 @@ contact inputs to suspension. Keep the live contact/suspension transition
 disconnected until the body-transform producer is session-owned and its
 per-step wheel reference inputs are established. The native query dataflow is
 documented in [`vehicle_setup.md`](vehicle_setup.md#shared-terrain-surface-query).
+The reference pointer at wheel `+0x10` is now traced through its constructor:
+`0x433C00` selects the nearest model-vertex row (or substitutes static zero
+vector `0x508E80` when `0x425870` rejects it), then `0x441C10` stores that
+address and copies its three coordinates to `+0x14..+0x1C`. `0x442530` only
+dereferences the pointer; it does not update it. Source setup retains the
+selected vertex coordinates and derived relative position by value, but does
+not retain the model resource/pointer lifetime or the fallback decision as a
+session-owned anchor. Do not serialize a fabricated host pointer into the
+portable wheel bytes. A follow-up can add an owned per-wheel anchor value once
+the fallback gate is represented; it still cannot enable live contact until
+the advancing body transform and query direction are also supplied.
 The opponents now use a deterministic route-gap controller with staged
 braking hysteresis rather than unconditional full throttle; the trace records
 each decision and repeated playback checks it. This authored policy improves
