@@ -22,6 +22,7 @@
 #include "viper/career_file_store.hpp"
 #include "viper/pcar_control_update.hpp"
 #include "viper/setup_preferences.hpp"
+#include "directinput_keyboard_service.h"
 
 #include <array>
 #include <algorithm>
@@ -1559,6 +1560,9 @@ struct AcarCurveSourceRuntimeState {
     viper::AcarCurveSourceRecord source_record{};
 };
 
+struct WindowState;
+void refresh_keyboard_controls(WindowState& state);
+
 struct WindowState {
     DirectSoundAudio audio;
     D3DWindow graphics;
@@ -1613,8 +1617,11 @@ struct WindowState {
     std::uint32_t physics_step_count{};
     std::uint32_t playback_clock_milliseconds{};
     // The native binding evaluator consumes a post-poll device snapshot. The
-    // Win32 adapter records key events into its digital-button observation.
+    // DirectInput service supplies the original 256-byte keyboard snapshot;
+    // Win32 key events remain a fallback and support deterministic UI smokes.
+    viper::DirectInputKeyboardService directinput_keyboard;
     std::array<std::uint8_t, 256> keyboard_button_states{};
+    std::array<std::uint8_t, 256> window_message_button_states{};
     std::array<viper::RaceInputBinding, viper::race_loop_binding_slot_count> control_bindings{{
         {1U, 0xcbU}, {1U, 0xcdU}, {1U, 0xc8U}, {1U, 0xd0U}}};
     viper::RaceLoop43B290State control_update_state{};
@@ -2333,6 +2340,17 @@ struct WindowState {
 
     bool update_native_control_state(const float delta_seconds)
     {
+        if (!playback_active) {
+            keyboard_button_states = window_message_button_states;
+            viper::DirectInputKeyboardService::KeyboardState native_keyboard{};
+            if (directinput_keyboard.poll(native_keyboard)) {
+                for (std::size_t key = 0; key < keyboard_button_states.size(); ++key) {
+                    if ((native_keyboard[key] & 0x80U) != 0U)
+                        keyboard_button_states[key] = 1U;
+                }
+            }
+            refresh_keyboard_controls(*this);
+        }
         viper::RaceLoop43B290Observation observation{};
         observation.simulation_delta = delta_seconds;
         std::copy(control_bindings.begin(), control_bindings.end(),
@@ -2767,7 +2785,10 @@ void update_control_key(WindowState& state, const UINT key, const bool pressed)
 {
     const auto selector = directinput_key_selector(key);
     if (!selector) return;
-    state.keyboard_button_states[*selector] = static_cast<std::uint8_t>(pressed);
+    state.window_message_button_states[*selector] =
+        static_cast<std::uint8_t>(pressed);
+    state.keyboard_button_states[*selector] =
+        static_cast<std::uint8_t>(pressed);
     refresh_keyboard_controls(state);
 }
 
@@ -2808,6 +2829,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
     case WM_CANCELMODE:
         if (state && !state->playback_active) {
             state->keyboard_button_states.fill(0U);
+            state->window_message_button_states.fill(0U);
             refresh_keyboard_controls(*state);
         }
         return 0;
@@ -3219,6 +3241,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << " parsed SFX0 PCM engine resources.\n";
     }
     ShowWindow(hwnd, SW_SHOWDEFAULT);
+    UpdateWindow(hwnd);
+    if (!state.directinput_keyboard.initialize(hwnd)) {
+        std::cerr << "DirectInput keyboard initialization failed; using Win32 key-message fallback.\n";
+    }
     MSG msg{};
     bool running = true;
     unsigned rendered_frames = 0;

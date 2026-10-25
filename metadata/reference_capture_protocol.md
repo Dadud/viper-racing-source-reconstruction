@@ -46,9 +46,11 @@ and its private extract at
 `../../analysis/reference_captures/physics_dispatch_20261025/runtime_trace_selected.json`
 plus the bounded intervention extract at
 `../../analysis/reference_captures/physics_dispatch_20261025/synthetic_dik_ramp_capture.json`.
-The next comparison should replay the same timestamped throttle ramp against
-the reconstructed input-update path, then capture a short, repeatable
-input-to-motion interval on both clients. Race completion and parity remain
+The next comparison should first capture per-update timestamps for a bounded
+throttle ramp on the original, then replay that schedule against the
+reconstructed input-update path and capture a short, repeatable
+input-to-motion interval on both clients. The current callback-ordered samples
+do not support a numeric ramp comparison. Race completion and parity remain
 unverified in the original capture.
 
 ## Pairing a scenario

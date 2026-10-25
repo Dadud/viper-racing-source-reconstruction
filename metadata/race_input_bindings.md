@@ -29,13 +29,17 @@ their low byte, matching the byte load at `param_1 + 4`.
 The type-1 selector is the keyboard device's DirectInput scan-code index, not
 the Win32 virtual-key number. `0x412F90` creates the system keyboard and sets
 its data format; `0x4130D0` polls `0x100` bytes into `DAT_004EF200`; and
-`0x413170` reads the selected byte's high bit. The runtime converts parsed
-virtual-key bindings and incoming Win32 key events through `MapVirtualKeyW`
-and maps an `E0`-prefixed scan code into the DirectInput extended-key range.
-The arrow-key conversion is exercised end to end by
-`game_keyboard_binding_smoke`, which verifies the runtime trace sees throttle
-while Up is held and clears it after key-up. Native device polling itself
-remains unimplemented. Evidence: `0x412F90`
+`0x413170` reads the selected byte's high bit. The Windows runtime now owns a
+DirectInput8 system-keyboard service that requests the same 256-byte data
+format, polls it once per outer race update, and attempts reacquisition after
+`DIERR_INPUTLOST` or `DIERR_NOTACQUIRED`. The runtime converts parsed
+virtual-key bindings through `MapVirtualKeyW` and maps an `E0`-prefixed scan
+code into the DirectInput extended-key range. Its WM key-event snapshot is
+merged as a fallback, which also supports deterministic posted-event smokes.
+`game_keyboard_binding_smoke` confirms the binding/evaluator/control path and
+fallback behavior; it does not prove that a physical key was observed through
+the DirectInput buffer on this host. Device polling remains to be validated
+with a foreground held-key capture. Evidence: `0x412F90`
 `ev_f1afb4146263e4c858ccb590428f2b21bdb16b8de7093427b63a76675c137001`,
 `0x4130D0` `ev_1ef0d1ce36204eea7927dd0bde9b4e425f3d473b4ff1cd9852f6bb807c0284d6`,
 and `0x413170` `ev_b9306522b3be005782bba4f9c3937d6c50a318d693aedc521d77a60d3836b011`.

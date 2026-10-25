@@ -77,6 +77,11 @@ and the probe script SHA-256 is
 `DB5E3C52E740D8F32842EA713A96366E9DA6E18B5A7E575AC926CD31328D82C4`. REA
 Evidence ID: `ev_492e1d41c4041bb2979c3e8b9e2e62458c90b5f19d664b29cef755f9a8acdd86`.
 
+The captured JSON timestamps the intervention bounds and sparse wrapper reads,
+but its throttle-output samples are ordered by callback/message index rather
+than timestamped per update. It is therefore not a frame-accurate input
+schedule for a numeric replay comparison.
+
 The original control update then produced a nonzero throttle global at
 `0x5093F4`: `0.31662598`, `0.63345343`, `0.95028085`, then `1.0`; after the
 synthetic key read ended, it decayed through `0.9472290`, `0.6831726`,

@@ -220,7 +220,10 @@ target_compile_features(viper_race_progression PUBLIC cxx_std_20)
 target_link_libraries(viper_race_progression PUBLIC viper_race_loop_model)
 
 if(WIN32)
-    add_executable(viper_game src/game_main.cpp src/game_assets.cpp)
+    add_executable(viper_game
+        src/game_main.cpp
+        src/game_assets.cpp
+        src/directinput_keyboard_service.cpp)
     target_compile_features(viper_game PRIVATE cxx_std_20)
     target_compile_definitions(viper_game PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
     if(MSVC)
@@ -235,7 +238,7 @@ if(WIN32)
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
         viper_scene_model viper_race_setup_model viper_wheel_body_coupling
-        viper_physics_scheduler d3d11 dxgi dsound user32)
+        viper_physics_scheduler d3d11 dxgi dsound dinput8 dxguid user32)
 endif()
 
 include(CTest)
