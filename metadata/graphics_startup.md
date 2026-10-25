@@ -195,15 +195,34 @@ simulation sample was captured. Before launch, all 32 staged `Data` hashes,
 the official launcher and engine hashes, `Config/options.cfg`, and the mounted
 `F:` volume label (`VIPER`) matched the expected capture setup.
 
-The same Windows session already had `C:\Sierra\Viper Racing\Data\race.bin`
-running from the installed 2016 v1.2.5 patch (SHA-256
+At the time of this failed attempt, the same Windows session also had
+`C:\Sierra\Viper Racing\Data\race.bin` running from the installed 2016
+v1.2.5 patch (SHA-256
 `8FB719439D58EC58BE971682C110B06A9C0702CDE057FFB48B054263E1C501BD`, file
 size 1,851,392). It is not the official ISO engine (SHA-256
 `F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`, file
 size 1,314,816). The patch's instruction file identifies it as the 2016
 v1.2.5 release; raw `.text` windows around the integrator and wheel-update
-addresses also differ substantially from the ISO image. The patch was left
-running and was not used as original-engine evidence. The failed official
-launch does not establish why no child was created. A future capture must
-recover the launch path that produced the already-retained ISO-hash race
-session, then attach the bounded PCAR probe before gameplay.
+addresses also differ substantially from the ISO image. It was excluded from
+original-engine evidence and later exited through its own UI.
+
+### Successful official child retry later on 2026-10-25
+
+A subsequent suspended launch of the verified official `GameRoot` launcher
+successfully emitted a `CreateProcessA` event for `Data\race.bin -1` with
+working directory `GameRoot\Data`. The child was PID 16852 and was attached
+while suspended before the launcher bridge resumed it. Before launch, the
+launcher, official ISO `race.bin`, `options.cfg`, mounted `VIPER` volume, and
+all 32 staged `Data` files matched their recorded hashes. The official child
+reached the main menu, the Viper/Bemidji/Easy/Arcade/3-lap Quick Race setup,
+and the 3D race start.
+
+This run required the documented process-only first-query video-memory
+override (`0xFFFF0000` to `0x00200000`) to pass the original startup gate.
+The bounded synthetic DIK_UP intervention changed only the return from the
+original `0x413170` key-read wrapper; the original control ramp then produced
+throttle values from 0 to 1 and the car reached a displayed 10 MPH. This is
+not evidence of ordinary keyboard delivery, a clean throttle-only force law,
+race completion, or parity. Subsequent read-only captures on the verified ISO
+engine sampled the player's wheel-scoped `0x43E6F0` force additions; see
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#corrected-wheel-scoped-force-callsites).

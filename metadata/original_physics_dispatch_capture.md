@@ -165,19 +165,57 @@ across the helper call. Evidence ID:
 `ev_508defee4d9d7bb7cd6ca513958ff9ca00c4048824e7ba5aa9befc3ffa19f2f0`.
 
 The probe's return address was consistently `0x43113F`, inside the forwarding
-wrapper at `0x431130` that calls `0x43E6F0`. That identifies a body-level
-force-addition callsite. Although the probe also recorded a wheel pointer
-offset of `+0x554`, that pointer came from the previously observed wheel-update
-context and does not establish that this writer belongs to that wheel. All 58
-samples had throttle zero, and the run did not inject input. Do not count this
-as per-wheel force evidence or use its wheel label as attribution.
+wrapper at `0x431130` that calls `0x43E6F0`. That return address alone did not
+identify which wheel update was active. The probe's `+0x554` wheel label came
+from stale context and cannot be used for attribution. A later scoped capture
+with an explicit `0x442530` entry/return lifetime resolved this ambiguity;
+the corrected result is below. All 58 samples in this first probe had throttle
+zero and the run did not inject input.
 
 The private probe bundle is
 `../../analysis/reference_captures/pcar_force_writer_probe_20261025.evidence.json`
 (SHA-256 `AF041F571D7CBAD131DF1AF2B4A24547A2A5FBC0AFDB1836F744B16F6CD75A43`).
-The next capture should use the helper's actual call stack or an in-function
-callsite under `0x442530` to associate force writes with a wheel update; it
-should record all four wheel slots and retain the upstream response inputs.
+
+## Corrected wheel-scoped force callsites
+
+A bounded read-only probe attached to the verified ISO `race.bin` (PID 16852,
+SHA-256 `F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`).
+It selected the player PCAR through callback `0x4384D0`, counted entry/return
+of each `0x442530` call, and sampled the `0x43E6F0` force vector, application
+point, body center, and accumulator bytes while that wheel call was active.
+The probe observed 219 selected PCAR callbacks/integrators, 876 wheel updates
+(four per integrator), and 4,161 force-writer calls over 3.5 seconds. Evidence
+IDs: callsite/slot capture `ev_7b5684967fcf4e1801c54934781e1156526d85e94b8dd30de9b9b83ec1875bac`;
+centered input/output capture `ev_df5f1c10472e7957072f1bd7df720c6dfd3518148b2f7d7da013687f2f6cb72a`.
+
+The first selected integrator shows two nonzero `0x43E6F0` writes per wheel:
+the wrapper return `0x43113F` (whose nested stack includes wheel callsite
+`0x4430E9`) and direct return `0x443C09`. The wheel pointer at each sampled
+call is the corresponding PCAR subobject at `+0x554 + 0x1A4 * wheel_index`.
+Calls returning to `0x443CBC` and `0x443E6C` had zero vectors in this sample
+and left both accumulators unchanged. After the fourth wheel updater returned,
+separate writes at `0x431C2D`, `0x431D12`, and `0x431DBC` were observed with
+no active wheel context; those remain integrator-level contributions. This
+distinguishes wheel-scoped contributions from later body-level additions and
+corrects the earlier return-address-only interpretation.
+
+The centered trace bundle remains outside the public repository at
+`../../analysis/reference_captures/viper_wheel_force_centered_callsites_20261025.json`
+(SHA-256 `8487BE6ACC43F8D86723CA293E41F39821D11B7240AC0BE1CB2E3BA091577E27`).
+The first-pass callsite bundle is
+`../../analysis/reference_captures/viper_wheel_force_callsites_20261025.json`
+(SHA-256 `AA08122BD2C7B3BFDCF2A8F5D05E9CFCAACE746A6F2BE6BA5C08F2063368981A`).
+The reusable bounded probe is [`tools/pcar_wheel_force_callsite_probe.js`](../tools/pcar_wheel_force_callsite_probe.js).
+
+An asset-free CTest fixture replays eight nonzero observed force writes through
+`accumulate_ncar_force_moment` and checks the captured force/moment accumulator
+outputs within 0.02 units; a captured zero-vector call also checks the native
+no-write gate. This validates the shared accumulator primitive and the
+captured wheel-call inputs. It does not reconstruct how the tire/suspension
+response vectors were produced, supply those inputs to the live reconstructed
+session, or prove player-physics parity. Exact upstream wheel response inputs,
+callback state, collision/query state, and integration into `WindowState`
+remain open.
 
 ## Bounded shared-integrator object probe
 
