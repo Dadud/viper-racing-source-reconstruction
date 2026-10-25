@@ -229,6 +229,16 @@ virtual itself is outside the model. Both paths continue through
 `0x434A80` and `0x43B880`, then cache values from `0x43BA00` and `0x43BA20` at
 `+0x4F0` and `+0x4EC`.
 
+A follow-up bounded capture at the branch gate (`0x438621`) and join
+(`0x43867F`) observed 24 paired visits for PCAR `0x4CA20CC`: the returned
+`AL` value and global byte `0x509360` were both zero, `+0xECC` was zero at
+the gate, and it remained zero at the join. This is the false-gate path, which
+clears `+0xECC`; it does not establish constructor initialization or imply the
+gate is always false. Evidence is in the external bundle
+`C:\Users\dadud\OneDrive\Documents\ChatGPT\analysis\reference_captures\pcar_timestamp_branch_20261025.evidence.json`,
+including `ev_7b48cd97034daaf7253c3ff2ea6644672d62ac729561cc14694f12ba119357ab`
+and `ev_b2e592ad0adc9ee86d12d582f1da70d5744053e1f72b2f00256b17c070c358a4`.
+
 The runtime's fixed-step phase is now checked against the outer dispatcher:
 `0x4207C0` calls the ordered `0x421050` task dispatcher and increments
 `DAT_00508774` only after that dispatch returns; `0x425790` returns
