@@ -56,6 +56,11 @@ struct OrderedTrackTaskRecord {
     std::vector<std::byte> record_bytes;
 };
 
+struct ConfiguredCarTaskRecordInput {
+    std::size_t configured_car_index{};
+    std::vector<std::byte> record_bytes;
+};
+
 struct OrderedTrackTaskRecordPlan {
     // True only when every manifest entry has a source-backed, complete
     // record whose tag agrees with the native cursor manifest.
@@ -84,6 +89,7 @@ materialize_track_object_task_records(
 // established; this function never substitutes the runtime car mapping.
 [[nodiscard]] OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
     const TrackObjectTaskRecordMaterialization& materialization,
-    const TrackPhysicsTaskManifest& manifest);
+    const TrackPhysicsTaskManifest& manifest,
+    std::span<const ConfiguredCarTaskRecordInput> configured_car_records = {});
 
 } // namespace viper

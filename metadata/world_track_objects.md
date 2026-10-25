@@ -548,6 +548,9 @@ Evidence IDs:
 - `0x45C270` world API check helper: `ev_474d802a38c3162465a6966ca781e66576a50a6c61665771718d99c448bafaa5`
 - `0x40E670` GCAR timer getter: `ev_280c0c61e0121222526ec61692c83e1c42cd487a89631b0fb1d6fb70cce40464`
 - `0x45EC20` CARF resource path and basename copy: `ev_17d1cae37797b0625f8cd9168909a49ea943b14a649befbff5dea0a0fb2466d5`; focused evidence is in `metadata/car_file_loader.evidence.json`
+- Focused confirmation that `0x45CAE0` calls the CARF loader and field mapper, then supplies the resulting record to its scene-construction path: `ev_0c21c172a16c58e01c47ed385c88c6018c7190ca4bd9f9ecdbedda281414dedd`
+- `0x45EC20` exact `0x228` CARF copy, model basename write, and call to `0x45E4B0`: `ev_fb3327a7e08f9a6d971381fe97d5a07675ead14fa67db814cca419b6d6950aa8`
+- `0x45E4B0` observed setup/CARF-to-record field stores, including `0x1E0` size followed by `0x45CAE0`'s final `0x1E4` size write: `ev_68656e61c5d41c844cb217bb7a21fe87a07e39090d7602d933940825e718e6aa`
 - `0x45E2F0` CARF version/upgrade loader: `ev_05c66de5eacb28dd86480abcad9ff524848abae7fecb91b9056a3bfdc06fb006`
 - `0x45E470` size-check helper body: `ev_af962d5e30792f74916a80bdc00afc19aeb957310c53c7b0dc7b9343c1b72358`
 - `0x45ED10` UPGS loader: `ev_bd53fdb90138dd00a7d2a870d4f301fdc59196586f8b37dd18da1cbe48aaed23`

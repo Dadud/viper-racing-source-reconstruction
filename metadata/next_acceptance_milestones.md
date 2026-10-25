@@ -173,9 +173,15 @@ Therefore the next implementation boundary is completing the native
 world-load-to-task path, not calling `advance_four_wheel_body_step`: produce
 every full record in `0x45C630` order (object directives, then remaining
 `0x45CAB0` configured rows), connect the existing per-class record producers,
-and explicitly resolve any missing layouts or car configuration inputs. Feed
-that one ordered byte stream through the observed task factory and retain the
-resulting physics objects for fixed-step dispatch. Then reconstruct mutable
+and supply each entrant's effective setup/CARF, model-name, and placement
+inputs. The car task-record layout is already source-backed: `0x45CAE0` calls
+`0x45EC20`/`0x45E4B0` to produce the 0x1E4 record later copied by the same
+world serializer. `plan_ordered_track_task_records` now joins non-car bytes to
+the manifest and accepts validated car bytes by configured-car index, but the
+live session does not yet supply every entrant record or serialize that full
+ordered result. Feed the complete ordered byte stream through the observed
+task factory and retain the resulting physics objects for fixed-step dispatch.
+Then reconstruct mutable
 PCAR callback/force state, locate the live player's wheel-history producer
 independently of the GCAR GhostBegin ring, and establish tick/fraction and
 callback ordering. Only when the full per-frame inputs are sourced can the

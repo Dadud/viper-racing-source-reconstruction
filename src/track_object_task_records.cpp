@@ -363,13 +363,16 @@ TrackObjectTaskRecordMaterialization materialize_track_object_task_records(
 
 OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
     const TrackObjectTaskRecordMaterialization& materialization,
-    const TrackPhysicsTaskManifest& manifest)
+    const TrackPhysicsTaskManifest& manifest,
+    const std::span<const ConfiguredCarTaskRecordInput> configured_car_records)
 {
     OrderedTrackTaskRecordPlan result;
-    result.complete = materialization.complete &&
+    result.complete =
         manifest.status == TrackPhysicsTaskManifestStatus::complete &&
         manifest.final_cursor.has_value();
     result.records.reserve(manifest.entries.size());
+    std::vector<bool> configured_car_record_used(configured_car_records.size());
+    std::vector<bool> materialized_row_used(materialization.rows.size());
 
     const auto read_u32_le = [](const std::span<const std::byte> bytes,
                                 const std::size_t offset) {
@@ -388,40 +391,116 @@ OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
         record.record_tag = entry.record_tag;
         record.cursor_offset = entry.cursor_offset;
 
-        if (entry.track_object_row.has_value()) {
+        bool complete_bytes = false;
+        if (entry.configured_car_index.has_value()) {
+            std::optional<std::size_t> car_input_index;
+            for (std::size_t input_index = 0;
+                 input_index < configured_car_records.size(); ++input_index) {
+                if (configured_car_records[input_index].configured_car_index !=
+                    *entry.configured_car_index) continue;
+                if (car_input_index.has_value()) {
+                    result.complete = false;
+                    if (!result.failed_manifest_entry.has_value())
+                        result.failed_manifest_entry = index;
+                    car_input_index.reset();
+                    break;
+                }
+                car_input_index = input_index;
+            }
+
+            if (car_input_index.has_value()) {
+                const auto& car_input = configured_car_records[*car_input_index];
+                const bool valid_header = car_input.record_bytes.size() >= 8U &&
+                    read_u32_le(car_input.record_bytes, 0U) == entry.record_tag &&
+                    read_u32_le(car_input.record_bytes, 4U) ==
+                        car_input.record_bytes.size();
+                bool matching_deferred_row = true;
+                if (entry.track_object_row.has_value()) {
+                    const auto source = std::find_if(materialization.rows.begin(),
+                        materialization.rows.end(), [&](const auto& row) {
+                            return row.source_row == *entry.track_object_row;
+                        });
+                    matching_deferred_row = source != materialization.rows.end() &&
+                        source->status == TrackObjectTaskRecordStatus::car_record_deferred;
+                    if (matching_deferred_row) {
+                        materialized_row_used[static_cast<std::size_t>(
+                            source - materialization.rows.begin())] = true;
+                    }
+                }
+                if (valid_header && matching_deferred_row) {
+                    record.source_status = TrackObjectTaskRecordStatus::complete_record;
+                    record.record_bytes = car_input.record_bytes;
+                    complete_bytes = true;
+                    configured_car_record_used[*car_input_index] = true;
+                }
+            } else if (entry.track_object_row.has_value()) {
+                const auto source = std::find_if(materialization.rows.begin(),
+                    materialization.rows.end(), [&](const auto& row) {
+                        return row.source_row == *entry.track_object_row;
+                    });
+                if (source != materialization.rows.end())
+                    record.source_status = source->status;
+            } else {
+                record.source_status = TrackObjectTaskRecordStatus::car_record_deferred;
+            }
+        } else if (entry.track_object_row.has_value()) {
             const auto source = std::find_if(materialization.rows.begin(),
                 materialization.rows.end(), [&](const auto& row) {
                     return row.source_row == *entry.track_object_row;
                 });
             if (source != materialization.rows.end()) {
+                materialized_row_used[static_cast<std::size_t>(
+                    source - materialization.rows.begin())] = true;
                 record.source_status = source->status;
                 record.record_bytes = source->record_bytes;
-                const bool complete_bytes =
+                complete_bytes =
                     source->status == TrackObjectTaskRecordStatus::complete_record &&
                     source->record_tag == entry.record_tag &&
                     source->record_bytes.size() >= 8U &&
                     read_u32_le(source->record_bytes, 0U) == entry.record_tag &&
                     read_u32_le(source->record_bytes, 4U) == source->record_bytes.size();
-                if (!complete_bytes) {
-                    result.complete = false;
-                    if (!result.failed_manifest_entry.has_value())
-                        result.failed_manifest_entry = index;
-                }
             } else {
                 record.source_status = TrackObjectTaskRecordStatus::incomplete_track_data;
-                result.complete = false;
-                if (!result.failed_manifest_entry.has_value())
-                    result.failed_manifest_entry = index;
             }
         } else {
             // The native post-directive configured-car pass has an identity
             // and cursor but no track.obt line from which to materialize bytes.
             record.source_status = TrackObjectTaskRecordStatus::car_record_deferred;
+        }
+        if (!complete_bytes) {
             result.complete = false;
             if (!result.failed_manifest_entry.has_value())
                 result.failed_manifest_entry = index;
         }
         result.records.push_back(std::move(record));
+    }
+
+    for (const bool used : configured_car_record_used) {
+        if (!used) {
+            result.complete = false;
+            if (!result.failed_manifest_entry.has_value())
+                result.failed_manifest_entry = manifest.entries.size();
+            break;
+        }
+    }
+    for (std::size_t row_index = 0; row_index < materialization.rows.size(); ++row_index) {
+        if (materialized_row_used[row_index]) continue;
+        const auto status = materialization.rows[row_index].status;
+        if (status == TrackObjectTaskRecordStatus::ignored_directive ||
+            status == TrackObjectTaskRecordStatus::end_of_track_directives ||
+            status == TrackObjectTaskRecordStatus::car_record_deferred) continue;
+        if (status == TrackObjectTaskRecordStatus::complete_record ||
+            status == TrackObjectTaskRecordStatus::visual_only ||
+            status == TrackObjectTaskRecordStatus::skipped_by_native_gate) {
+            result.complete = false;
+            if (!result.failed_manifest_entry.has_value())
+                result.failed_manifest_entry = manifest.entries.size();
+            break;
+        }
+        result.complete = false;
+        if (!result.failed_manifest_entry.has_value())
+            result.failed_manifest_entry = manifest.entries.size();
+        break;
     }
 
     return result;

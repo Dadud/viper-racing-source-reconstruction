@@ -11,12 +11,16 @@ merged order, assign stream cursors, or append configured entrants.
 `plan_ordered_track_task_records` now joins those results with the separately
 recovered `TrackPhysicsTaskManifest`. Every output row carries its manifest
 index, cursor, tag, and either the source-row bytes or the configured-car
-identity. It reports the first manifest entry without a complete matching
-record and is complete only when the materialization and manifest are both
-complete, every record header agrees with its bytes, and all manifest entries
-are covered. This is an ordering/validation layer, not a serializer or native
-task-array loader. Deferred car entries remain empty and keep the plan
-incomplete; the `0x1E4` runtime car mapping is intentionally not substituted.
+identity. It accepts separately produced car bytes keyed by configured-car
+index, which can be produced by `apply_car_track_runtime_record` from CARF,
+setup, model-name, and placement inputs. It checks their tag/size headers and
+the matching deferred source row before joining them. It reports the first
+manifest entry without a complete matching record and is complete only when
+the manifest and all record rows are covered. This is an ordering/validation
+layer, not a serializer or native task-array loader. Without caller-provided
+car bytes, PCAR/ACAR/NCAR/GCAR entries remain empty and keep the plan
+incomplete. The runtime car mapper is the observed `0x45E4B0` mapper; callers
+still need to supply per-entrant inputs and actual bytes.
 
 The materializer uses the existing line/record models for:
 
@@ -43,8 +47,10 @@ checkpoint route are represented as explicit no-task-record outcomes.
 The producer evidence is in `world_track_objects.md`: `0x45D950` emits CHKP
 bytes through `0x425720`; `0x45D5D0` constructs WOBL; `0x45D6E0` constructs
 STAT; and `0x45D390` derives OBST dimensions from FNIM geometry and serializes
-through `0x463510`/`0x425720`. `0x425720` framing and the later `0x4224D0`
-reader are documented in `physics_task_objects.md`.
+through `0x463510`/`0x425720`. `0x45CAE0` builds the car record using
+`0x45EC20`/`0x45E4B0`; the record is passed through `0x463920`/`0x463510` to
+the same stream serializer. `0x425720` framing and the later `0x4224D0` reader
+are documented in `physics_task_objects.md`.
 
 This is record production, not a complete native-world loader. It does not
 construct scene objects, include configured entrant rows, model BALL records
