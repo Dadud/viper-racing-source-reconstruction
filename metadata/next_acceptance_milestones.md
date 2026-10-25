@@ -24,6 +24,13 @@ The player now owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
 and persistent contact outputs. This closes object-state materialization only;
 the live loop still does not consume those bytes as suspension inputs.
+The Win32 loop now uses the recovered `0.016` physics-task schedule and
+two-step catch-up cap to advance its current route/contact prototype, while
+sampling controls once per frame and retaining the latest accepted simulation
+pose for rendering. Trace rows include scheduled steps, task tick count, and
+derived task time. This improves timing ownership only: the native task factory,
+interpolation ring, PCAR callback, and body-step integrator are not connected,
+and route kinematics still own player and opponent motion.
 
 The original-client attempt currently stops during graphics initialization;
 there is no paired gameplay baseline (`metadata/graphics_startup.md`,

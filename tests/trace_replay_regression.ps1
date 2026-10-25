@@ -48,12 +48,18 @@ try {
     $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
     $pcarBodyStart = [Array]::IndexOf($header, 'pcar_body_0xde0')
     $pcarMultiplierIndex = [Array]::IndexOf($header, 'pcar_0x40d270_multiplier')
+    $physicsStepsIndex = [Array]::IndexOf($header, 'physics_steps_scheduled')
+    $physicsTickIndex = [Array]::IndexOf($header, 'physics_step_count')
+    $physicsTimeIndex = [Array]::IndexOf($header, 'physics_simulation_time')
     if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0 -or
-        $pcarMultiplierIndex -lt 0) {
-        throw 'Trace is missing PCAR prefix, body, or multiplier fields'
+        $pcarMultiplierIndex -lt 0 -or $physicsStepsIndex -lt 0 -or
+        $physicsTickIndex -lt 0 -or $physicsTimeIndex -lt 0) {
+        throw 'Trace is missing PCAR or fixed-step scheduler fields'
     }
     $observedPcarBodyState = $false
     $observedConfiguredPcarMultiplier = $false
+    $observedPhysicsStep = $false
+    $previousPhysicsTick = -1
     for ($index = 1; $index -lt $replayedLines.Count; ++$index) {
         if ($replayedLines[$index] -cne $repeatedLines[$index]) {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
@@ -72,6 +78,19 @@ try {
                 $fields[10], [cultureinfo]::InvariantCulture)) -gt 0) {
             $observedSteering = $true
         }
+        $scheduledSteps = [int]::Parse($fields[$physicsStepsIndex],
+            [cultureinfo]::InvariantCulture)
+        $physicsTick = [int]::Parse($fields[$physicsTickIndex],
+            [cultureinfo]::InvariantCulture)
+        $physicsTime = [single]::Parse($fields[$physicsTimeIndex],
+            [cultureinfo]::InvariantCulture)
+        if ($scheduledSteps -lt 0 -or $scheduledSteps -gt 2 -or
+            $physicsTick -lt $previousPhysicsTick -or
+            [Math]::Abs($physicsTime - ($physicsTick * 0.016)) -gt 0.0001) {
+            throw "Fixed-step clock trace is inconsistent at frame $($index - 1)"
+        }
+        if ($physicsTick -gt 0) { $observedPhysicsStep = $true }
+        $previousPhysicsTick = $physicsTick
         for ($field = 0; $field -lt 4; ++$field) {
             if ([string]::IsNullOrEmpty($fields[$pcarBodyStart + $field])) { continue }
             if ($fields[$pcarPrefixStart + $field] -cne
@@ -87,6 +106,9 @@ try {
     if (-not $observedConfiguredPcarMultiplier) {
         throw 'No trace frame recorded the configured PCAR callback multiplier'
     }
+    if (-not $observedPhysicsStep) {
+        throw 'Trace playback did not advance the recovered fixed-step clock'
+    }
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }
     Write-Output "Trace playback reproduced $($replayedLines.Count - 1) frames exactly across two runs."
@@ -94,11 +116,14 @@ try {
     $raceLines = [System.Collections.Generic.List[string]]::new()
     $raceLines.Add($inputLines[0])
     $template = $inputLines[1].Split(',')
-    for ($frame = 0; $frame -lt 1800; ++$frame) {
+    # The live runtime follows the recovered 16 ms task cadence and two-step
+    # catch-up cap. A 32 ms schedule exercises two native ticks per row while
+    # providing enough simulated time for the full lap and opponent finishes.
+    for ($frame = 0; $frame -lt 3000; ++$frame) {
         $fields = [string[]]$template.Clone()
         $fields[0] = [string]$frame
         $fields[1] = '0'
-        $fields[2] = '0.05'
+        $fields[2] = '0.032'
         $fields[3] = '0'
         $fields[4] = '0'
         $fields[5] = '1'

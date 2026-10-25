@@ -16,6 +16,7 @@
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/physics_task_stream.hpp"
 #include "viper/physics_task_factory.hpp"
+#include "viper/physics_scheduler.hpp"
 #include "viper/track_object_task_records.hpp"
 #include "viper/world_track_objects.hpp"
 #include "viper/career_file_store.hpp"
@@ -1569,9 +1570,9 @@ struct WindowState {
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<std::array<float, 4>> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
-    // session. Its framed entry is prepared at the recovered logical cursor,
-    // but the complete ordered world stream and fixed-step ring are not yet
-    // connected. Route motion remains the visible pose authority.
+    // session. The complete ordered stream is validated and the recovered
+    // 16 ms scheduler drives the route prototype; native task dispatch, the
+    // interpolation ring, and body integration remain disconnected.
     std::vector<std::byte> player_runtime_car_record;
     std::vector<viper::ConfiguredCarTaskRecordInput> configured_car_task_records;
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
@@ -1595,6 +1596,8 @@ struct WindowState {
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
+    std::optional<std::array<float, 4>> player_simulated_pose;
+    std::vector<std::optional<std::array<float, 4>>> opponent_simulated_poses;
     std::optional<viper::TrackPhysicsTaskManifest> physics_task_manifest;
     bool player_constructor_inputs_ready{};
     bool accelerate{};
@@ -1603,6 +1606,11 @@ struct WindowState {
     bool right{};
     bool playback_active{};
     bool return_to_frontend{};
+    viper::PhysicsStepAccumulator physics_step_accumulator{};
+    viper::PhysicsStepSchedule last_physics_step_schedule{};
+    bool physics_step_clock_initialized{};
+    std::uint32_t physics_step_count{};
+    std::uint32_t playback_clock_milliseconds{};
     // The native binding evaluator consumes a post-poll device snapshot. The
     // Win32 adapter records key events into its digital-button observation.
     std::array<std::uint8_t, 256> keyboard_button_states{};
@@ -2186,7 +2194,16 @@ struct WindowState {
     bool initialize_opponents()
     {
         if (route.size() < 2U || terrain == nullptr) return false;
+        physics_step_accumulator = {};
+        last_physics_step_schedule = {};
+        physics_step_clock_initialized = false;
+        physics_step_count = 0U;
+        playback_clock_milliseconds = 0U;
+        player_simulated_pose.reset();
         opponent_motions.resize(graphics.car_count());
+        opponent_simulated_poses.resize(graphics.car_count());
+        std::fill(opponent_simulated_poses.begin(), opponent_simulated_poses.end(),
+            std::nullopt);
         pose_buffer.resize(graphics.car_count());
         for (std::size_t car = 0; car < graphics.car_count(); ++car) {
             if (car == player_car_index) continue;
@@ -2218,55 +2235,93 @@ struct WindowState {
         return true;
     }
 
-    bool advance(float delta_seconds, const bool update_graphics = true)
+    bool advance(float delta_seconds, const std::int32_t observed_clock_milliseconds,
+                 const bool update_graphics = true)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
         if (!update_native_control_state(delta_seconds)) return false;
-        auto candidate_motion = motion;
-        const auto route_result = viper::advance_route_motion(candidate_motion, route,
-            left, right, accelerate, brake, delta_seconds, target_laps,
-            control_update_state.controls.flag_0x5093f0 != 0U);
-        if (!route_result.valid && !route_result.finished) return false;
-        std::optional<viper::TerrainSurfaceQueryResult> surface;
-        if (route_result.valid) {
-            surface = viper::sample_terrain_resource(
-                *terrain, {route_result.x, 1000.0f, route_result.z}, true);
-            if (!surface->query_succeeded) return true;
-            if (!viper::commit_route_motion_after_terrain_query(
-                    motion, candidate_motion, surface->query_succeeded)) return true;
-        } else if (route_result.finished) {
-            motion = candidate_motion;
+        std::int32_t scheduler_clock = observed_clock_milliseconds;
+        if (playback_active) {
+            const auto elapsed_milliseconds = static_cast<std::uint32_t>(
+                std::max(0.0F, delta_seconds) * 1000.0F + 0.5F);
+            playback_clock_milliseconds += elapsed_milliseconds;
+            scheduler_clock = std::bit_cast<std::int32_t>(playback_clock_milliseconds);
         }
-        if (route_result.valid)
-            update_player_wheel_contacts(route_result.x, surface->sampled_position[1],
-                route_result.z, route_result.yaw);
-        if (route_result.lap_completed) refresh_title(true);
+        if (!physics_step_clock_initialized) {
+            physics_step_accumulator = {};
+            physics_step_accumulator.clock_anchor_0x04 = scheduler_clock;
+            physics_step_accumulator.recapture_anchor_0x09 = true;
+            physics_step_clock_initialized = true;
+        }
+        viper::PhysicsStepSchedulerInput scheduler_input{};
+        scheduler_input.scheduler_mode = 1;
+        // Ordinary unpaused quick-race uses the elapsed-time scheduler path.
+        // The human entrant selector is a pointer, so 0x49BE40 is false and
+        // the recovered scheduler caps catch-up at two steps.
+        scheduler_input.gate_0x508a40 = false;
+        scheduler_input.gate_0x508760 = false;
+        scheduler_input.cap_to_four = false;
+        scheduler_input.simulation_tick_low_byte = static_cast<std::uint8_t>(
+            physics_step_count);
+        scheduler_input.clock_now = scheduler_clock;
+        scheduler_input.task_simulation_time =
+            static_cast<float>(physics_step_count) * 0.016F;
+        const auto schedule = viper::schedule_physics_steps(
+            physics_step_accumulator, scheduler_input);
+        last_physics_step_schedule = schedule;
+        bool lap_completed = false;
+        for (std::int32_t step = 0; step < schedule.steps; ++step) {
+            auto candidate_motion = motion;
+            const auto route_result = viper::advance_route_motion(candidate_motion, route,
+                left, right, accelerate, brake, 0.016F, target_laps,
+                control_update_state.controls.flag_0x5093f0 != 0U);
+            if (!route_result.valid && !route_result.finished) return false;
+            if (route_result.valid) {
+                const auto surface = viper::sample_terrain_resource(
+                    *terrain, {route_result.x, 1000.0f, route_result.z}, true);
+                if (!surface.query_succeeded) return true;
+                if (!viper::commit_route_motion_after_terrain_query(
+                        motion, candidate_motion, surface.query_succeeded)) return true;
+                player_simulated_pose = std::array<float, 4>{route_result.x,
+                    surface.sampled_position[1], route_result.z, route_result.yaw};
+                update_player_wheel_contacts(route_result.x,
+                    surface.sampled_position[1], route_result.z, route_result.yaw);
+            } else if (route_result.finished) {
+                motion = candidate_motion;
+            }
+            lap_completed = lap_completed || route_result.lap_completed;
+
+            for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
+                if (car == player_car_index) continue;
+                auto& ai = opponent_motions[car];
+                auto candidate_ai = ai;
+                const auto ai_result = viper::advance_route_motion(candidate_ai, route,
+                    false, false, true, false, 0.016F, target_laps);
+                if (!ai_result.valid) continue;
+                const auto ai_surface = viper::sample_terrain_resource(
+                    *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
+                if (!ai_surface.query_succeeded ||
+                    !viper::commit_route_motion_after_terrain_query(
+                        ai, candidate_ai, ai_surface.query_succeeded)) continue;
+                opponent_simulated_poses[car] = std::array<float, 4>{ai_result.x,
+                    ai_surface.sampled_position[1], ai_result.z, ai_result.yaw};
+            }
+            ++physics_step_count;
+        }
+        if (lap_completed) refresh_title(true);
         if (update_graphics) {
             for (std::size_t car = 0; car < graphics.car_count(); ++car) {
                 const auto position = graphics.car_position(car);
                 pose_buffer[car] = {position[0], graphics.car_height(car), position[1],
                     graphics.car_yaw(car)};
             }
-            if (route_result.valid)
-                pose_buffer[player_car_index] = {route_result.x, surface->sampled_position[1],
-                    route_result.z, route_result.yaw};
-        }
-        for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
-            if (car == player_car_index) continue;
-            auto& ai = opponent_motions[car];
-            auto candidate_ai = ai;
-            const auto ai_result = viper::advance_route_motion(candidate_ai, route, false, false,
-                true, false, delta_seconds, target_laps);
-            if (!ai_result.valid) continue;
-            const auto ai_surface = viper::sample_terrain_resource(
-                *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
-            if (!ai_surface.query_succeeded ||
-                !viper::commit_route_motion_after_terrain_query(
-                    ai, candidate_ai, ai_surface.query_succeeded)) continue;
-            if (update_graphics) {
-                pose_buffer[car] = {ai_result.x, ai_surface.sampled_position[1],
-                    ai_result.z, ai_result.yaw};
+            for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
+                if (car == player_car_index) continue;
+                if (opponent_simulated_poses[car].has_value())
+                    pose_buffer[car] = *opponent_simulated_poses[car];
             }
+            if (player_simulated_pose.has_value())
+                pose_buffer[player_car_index] = *player_simulated_pose;
         }
         if (update_graphics && !graphics.set_car_poses(pose_buffer)) return false;
         audio.update(motion.race.finished ? 0.0F : motion.speed,
@@ -3121,7 +3176,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_body_0x500,pcar_body_0xdcc,pcar_body_0xbe4"
               << ",pcar_body_0x630,pcar_body_0x7d4"
               << ",pcar_body_0x978,pcar_body_0xb1c"
-              << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier";
+              << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier"
+              << ",physics_steps_scheduled,physics_step_count"
+              << ",physics_simulation_time,physics_catchup_limited";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -3180,7 +3237,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             const bool render_frame = replay == nullptr ||
                 (playback_frame % 8U) == 0U || playback_frame + 1U == playback_trace->size();
             if ((replay != nullptr || state.last_tick != 0U) &&
-                !state.advance(delta_seconds, render_frame)) {
+                !state.advance(delta_seconds,
+                    std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(now)),
+                    render_frame)) {
                 std::cerr << "Vehicle pose update failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
@@ -3281,6 +3340,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 trace << ',' << state.pcar_callback_globals.gate_0x5093fc;
                 trace << ',' << state.player_pcar_callback_result
                     .callback_multiplier.value;
+                trace << ',' << state.last_physics_step_schedule.steps
+                      << ',' << state.physics_step_count
+                      << ',' << static_cast<float>(state.physics_step_count) * 0.016F
+                      << ',' << state.last_physics_step_schedule.catchup_limited;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";
