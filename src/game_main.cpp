@@ -3813,7 +3813,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << ',';
                         if (value.has_value()) physics_tick_trace << *value;
                     }
-                    physics_tick_trace << ',' << tick.body_kinematics_input_ready
+                    physics_tick_trace << std::dec << ','
+                        << tick.body_kinematics_input_ready
                         << ',' << tick.body_kinematics_non_finite
                         << ',' << tick.body_kinematics_reader_inventory_mismatch
                         << ',' << tick.body_kinematics_missing_float_count;

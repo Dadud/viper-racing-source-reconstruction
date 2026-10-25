@@ -62,6 +62,19 @@ try {
     $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
     $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
     $bodyTimerColumn = [Array]::IndexOf($tickHeader, 'body_timer_0xe44')
+    $bodyKinematicsReadyColumn = [Array]::IndexOf(
+        $tickHeader, 'body_kinematics_input_ready')
+    $bodyKinematicsNonFiniteColumn = [Array]::IndexOf(
+        $tickHeader, 'body_kinematics_non_finite')
+    $bodyKinematicsMissingCountColumn = [Array]::IndexOf(
+        $tickHeader, 'body_kinematics_missing_float_count')
+    $bodyKinematicsMissingOffsets = [int[]]::new(44)
+    for ($lane = 0; $lane -lt 44; ++$lane) {
+        $bodyKinematicsMissingOffsets[$lane] = [Array]::IndexOf(
+            $tickHeader, "body_kinematics_missing_offset_$lane")
+    }
+    $expectedMissingKinematicsOffsets = @(
+        '274', '278', '27c', '280', '284', '220', '224', '228', '22c', '230')
     $bodyBasisColumns = [int[]]::new(9)
     for ($basis = 0; $basis -lt 9; ++$basis) {
         $bodyBasisColumns[$basis] = [Array]::IndexOf(
@@ -95,7 +108,10 @@ try {
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
         $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0 -or
-        $bodyTimerColumn -lt 0) {
+        $bodyTimerColumn -lt 0 -or $bodyKinematicsReadyColumn -lt 0 -or
+        $bodyKinematicsNonFiniteColumn -lt 0 -or
+        $bodyKinematicsMissingCountColumn -lt 0 -or
+        @($bodyKinematicsMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
     if (@($bodyBasisColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -136,6 +152,16 @@ try {
             $fields[$tickSourceColumn] -ne '1' -or
             $fields[$tickInputColumn].Length -ne 512) {
             throw "Fixed-step input/timing snapshot is invalid at line $($index + 1)"
+        }
+        $reportedMissingOffsets = @($bodyKinematicsMissingOffsets | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($fields[$_])
+        } | ForEach-Object { $fields[$_] })
+        if ($fields[$bodyKinematicsReadyColumn] -ne '0' -or
+            $fields[$bodyKinematicsNonFiniteColumn] -ne '0' -or
+            $fields[$bodyKinematicsMissingCountColumn] -ne '10' -or
+            ($reportedMissingOffsets -join ',') -cne
+                ($expectedMissingKinematicsOffsets -join ',')) {
+            throw "Body kinematics diagnostics differ at line $($index + 1): ready=$($fields[$bodyKinematicsReadyColumn]), nonfinite=$($fields[$bodyKinematicsNonFiniteColumn]), missingCount=$($fields[$bodyKinematicsMissingCountColumn]), offsets=$($reportedMissingOffsets -join ';')"
         }
         foreach ($column in $bodyBasisColumns + $bodyPositionColumns) {
             $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)
