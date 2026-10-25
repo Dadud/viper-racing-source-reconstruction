@@ -146,6 +146,29 @@ void require_close(const std::array<float, 3>& actual,
 int main()
 {
     try {
+        // This synthetic case isolates the second projection described in
+        // metadata/vehicle_setup.md. The private live capture records the
+        // resulting scalar but not the pre-update scalar/basis pair, so this
+        // checks the recovered arithmetic without claiming capture parity.
+        const viper::WheelTireBasisUpdateInput scalar_projection_input{
+            {2.0F, -3.0F, 4.0F},
+            {0.5F, 0.0F, 0.0F},
+            {0.0F, 0.25F, -0.5F},
+            7.0F};
+        const auto scalar_projection =
+            viper::apply_wheel_tire_basis_update(scalar_projection_input);
+        require_close(
+            {scalar_projection.corrected_vector_0x100_0x108.x,
+             scalar_projection.corrected_vector_0x100_0x108.y,
+             scalar_projection.corrected_vector_0x100_0x108.z},
+            {1.5F, -3.0F, 4.0F},
+            "tire vector projection must use its +0x110 basis");
+        if (std::fabs(scalar_projection.response_scalar_0x7c - 9.75F) >
+            1.0e-6F) {
+            throw std::runtime_error(
+                "tire response scalar must subtract the independent +0x58 projection");
+        }
+
         for (const auto& sample : captured_wheel_writes) {
             viper::NcarForceMomentAccumulator accumulator{
                 sample.before_force, sample.before_moment};

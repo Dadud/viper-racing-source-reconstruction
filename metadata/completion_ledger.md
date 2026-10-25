@@ -83,6 +83,16 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25, tire response scalar projection regression:** Extended
+  `ncar_force_capture_regression` with a synthetic case that independently
+  checks the tire vector projection against basis `+0x110..+0x118` and the
+  response-scalar subtraction against caller basis `+0x58..+0x60`. The focused
+  Release target built and its CTest case passed. The private wheel capture
+  contains post-update scalar state but not the pre-update scalar/basis pair,
+  so this is a regression of the statically recovered arithmetic only; it is
+  not a native scalar parity result. Source: `tests/ncar_force_capture_regression.cpp`;
+  static field/operation evidence: `metadata/vehicle_setup.md`.
+
 - **2026-10-25, persistent wheel suspension history model:** Added
   `advance_ncar_wheel_suspension_with_history`, which reads initialized wheel
   `+0xE8`, substitutes it for any duplicate caller history value, runs the
