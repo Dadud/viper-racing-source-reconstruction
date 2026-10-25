@@ -366,13 +366,16 @@ creation sequence against a controlled original run, establish exact runtime
 gate/global values and obstacle model lookup order, and feed the stream through
 the observed task factory while retaining its objects for fixed-step dispatch.
 Then reconstruct mutable
-PCAR callback/force state, locate the live player's wheel-history producer
-independently of the GCAR GhostBegin ring, and establish tick/fraction and
-callback ordering. Only when the full per-frame inputs are sourced can the
-session connect the shared integrator and feed evidence-backed `+0x50C` and
-`+0xE8` values into the wheel/body composition. In parallel, the polarity
-initializer still needs the actual common-startup timer backend and a single
-shared stream whose call order includes non-wheel consumers. Keep these as
+PCAR callback/force state and establish tick/fraction and callback ordering.
+The transfer from body `+0x50C` to wheel `+0x158` is already identified at
+`0x4329C0`; the remaining timer dependency is the live `+0x50C` value produced
+by the gated `0x433570` branch. The GCAR GhostBegin ring is separate and must
+not be used as a substitute for that PCAR value. Only when the full per-frame
+inputs are sourced can the session connect the shared integrator and feed
+evidence-backed `+0x50C` and `+0xE8` values into the wheel/body composition. In
+parallel, the polarity initializer still needs the actual common-startup timer
+backend and a single shared stream whose call order includes non-wheel
+consumers. Keep these as
 explicit dependencies; do not claim the existing models are live physics.
 
 ### 2. Close the physical race loop: terrain, collision, damage, and finish

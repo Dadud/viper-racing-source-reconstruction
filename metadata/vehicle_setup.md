@@ -665,16 +665,18 @@ the PCAR callback `0x4384D0`; the PCAR derived constructor `0x42FF90` sets
 contains a ramp/reset writer at `0x433570`; NCAR callback `0x439200` has
 additional gated decrement/assignment paths. The record-driven `0x432420`
 writer belongs to the separate GCAR GhostBegin playback ring and is not the
-player's live ring. These per-frame effects are modeled, and the runtime now
-stores the known shared-constructor body bytes, PCAR vtable/initial `+0x50C`,
-settings-derived shift/clutch/yaw bytes, and per-wheel traction/ABS stores in
-persistent byte-backed state. Each race update also writes the modeled opening
-PCAR scalar stores at `+0xDE0..+0xDEC` to the body, and traces those bytes;
-the `0x40D270` multiplier remains the explicit startup fallback `1.0`. It
-still does not dispatch the PCAR callback or
-own its mutable frame transitions, callback inputs, and live wheel-history
-producer. Consequently, wheel `+0x158` remains
-unavailable to live suspension and must not be guessed from constructor state.
+player's live ring. Thus the transfer into wheel `+0x158` is identified; the
+unresolved live value is the mutable body `+0x50C` produced by the PCAR timer
+branch and its callback ordering. These per-frame effects are modeled, and the
+runtime now stores the known shared-constructor body bytes, PCAR vtable/initial
+`+0x50C`, settings-derived shift/clutch/yaw bytes, and per-wheel traction/ABS
+stores in persistent byte-backed state. Each race update also writes the
+modeled opening PCAR scalar stores at `+0xDE0..+0xDEC` to the body, and traces
+those bytes; the `0x40D270` multiplier remains the explicit startup fallback
+`1.0`. The session still does not dispatch the complete PCAR callback or own
+its mutable frame transitions and callback inputs. Until the timer branch and
+callback order are session-owned, the constructor value must not be fed to live
+suspension as a substitute for current body `+0x50C`.
 Evidence: `0x4329C0` dossier
 `ev_ec495a0523b6b3e8a6e16deb0b941496b12fb9879319d848e6ea55c41bb6ad6e`,
 `0x43E490` dossier
