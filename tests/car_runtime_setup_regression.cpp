@@ -728,6 +728,18 @@ int main()
         const std::array<float, 12> projection_transform{
             0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
             1.0F, 3.0F, 2.0F, 0.0F, 0.0F, 0.0F};
+        viper::WheelPointTransformInput wheel_point_transform{};
+        wheel_point_transform.wheel_position_0x04_0x0c = {1.0F, 1.0F, 1.0F};
+        wheel_point_transform.referenced_point_0x10 = {1.0F, 2.0F, 3.0F};
+        wheel_point_transform.body_transform_0x38_to_0x64 = {
+            0.0F, 1.0F, 0.0F, -1.0F, 0.0F, 0.0F,
+            0.0F, 0.0F, 1.0F, 10.0F, 20.0F, 30.0F};
+        const auto transformed_wheel_point =
+            viper::transform_wheel_point_0xc8(wheel_point_transform);
+        require(transformed_wheel_point.x == 7.0F &&
+                transformed_wheel_point.y == 22.0F &&
+                transformed_wheel_point.z == 34.0F,
+            "wheel application-point transform must preserve native body matrix axes and translation");
         require(viper::project_body_point_velocity_0x442530(
                     {10.0F, 20.0F, 30.0F}, projection_transform) == 140.0F,
             "wheel surface projection must preserve native +0x50/+0x58/+0x54 operand order");

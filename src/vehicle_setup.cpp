@@ -649,18 +649,21 @@ PhysicsVector3 transform_wheel_point_0xc8(
         static_cast<float>(static_cast<long double>(input.wheel_position_0x04_0x0c.z) +
                            input.referenced_point_0x10.z)};
     const auto& m = input.body_transform_0x38_to_0x64;
+    // `m` is laid out in binary offset order (+0x38..+0x64). Native
+    // 0x437BA0 maps point.x through +0x38/+0x3C/+0x40, point.y through
+    // +0x44/+0x48/+0x4C, and point.z through +0x50/+0x54/+0x58.
     const auto transformed_x = static_cast<float>(
+        static_cast<long double>(m[0]) * point.x +
+        static_cast<long double>(m[3]) * point.y +
+        static_cast<long double>(m[6]) * point.z);
+    const auto transformed_y = static_cast<float>(
         static_cast<long double>(m[1]) * point.x +
         static_cast<long double>(m[4]) * point.y +
         static_cast<long double>(m[7]) * point.z);
-    const auto transformed_y = static_cast<float>(
-        static_cast<long double>(m[2]) * point.x +
-        static_cast<long double>(m[8]) * point.z +
-        static_cast<long double>(m[5]) * point.y);
     const auto transformed_z = static_cast<float>(
-        static_cast<long double>(m[6]) * point.z +
-        static_cast<long double>(m[0]) * point.x +
-        static_cast<long double>(m[3]) * point.y);
+        static_cast<long double>(m[2]) * point.x +
+        static_cast<long double>(m[5]) * point.y +
+        static_cast<long double>(m[8]) * point.z);
     return {
         static_cast<float>(static_cast<long double>(m[9]) + transformed_x),
         static_cast<float>(static_cast<long double>(m[10]) + transformed_y),
