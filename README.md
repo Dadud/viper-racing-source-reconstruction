@@ -56,8 +56,12 @@ session, another results return, and clean shutdown. This is acceptance evidence
 for the route-kinematic lifecycle, not physical-race or original-game parity.
 
 Public CI runs without original assets. Runtime checks use an external data
-directory, also configurable through `VIPER_DATA_DIR`. On Windows, CTest adds
-asset validation and a three-frame WARP render smoke when
+directory, also configurable through `VIPER_DATA_DIR`. If neither is provided,
+the runtime searches the current directory and executable directory, including
+their conventional `GameData` subdirectories, for `common.res`. A Windows
+CTest checks installation-relative discovery, environment-variable selection,
+explicit command-line precedence, and actionable diagnostics when assets are
+missing. CTest also adds asset validation and a three-frame WARP render smoke when
 `../game_install/GameData/common.res` exists beside the checkout. Passing these checks
 does not establish gameplay fidelity; original-game comparisons remain required.
 

@@ -313,6 +313,11 @@ if(BUILD_TESTING)
         add_test(NAME game_help COMMAND viper_game --help)
         set(VIPER_EXTERNAL_DATA_DIR "${CMAKE_SOURCE_DIR}/../game_install/GameData")
         if(EXISTS "${VIPER_EXTERNAL_DATA_DIR}/common.res")
+            add_test(NAME game_asset_root_discovery
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${CMAKE_SOURCE_DIR}/tests/asset_root_discovery_smoke.ps1"
+                    -GameExe "$<TARGET_FILE:viper_game>"
+                    -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
             add_test(NAME game_original_asset_validation
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
             add_test(NAME game_warp_render_smoke
@@ -344,6 +349,7 @@ if(BUILD_TESTING)
             set_tests_properties(game_frontend_launch_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_keyboard_binding_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_frontend_race_lifecycle_smoke PROPERTIES TIMEOUT 180)
+            set_tests_properties(game_asset_root_discovery PROPERTIES TIMEOUT 45)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)
             set(VIPER_SHIPPED_CARS viper exotic plane sedan sports)

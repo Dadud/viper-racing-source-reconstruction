@@ -49,7 +49,7 @@ means there is not an integrated implementation with runtime evidence.
 | Replay and trace capture | `metadata/ncar_replay_cursor.evidence.json` is static analysis evidence. The runtime accepts `--record-trace PATH` and `--play-trace PATH`; traces contain per-frame control levels and deltas plus player/opponent route and finish states. A Windows CTest replays edited throttle/steering/braking twice and compares every state row, then runs a one-lap Viper/Bemidji trace and asserts player finish/time freeze plus all opponent finishes. A separate v6 native replay container codec now losslessly retains the fixed `0xCD4` record, header, 3647-word table, and opaque payload, and `replay_file_regression` round-trips the shipped `bench.rpl` byte-for-byte when external game data is present; format constraints and provenance are in `metadata/replay_container_codec.md`. This remains container handling, not native replay playback or UI. | The native frame-table and payload semantics, packet playback/recording, fixed-record validation, original-compatible event/state behavior, seeking, results UI, and original comparison remain absent. The existing live trace is still route-kinematic and does not exercise replay container playback. | Record a race and replay it with reproducible event ordering and visible motion; verify save/load and compare the captured replay state. | partial |
 | Modern multiplayer | Multiplayer protocol and status evidence exists in `metadata/multiplayer_*.evidence.json`. | No integrated modern network session, lobby, matchmaking, or verified peer race. Legacy client interoperability is excluded. | Two new clients can discover/join a session, race, receive results, and recover from disconnects on a documented supported Windows/network setup. | partial |
 | Error handling and resource lifecycle | Panic, startup, and resource models are documented in `metadata/engine_panic.evidence.json`, `metadata/engine_application_entry.md`, and `metadata/resource_loading.md`. | Native error paths and resource ownership have not been exercised across a playable session. | Missing/corrupt assets and failed initialization produce actionable errors; repeated menu/race transitions and shutdown release owned resources and permit relaunch. | partial |
-| Clean checkout and assets boundary | `README.md` states original executables and payload are outside this source-only repository; CMake build produces analysis tooling. | No clean-checkout playable build or user-facing external asset discovery/validation flow. | From a clean public checkout, build succeeds without private assets; app clearly locates a separately supplied game data directory and reports missing/unsupported content. | partial |
+| Clean checkout and assets boundary | `README.md` states original executables and payload are outside this source-only repository; CMake build produces analysis tooling. The runtime now discovers `common.res` in the current or executable directory and conventional `GameData` child paths when neither CLI nor environment path is set; explicit `--data-dir` takes precedence over `VIPER_DATA_DIR`. The Windows `game_asset_root_discovery` test checks install-relative lookup, environment lookup, CLI precedence, and missing-asset diagnostics using the separately supplied data directory. | Discovery checks only a bounded set of conventional locations; the public clean-checkout build and unsupported/corrupt-content UX remain to be verified. | From a clean public checkout, build succeeds without private assets; app clearly locates a separately supplied game data directory and reports missing/unsupported content. | partial |
 
 ## Milestone order
 
@@ -69,6 +69,17 @@ source/evidence and record the scenario, environment, outcome, and remaining
 gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
+
+- **2026-10-24, external asset-root discovery:** Added bounded discovery of
+  `common.res` in the current or executable directory and conventional
+  `GameData` children. Explicit `--data-dir` overrides `VIPER_DATA_DIR`; when
+  neither is supplied, a failed search lists every attempted path and the two
+  supported ways to set the asset location. Added a Windows CTest covering
+  install-relative lookup, environment lookup, CLI precedence, and missing
+  asset diagnostics. This test requires the external `GameData` tree already
+  used by the Windows runtime checks; it does not bundle or copy original data.
+  The Release `viper_game` build succeeded and all 58 CTest cases passed on the
+  Windows host with the external data tree present.
 
 - **2026-10-24, per-wheel terrain query origins in race traces:** Extended
   recorded race rows with the world-space query origin for each constructor-

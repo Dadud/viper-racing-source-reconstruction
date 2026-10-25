@@ -100,6 +100,7 @@ HRESULT compile_shader(const char* source, const char* entry, const char* target
 
 struct Options {
     std::filesystem::path data_dir;
+    bool data_dir_explicit{};
     std::optional<std::filesystem::path> setup_config_directory;
     std::optional<std::string> track;
     std::optional<std::string> car;
@@ -125,14 +126,73 @@ void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
         << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
-        << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n";
+        << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
+        << "Without either, searches the current and executable directories for common.res or GameData/common.res.\n";
+}
+
+std::filesystem::path executable_directory()
+{
+    std::vector<wchar_t> buffer(512U);
+    for (;;) {
+        const DWORD length = GetModuleFileNameW(nullptr, buffer.data(),
+            static_cast<DWORD>(buffer.size()));
+        if (length == 0U)
+            throw std::runtime_error("could not determine the executable directory");
+        if (length < buffer.size())
+            return std::filesystem::path(std::wstring_view(buffer.data(), length))
+                .parent_path();
+        if (buffer.size() >= 32768U)
+            throw std::runtime_error("executable path exceeds the Windows path limit");
+        buffer.resize(std::min<std::size_t>(buffer.size() * 2U, 32768U));
+    }
+}
+
+std::filesystem::path resolve_data_directory(const Options& options)
+{
+    if (options.data_dir_explicit || !options.data_dir.empty())
+        return options.data_dir;
+
+    std::error_code error;
+    const auto current = std::filesystem::current_path(error);
+    if (error)
+        throw std::runtime_error("could not determine the current directory: " +
+            error.message());
+    const auto executable = executable_directory();
+    const std::array<std::filesystem::path, 8> candidates{{
+        current,
+        current / "GameData",
+        current / "data" / "GameData",
+        executable,
+        executable / "GameData",
+        executable.parent_path() / "GameData",
+        executable.parent_path().parent_path() / "GameData",
+        executable / "data" / "GameData"}};
+    std::vector<std::filesystem::path> attempted;
+    for (const auto& candidate : candidates) {
+        const auto normalized = candidate.lexically_normal();
+        if (std::find(attempted.begin(), attempted.end(), normalized) != attempted.end())
+            continue;
+        attempted.push_back(normalized);
+        error.clear();
+        if (std::filesystem::is_regular_file(normalized / "common.res", error) &&
+            !error)
+            return normalized;
+    }
+
+    std::string message = "could not locate extracted game assets (common.res). Searched:";
+    for (const auto& path : attempted)
+        message += "\n  " + path.string() + "\\common.res";
+    message += "\nPass --data-dir PATH or set VIPER_DATA_DIR to the extracted GameData directory.";
+    throw std::runtime_error(std::move(message));
 }
 
 Options parse_options(const int argc, wchar_t** argv)
 {
     Options options;
     const DWORD required = GetEnvironmentVariableW(L"VIPER_DATA_DIR", nullptr, 0);
-    if (required > 0) {
+    // An empty environment variable is equivalent to leaving this optional
+    // override unset. Windows reports its required size as one for the NUL.
+    if (required > 1U) {
         std::wstring value(required, L'\0');
         const DWORD length = GetEnvironmentVariableW(L"VIPER_DATA_DIR", value.data(), required);
         if (length == 0 || length >= required)
@@ -181,6 +241,7 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--data-dir") {
             if (++i >= argc) throw std::runtime_error("--data-dir requires a path");
             options.data_dir = argv[i];
+            options.data_dir_explicit = true;
         } else if (arg == L"--config-dir") {
             if (++i >= argc) throw std::runtime_error("--config-dir requires a path");
             options.setup_config_directory = std::filesystem::path(argv[i]);
@@ -3122,21 +3183,20 @@ int wmain(int argc, wchar_t** argv)
     try {
         const auto options = parse_options(argc, argv);
         if (options.help) { usage(std::cout); return 0; }
-        if (options.data_dir.empty())
-            throw std::runtime_error("pass --data-dir PATH or set VIPER_DATA_DIR");
+        const auto data_directory = resolve_data_directory(options);
         std::optional<std::vector<TraceInputFrame>> playback_trace;
         if (options.play_trace) playback_trace = load_input_trace(*options.play_trace);
-        const auto config_path = options.data_dir / "options.def";
+        const auto config_path = data_directory / "options.def";
         viper::GameOptions configured_options;
         std::error_code config_error;
         if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
             configured_options = viper::GameOptions::load(config_path);
         const auto track = options.track
             ? *options.track
-            : configured_track_stem(options.data_dir, configured_options);
+            : configured_track_stem(data_directory, configured_options);
         const auto car = options.car
             ? *options.car
-            : configured_car_stem(options.data_dir, configured_options);
+            : configured_car_stem(data_directory, configured_options);
         const bool interactive_frontend = !options.validate_assets &&
             !options.track && !options.car && !options.smoke_frames &&
             !options.audio_smoke && !options.record_trace;
@@ -3144,12 +3204,12 @@ int wmain(int argc, wchar_t** argv)
         auto selected_car = car;
         auto setup_config_directory = options.setup_config_directory
             ? *options.setup_config_directory
-            : resolve_setup_config_directory(options.data_dir);
+            : resolve_setup_config_directory(data_directory);
         std::vector<std::string> setup_tracks;
         std::vector<std::string> setup_cars;
         if (interactive_frontend) {
-            setup_tracks = selectable_track_stems(options.data_dir);
-            setup_cars = selectable_car_stems(options.data_dir);
+            setup_tracks = selectable_track_stems(data_directory);
+            setup_cars = selectable_car_stems(data_directory);
             const auto saved = viper::load_setup_selection_preference(
                 setup_config_directory);
             if (!saved.error.empty())
@@ -3172,7 +3232,9 @@ int wmain(int argc, wchar_t** argv)
                     std::cerr << "Could not persist setup selection: "
                               << saved.error << '\n';
             }
-            const auto result = run_selected_race(options, selected_track,
+            auto runtime_options = options;
+            runtime_options.data_dir = data_directory;
+            const auto result = run_selected_race(runtime_options, selected_track,
                 selected_car, playback_trace ? &*playback_trace : nullptr,
                 interactive_frontend);
             if (result != 10) return result;
