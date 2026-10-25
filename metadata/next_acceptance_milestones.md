@@ -54,9 +54,12 @@ loader/factory path. Its base constructor initializes position to zero and a
 separate basis to `(0,0,1)`; the post-constructor loader only assigns the native
 ordinal. A runtime-resolved manager slot points to `0x43CA90`; its registrar
 stores the body pointer by ordinal and initializes sidecar state but does not
-copy placement into body pose. The second registration subsystem and later
-runtime synchronization remain unresolved. This is evidence that native body
-state evolves, not a runtime integration or an input-driven baseline.
+copy placement into body pose. The second registration dispatch was traced to a
+`LiveMultiInfo`/`Multiplayer` service context and is deferred to the multiplayer
+milestone; it does not explain single-player pose initialization. The later
+single-player runtime synchronization remains unresolved. This is evidence
+that native body state evolves, not a runtime integration or an input-driven
+baseline.
 The session now also retains one ordered semantic task collection from the
 validated serialized stream: finite CHKP geometry and supported inactive STAT
 state are materialized, while other records remain explicit as unavailable

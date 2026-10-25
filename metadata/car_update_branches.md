@@ -1366,24 +1366,39 @@ Static Ghidra analysis shows `0x43DFB0` calls `0x49C1F0` during the derived
 PCAR constructor. `0x49C1F0` first checks `0x49BE40`; when that readiness gate
 is true, it initializes the subsystem through `0x49C7A0`, dispatches the two
 constructor arguments through `DAT_004E322C`'s interface vtable slot `+0x78`,
-then calls `0x49C8E0` for teardown/finalization. This is a plausible placement
-handoff boundary, but static call shape does not establish the virtual target
-or prove that it writes body pose.
+then calls `0x49C8E0` for teardown/finalization. Further static analysis
+changes the interpretation: `0x49C620` allocates a 0x3C-byte `LiveMultiInfo`
+object and initializes a `Multiplayer` service; `0x49BDF0` publishes that
+object through `DAT_004E322C`, while `0x49BDE0` clears the global. The per-frame
+`0x49BEC0` handler uses the same service and its state/status callbacks.
+`0x49C2E0` temporarily publishes the service only in a low-state branch, then
+clears the global before returning. Together these observations identify this
+dispatch as belonging to the optional multiplayer subsystem. They provide no
+evidence that its `+0x78` call transfers single-player placement into body
+pose, so this is no longer the leading pose-handoff candidate.
 
 A bounded read-only Frida attempt against the already-running PID 25904 found
 `DAT_004E322C` null at the sampled process state, so the interface and slot
-could not be resolved. No pointer was dereferenced beyond the null global and
-the attachment ended automatically. The readiness gate's false state in this
-snapshot does not establish what happens during race loading; the pose handoff
-remains unresolved. Static evidence is in
+could not be resolved. This is consistent with the observed clear/reset paths;
+the null-pointer sample did not observe a race-constructor invocation. No
+pointer was dereferenced beyond the null global and the attachment ended
+automatically. Static evidence is in
 `../../analysis/reference_captures/viper_second_registration_static_20261025.evidence.json`
 (Ghidra records `ev_92e0c3de48b60c960b4714e3e69da17731567770d25769ad98be4e99d579679d`
 and `ev_0e4cae09590de2e6eea747d730b5f1d08ec6ed7dc1f7dfba0e5cfdc573624561`);
-the bounded runtime observation is `ev_11d8079166884f2e56e1a82e5e6bf1cc916edbf9e4446e7a4f1ca202db3912fe`.
+the expanded nine-record context bundle is
+`../../analysis/reference_captures/viper_second_registration_context_20261025.evidence.json`
+(including `0x49BDE0` `ev_01bc042d87b71f20c967d82e047e2503513d1770c994ff1687a87d771e83fe8f`,
+`0x49BDF0` `ev_aa7db30a4e3cb46472b64ecc61e8615cf391db14fbceb86f9fd50e13100987be`,
+`0x49C620` `ev_e8946a147399a4168b711ae1e891fe1bb1563aac21240308831cd220eb27f3c7`,
+`0x49C670` `ev_1b1b16e0d46018109901a947f5acfabb80f256a09a65b05e553d13a7e0902d21`,
+`0x49C2E0` `ev_cc38133465aea6a6270a54acf73b71c9e8bc156a986ca08c8d3c9c20859609c3`,
+and `0x49BE40` `ev_0d1cac05b94aa5dc4c850cd384bb6e6cb97abe2a8a92e0f36bab0295f5a90e28`).
+The bounded runtime observation remains `ev_11d8079166884f2e56e1a82e5e6bf1cc916edbf9e4446e7a4f1ca202db3912fe`.
 
-Next probe: capture the global and vtable when the constructor actually enters
-`0x49C1F0` during race loading, then inspect the exact `+0x78` target and its
-body/side effects before implementing any pose transfer.
+Next probe for pose is to trace actual body stores during single-player
+construction/update after the world placement transform is built; tracing this
+multiplayer-only service is deferred to the multiplayer milestone.
 
 A bounded Frida attachment to the already-running original `race.bin` (PID
 25904; SHA-256 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`)
