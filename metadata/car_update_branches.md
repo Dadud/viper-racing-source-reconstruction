@@ -1207,6 +1207,17 @@ profile calculation and copies up to seven contiguous positive selector
 entries from runtime `+0x94..+0xAC`. The host byte-backed body preserves the
 native subobject links at `+0xC00` and `+0xC9C` as unknown pointer fields.
 
+Offset audit: `0x43F910` stores its setup denominator at selector child `+8`
+(parent `+0xCA0`) and its reciprocal at child `+0xC` (parent `+0xCA4`). The
+selection routine `0x43FDD0` separately reads the denominator at child `+0x18`
+(parent `+0xCB0`), which `0x43FA30` initializes to zero. The live adapter
+preserves both fields and supplies `+0xCB0` to
+`EmbeddedSelectionFields::denominator_0x18`; it does not alias the setup value.
+Evidence: `0x43F910` `ev_e9cb5b8fd6b6ac8f09e5234365095cffba808175ba977040902c83da420b52cb`,
+`0x43FA80` `ev_51bc5b48e5e08c87b52543dbf3dc61701e8398e61c0db23c1aec5ac2d6578ef0`,
+`0x43FA30` `ev_b52a8db0173565e390ae13565544d7fa88998048a716ead1c240f7ac5f5f6fe8`,
+and `0x43FDD0` `ev_7035bf5be786d9224b8681879fb94bc939f27b3dc9c5ba62f819f684f7de8768`.
+
 After the scalar prefix, the live callback adapter snapshots only initialized
 curve, selector, and branch bytes, invokes `advance_pcar_callback_branch`, and
 persists its `+0xCBC/+0xD64`, `+0x54`, `+0xDEC`, and status-flag writes. If the

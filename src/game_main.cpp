@@ -2213,12 +2213,26 @@ struct WindowState {
                 }
                 selector_entries[index] = *entry;
             }
-            const auto selector_denominator = body_float(0xca0U);
+            // 0x43F910's setup denominator is the child's +0x08 at parent
+            // +0xCA0. 0x43FDD0's selection denominator is child +0x18,
+            // parent +0xCB0; keep these distinct.
+            const auto selector_denominator = body_float(0xcb0U);
             const auto selector_floor = body_word(0xcb4U);
             const auto selector_base = body_float(0xcc0U);
             const auto selector_policy = body_word(0xd00U);
+            const std::array<std::optional<float>, 10> curve_values{{
+                body_float(0xc10U), body_float(0xc30U), body_float(0xc34U),
+                body_float(0xc38U), body_float(0xc40U), body_float(0xc44U),
+                body_float(0xc48U), body_float(0xc4cU), body_float(0xc50U),
+                body_float(0xc54U)}};
+            const auto curve_mode_40 = viper::read_ncar_body_object_u8(
+                player_runtime_state.body_object, 0xc3cU);
+            const auto curve_mode_41 = viper::read_ncar_body_object_u8(
+                player_runtime_state.body_object, 0xc3dU);
             if (selector_entries_complete && selector_denominator && selector_floor &&
-                selector_base && selector_policy) {
+                selector_base && selector_policy && curve_mode_40 && curve_mode_41 &&
+                std::all_of(curve_values.begin(), curve_values.end(),
+                    [](const auto& value) { return value.has_value(); })) {
                 viper::PcarCallbackBranchFields branch{};
                 branch.scalars = player_pcar_control_prefix;
                 branch.value_0x54 = *branch_value_54;
@@ -2242,18 +2256,11 @@ struct WindowState {
                     std::bit_cast<std::int32_t>(*branch_cbc),
                     *selector_base,
                     *selector_policy != 0U};
-                const auto read_curve = [&](const std::uint32_t offset) {
-                    return body_float(offset).value_or(0.0F);
-                };
                 branch_observation.curve_0xbfc = viper::UpdateCurveFields{
-                    read_curve(0xc10U), read_curve(0xc30U), read_curve(0xc34U),
-                    read_curve(0xc38U),
-                    viper::read_ncar_body_object_u8(
-                        player_runtime_state.body_object, 0xc3cU).value_or(0U),
-                    viper::read_ncar_body_object_u8(
-                        player_runtime_state.body_object, 0xc3dU).value_or(0U),
-                    read_curve(0xc40U), read_curve(0xc44U), read_curve(0xc48U),
-                    read_curve(0xc4cU), read_curve(0xc50U), read_curve(0xc54U)};
+                    *curve_values[0], *curve_values[1], *curve_values[2],
+                    *curve_values[3], *curve_mode_40, *curve_mode_41,
+                    *curve_values[4], *curve_values[5], *curve_values[6],
+                    *curve_values[7], *curve_values[8], *curve_values[9]};
                 const auto branch_result = viper::advance_pcar_callback_branch(
                     branch, branch_observation);
                 if (!branch_result.complete) return false;

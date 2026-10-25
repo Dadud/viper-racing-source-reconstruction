@@ -95,10 +95,14 @@ checks the physics object's virtual `+0x2C` gate and calls virtual `+8`, which
 resolves through PCAR vtable `0x4C8188` to callback `0x4384D0`. That callback
 conditionally calls shared wheel/body integrator `0x431150`; NCAR callback
 `0x439200` is a separate sample/queue/interpolation path and must not be used
-as the player callback. The PCAR callback's modeled control prefix still
-requires body velocity and basis. The production session now owns the known
-base-constructor bytes for one PCAR body, but does not dispatch the native
-callback or advance that state through its integrator. The 3-slot NCAR `0x3E` sample
+as the player callback. The live session now persists the numeric ACAR-derived
+curve and selector configuration and runs the modeled PCAR embedded-selection
+branch after the existing scalar prefix. The selector's `0x43F910` setup value
+at child `+8` (parent `+0xCA0`) is distinct from the `0x43FDD0` selection
+denominator at child `+0x18` (parent `+0xCB0`); the adapter reads the latter.
+The callback's velocity/basis smoother and the shared integrator remain
+unwired. The production session owns known base-constructor bytes for one PCAR
+body, but does not yet advance that state through `0x431150`. The 3-slot NCAR `0x3E` sample
 history is distinct from the `0x960`-record GCAR `0x3C` wheel-history ring;
 the latter is tied to GhostBegin playback and is not a live-player ring.
 See `metadata/physics_task_objects.md`, `metadata/car_update_branches.md`, and
@@ -117,15 +121,18 @@ constructor vtable/`+0x50C`, and settings-derived shift/clutch/yaw plus wheel
 traction/ABS fields in persistent byte-backed body/wheel objects with
 initialized-byte masks. The session now also applies the constructor's known
 embedded curve/selector defaults at `+0xBFC` and `+0xC98` to that same byte
-owner. Runtime selector table entries and PCAR curve/profile producers remain
-unavailable, so the embedded update helpers are not yet dispatched. On each
-race update, the modeled callback's opening
+owner. Runtime selector table entries and ACAR-derived curve/profile inputs
+are now projected from the mapped runtime car record; the numeric embedded
+selection branch is connected after the scalar prefix. Its denominator and
+constructor setup fields are kept separate by native child-relative offsets.
+On each race update, the modeled callback's opening
 `+0xDE0/+0xDE4/+0xDE8/+0xDEC` scalar stores are now written into that same
 body owner and traced alongside their modeled values; the current multiplier
 remains the explicit `0x40D270 = 1.0` startup fallback. This does not execute
-the callback or its smoother branch. It still does not dispatch native PCAR callback
-`0x4384D0` or execute shared integrator `0x431150`; it lacks their runtime
-body, timer, table, and callback transitions. Two constructor inputs also
+the callback's velocity/basis smoother or shared integrator. The runtime does
+not yet dispatch complete native PCAR callback `0x4384D0` or shared integrator
+`0x431150`; it lacks their runtime body, timer, table, force-collection, and
+callback transitions. Two constructor inputs also
 remain unresolved: `+0x4F4` copies global `0x508794`, set from the physics
 session's incoming mode word, and `+0xD74` stores the result of a helper that
 samples gated control state at global `0x509328`. The mapping of session modes
