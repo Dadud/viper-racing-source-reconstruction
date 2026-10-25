@@ -26,6 +26,14 @@ they do not establish a particular runtime's clock samples or thread schedule.
   `0x4F0908`, increment `0x4F0A94`, wrap value `0x4F0A98`, indices
   `0x4F0AA4/0x4F0AA8` to `0x60/0x20`, and initialized byte `0x4D3C58`.
   Evidence: `ev_3bb02f1aa8da6bfea97f61f57806c157b2294c12161f786d8864577cf427a295`, `ev_e4863482e00c2d90193abc28b0d55365db2fc169b52bc487a057b46678bd7999`.
+
+  Evaluate the initializer's stack offsets at each read. Let `S` be its entry
+  ESP. At `0x419446` and `0x419456`, before lock-call arguments are removed at
+  `0x41945A`, ESP is `S-0x30`; `[esp+0x34]` reads `S+4`, argument 0 (the second
+  timer remainder). Later, after `add esp,0x0C`, ESP is `S-0x24`; the read at
+  `0x419489` of `[esp+0x2C]` reads `S+8`, argument 1 (the first timer
+  remainder). This confirms both timer inputs and their order. Applying the
+  later ESP value to the earlier read would produce an incorrect stack trace.
 - `0x413BD0` selects calibrated TSC, QPC, or `timeGetTime()` according to
   timer setup globals. `0x413610` establishes those modes and `0x416360`
   reaches that setup. The exact runtime samples depend on machine timing and
@@ -45,10 +53,13 @@ loaded 64 against the accumulated candidate and its carry flag selects whether
 the current half-step is added. The step begins at 0.5 and is halved 24 times.
 Constants used include 1/177, 177, 1/169, 178, 169, 179, 53, 1, 64, 32, and
 0.5. Exact generated output has not been checked against a native table
-fixture. Do not substitute a fixed seed or claim a source-level C++ port is
-bit-exact: x64 MSVC uses SSE2 and binary64 `long double`, unlike native x87
-extended intermediates. Exact implementation needs an explicit x87-compatible
-emulator/assembly path and seed fixtures, or must retain a documented
+fixture. The full x87 register-stack dataflow and the control word active at
+this initializer remain unknown; CRT initialization reaches `0x4BE300` and
+game setup reaches `0x415C60`, which modifies the control word. Do not
+substitute a fixed seed or claim a source-level C++ port is bit-exact: x64 MSVC
+uses SSE2 and binary64 `long double`, unlike native x87 extended intermediates.
+Exact implementation needs an explicit x87-compatible emulator/assembly path,
+the startup control word, and seed/table fixtures, or must retain a documented
 approximation status. Evidence:
 `ev_e4863482e00c2d90193abc28b0d55365db2fc169b52bc487a057b46678bd7999`,
 `ev_1f0144ba5ff39e36ced30debe4cd8e2dd002c63683863cfffa1cf6bf82c65226e`,
