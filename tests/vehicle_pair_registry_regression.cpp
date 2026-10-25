@@ -37,12 +37,12 @@ int main()
                 registry->records.size() == 3U &&
                 registry->table_entries.size() == 3U * (3U * 3U + 4U),
             "registry allocation dimensions must match N choose 2 and native stride");
-        require(registry->records[0].ordinal_a == 0U &&
-                registry->records[0].ordinal_b == 1U &&
-                registry->records[1].ordinal_a == 0U &&
-                registry->records[1].ordinal_b == 2U &&
-                registry->records[2].ordinal_a == 1U &&
-                registry->records[2].ordinal_b == 2U,
+        require(registry->records[0].endpoint_a_ordinal_0x00 == 0 &&
+                registry->records[0].endpoint_b_ordinal_0x02 == 1 &&
+                registry->records[1].endpoint_a_ordinal_0x00 == 0 &&
+                registry->records[1].endpoint_b_ordinal_0x02 == 2 &&
+                registry->records[2].endpoint_a_ordinal_0x00 == 1 &&
+                registry->records[2].endpoint_b_ordinal_0x02 == 2,
             "pair records must be initialized in lexicographic ordinal order");
 
         for (std::size_t layer = 0U;
@@ -66,23 +66,40 @@ int main()
                 !registry->native_table_byte_offset(0U, 3U, 1U).has_value(),
             "invalid layer and ordinal lookups must be rejected");
 
-        registry->records[0].value_a = {12.5F, -3.0F};
-        registry->records[0].value_b = {-4.0F, 8.25F};
-        const auto forward_a = registry->oriented_value_a(0U, 1U);
-        const auto reverse_a = registry->oriented_value_a(1U, 0U);
-        const auto forward_b = registry->oriented_value_b(0U, 1U);
-        const auto reverse_b = registry->oriented_value_b(1U, 0U);
-        require(forward_a == std::array<float, 2>{12.5F, -3.0F} &&
-                reverse_a == std::array<float, 2>{-12.5F, 3.0F} &&
-                forward_b == std::array<float, 2>{-4.0F, 8.25F} &&
-                reverse_b == std::array<float, 2>{4.0F, -8.25F},
-            "pair accessors must reverse both planar components for the opposite ordinal");
-        require(!registry->oriented_value_a(0U, 0U).has_value() &&
-                !registry->oriented_value_b(3U, 0U).has_value(),
+        const std::array<viper::VehiclePairParticipantRow, 3> rows{{
+            {true, 1.0F, 2.0F, 3.0F, 4.0F},
+            {true, 8.0F, -2.0F, -1.0F, 6.0F},
+            {false, 99.0F, 99.0F, 99.0F, 99.0F}}};
+        require(registry->update_pair_deltas(rows),
+            "all pair deltas must be produced from ordinal participant rows");
+        const auto forward_position = registry->oriented_position_delta(0U, 1U);
+        const auto reverse_position = registry->oriented_position_delta(1U, 0U);
+        const auto forward_velocity = registry->oriented_velocity_delta(0U, 1U);
+        const auto reverse_velocity = registry->oriented_velocity_delta(1U, 0U);
+        require(forward_position == std::array<float, 2>{7.0F, -4.0F} &&
+                reverse_position == std::array<float, 2>{-7.0F, 4.0F} &&
+                forward_velocity == std::array<float, 2>{-4.0F, 2.0F} &&
+                reverse_velocity == std::array<float, 2>{4.0F, -2.0F},
+            "pair producer and accessors must preserve native position/velocity ordering and orientation");
+        require(registry->records[1].position_delta_x_0x04 == -1.0F &&
+                registry->records[1].position_delta_z_0x08 == -2.0F &&
+                registry->records[1].velocity_delta_x_0x0c == -3.0F &&
+                registry->records[1].velocity_delta_z_0x10 == -4.0F,
+            "unregistered participant rows must remain native zero values during pair generation");
+        const auto original = registry->records[0];
+        const std::array<viper::VehiclePairParticipantRow, 2> short_rows{};
+        require(!registry->update_pair_deltas(short_rows) &&
+                registry->records[0].position_delta_x_0x04 ==
+                    original.position_delta_x_0x04 &&
+                registry->records[0].velocity_delta_x_0x0c ==
+                    original.velocity_delta_x_0x0c,
+            "mismatched row count must fail without partially updating pair records");
+        require(!registry->oriented_position_delta(0U, 0U).has_value() &&
+                !registry->oriented_velocity_delta(3U, 0U).has_value(),
             "oriented reads must reject diagonal and out-of-range pairs");
 
-        require(!viper::make_vehicle_pair_registry(65536U).has_value(),
-            "record ordinals wider than the native 16-bit fields must be rejected");
+        require(!viper::make_vehicle_pair_registry(32769U).has_value(),
+            "record ordinals outside the native signed 16-bit range must be rejected");
         std::cout << "vehicle pair registry regressions passed\n";
         return 0;
     }

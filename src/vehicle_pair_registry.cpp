@@ -5,6 +5,9 @@
 namespace viper {
 namespace {
 
+constexpr std::size_t max_vehicle_count_for_signed_ordinals =
+    static_cast<std::size_t>(std::numeric_limits<std::int16_t>::max()) + 1U;
+
 [[nodiscard]] std::optional<std::size_t> table_word_index(
     const VehiclePairRegistry& registry,
     const std::size_t layer,
@@ -37,7 +40,7 @@ std::optional<std::size_t> VehiclePairRegistry::pair_record_index(
     return table_entries[*index];
 }
 
-std::optional<std::array<float, 2>> VehiclePairRegistry::oriented_value_a(
+std::optional<std::array<float, 2>> VehiclePairRegistry::oriented_position_delta(
     const std::size_t row,
     const std::size_t column) const noexcept
 {
@@ -45,14 +48,19 @@ std::optional<std::array<float, 2>> VehiclePairRegistry::oriented_value_a(
     if (!record_index.has_value() || *record_index >= records.size())
         return std::nullopt;
     const auto& record = records[*record_index];
-    if (row == record.ordinal_a && column == record.ordinal_b)
-        return record.value_a;
-    if (row != record.ordinal_b || column != record.ordinal_a)
+    if (row == static_cast<std::size_t>(record.endpoint_a_ordinal_0x00) &&
+        column == static_cast<std::size_t>(record.endpoint_b_ordinal_0x02)) {
+        return std::array<float, 2>{record.position_delta_x_0x04,
+            record.position_delta_z_0x08};
+    }
+    if (row != static_cast<std::size_t>(record.endpoint_b_ordinal_0x02) ||
+        column != static_cast<std::size_t>(record.endpoint_a_ordinal_0x00))
         return std::nullopt;
-    return std::array<float, 2>{-record.value_a[0], -record.value_a[1]};
+    return std::array<float, 2>{-record.position_delta_x_0x04,
+        -record.position_delta_z_0x08};
 }
 
-std::optional<std::array<float, 2>> VehiclePairRegistry::oriented_value_b(
+std::optional<std::array<float, 2>> VehiclePairRegistry::oriented_velocity_delta(
     const std::size_t row,
     const std::size_t column) const noexcept
 {
@@ -60,11 +68,57 @@ std::optional<std::array<float, 2>> VehiclePairRegistry::oriented_value_b(
     if (!record_index.has_value() || *record_index >= records.size())
         return std::nullopt;
     const auto& record = records[*record_index];
-    if (row == record.ordinal_a && column == record.ordinal_b)
-        return record.value_b;
-    if (row != record.ordinal_b || column != record.ordinal_a)
+    if (row == static_cast<std::size_t>(record.endpoint_a_ordinal_0x00) &&
+        column == static_cast<std::size_t>(record.endpoint_b_ordinal_0x02)) {
+        return std::array<float, 2>{record.velocity_delta_x_0x0c,
+            record.velocity_delta_z_0x10};
+    }
+    if (row != static_cast<std::size_t>(record.endpoint_b_ordinal_0x02) ||
+        column != static_cast<std::size_t>(record.endpoint_a_ordinal_0x00))
         return std::nullopt;
-    return std::array<float, 2>{-record.value_b[0], -record.value_b[1]};
+    return std::array<float, 2>{-record.velocity_delta_x_0x0c,
+        -record.velocity_delta_z_0x10};
+}
+
+bool VehiclePairRegistry::update_pair_deltas(
+    const std::span<const VehiclePairParticipantRow> rows) noexcept
+{
+    if (rows.size() != vehicle_count ||
+        rows.size() > max_vehicle_count_for_signed_ordinals) {
+        return false;
+    }
+    for (const auto& record : records) {
+        const auto endpoint_a = static_cast<std::size_t>(
+            record.endpoint_a_ordinal_0x00);
+        const auto endpoint_b = static_cast<std::size_t>(
+            record.endpoint_b_ordinal_0x02);
+        if (endpoint_a >= rows.size() || endpoint_b >= rows.size() ||
+            endpoint_a >= endpoint_b) {
+            return false;
+        }
+    }
+    const auto read_row = [rows](const std::size_t ordinal) {
+        const auto& row = rows[ordinal];
+        if (!row.registered) return VehiclePairParticipantRow{};
+        return row;
+    };
+    for (auto& record : records) {
+        const auto endpoint_a = static_cast<std::size_t>(
+            record.endpoint_a_ordinal_0x00);
+        const auto endpoint_b = static_cast<std::size_t>(
+            record.endpoint_b_ordinal_0x02);
+        const auto a = read_row(endpoint_a);
+        const auto b = read_row(endpoint_b);
+        record.position_delta_x_0x04 =
+            b.position_x_0x5c - a.position_x_0x5c;
+        record.position_delta_z_0x08 =
+            b.position_z_0x64 - a.position_z_0x64;
+        record.velocity_delta_x_0x0c =
+            b.velocity_x_0x234 - a.velocity_x_0x234;
+        record.velocity_delta_z_0x10 =
+            b.velocity_z_0x23c - a.velocity_z_0x23c;
+    }
+    return true;
 }
 
 std::optional<std::size_t> VehiclePairRegistry::native_table_byte_offset(
@@ -88,7 +142,7 @@ std::optional<std::size_t> VehiclePairRegistry::native_table_byte_offset(
 std::optional<VehiclePairRegistry> make_vehicle_pair_registry(
     const std::uint32_t vehicle_count)
 {
-    if (vehicle_count > std::numeric_limits<std::uint16_t>::max())
+    if (vehicle_count > max_vehicle_count_for_signed_ordinals)
         return std::nullopt;
 
     const auto count = static_cast<std::size_t>(vehicle_count);
@@ -121,8 +175,8 @@ std::optional<VehiclePairRegistry> make_vehicle_pair_registry(
         for (std::size_t b = a + 1U; b < count; ++b) {
             const auto record_index = registry.records.size();
             registry.records.push_back(VehiclePairRecord{
-                static_cast<std::uint16_t>(a), static_cast<std::uint16_t>(b),
-                {}, {}});
+                static_cast<std::int16_t>(a), static_cast<std::int16_t>(b),
+                0.0F, 0.0F, 0.0F, 0.0F});
             for (std::size_t layer = 0U;
                  layer < vehicle_pair_registry_layers; ++layer) {
                 const auto ab = table_word_index(registry, layer, a, b);
