@@ -125,14 +125,29 @@ hooked the engine callback at `0x44EE00`. It ran 23 times; the first
 The 640x480 flag remained set after enumeration and the `0x44EEB0` wrapper,
 yet the child still exited with code 5. The exit-origin capture
 `../../analysis/reference_captures/exit_origin_20261025T030208Z.json` hooked
-termination APIs and observed the engine call `ExitProcess(5)` at `0x44EDB0`
-(return address `0x44EDB3`); `0x44E080` had returned success immediately
-before. Static analysis places that call in `0x44EC00`, which queries
-available video memory, maps the reported amount into a supported memory
-class at `0x509C2C`, and exits with code 5 when the class is unsupported.
-Thus the DirectDraw mode gate passed, and the failure is in the later video
-memory-class gate, before surface creation. The live memory-query HRESULT and
-outputs are not yet captured; the next probe targets the
-`GetAvailableVidMem` calls and the computed class. Across the captures,
-cleanup is verified and hashes of the launcher, engine, ISO, and all 31
-GameData files match their baselines.
+termination APIs and observed the engine call `ExitProcess(5)` at `0x44EDAD`
+(the preceding `push 5` is at `0x44EDAB`; return address `0x44EDB3`);
+`0x44E080` had returned success immediately before. Static analysis places
+that call in `0x44EC00`, which queries available video memory and maps the
+reported amount into a supported memory class at `0x509C2C`.
+
+The private capture
+`../../analysis/reference_captures/vidmem_report_20261025T030612Z.json`
+records three successful `GetAvailableVidMem` calls through vtable slot 23.
+The first call, with caps `0x4000`, returned total `0xFFFF0000` and free
+`0xFFEC4000`. The wrapper passed HRESULT success. `0x44EC00` then adds
+`0x96000` to the total in 32-bit arithmetic; the value wraps to `0x00086000`,
+below the 2 MB cutoff, so the class at `0x509C2C` becomes zero and its default
+switch arm calls `ExitProcess(5)`. This establishes the failure as an
+unsupported video-memory-class result produced by the driver's near-4 GB
+DWORD report and the engine's 32-bit addition, before surface creation.
+Later calls reported totals/free values `0xC0000000/0xBFED4000` for caps
+`0x10001000` and `0x3FFF0000/0x3FFF0000` for caps `0x20001000`.
+
+A child-only override probe
+`../../analysis/reference_captures/vidmem_override_20261025T031500Z.json`
+did not reach the memory-query hook: the REA Frida child session detached
+before resume with a closed connection, and the retained handle reported
+`0xC0000409`. No override was applied and gameplay was not reached. Cleanup
+is verified across captures, and hashes of the launcher, engine, ISO, and all
+31 GameData files match their baselines.
