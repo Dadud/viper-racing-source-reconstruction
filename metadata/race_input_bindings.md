@@ -28,11 +28,16 @@ their low byte, matching the byte load at `param_1 + 4`.
 
 The type-1 selector is the keyboard device's DirectInput scan-code index, not
 the Win32 virtual-key number. `0x412F90` creates the system keyboard and sets
-its data format; `0x4130D0` polls `0x100` bytes into `DAT_004EF200`; and
-`0x413170` reads the selected byte's high bit. The Windows runtime now owns a
+its data format with foreground/nonexclusive cooperative flags (`6`), then
+calls Acquire. `0x4130D0` polls `0x100` bytes into `DAT_004EF200`; on success it
+refreshes three combined key bytes at `0x004EF2FD`–`0x004EF2FF`. `0x413170`
+reads the selected byte's high bit. The Windows runtime now owns a
 DirectInput8 system-keyboard service that requests the same 256-byte data
 format, polls it once per outer race update, and attempts reacquisition after
-`DIERR_INPUTLOST` or `DIERR_NOTACQUIRED`. The runtime converts parsed
+`DIERR_INPUTLOST` or `DIERR_NOTACQUIRED`, returning without retrying until the
+next update as the original does. The original sends other polling errors
+through its diagnostic/error routine; the current service reports only a
+failed sample and does not reproduce that diagnostic path. The runtime converts parsed
 virtual-key bindings through `MapVirtualKeyW` and maps an `E0`-prefixed scan
 code into the DirectInput extended-key range. Its WM key-event snapshot is
 merged as a fallback, which also supports deterministic posted-event smokes.
@@ -42,7 +47,7 @@ the DirectInput buffer on this host. Device polling remains to be validated
 with a foreground held-key capture. Race trace rows now include
 `directinput_keyboard_state_read` and `directinput_up_pressed` diagnostics for
 that capture. Evidence: `0x412F90`
-`ev_f1afb4146263e4c858ccb590428f2b21bdb16b8de7093427b63a76675c137001`,
+`ev_72d88c205fb8150fa5e632f87e02b401b3395f2745cde2cf841b2eba351de1c3`,
 `0x4130D0` `ev_1ef0d1ce36204eea7927dd0bde9b4e425f3d473b4ff1cd9852f6bb807c0284d6`,
 and `0x413170` `ev_b9306522b3be005782bba4f9c3937d6c50a318d693aedc521d77a60d3836b011`.
 

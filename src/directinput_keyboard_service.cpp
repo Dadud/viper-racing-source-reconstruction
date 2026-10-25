@@ -97,11 +97,10 @@ bool DirectInputKeyboardService::poll(KeyboardState& state) {
     HRESULT result = impl_->keyboard->GetDeviceState(
         static_cast<DWORD>(state.size()), state.data());
     if (result == DIERR_INPUTLOST || result == DIERR_NOTACQUIRED) {
-        if (!impl_->acquire()) {
-            return false;
-        }
-        result = impl_->keyboard->GetDeviceState(
-            static_cast<DWORD>(state.size()), state.data());
+        // The original routine reacquires and returns immediately. A new
+        // state sample is taken on the next race update, not in this one.
+        (void)impl_->acquire();
+        return false;
     }
     return SUCCEEDED(result);
 }
