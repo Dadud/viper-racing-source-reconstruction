@@ -31,6 +31,10 @@ including live-keyboard versus logical-replay provenance, recovered controls,
 callback globals, scheduler clock, and the pre-increment native tick time.
 This is a provenance boundary feeding the existing projections; it does not
 make their route-driven movement or terrain/contact samples physics-owned.
+The race HUD now shows live position from each route adapter's signed travelled
+distance; repeated input traces retain and validate those distances and the rank.
+This is a route-prototype race indicator, not a physics-owned position or an
+original-match acceptance result.
 The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
 per-tick controls/timing plus post-callback byte-backed body orientation basis,

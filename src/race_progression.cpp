@@ -99,6 +99,7 @@ RouteMotionResult advance_route_motion(
     state.speed = std::clamp(state.speed *
         std::pow(0.992F, delta_seconds * 60.0F), -8.0F, 38.0F);
     float distance = state.speed * delta_seconds;
+    float route_distance_delta = 0.0F;
     for (unsigned guard = 0U; std::abs(distance) > 1.0e-5F && guard < 128U; ++guard) {
         const auto& a = route[state.route_segment];
         const auto& b = route[(state.route_segment + 1U) % route.size()];
@@ -113,10 +114,12 @@ RouteMotionResult advance_route_motion(
         const float remaining = (distance > 0.0F
             ? 1.0F - state.route_fraction : state.route_fraction) * length;
         if (std::abs(distance) < remaining) {
+            route_distance_delta += distance;
             state.route_fraction += distance / length;
             distance = 0.0F;
         } else {
             const bool forward = distance > 0.0F;
+            route_distance_delta += forward ? remaining : -remaining;
             distance += distance > 0.0F ? -remaining : remaining;
             state.route_segment = (state.route_segment +
                 (forward ? 1U : route.size() - 1U)) % route.size();
@@ -129,6 +132,7 @@ RouteMotionResult advance_route_motion(
             }
         }
     }
+    state.route_distance_travelled += route_distance_delta;
     const auto& a = route[state.route_segment];
     const auto& b = route[(state.route_segment + 1U) % route.size()];
     const float dx = b[0] - a[0];
@@ -141,7 +145,8 @@ RouteMotionResult advance_route_motion(
     result.z = route_z - std::sin(tangent) * lateral;
     result.yaw = tangent + state.steering * 0.35F;
     result.valid = std::isfinite(result.x) && std::isfinite(result.z) &&
-        std::isfinite(result.yaw);
+        std::isfinite(result.yaw) &&
+        std::isfinite(state.route_distance_travelled);
     result.finished = state.race.finished;
     return result;
 }
@@ -183,6 +188,45 @@ std::vector<RouteRaceStanding> build_route_race_standings(
             return left.participant_index < right.participant_index;
         });
     return standings;
+}
+
+std::vector<RouteRacePosition> build_route_race_positions(
+    const RouteMotionState& player_state,
+    const std::span<const RouteMotionState> participants,
+    const std::size_t player_participant_index)
+{
+    std::vector<RouteRacePosition> positions;
+    positions.reserve(participants.size());
+    const auto append = [&positions](const RouteMotionState& state,
+                                     const std::size_t index,
+                                     const bool player) {
+        if (!std::isfinite(state.route_distance_travelled)) return;
+        if (state.race.finished &&
+            (!std::isfinite(state.race.elapsed_seconds) ||
+             state.race.elapsed_seconds < 0.0F)) return;
+        positions.push_back({index, state.route_distance_travelled,
+            state.race.elapsed_seconds, state.race.finished, player});
+    };
+    append(player_state, player_participant_index, true);
+    for (std::size_t index = 0; index < participants.size(); ++index) {
+        if (index == player_participant_index) continue;
+        append(participants[index], index, false);
+    }
+    std::stable_sort(positions.begin(), positions.end(),
+        [](const RouteRacePosition& left, const RouteRacePosition& right) {
+            if (left.finished != right.finished) return left.finished;
+            if (left.finished &&
+                left.finish_time_seconds != right.finish_time_seconds) {
+                return left.finish_time_seconds < right.finish_time_seconds;
+            }
+            if (!left.finished &&
+                left.route_distance_travelled != right.route_distance_travelled) {
+                return left.route_distance_travelled >
+                    right.route_distance_travelled;
+            }
+            return left.participant_index < right.participant_index;
+        });
+    return positions;
 }
 
 } // namespace viper

@@ -21,6 +21,9 @@ struct RouteMotionState {
     float steering{};
     float speed{};
     RaceProgressionState race;
+    // Signed distance traversed along the route adapter's polyline. This is
+    // runtime route state, not native rigid-body displacement.
+    float route_distance_travelled{};
 };
 
 struct RouteMotionResult {
@@ -35,6 +38,14 @@ struct RouteMotionResult {
 struct RouteRaceStanding {
     std::size_t participant_index{};
     float finish_time_seconds{};
+    bool player{};
+};
+
+struct RouteRacePosition {
+    std::size_t participant_index{};
+    float route_distance_travelled{};
+    float finish_time_seconds{};
+    bool finished{};
     bool player{};
 };
 
@@ -76,6 +87,14 @@ void advance_race_clock(
 // states. `participants` is indexed by rendered entrant slot; player_state is
 // supplied separately because the runtime keeps it outside that array.
 [[nodiscard]] std::vector<RouteRaceStanding> build_route_race_standings(
+    const RouteMotionState& player_state,
+    std::span<const RouteMotionState> participants,
+    std::size_t player_participant_index);
+
+// Ranks every finite route-runtime participant. Finished entrants rank ahead
+// of active entrants; finishers use finish time, and active entrants use
+// signed distance travelled with entrant slot as a stable tie-break.
+[[nodiscard]] std::vector<RouteRacePosition> build_route_race_positions(
     const RouteMotionState& player_state,
     std::span<const RouteMotionState> participants,
     std::size_t player_participant_index);

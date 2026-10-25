@@ -278,7 +278,22 @@ try {
     $observedThrottle = $false
     $observedSteering = $false
     $observedAiDecision = $false
+    $observedRouteDistance = $false
     $header = $replayedLines[0].Split(',')
+    $routeDistanceColumn = [Array]::IndexOf(
+        $header, 'player_route_distance_travelled')
+    $livePositionColumn = [Array]::IndexOf($header, 'live_position')
+    $liveFieldSizeColumn = [Array]::IndexOf($header, 'live_field_size')
+    $opponentRouteDistanceColumns = @()
+    foreach ($name in $header) {
+        if ($name -match '^car\d+_route_distance_travelled$') {
+            $opponentRouteDistanceColumns += [Array]::IndexOf($header, $name)
+        }
+    }
+    if ($routeDistanceColumn -lt 0 -or $livePositionColumn -lt 0 -or
+        $liveFieldSizeColumn -lt 0 -or $opponentRouteDistanceColumns.Count -ne 7) {
+        throw 'Trace is missing live race-position route-state fields'
+    }
     $aiValidColumns = @()
     for ($column = 0; $column -lt $header.Count; ++$column) {
         if ($header[$column] -match '^car\d+_ai_valid$') {
@@ -342,6 +357,27 @@ try {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
         }
         $fields = $replayedLines[$index].Split(',')
+        $playerRouteDistance = [single]::Parse(
+            $fields[$routeDistanceColumn], [cultureinfo]::InvariantCulture)
+        $livePosition = [int]::Parse(
+            $fields[$livePositionColumn], [cultureinfo]::InvariantCulture)
+        $liveFieldSize = [int]::Parse(
+            $fields[$liveFieldSizeColumn], [cultureinfo]::InvariantCulture)
+        if ([single]::IsNaN($playerRouteDistance) -or
+            [single]::IsInfinity($playerRouteDistance) -or
+            $liveFieldSize -ne 8 -or $livePosition -lt 1 -or
+            $livePosition -gt $liveFieldSize) {
+            throw "Live route position diagnostics are malformed at frame $($index - 1)"
+        }
+        if ($playerRouteDistance -gt 0.0) { $observedRouteDistance = $true }
+        foreach ($column in $opponentRouteDistanceColumns) {
+            $opponentRouteDistance = [single]::Parse(
+                $fields[$column], [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($opponentRouteDistance) -or
+                [single]::IsInfinity($opponentRouteDistance)) {
+                throw "Opponent route distance is non-finite at frame $($index - 1)"
+            }
+        }
         foreach ($columns in $aiActionColumns) {
             if ($fields[$columns[0]] -notin @('0', '1')) {
                 throw "AI action validity is malformed at frame $($index - 1)"
@@ -461,6 +497,7 @@ try {
         throw 'Trace playback did not record the PCAR timestamp boundary on a callback step'
     }
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
+    if (-not $observedRouteDistance) { throw 'Playback did not advance signed route distance' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }
     if (-not $observedAiDecision) { throw 'Replay trace did not record any live opponent AI decisions' }
     Write-Output "Trace playback reproduced $($replayedLines.Count - 1) frames exactly across two runs."

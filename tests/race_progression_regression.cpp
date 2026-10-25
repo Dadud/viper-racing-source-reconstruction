@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <array>
 #include <vector>
@@ -144,8 +145,9 @@ int main()
         require(reverse_result.valid && reverse_motion.speed < 0.0F &&
                 reverse_motion.route_segment == square_route.size() - 1U &&
                 reverse_motion.route_fraction < 1.0F &&
-                reverse_motion.race.completed_laps == 0U,
-            "the separate reverse binding must move backward without counting a lap");
+                reverse_motion.race.completed_laps == 0U &&
+                reverse_motion.route_distance_travelled < 0.0F,
+            "reverse travel must reduce signed route distance without counting a lap");
 
         viper::RouteMotionState steering_motion{};
         viper::initialize_race_progression(steering_motion.race, 0U);
@@ -183,12 +185,16 @@ int main()
                     committed_before_query.race.elapsed_seconds &&
                 staged_motion.race.completed_laps ==
                     committed_before_query.race.completed_laps &&
+                staged_motion.route_distance_travelled ==
+                    committed_before_query.route_distance_travelled &&
                 staged_motion.race.finished == committed_before_query.race.finished,
             "failed terrain validation must roll back all player route and race progress");
         require(viper::commit_route_motion_after_terrain_query(
                     staged_motion, candidate_motion, true) &&
                 staged_motion.route_fraction == candidate_motion.route_fraction &&
                 staged_motion.steering == candidate_motion.steering &&
+                staged_motion.route_distance_travelled ==
+                    candidate_motion.route_distance_travelled &&
                 staged_motion.race.elapsed_seconds ==
                     candidate_motion.race.elapsed_seconds &&
                 staged_motion.race.completed_laps == 1U,
@@ -208,6 +214,25 @@ int main()
                 standings[1].player && standings[1].participant_index == 3U &&
                 standings[2].participant_index == 0U,
             "race standings must sort only completed entrants by finish time and slot");
+
+        std::array<viper::RouteMotionState, 5> active_participants{};
+        active_participants[0].route_distance_travelled = 12.0F;
+        active_participants[1].route_distance_travelled = 18.0F;
+        active_participants[2].route_distance_travelled = 18.0F;
+        active_participants[3].route_distance_travelled =
+            std::numeric_limits<float>::quiet_NaN();
+        active_participants[4].race = {0U, 1U, 8.0F, true};
+        active_participants[4].route_distance_travelled = 5.0F;
+        viper::RouteMotionState active_player{};
+        active_player.route_distance_travelled = 15.0F;
+        const auto positions = viper::build_route_race_positions(
+            active_player, active_participants, 0U);
+        require(positions.size() == 4U && positions[0].finished &&
+                positions[0].participant_index == 4U &&
+                positions[1].participant_index == 1U &&
+                positions[2].participant_index == 2U &&
+                positions[3].player && positions[3].participant_index == 0U,
+            "live positions must rank finishers first, then signed route distance with stable ties and skip invalid progress");
         std::cout << "race progression regression checks passed\n";
         return 0;
     } catch (const std::exception& error) {

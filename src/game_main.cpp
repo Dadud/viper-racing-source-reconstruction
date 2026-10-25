@@ -2459,6 +2459,7 @@ struct WindowState {
         // transform. Route projection only seeds progression state; replacing
         // that transform here would discard the native spline heading/height.
         if (!surface.query_succeeded) return false;
+        motion.route_distance_travelled = 0.0F;
         viper::initialize_race_progression(motion.race, motion.route_segment);
         refresh_title(true);
         return true;
@@ -2703,6 +2704,7 @@ struct WindowState {
             // player. The route policy supplies runtime-owned throttle/brake
             // decisions instead of an entrant-index speed seed.
             ai.speed = 0.0F;
+            ai.route_distance_travelled = 0.0F;
             viper::initialize_race_progression(ai.race, ai.route_segment);
         }
         return true;
@@ -3347,9 +3349,20 @@ struct WindowState {
         const auto seconds = static_cast<unsigned>(motion.race.elapsed_seconds) % 60U;
         const auto hundredths = static_cast<unsigned>(
             std::fmod(std::max(0.0F, motion.race.elapsed_seconds), 1.0F) * 100.0F);
+        const auto positions = viper::build_route_race_positions(
+            motion, opponent_motions, player_car_index);
+        const auto player_position = std::find_if(positions.begin(), positions.end(),
+            [this](const viper::RouteRacePosition& position) {
+                return position.player;
+            });
         std::string status = "LAP " + std::to_string(std::min(target_laps,
             motion.race.completed_laps + (motion.race.finished ? 0U : 1U))) +
             " / " + std::to_string(target_laps);
+        if (player_position != positions.end()) {
+            status += "\nPOSITION " + std::to_string(
+                static_cast<std::size_t>(player_position - positions.begin()) + 1U) +
+                " / " + std::to_string(positions.size());
+        }
         status += "\nTIME " + std::to_string(minutes) + ":" +
             (seconds < 10U ? "0" : "") + std::to_string(seconds) + "." +
             (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
@@ -4221,6 +4234,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_ai_target_speed,car" << car << "_ai_leader,car" << car
                   << "_ai_gap";
         }
+        trace << ",player_route_distance_travelled,live_position,live_field_size";
+        for (std::size_t car = 0U; car < state.opponent_motions.size(); ++car) {
+            if (car == player_car_index) continue;
+            trace << ",car" << car << "_route_distance_travelled";
+        }
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -4553,6 +4571,23 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         std::numeric_limits<std::size_t>::max())
                         trace << decision.leader_index;
                     trace << ',' << decision.distance_to_leader;
+                }
+                const auto positions = viper::build_route_race_positions(
+                    state.motion, state.opponent_motions, player_car_index);
+                const auto player_position = std::find_if(
+                    positions.begin(), positions.end(),
+                    [](const viper::RouteRacePosition& position) {
+                        return position.player;
+                    });
+                trace << ',' << state.motion.route_distance_travelled << ',';
+                if (player_position != positions.end())
+                    trace << static_cast<std::size_t>(
+                        player_position - positions.begin()) + 1U;
+                trace << ',' << positions.size();
+                for (std::size_t car = 0U; car < state.opponent_motions.size(); ++car) {
+                    if (car == player_car_index) continue;
+                    trace << ',' << state.opponent_motions[car]
+                        .route_distance_travelled;
                 }
                 trace << '\n';
                 if (!trace) {
