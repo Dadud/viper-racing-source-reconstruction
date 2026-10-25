@@ -98,9 +98,27 @@ SetCooperativeLevel(flags `0x11`), and SetDisplayMode(640x480x16) all returned
 success; the enumeration callback accepted the 640x480 mode. Both reported
 driver and HEL capability flags had bit 0 set. Nevertheless, the child exited
 with the same generic video-driver dialog before gameplay. This moves the
-failure boundary past successful mode selection; surface creation and later
-render-resource setup are the next unknowns. The trace does not prove which
-later call fails. A screenshot is kept outside the repository. Process,
-temporary data junction/staging directory, Frida session, and ISO mount were
-cleaned up, and launcher, engine, and ISO hashes remained unchanged. All 31
-GameData SHA-256 values also match the prior baseline.
+failure boundary past those successful API calls, but the dialog alone did
+not prove that the engine's own required-mode gate passed. A screenshot is
+kept outside the repository. Process, temporary data junction/staging
+directory, Frida session, and ISO mount were cleaned up, and launcher, engine,
+and ISO hashes remained unchanged. All 31 GameData SHA-256 values also match
+the prior baseline.
+
+The next private capture
+`../../analysis/reference_captures/launcher_surface_trace_20261025T025327Z.json`
+installed hooks before resuming the suspended launcher-created child. The
+same DirectDraw calls again returned success, the enumeration callback
+reported return value 1 for 640x480, and SetDisplayMode succeeded at
+640x480x16. No CreateSurface or surface-vtable call occurred before the child
+exited with code 5 and the generic dialog appeared. Static analysis of
+`0x44EEB0` establishes that exit code 5 is taken when byte `0x509C52` (the
+640x480-supported flag within `0x509C50`) is still zero after enumeration.
+Therefore callback return value 1 does not establish that the engine's
+required-mode flag was set; the current trace has not captured that global or
+the callback's raw mode fields. The failure is localized to the internal
+640x480 acceptance gate after enumeration and before surface creation, but
+the reason the flag remains unset is unresolved. A bounded follow-up should
+record callback input fields and the flag before/after the callback. The
+capture confirms cleanup, unchanged launcher/engine/ISO hashes, and matching
+hashes for all 31 GameData files.
