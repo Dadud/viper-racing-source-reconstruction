@@ -15,6 +15,7 @@
 #include "viper/sound_resource.hpp"
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/physics_task_stream.hpp"
+#include "viper/track_object_task_records.hpp"
 #include "viper/world_track_objects.hpp"
 #include "viper/career_file_store.hpp"
 #include "viper/pcar_control_update.hpp"
@@ -1566,6 +1567,7 @@ struct WindowState {
     // but the complete ordered world stream and fixed-step ring are not yet
     // connected. Route motion remains the visible pose authority.
     std::vector<std::byte> player_runtime_car_record;
+    std::vector<viper::ConfiguredCarTaskRecordInput> configured_car_task_records;
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
@@ -1959,6 +1961,51 @@ struct WindowState {
         player_constructor_inputs_ready =
             player_runtime_state.constructor_outputs_materialized;
         return true;
+    }
+
+    std::size_t prepare_ai_runtime_car_records(
+        const viper::SingleRaceAISetupPlan* const setups,
+        const viper::CarFileResourcePayloads& ai_car_resources,
+        const std::span<const std::uint32_t> configured_car_record_tags)
+    {
+        if (setups == nullptr) return 0U;
+        std::size_t prepared_count = 0U;
+        for (const auto& setup : setups->ai_setups) {
+            const auto car_index = setup.entrant_index;
+            if (!setup.input_complete || car_index >= configured_car_record_tags.size() ||
+                configured_car_record_tags[car_index] != 0x41434152U) continue;
+            const auto* construction = graphics.car_placement_plan(car_index);
+            if (construction == nullptr || construction->record_tag != 0x41434152U ||
+                construction->model_name != "viper") continue;
+
+            std::array<std::byte, 0x8cU> setup_payload{};
+            for (std::size_t word = 0; word < setup.setup.setup_words.size(); ++word) {
+                const auto value = setup.setup.setup_words[word];
+                for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+                    setup_payload[word * sizeof(value) + byte] =
+                        static_cast<std::byte>((value >> (byte * 8U)) & 0xffU);
+                }
+            }
+            const auto preparation =
+                viper::prepare_car_file_runtime_mapping_from_setup_payload(
+                    ai_car_resources, setup_payload, {}, false, false);
+            if (!preparation.input_complete || !preparation.mapping.has_value())
+                continue;
+            const auto name_plan = viper::plan_car_file_model_name("viper");
+            if (!name_plan.input_complete || name_plan.local_stack_copy_overflow ||
+                name_plan.runtime_record_copy_overflow) continue;
+            std::vector<std::byte> runtime_record(
+                viper::CarFileRuntimeMapping::runtime_record_size, std::byte{0});
+            if (!viper::apply_car_track_runtime_record(runtime_record, preparation,
+                    name_plan, *construction) || runtime_record.size() != 0x1e4U ||
+                read_u32_le(runtime_record.data()) != 0x41434152U ||
+                read_u32_le(runtime_record.data() + 4U) != runtime_record.size())
+                continue;
+            configured_car_task_records.push_back({car_index,
+                std::move(runtime_record)});
+            ++prepared_count;
+        }
+        return prepared_count;
     }
 
     void refresh_title(const bool force = false)
@@ -2696,6 +2743,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::size_t player_car_index,
                const std::vector<std::string>& participant_names,
                const std::span<const std::uint32_t> configured_car_record_tags,
+               const viper::SingleRaceAISetupPlan* const selected_ai_setups,
+               const viper::CarFileResourcePayloads& ai_car_resources,
                const std::uint32_t target_laps,
                const std::string_view track_name,
                const std::string_view car_name,
@@ -2799,6 +2848,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ", inverse mass " << *state.player_body_inverse_mass_0x200
               << ", four materialized initial wheel world anchors, core setups, and "
               << "axle-selected tire responses.\n";
+    state.configured_car_task_records.push_back({player_car_index,
+        state.player_runtime_car_record});
+    const auto prepared_ai_record_count = state.prepare_ai_runtime_car_records(
+        selected_ai_setups, ai_car_resources, configured_car_record_tags);
+    std::size_t resolved_manifest_car_records = 0U;
+    for (const auto& entry : state.physics_task_manifest->entries) {
+        if (!entry.configured_car_index.has_value()) continue;
+        const auto found = std::find_if(
+            state.configured_car_task_records.begin(),
+            state.configured_car_task_records.end(), [&](const auto& record) {
+                return record.configured_car_index == *entry.configured_car_index;
+            });
+        if (found != state.configured_car_task_records.end() &&
+            entry.record_tag == read_u32_le(found->record_bytes.data()))
+            ++resolved_manifest_car_records;
+    }
+    std::cout << "Materialized " << prepared_ai_record_count << " selected AI ACAR "
+              << "runtime records; " << resolved_manifest_car_records << " of "
+              << configured_car_record_tags.size()
+              << " configured car records now match manifest indices and tags. "
+              << "The full ordered world stream is still unresolved.\n";
     if (playback_trace != nullptr) state.graphics.set_vsync(false);
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
@@ -3179,6 +3249,8 @@ int run_selected_race(const Options& options, const std::string_view track,
         *entrants.player_record_index,
         participant_names,
         configured_car_record_tags,
+        selected_ai_setups ? &*selected_ai_setups : nullptr,
+        assets.ai_car(),
         std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),
         assets.ideal_line(), assets.player_model(), assets.ai_model(),

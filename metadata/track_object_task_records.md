@@ -17,10 +17,12 @@ setup, model-name, and placement inputs. It checks their tag/size headers and
 the matching deferred source row before joining them. It reports the first
 manifest entry without a complete matching record and is complete only when
 the manifest and all record rows are covered. This is an ordering/validation
-layer, not a serializer or native task-array loader. Without caller-provided
-car bytes, PCAR/ACAR/NCAR/GCAR entries remain empty and keep the plan
-incomplete. The runtime car mapper is the observed `0x45E4B0` mapper; callers
-still need to supply per-entrant inputs and actual bytes.
+layer, not a serializer or native task-array loader. The runtime now produces
+the player's PCAR and selected AI ACAR record bytes from their setup, CARF,
+model name, and placement inputs, then checks their configured indices and tags
+against the manifest. It still does not pass those records through this ordered
+join or load a full task stream; NCAR/GCAR entries and all materialized
+non-car records also remain unresolved at runtime.
 
 The materializer uses the existing line/record models for:
 

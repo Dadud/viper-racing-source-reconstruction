@@ -25,14 +25,21 @@ product of row `+0` and record `+0x20` to setup word 1, passes row `+4` to
 car, and track bundles. When the selected player car is not Viper, it also
 opens and owns `viper.car` as a separate AI vehicle bundle and parses its CARF
 without player upgrade overlays. It resolves the selected track's `tracks.tab`
-row. At runtime startup, the setup planner uses `GAME.opponent_strength` as the
-selected AIDR profile and each AI entrant's native modulo-7 slot. The tuning
-mode is 0 for the single-race path: both native single-race initializers zero
+row. At runtime startup, the setup planner uses `GAME.opponent_strength` as its
+AIDR profile index and each AI entrant's native modulo-7 slot. Native setup
+copies the configured value to the shared selector and passes it with the
+per-entrant modulo-7 key to a virtual profile lookup; the exact virtual
+implementation is not yet resolved. The tuning byte remains zero on the
+documented single-race path: both initializers zero
 their `0xCD4`-byte race state with `0x45C5B0`, then call `0x40A5D0`; that path
 does not write the mode byte at `+0xCD1` before `0x41A000` reads it. Native
-fallback block acquisition and FDIV helper mode remain unresolved; generated
-setups are not yet fed to opponent vehicle construction. The parser currently
-does not accept the legacy
+fallback block acquisition and FDIV helper mode remain unresolved. The runtime
+now applies each complete selected AI setup to the Viper CARF and its native
+placement plan, producing a tagged 0x1E4-byte ACAR record keyed by configured
+entrant index. A direct Viper/Bemidji smoke generated seven records and matched
+all eight configured car indices/tags, including the player's PCAR. These car
+bytes are not yet joined to materialized non-car task records or consumed by
+the ACAR constructor/motion loop. The parser currently does not accept the legacy
 `0x660C`-byte version-2 payload that the native loader also recognizes and
 converts. Native `0x41B9B0` copies the legacy payload's first three groups and
 builds the remaining five groups from the first current runtime-manager record
@@ -46,16 +53,13 @@ records. Evidence: `0x41B9B0`
 and `0x41BB50`
 `ev_88536434a4e9f02940f233812b02e911b5576593e57f294b8ee4fd05775efd03`.
 
-The single-race mode-0 path is supported by `0x45C5B0`
-`ev_0e695679750469c5a42eff7d5b5e8b7071961c4a85e551a2217e6f6e31c5eea8`,
-the two initializers `0x402AA0`
-`ev_749c1595510a9f81b76da5bf2e4f633182bd21c1f1589aacab6aea266fd57b9c` and
-`0x402BE0`
-`ev_041869a71d7adb78375a09de6452fbcd68ec4e8574bb399e22eb3499dbef3584`,
-the dispatch path `0x40A5D0`
-`ev_cc24790f321708d1f9ea5c4246a5f02757dd236c9ba0d2f4b956aec35e7156dc`, and
-the tuning-byte consumer `0x41A000`
-`ev_4e1034ff93f07927121e5fd1ebce8e3c9cf5fdf294c6f07f49101bab8632b5e1`.
+The selector and mode trace is recorded in
+`metadata/single_race_ai_runtime_selectors.evidence.json`: `0x40A850` writes
+the configured selector through `0x41B000`; `0x41C990` derives the entrant's
+modulo-7 key; `0x41CA40` passes both values to the virtual lookup; and
+`0x41A000` applies that result with mode byte `+0xCD1`. The same evidence file
+contains both single-race initializers and the `0x45C5B0` state clear that
+support the mode-zero inference.
 
 The Win32 single-race runtime reads `GAME.opponent_strength` as the selected
 profile index and resolves the corresponding localized display names from the
