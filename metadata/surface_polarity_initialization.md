@@ -1,0 +1,64 @@
+# Surface polarity initialization and shared call stream
+
+## Artifact and scope
+
+Static observations below come from `race.bin`, SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`, analyzed
+as x86 PE with Ghidra 12.1.4. These observations describe code and call paths;
+they do not establish a particular runtime's clock samples or thread schedule.
+
+## Initialization path
+
+- `0x417270` calls `0x419380`, then a 10,000-unit timing setup, then
+  `0x417350`. Its resolved callers are the interactive entry `0x401460` and
+  dedicated-server entry `0x49D3E0`. Both reach polarity initialization before
+  mode dispatch/main-loop work. Evidence: `ev_cdc15079c08a329e4bf0c562853e45eab5cc47bb166c33cc32bcb46693f2fef5`.
+- `0x419380` registers/gets the named `"random"` critical-section slot via
+  `0x4150C0`, stores it in `0x4F0A9C`, then calls `0x4193C0`. The lock registry
+  is not a random-number generator. Evidence: `ev_bed9b066666fffb4d298ccd5da2ce834f37e9c5d7580c80056e44a6c75e41928`.
+- `0x4193C0` calls `0x413BD0` twice; each signed return is divided by 30,000
+  and the signed remainder is passed to `0x419430`. The table initializer
+  writes 97 float entries at `0x4F0910..0x4F0A90`, then initializes phase
+  `0x4F0908`, increment `0x4F0A94`, wrap value `0x4F0A98`, indices
+  `0x4F0AA4/0x4F0AA8` to `0x60/0x20`, and initialized byte `0x4D3C58`.
+  Evidence: `ev_3bb02f1aa8da6bfea97f61f57806c157b2294c12161f786d8864577cf427a295`, `ev_e4863482e00c2d90193abc28b0d55365db2fc169b52bc487a057b46678bd7999`.
+- `0x413BD0` selects calibrated TSC, QPC, or `timeGetTime()` according to
+  timer setup globals. `0x413610` establishes those modes and `0x416360`
+  reaches that setup. The exact runtime samples depend on machine timing and
+  are not available from static analysis. Evidence:
+  `ev_72f206f0e4759b827c8836afbe8d15284052fcb72d65d2e809e89e3afb7e0409`,
+  `ev_5ec0098d72e412d56f258a7378c59cc52938c007f5c90b824a72bc5892f6ad2c`.
+
+## Table generation facts and current limit
+
+The initializer is deterministic for its two signed seed arguments. It uses a
+24-iteration binary search for each of 97 entries, fixed constants in the
+binary, x87 intermediate arithmetic, `__ftol` truncation toward zero, and
+binary32 stores. The table recurrence and comparison operand still need a
+complete x87 stack trace or captured native fixtures. Do not substitute a
+guessed recurrence or a fixed seed and call it exact. Evidence:
+`ev_e4863482e00c2d90193abc28b0d55365db2fc169b52bc487a057b46678bd7999`,
+`ev_1f0144ba5ff39e36ced30debe4cd8e2dd002c63683863cfffa1cf6bf82c65226e`.
+
+## Runtime consumer order
+
+`0x419620` advances the process-global state under the registered critical
+section. `0x4193F0` calls it and scales/converts its result. The wheel update
+path `0x431150` calls `0x442530` four times sequentially per car update, but
+at least 16 other resolved direct callers also consume the same stream. Calls
+must not be modeled as independent per-wheel generators. Thread scheduling
+can affect interleaving, so matching a run requires capturing or reproducing
+the shared call order. Evidence:
+`ev_3afbbf14b159826caa99a4d8315bfd22f427d866e42c6231e4e5775a75488608`,
+`ev_6b1334751a6337d3165d366b0c495d29963640f958a57149aa3dfa596205c872`,
+`ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`.
+
+## Implementation boundary
+
+The repository currently models the per-call `0x419620` transition and
+`0x4193F0` conversion, but the live session does not own initialization,
+clock-derived seed sampling, or the shared process-wide stream. Next exact
+steps are: finish the initializer's x87 recurrence; add signed seed-pair
+fixtures; model the timer source behind an injectable clock service; and route
+all reconstructed consumers through one locked session-level stream while
+recording unresolved call-order differences.
