@@ -52,6 +52,17 @@ up axis. `trace_replay_regression.ps1` confirms the supported terrain query
 samples remain valid through a deterministic full Viper/Bemidji race. This
 does not advance body pose, run the native collision query, produce native
 forces, or transfer pose authority from the route prototype.
+The native wheel-query origin producer is now pinned to the exact inputs at
+`0x442530`: wheel local position `+0x04..+0x0C` plus the referenced point at
+`+0x10`, transformed by all twelve body floats `+0x38..+0x64` through
+`0x437BA0`, producing wheel `+0xC8..+0xD0` before `0x45F760`/`0x4672B0`.
+`transform_wheel_point_0xc8` models that affine operation, but the session only
+has constructor body placement; it has no physics-updated body transform.
+Its current route-pose terrain observations therefore cannot serve as native
+contact inputs to suspension. Keep the live contact/suspension transition
+disconnected until the body-transform producer is session-owned and its
+per-step wheel reference inputs are established. The native query dataflow is
+documented in [`vehicle_setup.md`](vehicle_setup.md#shared-terrain-surface-query).
 The opponents now use a deterministic route-gap controller with staged
 braking hysteresis rather than unconditional full throttle; the trace records
 each decision and repeated playback checks it. This authored policy improves
