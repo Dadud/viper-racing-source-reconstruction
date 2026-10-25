@@ -69,6 +69,14 @@ int main()
     }
 
     viper::PcarCallbackGlobals globals{};
+    viper::set_pcar_callback_globals_0x43b880(
+        globals, 0x11223344U, 0x55667788U, 0x99aabbccU);
+    if (globals.value_0x509384 != 0x11223344U ||
+        globals.value_0x509388 != 0x55667788U ||
+        globals.value_0x5093a4 != 0x99aabbccU) {
+        std::cerr << "0x43B880 did not preserve its three raw global stores.\n";
+        return EXIT_FAILURE;
+    }
     globals.value_0x5093f4 = 0.5F;
     globals.value_0x509320 = 0.4F;
     globals.value_0x5093b8 = 0.2F;

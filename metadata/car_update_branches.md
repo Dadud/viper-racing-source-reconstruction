@@ -359,12 +359,17 @@ object. `pcar_callback_step_count` is checked against `physics_step_count` by
 `+0xC3C`, `+0xDE0`, `+0xDE4`, and `+0x508` stores at the same fixed-step
 boundary when the recovered gates request them and all consumed body bytes are
 initialized in the session owner. Unknown tail inputs skip that projection;
-they no longer abort the race update. The preceding `0x43BA00` and
+they no longer abort the race update. The exact `0x43B880` three-DWORD global
+store now runs after the timestamp path when body `+0xEB0/+0xEA8/+0xEAC` are
+initialized, mapped in native push order to globals `+0x509384`, `+0x509388`,
+and `+0x5093A4`; otherwise the session retains its prior shared-global values. The
+preceding linked-target `0x434A80` call and its target lookup remain outside
+the production path. The preceding `0x43BA00` and
 `0x43BA20` getter outputs now store the current modeled `+0x509344` float at
-`+0x4F0` and `+0x509420` byte at `+0x4EC`, in the observed order. Timestamp
-handling and the earlier `0x434A80`/`0x43B880` callback effects remain absent;
-the `0x43BA10` input to the tail is the current modeled `+0x509340`, not a
-value updated through the full callback sequence. Post-integrator record/event
+`+0x4F0` and `+0x509420` byte at `+0x4EC`, in the observed order. The earlier
+linked-target `0x434A80` effect remains absent. The `0x43BA10` input to the tail
+is the current modeled `+0x509340`, not a value updated through the full
+callback sequence. Post-integrator record/event
 handling and shared `0x431150` integration are still outside the live path.
 The floor constant bytes were read from the shipped `race.bin` at `0x4C814C`
 (`ev_c1a1c96bc554d4b7efe42229fd89168076d2116e4f6cb2b020456143cbca6054`).

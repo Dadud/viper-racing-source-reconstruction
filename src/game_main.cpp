@@ -3061,10 +3061,26 @@ struct WindowState {
                         &timestamp_write, 1U))) return false;
         }
 
+        // 0x43869C calls 0x43B880 after timestamp handling. The separate
+        // linked-target 0x434A80 effect is still unresolved here.
+        // Its pushes map object +0xEB0, +0xEA8, +0xEAC to globals
+        // +0x509384, +0x509388, +0x5093A4 respectively. Preserve the raw
+        // DWORDs and only advance this global snapshot when every source byte
+        // is owned by the session object.
+        const auto callback_global_0x509384 = body_word(0xeb0U);
+        const auto callback_global_0x509388 = body_word(0xea8U);
+        const auto callback_global_0x5093a4 = body_word(0xeacU);
+        if (callback_global_0x509384 && callback_global_0x509388 &&
+            callback_global_0x5093a4) {
+            viper::set_pcar_callback_globals_0x43b880(
+                pcar_callback_globals, *callback_global_0x509384,
+                *callback_global_0x509388, *callback_global_0x5093a4);
+        }
+
         // Preserve the native shared-global getter stores that precede the
         // late callback tail: 0x43BA00 -> +0x4F0 (float), then 0x43BA20
-        // -> +0x4EC (byte). The earlier 0x434A80 and 0x43B880 effects are
-        // still unresolved and are not synthesized here.
+        // -> +0x4EC (byte). The linked-target 0x434A80 effect remains
+        // unresolved; the raw 0x43B880 global stores are applied above.
         const std::array<viper::NcarObjectFieldWrite, 2> callback_cache_writes{{
             {0x4f0U, 4U, std::bit_cast<std::uint32_t>(
                 pcar_callback_globals.value_0x509344)},
@@ -3076,10 +3092,9 @@ struct WindowState {
             return false;
         }
 
-        // These stores are the observed late PCAR callback tail. Timestamp
-        // handling and the 0x434A80/0x43B880 calls before the cache stores are
-        // not yet connected, so only apply the modeled tail with currently
-        // observed body inputs.
+        // These stores are the observed late PCAR callback tail. The
+        // 0x434A80 linked-target call before the cache stores is not yet
+        // connected, so apply the modeled tail only with observed inputs.
         const auto tail_c3c = body_u8(0xc3cU);
         const auto tail_c3d = body_u8(0xc3dU);
         const auto tail_c7c = body_float(0xc7cU);
