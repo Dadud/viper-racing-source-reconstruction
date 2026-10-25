@@ -75,10 +75,13 @@ gap; do not infer runtime support from static analysis or file presence.
   Quick Race, retained its default Dodge Viper/Bemidji/Easy/Arcade/3-lap setup,
   and selected RACE. The retained 640×480 capture shows the Bemidji 3D grid,
   Lap 1/3, Position 8/8, and countdown lights. This is a rendered race-start
-  scene from the original client in the instrumented environment. A brief Up
-  key attempt did not have a post-input capture, so car movement and race
-  completion remain unverified. Details, screenshot paths, DirectDraw counts,
-  trace hash, and cleanup verification are in `metadata/graphics_startup.md`.
+  scene from the original client in the instrumented environment. The
+  successful run sent clicks only; no accelerator key was delivered. A later
+  input-capture attempt failed before the engine child was created, so car
+  movement and race completion remain unverified. The failed attempt audit is
+  `../../analysis/reference_captures/viper-quickrace-accelerator-attempt_20261025.json`.
+  Details, screenshot paths, DirectDraw counts, trace hash, and cleanup
+  verification are in `metadata/graphics_startup.md`.
 
 - **2026-10-25, original main-menu rendering under a bounded startup override:**
   With hooks confirmed on the suspended original child, the probe changed only
