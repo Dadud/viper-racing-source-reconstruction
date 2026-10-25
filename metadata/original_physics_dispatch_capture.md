@@ -543,3 +543,46 @@ branch-input values were recovered and the detach cause is unknown. The
 checked-in probe should be loaded before starting the next race and its session
 status verified while the child is still live. It still does not trace writes
 to each wheel object's `+0x158`.
+
+### Fresh external-copy launcher retry (2026-10-25)
+
+To keep the prior aborted-launcher dialog and the reconstruction process
+untouched, a separate capture tree was copied outside Git to
+`analysis/reference_captures/timer_branch_probe_20261025/GameRoot`. The staged
+launcher hash is `D75B38228D4B68B2C5EF39252B95E43A9DE16976005C26FAB4491D05CE3D32D4`;
+the staged `Data/race.bin` hash is
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`. The
+launcher was created suspended (PID 13856, primary thread 34284), and both
+`CreateProcessA/W` child-bridge hooks were ready before the primary thread was
+resumed (previous suspend count 1). The launcher Frida session then detached
+without any race-child creation event, and a later process inventory no longer
+found PID 13856. Evidence ID:
+`ev_38711824ca25b9c715053efa1ee9dde5e06856250f2bf884f35e49ae0f8cabd4`.
+No `race.bin` target was produced, so the timer-branch probe did not run and no
+simulation values were recovered. The abort cause remains unknown. The new
+external copy and its launcher helper remain outside Git; the older staged
+launcher dialog and user-owned reconstruction process were left untouched.
+
+### Isolated launcher-to-engine handoff retry (2026-10-25)
+
+A subsequent run used a fresh process-local semaphore suffix on the staged
+launcher while making the engine's main semaphore unique and its Canary name
+match the launcher. The launcher created `Data/race.bin` suspended (PID
+33296, primary TID 38128). The engine shim observed both expected names:
+`MGI Viper Racing 1998 Codex engine 33296` and
+`MGI Viper Racing 1998 Canary Codex timer capture 20261025 run2`. The checked-in
+timer-branch probe was loaded before the child thread resumed. Its ready event
+was observed, but no branch row was emitted; after TID 38128 resumed with a
+previous suspend count of 1, PID 33296 exited and its Frida session detached.
+The engine-session status evidence is
+`ev_a71594e5dde02ea615b71f152446d3c0da8a2bc12e04bec70f5522ce6648c693`; the
+launcher evidence is `ev_2750807cb5909268c8d1a586de793df5a2116689428333864402974edb1590d3`.
+This establishes successful process creation and semaphore scoping, but not a
+usable game window, timer execution, or simulation behavior. The exit cause is
+unknown. The process-local shims and staged assets remain outside Git. The
+launcher also displayed an `Our Apologies` dialog stating, “Your video card
+returned an error. Are your video drivers up to date?” This is direct evidence
+of a graphics-startup failure in the launcher window, but it does not by itself
+prove that this dialog caused the child `race.bin` exit. The parent Frida
+session later reported detachment (evidence
+`ev_4c997030884f5a6db6d2906378d92598cfacb1240f6ef2afa7157e0d3e1e7f2d`).

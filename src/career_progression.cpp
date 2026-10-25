@@ -2,6 +2,8 @@
 #include "viper/career_season.hpp"
 #include "viper/race_setup.hpp"
 
+#include <bit>
+#include <cstdint>
 #include <utility>
 
 namespace viper {
@@ -43,6 +45,15 @@ CareerEntrantOrderObservation estimate_career_entrant_order(
             observation.estimated_seconds[competitor] =
                 (baseline_seconds + profile_seconds[competitor]) * jitter;
         } else {
+            observation.estimated_seconds[competitor] = 300.0F;
+        }
+
+        // 0x4AA5E0 compares the candidate's raw float bits against
+        // 0x80000000 and substitutes 300.0f when the unsigned value is
+        // greater. This maps negative estimates (and negative NaNs) to the
+        // same fallback used for missing AI profile times.
+        if (std::bit_cast<std::uint32_t>(
+                observation.estimated_seconds[competitor]) > 0x80000000U) {
             observation.estimated_seconds[competitor] = 300.0F;
         }
     }

@@ -1,5 +1,7 @@
 #include "viper/career_file_store.hpp"
+#include "viper/career_progression.hpp"
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -24,6 +26,17 @@ void check(const bool condition, const std::string& message)
 
 int main()
 {
+    std::array<float, viper::career_progression_row_count> profile_seconds{};
+    profile_seconds.fill(100.0F);
+    std::array<std::int32_t, viper::career_progression_row_count> random_samples{};
+    random_samples.fill(100);
+    const auto clamped_estimates = viper::estimate_career_entrant_order(
+        profile_seconds, -200.0F, -1.0F, random_samples);
+    for (const auto candidate_seconds : clamped_estimates.estimated_seconds) {
+        check(candidate_seconds == 300.0F,
+            "maps negative AI and player estimates to the observed 300-second fallback");
+    }
+
     const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto root = std::filesystem::temp_directory_path() /
         ("viper-career-store-" + std::to_string(nonce));
