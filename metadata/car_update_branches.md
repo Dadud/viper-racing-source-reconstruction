@@ -263,6 +263,19 @@ constructor path calls `0x49C1F0(this, +0x510)`, which may dispatch an indirect
 manager virtual at `+0x78`; its object-side effects have not been resolved.
 Keep the post-construction `+0xECC` unknown in the live projection until that
 manager edge is audited or a controlled first-callback capture observes it.
+That capture has now been made against the already-running original
+`race.bin` process (PID 25904; the executable path and Viper Racing window were
+checked before attach). At `0x4384D0` entry, the same object pointer
+`0x4CA20CC` had raw `+0xECC == 0` on eight observations in one 12-second
+attach. A second six-second attach observed 16 more entries with the same
+pointer and value. Neither attach observed `0x4381E0` constructor entry, and
+the second attach observed no callback returns during its window. This proves
+the value at those callback-entry samples only; it does not establish the
+constructor's post-state or explain the zero. The entry observations are
+retained in the external REA bundle
+`C:\Users\dadud\OneDrive\Documents\ChatGPT\analysis\reference_captures\pcar_timestamp_live_entry_20261025.evidence.json`
+(`ev_f0177b1dc3e531fd979cb3bd2b42428edfb80a6d063e5683aa59c5e04d531c0e`,
+`ev_d1215ba9904ae7097081f580537ea07e0aa09d7733d937ad68283b0c460eed88`).
 Evidence: `0x43DFB0`
 `ev_feefea8447a3a65f61cb349cdc59190de6a96f6d2c0652ff468fb93d826a7864`,
 `0x42FF90` `ev_a3e97a69dfdfc6c057b9d575b684e30323444ffb2eb38cfff8f6fc133e7bbec8`,
