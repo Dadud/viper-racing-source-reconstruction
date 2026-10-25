@@ -100,6 +100,12 @@ quicksort path, including the null diagonal and ordinal selection. Production
 still does not collect and pass the descriptor rows, so this standalone
 algorithm is not yet exercised against live native rows and the timer remains
 disconnected from production physics.
+The portable resolver constructs and sorts only the requested row because
+the timer consumes one row entry; the native descriptor itself constructs all
+rows during setup. The timer API is allowed to propagate allocation failures
+because this row reconstruction uses dynamic storage. Comparator operation
+order is preserved, but binary64 intermediate precision is not proven to
+match the original x87 extended precision for adversarial cancellation cases.
 
 The next original-client capture can use the passive one-shot Frida probe at
 [`../../analysis/reference_captures/ordinal_pair_lookup_probe.js`](../../analysis/reference_captures/ordinal_pair_lookup_probe.js).

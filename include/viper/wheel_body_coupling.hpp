@@ -497,7 +497,7 @@ struct NcarIntegratorTimerResult {
 // formula, and nearby-record timestamp update. Table lookup data stays input.
 [[nodiscard]] NcarIntegratorTimerResult advance_ncar_integrator_timer(
     NcarIntegratorTimerState& state,
-    const NcarIntegratorTimerInput& input) noexcept;
+    const NcarIntegratorTimerInput& input);
 
 struct NcarIntegratorEarlyBoundsResult {
     bool within_bounds{};

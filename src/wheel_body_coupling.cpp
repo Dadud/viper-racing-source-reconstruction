@@ -29,7 +29,9 @@ int compare_ordinal_pair_records(
     const auto& b = records[*second];
     // The x87 callback stores the difference to a float stack temporary
     // before its comparisons. Preserve the native subtraction/addition order;
-    // double intermediates retain exact products of finite float inputs.
+    // binary64 represents each finite-float product exactly. Its 53-bit
+    // intermediate precision can still differ from x87 extended precision
+    // for adversarial cancellation, so bit-exact parity remains unverified.
     const auto ax = static_cast<double>(a.position_delta_x_0x04);
     const auto az = static_cast<double>(a.position_delta_z_0x08);
     const auto bx = static_cast<double>(b.position_delta_x_0x04);
@@ -148,35 +150,37 @@ NcarOrdinalPairLookupResult resolve_ncar_ordinal_pair_lookup(
         if (!row.registered) return NcarOrdinalPairRowInput{};
         return row;
     };
+    const auto selected_row = static_cast<std::size_t>(ordinal);
+    const auto selected_values = row_values(selected_row);
     std::vector<NcarOrdinalPairRecord> records;
-    records.reserve(rows.size() * (rows.size() - 1U) / 2U);
-    std::vector<std::vector<OrdinalPairPointer>> middle_lists(
-        rows.size(), std::vector<OrdinalPairPointer>(rows.size()));
-    for (std::size_t endpoint_a = 0U; endpoint_a < rows.size(); ++endpoint_a) {
-        for (std::size_t endpoint_b = endpoint_a + 1U;
-             endpoint_b < rows.size(); ++endpoint_b) {
-            const auto a = row_values(endpoint_a);
-            const auto b = row_values(endpoint_b);
-            const auto record_index = records.size();
+    records.reserve(rows.size() - 1U);
+    std::vector<OrdinalPairPointer> selected_list(rows.size());
+    for (std::size_t partner = 0U; partner < rows.size(); ++partner) {
+        if (partner == selected_row) continue;
+        const auto partner_values = row_values(partner);
+        const auto record_index = records.size();
+        if (selected_row < partner) {
             records.push_back({
-                static_cast<std::int16_t>(endpoint_a),
-                static_cast<std::int16_t>(endpoint_b),
-                b.position_x_0x5c - a.position_x_0x5c,
-                b.position_z_0x64 - a.position_z_0x64,
-                b.velocity_x_0x234 - a.velocity_x_0x234,
-                b.velocity_z_0x23c - a.velocity_z_0x23c});
-            middle_lists[endpoint_a][endpoint_b] = record_index;
-            middle_lists[endpoint_b][endpoint_a] = record_index;
+                static_cast<std::int16_t>(selected_row),
+                static_cast<std::int16_t>(partner),
+                partner_values.position_x_0x5c - selected_values.position_x_0x5c,
+                partner_values.position_z_0x64 - selected_values.position_z_0x64,
+                partner_values.velocity_x_0x234 - selected_values.velocity_x_0x234,
+                partner_values.velocity_z_0x23c - selected_values.velocity_z_0x23c});
+        } else {
+            records.push_back({
+                static_cast<std::int16_t>(partner),
+                static_cast<std::int16_t>(selected_row),
+                selected_values.position_x_0x5c - partner_values.position_x_0x5c,
+                selected_values.position_z_0x64 - partner_values.position_z_0x64,
+                selected_values.velocity_x_0x234 - partner_values.velocity_x_0x234,
+                selected_values.velocity_z_0x23c - partner_values.velocity_z_0x23c});
         }
+        selected_list[partner] = record_index;
     }
 
     const auto record_span = std::span<const NcarOrdinalPairRecord>(records);
-    for (auto& row : middle_lists) {
-        quicksort_ordinal_pair_pointers(row, record_span);
-    }
-
-    const auto selected_row = static_cast<std::size_t>(ordinal);
-    const auto& selected_list = middle_lists[selected_row];
+    quicksort_ordinal_pair_pointers(selected_list, record_span);
     result.sorted_partner_ordinals.reserve(selected_list.size());
     for (const auto& pointer : selected_list) {
         if (!pointer) {
@@ -241,7 +245,7 @@ NcarIntegratorPrefixResult apply_ncar_integrator_prefix(
 
 NcarIntegratorTimerResult advance_ncar_integrator_timer(
     NcarIntegratorTimerState& state,
-    const NcarIntegratorTimerInput& input) noexcept
+    const NcarIntegratorTimerInput& input)
 {
     NcarIntegratorTimerResult result{};
     constexpr auto timer_tick_seconds = std::bit_cast<float>(0x3C83126FU);
