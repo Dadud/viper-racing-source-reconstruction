@@ -455,8 +455,11 @@ visible in the ledger.
 eight selected PCAR updates and 32 ordered wheel observations, including
 downstream suspension and tire projection fields. Before production wiring,
 resolve the actual wheel `+0x158` producer and the upstream tire response/query
-producers, then obtain timestamp-correlated wheel/accumulator/body samples for
-throttle, steering, braking, and coast. Capture identity and limits are in
+producers. The captured `+0xF4` row is sampled after the current response
+calculation at the tire-force callsite, so it validates the projection output
+and does not reveal the locals/curves/velocity inputs that formed it. Then
+obtain timestamp-correlated wheel/accumulator/body samples for throttle,
+steering, braking, and coast. Capture identity and limits are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 
 ### 3. Complete and compare the first original-compatible single-player race

@@ -772,8 +772,13 @@ selected wheel response at `+0x178` matched the captured suspension
 magnitude local; suspension direction components, wheel response vectors,
 pre-projection tire response at `+0xF4`, projected vector at `+0x100`,
 application point at `+0xC8`, contact depth, scalar response, and contact flag
-were recorded. Body position and speed samples show motion during the same
-throttle/coast interval.
+were recorded. The wheel-vector stage row is sampled at `0x443C04`, after
+`0x442530` has written the current update's `+0xF4..+0xFC` local and before
+the direct `0x443C09` accumulator call. Static `0x442530` control flow shows
+that `+0xF4` is a current pre-projection output at that site; the same field
+sampled at callback entry would instead be prior state. Neither value is the
+upstream producer input by itself. Body position and speed samples show motion
+during the same throttle/coast interval.
 
 The compact extract is
 `../../analysis/reference_captures/wheel_history_probe_20261025/pcar_wheel_response_after_throttle_20261025.json`,
@@ -789,6 +794,8 @@ The compact wheel rows have no per-row callback ordinal/timestamp, so they do
 not establish precise causal alignment to each throttle sample. No steering,
 braking, reset, controlled collision, or paired reconstruction trace was
 captured. This is not a throttle-only force law or proof that all consumed
-physics fields are owned. In particular, the actual wheel `+0x158` producer
-and upstream tire-response/query producers remain unresolved; keep the
-production physics path disconnected.
+physics fields are owned. In particular, the actual wheel `+0x158` producer,
+the local response inputs that produce current `+0xF4`, and upstream
+tire-query/contact inputs remain unresolved; keep the production physics path
+disconnected. The `0x442530` static ordering used to interpret the vector rows
+is in Evidence `ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7`.
