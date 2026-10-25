@@ -49,6 +49,49 @@ and `ev_946ec3efe850470f7eea21d3d08dc427a46c9a686b71d929dbd583ebeab36ae6`
 (`0x433570` constants). The retained records are in
 [`ncar_integrator_timer.evidence.json`](ncar_integrator_timer.evidence.json).
 
+### Runtime descriptor lifecycle behind the ordinal lookup
+
+Static evidence now connects the `0x4D45B0` lookup's descriptor to its
+allocation, per-car writes, and post-processing path. `0x41F120` allocates a
+`0x14`-byte descriptor, initializes it through `0x41E9B0`, then publishes the
+same pointer in globals `0x4D45B4` and `0x4D45B0`; allocation failure clears
+both. `0x41E9B0` records the requested dimension at `+0`, allocates a
+triangular `n*(n-1)/2` pool of `0x14`-byte pair records at `+8`, sets the
+stride at `+0x0C` to `n*12+16`, and allocates the `n*stride` matrix buffer at
+`+0x10`. `0x41EAB0` initializes the triangular pair indexing/pointer arrays.
+These are observed storage shapes; the record entries' full gameplay
+semantics are not inferred here.
+
+The runtime registry is a separate 16-slot array at `0x4F0AC0` through
+`0x4F0AFC`. `0x41AEB0` visits non-null entries and calls `0x419E80`;
+`0x419E80` reads the registered object's body pointer, ordinal `+0x50`, body
+position `+0x5C/+0x64`, and velocity `+0x234/+0x23C`, then calls `0x41EC00`.
+That writer copies two 8-byte pairs into the matrix buffer at
+`buffer + ordinal*stride` and `+8`. A subsequent pass in `0x41AED0` calls
+`0x41EC40`, which forms triangular pair differences and then invokes
+`0x41EF40` through callbacks `0x41EE90` and `0x41ED20` for each row. The
+callback-produced ordering and the exact relationship between that matrix,
+its pair records, and the `0x433570` `+0x10` slot expression remain unresolved.
+In particular, the native lookup's byte-offset term must not yet be
+substituted with a guessed position/velocity formula.
+
+`0x41F160` destroys the descriptor by calling `0x41EA70` to free the owned
+`+0x10` and `+8` buffers, freeing the descriptor, and clearing both published
+globals. The independent `0x41EAA1` cleanup store clears only `0x4D45B0` and
+is not the same lifecycle path. Until the slot-to-pair mapping and callback
+effects are resolved or captured, `advance_ncar_integrator_timer` continues
+to require an explicit lookup observation and marks unavailable lookups
+incomplete.
+
+Evidence: `0x41E9B0` `ev_3b7f7d190ea4c86c09a2da3c5380c479bbbd775a95dff54ed7ecebb5eb43a7a1`,
+`0x41EAB0` `ev_af5da57252f41fcd0aa04bb6653499d28865bacdb9057d9ecb6f8436ce4f6c71`,
+`0x41F120` `ev_564ee35ebbabca97b3eeac8b401ea5315635ca133e81b5e6dd6fbf88ddef1c75`,
+`0x41F160` `ev_ac45052496f949a64e66d16196d167241f964aa5c0c55b65e4f7140022982a42`,
+`0x419E80` `ev_1ec32a87e35be27875f5f9264b12b3d58108d672af98c883bcfa0a9755464067`,
+`0x41EC00` `ev_5d2318c4bf2eeae6a8ae00d61a76fe9fe28dabff55b8e2c9105f7deffeeb8ee5`,
+`0x41EC40` `ev_240938eecb93f46cc2581792cf643ca862b6427ce48841acbc367ee45c29d819`,
+and registry iteration `0x41AEB0` `ev_545646b73d04a272070078ae5d72bb6b77afea754e75f3fe52b5eb6fb9ae68be`.
+
 Immediately afterward, `0x431150` calls `0x432130` on the body position at
 `+0x5C`. The helper returns zero only when all three raw DWORD pairs pass:
 X/Z are strictly between -5000 and 5000, and Y is strictly between -1000 and

@@ -1578,6 +1578,27 @@ struct AcarCurveSourceRuntimeState {
 struct WindowState;
 void refresh_keyboard_controls(WindowState& state);
 
+enum class PhysicsTickInputProvenance : std::uint8_t {
+    merged_live_keyboard = 0U,
+    logical_trace_actions = 1U,
+};
+
+// Immutable per-fixed-step capture of the values sampled at the outer update
+// boundary. This records provenance for later physics integration without
+// treating the current route prototype or terrain projections as body state.
+struct PlayerPhysicsTickContext {
+    PhysicsTickInputProvenance input_provenance{
+        PhysicsTickInputProvenance::merged_live_keyboard};
+    std::array<std::uint8_t, 256> keyboard_snapshot{};
+    viper::RaceLoop43B290State controls{};
+    viper::PcarCallbackGlobals pcar_callback_globals{};
+    std::int32_t scheduler_clock_milliseconds{};
+    std::uint32_t tick_index{};
+    std::uint32_t scheduled_step_index{};
+    std::uint32_t scheduled_step_count{};
+    float simulation_time_seconds{};
+};
+
 struct WindowState {
     DirectSoundAudio audio;
     D3DWindow graphics;
@@ -1629,6 +1650,7 @@ struct WindowState {
     bool return_to_frontend{};
     viper::PhysicsStepAccumulator physics_step_accumulator{};
     viper::PhysicsStepSchedule last_physics_step_schedule{};
+    std::optional<PlayerPhysicsTickContext> last_player_physics_tick;
     bool physics_step_clock_initialized{};
     std::uint32_t physics_step_count{};
     std::uint32_t pcar_callback_step_count{};
@@ -2338,13 +2360,35 @@ struct WindowState {
         const auto schedule = viper::schedule_physics_steps(
             physics_step_accumulator, scheduler_input);
         last_physics_step_schedule = schedule;
+        last_player_physics_tick.reset();
         bool lap_completed = false;
         for (std::int32_t step = 0; step < schedule.steps; ++step) {
-            if (!dispatch_player_pcar_callback_projection()) return false;
+            PlayerPhysicsTickContext tick_context{};
+            tick_context.input_provenance = playback_active
+                ? PhysicsTickInputProvenance::logical_trace_actions
+                : PhysicsTickInputProvenance::merged_live_keyboard;
+            tick_context.keyboard_snapshot = keyboard_button_states;
+            tick_context.controls = control_update_state;
+            tick_context.pcar_callback_globals = pcar_callback_globals;
+            tick_context.scheduler_clock_milliseconds = scheduler_clock;
+            tick_context.tick_index = physics_step_count;
+            tick_context.scheduled_step_index =
+                static_cast<std::uint32_t>(step);
+            tick_context.scheduled_step_count =
+                static_cast<std::uint32_t>(schedule.steps);
+            // Native dispatch consumes the current timer before incrementing it.
+            tick_context.simulation_time_seconds =
+                static_cast<float>(physics_step_count) * 0.016F;
+            last_player_physics_tick = tick_context;
+            if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             auto candidate_motion = motion;
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
-                left, right, accelerate, brake, 0.016F, target_laps,
-                control_update_state.controls.flag_0x5093f0 != 0U);
+                tick_context.controls.steering.value_0x509358 < -0.2F,
+                tick_context.controls.steering.value_0x509358 > 0.2F,
+                tick_context.controls.analog_0x5093f4.value > 0.2F,
+                tick_context.controls.analog_0x509320.value > 0.2F,
+                0.016F, target_laps,
+                tick_context.controls.controls.flag_0x5093f0 != 0U);
             if (!route_result.valid && !route_result.finished) return false;
             if (route_result.valid) {
                 const auto surface = viper::sample_terrain_resource(
@@ -2489,7 +2533,8 @@ struct WindowState {
         return true;
     }
 
-    bool update_player_pcar_callback()
+    bool update_player_pcar_callback(
+        const PlayerPhysicsTickContext& tick_context)
     {
         const auto body_word = [&](const std::uint32_t offset) {
             return viper::read_ncar_body_object_u32(
@@ -2507,7 +2552,7 @@ struct WindowState {
                 player_runtime_state.body_object, offset);
         };
         viper::PcarCallbackControlObservation callback_observation{};
-        callback_observation.globals = pcar_callback_globals;
+        callback_observation.globals = tick_context.pcar_callback_globals;
         callback_observation.multiplier.override_gate_0x4d10fc = true;
         callback_observation.multiplier.configured_multiplier_0x4ecc60 =
             game_throttle_boost_0x4ecc60;
@@ -2623,7 +2668,7 @@ struct WindowState {
                 if (!saved_flags) return false;
                 branch.value_0x4 = *saved_flags;
                 viper::PcarCallbackBranchObservation branch_observation{};
-                branch_observation.globals = pcar_callback_globals;
+                branch_observation.globals = tick_context.pcar_callback_globals;
                 branch_observation.selector_0xc98 = viper::EmbeddedSelectionFields{
                     *selector_denominator,
                     std::bit_cast<std::int32_t>(*selector_floor),
@@ -2676,7 +2721,7 @@ struct WindowState {
             const auto timestamp = viper::update_pcar_timestamp(
                 timestamp_bits.value_or(0U),
                 pcar_callback_globals.gate_0x509360,
-                static_cast<float>(physics_step_count) * 0.016F);
+                tick_context.simulation_time_seconds);
             pcar_timestamp_backend_callback_requested =
                 timestamp.request_backend_callback;
             const viper::NcarObjectFieldWrite timestamp_write{
@@ -2761,7 +2806,8 @@ struct WindowState {
         return true;
     }
 
-    bool dispatch_player_pcar_callback_projection()
+    bool dispatch_player_pcar_callback_projection(
+        const PlayerPhysicsTickContext& tick_context)
     {
         if (!physics_task_runtime_collection.has_value() ||
             !player_pcar_task_binding.has_value()) return false;
@@ -2788,7 +2834,7 @@ struct WindowState {
                     std::numeric_limits<std::uint32_t>::max()) {
                 return false;
             }
-            if (!update_player_pcar_callback()) return false;
+            if (!update_player_pcar_callback(tick_context)) return false;
             ++entry.known_callback_projection_steps;
             ++pcar_callback_step_count;
             return true;
@@ -3450,7 +3496,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_callback_task_stream_index"
               << ",pcar_task_projection_dispatch_steps"
               << ",physics_simulation_time,physics_catchup_limited";
-        trace << ",directinput_keyboard_state_read,directinput_up_pressed,paused";
+        trace << ",directinput_keyboard_state_read,directinput_up_pressed,paused"
+              << ",physics_tick_input_provenance,physics_tick_clock_ms"
+              << ",physics_tick_index,physics_tick_scheduled_step_index"
+              << ",physics_tick_scheduled_step_count,physics_tick_simulation_time"
+              << ",physics_tick_steering,physics_tick_throttle,physics_tick_brake";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -3652,6 +3702,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.directinput_keyboard_state_read
                       << ',' << state.directinput_up_pressed
                       << ',' << state.paused;
+                if (state.last_player_physics_tick.has_value()) {
+                    const auto& tick = *state.last_player_physics_tick;
+                    trace << ',' << static_cast<unsigned>(tick.input_provenance)
+                          << ',' << tick.scheduler_clock_milliseconds
+                          << ',' << tick.tick_index
+                          << ',' << tick.scheduled_step_index
+                          << ',' << tick.scheduled_step_count
+                          << ',' << tick.simulation_time_seconds
+                          << ',' << tick.controls.steering.value_0x509358
+                          << ',' << tick.controls.analog_0x5093f4.value
+                          << ',' << tick.controls.analog_0x509320.value;
+                } else {
+                    trace << ",,,,,,,,";
+                }
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";

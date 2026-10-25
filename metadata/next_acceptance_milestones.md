@@ -22,6 +22,13 @@ recorded as incomplete in the physics, AI, and race-mode rows of
 models are substantial but many still accept caller observations and are not
 owned by the live session (`metadata/car_update_branches.md`,
 `metadata/simulation_loop.md`, `metadata/vehicle_setup.md`).
+Each scheduled player tick now retains an immutable input/timing context
+including live-keyboard versus logical-replay provenance, recovered controls,
+callback globals, scheduler clock, and the pre-increment native tick time.
+This is a provenance boundary feeding the existing projections; it does not
+make their route-driven movement or route-derived terrain/contact samples
+physics-owned. Race-trace validation should next confirm fixed-step snapshots
+and deterministic replay before the complete body update is wired.
 The player now owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
 and persistent contact outputs. This closes object-state materialization only;
