@@ -442,3 +442,15 @@ career/upgrades/saves, compatible replay, modern multiplayer between
 reconstructed clients, error/resource lifecycle, clean-checkout asset
 discovery, and a requirement-by-requirement completion audit. Keep original
 assets and private captures outside the public repo.
+
+### Timer capture follow-up (2026-10-25)
+
+The installed `GameRoot\Data` junction was preserved in an external staged
+copy. That restored startup through the original main menu and Bemidji Quick
+Race setup, with the DirectDraw memory override applied and the timer probe
+loaded before child resume. Selecting Race caused the original client to abort
+before emitting a timer row. The junction mismatch is resolved; the gameplay
+startup abort remains unexplained. See
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md)
+for the observed dialog, Frida evidence ID, and limits. Do not treat this as a
+gameplay comparison or as timer-branch evidence.

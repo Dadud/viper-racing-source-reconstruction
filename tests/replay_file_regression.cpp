@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -52,6 +53,26 @@ try {
             "replay fields should round-trip");
     require(viper::encode_replay_file(decoded.replay, error) == encoded,
             "replay encoding should be byte stable");
+
+    // Exercise the actual save/reload path as well as the in-memory codec.
+    // Distinct bytes in the opaque fixed record make accidental omission or
+    // reinitialization visible in the file round-trip.
+    for (std::size_t i = 0; i < sample.engine_record.size(); ++i)
+        sample.engine_record[i] = static_cast<std::uint8_t>(i * 37U + 11U);
+    const auto file_path = std::filesystem::temp_directory_path() /
+        "viper_replay_file_regression.rpl";
+    require(viper::write_replay_file(file_path, sample, error),
+            "valid replay should save to disk");
+    const auto reloaded = viper::read_replay_file(file_path);
+    std::error_code remove_error;
+    std::filesystem::remove(file_path, remove_error);
+    require(static_cast<bool>(reloaded), "saved replay should reload");
+    require(reloaded.replay.engine_record == sample.engine_record &&
+            reloaded.replay.timestamp_or_index == sample.timestamp_or_index &&
+            reloaded.replay.frame_count == sample.frame_count &&
+            reloaded.replay.frame_words == sample.frame_words &&
+            reloaded.replay.payload == sample.payload,
+            "save/reload should preserve the complete native container");
 
     auto signed_header = sample;
     signed_header.timestamp_or_index = -1;

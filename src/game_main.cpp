@@ -1615,7 +1615,7 @@ public:
 
     void update(const float speed, const bool accelerating) noexcept
     {
-        if (!initialized_ || sounds_.empty()) return;
+        if (!initialized_ || paused_ || sounds_.empty()) return;
         const auto absolute_speed = std::abs(speed);
         std::size_t desired = idle_index_;
         // Temporary player-only speed band selection. The ESFX record is
@@ -1639,9 +1639,20 @@ public:
             static_cast<long>(DSBFREQUENCY_MIN), static_cast<long>(DSBFREQUENCY_MAX)));
         for (std::size_t index = 0; index < sounds_.size(); ++index) {
             const LONG volume = index == desired ? -850 : DSBVOLUME_MIN;
-            static_cast<void>(sounds_[index].buffer->SetVolume(volume));
-            if (index == desired)
-                static_cast<void>(sounds_[index].buffer->SetFrequency(frequency));
+            auto& sound = sounds_[index];
+            const auto volume_result = sound.buffer->SetVolume(volume);
+            if (volume_result == DSERR_BUFFERLOST && restore_buffer(sound)) {
+                static_cast<void>(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
+                static_cast<void>(sound.buffer->SetVolume(volume));
+            }
+            if (index == desired) {
+                const auto frequency_result = sound.buffer->SetFrequency(frequency);
+                if (frequency_result == DSERR_BUFFERLOST && restore_buffer(sound)) {
+                    static_cast<void>(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
+                    static_cast<void>(sound.buffer->SetFrequency(frequency));
+                    static_cast<void>(sound.buffer->SetVolume(volume));
+                }
+            }
         }
     }
 
@@ -1654,7 +1665,10 @@ public:
             if (paused_) {
                 static_cast<void>(sound.buffer->Stop());
             } else {
-                static_cast<void>(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
+                auto result = sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING);
+                if (result == DSERR_BUFFERLOST && restore_buffer(sound))
+                    result = sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING);
+                static_cast<void>(result);
             }
         }
     }
@@ -1681,7 +1695,33 @@ private:
         ComPtr<IDirectSoundBuffer> buffer;
         DWORD sample_rate{};
         std::optional<std::array<float, 7>> engine_parameters;
+        std::vector<std::byte> pcm_data;
     };
+
+    static bool copy_pcm_to_buffer(Sound& sound) noexcept
+    {
+        if (!sound.buffer || sound.pcm_data.empty() ||
+            sound.pcm_data.size() > std::numeric_limits<DWORD>::max()) return false;
+        void* first_region = nullptr;
+        void* second_region = nullptr;
+        DWORD first_bytes = 0U;
+        DWORD second_bytes = 0U;
+        const auto byte_count = static_cast<DWORD>(sound.pcm_data.size());
+        if (FAILED(sound.buffer->Lock(0U, byte_count, &first_region,
+                &first_bytes, &second_region, &second_bytes, 0U))) return false;
+        std::memcpy(first_region, sound.pcm_data.data(), first_bytes);
+        if (second_bytes != 0U)
+            std::memcpy(second_region, sound.pcm_data.data() + first_bytes,
+                second_bytes);
+        return SUCCEEDED(sound.buffer->Unlock(first_region, first_bytes,
+            second_region, second_bytes));
+    }
+
+    static bool restore_buffer(Sound& sound) noexcept
+    {
+        if (!sound.buffer || FAILED(sound.buffer->Restore())) return false;
+        return copy_pcm_to_buffer(sound);
+    }
 
     bool load_sound(const viper::ResourceBundle& bundle,
                     const std::string& name,
@@ -1714,22 +1754,8 @@ private:
         Sound sound{};
         if (FAILED(device_->CreateSoundBuffer(&desc, &sound.buffer, nullptr)))
             return false;
-        void* first_region = nullptr;
-        void* second_region = nullptr;
-        DWORD first_bytes = 0U;
-        DWORD second_bytes = 0U;
-        if (FAILED(sound.buffer->Lock(0U, desc.dwBufferBytes, &first_region,
-                &first_bytes, &second_region, &second_bytes, 0U))) {
-            return false;
-        }
-        std::memcpy(first_region, pcm->pcm_data.data(), first_bytes);
-        if (second_bytes != 0U)
-            std::memcpy(second_region, pcm->pcm_data.data() + first_bytes,
-                second_bytes);
-        if (FAILED(sound.buffer->Unlock(first_region, first_bytes,
-                second_region, second_bytes))) {
-            return false;
-        }
+        sound.pcm_data.assign(pcm->pcm_data.begin(), pcm->pcm_data.end());
+        if (!copy_pcm_to_buffer(sound)) return false;
         sound.sample_rate = pcm->sample_rate;
         if (engine_parameters != nullptr) sound.engine_parameters = *engine_parameters;
         const auto index = sounds_.size();
@@ -2419,7 +2445,8 @@ struct WindowState {
         return true;
     }
 
-    void update_player_wheel_contacts_from_body()
+    void update_player_wheel_contacts_from_body(
+        const std::optional<std::array<float, 4>>& route_pose)
     {
         player_wheel_terrain_queries_succeeded.fill(false);
         player_wheel_contact_observations = {};
@@ -2456,9 +2483,19 @@ struct WindowState {
                 state.contact_active_0x168 = 0U;
             return;
         }
-        const viper::PhysicsVector3 body_position{*body_x, *body_y, *body_z};
-        const viper::PhysicsVector3 body_up{
+        auto body_position = viper::PhysicsVector3{*body_x, *body_y, *body_z};
+        auto body_up = viper::PhysicsVector3{
             body_basis[3], body_basis[4], body_basis[5]};
+        // Route motion supplies position and yaw, not a native body
+        // transform. Keep the initialized basis and use the route pose only
+        // as the terrain-query origin; never write this projection to PCAR.
+        if (route_pose.has_value() && std::all_of(route_pose->begin(),
+                route_pose->end(), [](const float value) {
+                    return std::isfinite(value);
+                })) {
+            body_position = {(*route_pose)[0], (*route_pose)[1],
+                (*route_pose)[2]};
+        }
         for (std::size_t wheel = 0; wheel < player_wheel_contact_states.size(); ++wheel) {
             const auto& core = player_wheel_core_initialization->wheels[wheel];
             if (!core.has_value()) {
@@ -2739,7 +2776,7 @@ struct WindowState {
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
-            update_player_wheel_contacts_from_body();
+            update_player_wheel_contacts_from_body(player_simulated_pose);
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());

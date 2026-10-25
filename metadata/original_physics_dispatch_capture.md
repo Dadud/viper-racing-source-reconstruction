@@ -619,3 +619,25 @@ not identify the child's exit branch or overturn the separately successful
 original-client capture. Preserve the staged process logs outside Git and do
 not repeat the same staged launch shape without first resolving its early
 startup divergence.
+
+### Junction-preserving Quick Race retry (2026-10-25)
+
+The earlier staged trees had copied `GameRoot\Data` as an ordinary directory,
+while the installed `GameRoot\Data` is a junction to the external ISO data
+directory. A fresh staged tree at
+`analysis/reference_captures/timer_branch_junction_20261025/GameRoot` restored
+that directory relationship. All 32 staged data files matched the verified
+manifest, and the launcher, engine, and options hashes matched the expected
+baseline. The official launcher created the child suspended; the engine's
+semaphore scopes were captured, and the first-query DirectDraw memory override
+was applied. The checked-in timer probe was ready before the child resumed.
+
+This layout reached the original main menu and Bemidji Quick Race setup. On
+selecting Race, the original client displayed `Viper Racing has aborted (1).
+Let's check out the log.` The child Frida session then detached with no
+`pcar_timer_branch_probe_row` or completion event. Session evidence:
+`ev_b0bb7c68c36e76e3ccdb428a8420a32467741d4b41e1517e3e5ad3cdedf1caee`.
+The junction therefore resolves the earlier staged-copy divergence through
+frontend startup, but it does not resolve the gameplay-start abort. The abort
+cause is unknown; this retry produced no timer or physics input values. The
+staged tree and helpers remain outside Git.
