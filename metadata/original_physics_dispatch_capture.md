@@ -495,3 +495,23 @@ repository at
 records, no unknowns). Staged game files and original captures remain outside
 Git. The capture is an observed original-client sample, not a gameplay parity
 acceptance result.
+
+### Same-offset state-row cross-check (2026-10-25)
+
+Follow-up Ghidra pseudocode for `0x4329C0` shows a separate frame/state row
+destination, `*(this + 8) + param_1`, receiving body `+0x50C` at row offset
+`+0x158`. That destination is a state-row pointer; it is not the wheel pointer
+passed to `0x442530` in the live capture. This is a concrete example of why a
+matching numeric offset cannot establish field identity across object types.
+The same pseudocode then iterates four embedded wheel records through
+`0x444120`, but does not establish the live wheel object's `+0x158` producer.
+Ghidra Evidence ID: `ev_c36186602773729f049239e1bd1812be63e60c81bed8056cb6aa9c2c6cea9724`.
+
+The helper at `0x433570` independently confirms the body timer generation:
+it computes elapsed time from `FUN_00425790() - body+0xE44`, applies the
+captured 6.2-second ramp gate, and advances `+0xE44` by `0.016` only on its
+near-participant branch. The live wheel-history capture saw `+0xE44 == -100`
+and `+0x50C == 1` throughout the selected eight updates, so it did not observe
+this ramp advancing. This leaves the runtime invocation/input and wheel-field
+copy producer unresolved. Ghidra Evidence ID:
+`ev_98635cd43aa39a1c3cd84a9f9cd488bca08e122c47540014cd16fec738b76d7c`.
