@@ -307,13 +307,14 @@ captured wheel `+0xF4` response projected off basis `+0x110`; the four captured
 first-update object snapshots reproduce `+0x100` within `7.3e-6`, and the
 asset-free regression now replays that transform before its four direct tire
 accumulator calls. The regression also checks the four captured suspension X
-compositions. The checked-in response probe has exact stage hooks for the
-suspension and tire callsites, but those additional stack rows have not yet
-been captured. The regression now replays all 32 ordered direct tire writes
-from eight captured integrator updates, checking the known projection and
-accumulator stages for each wheel. This closes another wheel-to-accumulator
-stage; the pre-projection response inputs, suspension direction producers,
-native collision/query state, and live session ownership remain unresolved. See
+compositions. A throttle-gated original capture now supplies 32 downstream
+suspension/tire stage rows across eight selected integrators; generic
+force-writer argument pointers are excluded because their x86 layout is
+unvalidated. The existing regression still replays all 32 ordered direct tire
+writes from the earlier centered capture, checking the known projection and
+accumulator stages. The new stage capture does not close upstream provenance:
+the pre-projection response inputs, suspension direction producers, native
+collision/query state, and live session ownership remain unresolved. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#corrected-wheel-scoped-force-callsites).
 
 ### State required before the live physics integration can be wired
