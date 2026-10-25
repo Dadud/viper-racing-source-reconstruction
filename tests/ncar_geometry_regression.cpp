@@ -131,6 +131,24 @@ int main()
                 read_body_dword(0x50cU) == std::bit_cast<std::uint32_t>(1.0F) &&
                 body_runtime_state.initialized_bytes[0x50cU] != 0U,
             "derived PCAR constructor stores must update the same persistent object");
+        const auto pcar_initialization =
+            viper::plan_ncar_object_initialization({});
+        const auto pcar_e44_write = std::find_if(
+            pcar_initialization.writes_before_backend_refresh.begin(),
+            pcar_initialization.writes_before_backend_refresh.end(),
+            [](const viper::NcarObjectFieldWrite& write) {
+                return write.offset == 0xe44U && write.width_bytes == 4U;
+            });
+        require(pcar_e44_write !=
+                    pcar_initialization.writes_before_backend_refresh.end() &&
+                pcar_e44_write->value_bits == 0xc2c80000U &&
+                viper::apply_ncar_body_object_writes(
+                    body_runtime_state,
+                    pcar_initialization.writes_before_backend_refresh) &&
+                viper::read_ncar_body_object_u32(body_runtime_state, 0xe44U) ==
+                    0xc2c80000U &&
+                body_runtime_state.initialized_bytes[0xe47U] != 0U,
+            "PCAR constructor 0x433AA0 must persist its exact -100.0 timestamp sentinel at +0xE44");
         const std::array<viper::NcarObjectFieldWrite, 4> pcar_scalar_writes{{
             {0xde0U, 4U, std::bit_cast<std::uint32_t>(0.25F)},
             {0xde4U, 4U, std::bit_cast<std::uint32_t>(0.5F)},

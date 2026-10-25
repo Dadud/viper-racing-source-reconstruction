@@ -197,8 +197,10 @@ from initialized PCAR body velocity/basis and constructor-backed `+0x500`,
 `+0xDCC`, and `+0xBE4` fields. Their selected output pair and the opening scalar
 stores are persisted into the same body object. The shared integrator remains
 unwired, so these values still do not advance body pose. The production session
-owns known base-constructor bytes for one PCAR body, but does not yet advance
-that state through `0x431150`. The 3-slot NCAR `0x3E` sample
+owns known base-constructor bytes for one PCAR body, including the exact
+`0x433AA0` `+0xE44 = -100.0` sentinel. It does not yet run the `0x433570`
+ordinal-record timer update or advance body state through `0x431150`. The
+3-slot NCAR `0x3E` sample
 history is distinct from the `0x960`-record GCAR `0x3C` wheel-history ring;
 the latter is tied to GhostBegin playback and is not a live-player ring.
 See `metadata/physics_task_objects.md`, `metadata/car_update_branches.md`, and

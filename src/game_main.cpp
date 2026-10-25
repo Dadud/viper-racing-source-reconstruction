@@ -1568,6 +1568,10 @@ struct MaterializedNcarRuntimeState {
     // constructor. Keep it as constructor state; the later callback/ring that
     // can change this value is not yet connected to the session.
     std::optional<float> constructor_field_0x50c;
+    // Shared initializer 0x433AA0 writes -100.0f to +0xE44. The timer's later
+    // ordinal-record producer is still unavailable, so retain only this known
+    // constructor value in the byte-backed object.
+    std::optional<float> constructor_field_0xe44;
     std::array<std::optional<viper::NcarWheelConstructorPlan>, 4>
         wheel_constructor_plans{};
     std::array<viper::NcarWheelRuntimeObjectState, 4>
@@ -1604,9 +1608,9 @@ struct PlayerPhysicsTickContext {
     std::uint64_t outer_update_index{};
     float simulation_time_seconds{};
     // Post-callback byte-backed body fields in this order: orientation basis,
-    // position, linear/angular velocity, accumulated force, accumulated
-    // moment. Unknown native bytes remain empty rather than becoming zeroes.
-    std::array<std::optional<float>, 24> body_state_after_tick{};
+    // position, linear/angular velocity, accumulated force/moment, then the
+    // constructor timer sentinel. Unknown native bytes remain empty.
+    std::array<std::optional<float>, 25> body_state_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
 };
@@ -2033,6 +2037,26 @@ struct WindowState {
             player_runtime_state = {};
             return false;
         }
+        // PCAR constructor 0x42FF90 calls 0x433AA0 after the placement
+        // handoff. Reuse the initializer's evidence-backed direct-write
+        // prefix, which includes the exact +0xE44 timestamp sentinel.
+        const auto pcar_initializer = viper::plan_ncar_object_initialization({});
+        const auto e44_initializer = std::find_if(
+            pcar_initializer.writes_before_backend_refresh.begin(),
+            pcar_initializer.writes_before_backend_refresh.end(),
+            [](const viper::NcarObjectFieldWrite& write) {
+                return write.offset == 0xe44U && write.width_bytes == 4U;
+            });
+        if (e44_initializer ==
+                pcar_initializer.writes_before_backend_refresh.end() ||
+            !viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                pcar_initializer.writes_before_backend_refresh)) {
+            player_runtime_state = {};
+            return false;
+        }
+        player_runtime_state.constructor_field_0xe44 =
+            std::bit_cast<float>(e44_initializer->value_bits);
         for (std::size_t wheel = 0; wheel < player_runtime_state
                 .initial_wheel_world_positions.size(); ++wheel) {
             const auto& core = player_wheel_core_initialization->wheels[wheel];
@@ -2296,11 +2320,12 @@ struct WindowState {
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
-        constexpr std::array<std::uint32_t, 24> offsets{
+        constexpr std::array<std::uint32_t, 25> offsets{
             0x38U, 0x3cU, 0x40U, 0x44U, 0x48U, 0x4cU,
             0x50U, 0x54U, 0x58U, 0x5cU, 0x60U, 0x64U,
             0x234U, 0x238U, 0x23cU, 0x240U, 0x244U, 0x248U,
-            0x24cU, 0x250U, 0x254U, 0x258U, 0x25cU, 0x260U};
+            0x24cU, 0x250U, 0x254U, 0x258U, 0x25cU, 0x260U,
+            0xe44U};
         for (std::size_t index = 0U; index < offsets.size(); ++index) {
             const auto bits = viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offsets[index]);
@@ -3557,7 +3582,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",body_basis_5,body_basis_6,body_basis_7,body_basis_8"
             ",body_pos_x,body_pos_y,body_pos_z,body_vel_x,body_vel_y,body_vel_z"
             ",body_ang_x,body_ang_y,body_ang_z,body_force_x,body_force_y,body_force_z"
-            ",body_moment_x,body_moment_y,body_moment_z";
+            ",body_moment_x,body_moment_y,body_moment_z,body_timer_0xe44";
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_projected_depth";

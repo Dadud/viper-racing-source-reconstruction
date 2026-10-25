@@ -303,9 +303,16 @@ constructor `0x43E490`, and shared body initializer `0x4375C0`. Their analyzed
 direct stores contain no write to `+0xECC`. A sibling derived constructor
 `0x4278F0` does write `this+0x510` into `this+0xECC`; this confirms the offset
 has class-specific meaning and that sibling writes cannot establish PCAR's
-timestamp initialization. The base constructor's nearby `0x433AA0` initializer writes through
-`+0xEAC` and then resumes at other fields; it does not store `+0xECC`
-either.
+timestamp initialization. Shared initializer `0x433AA0` is called from PCAR
+constructor `0x42FF90`; its direct prefix sets `+0x50C = 1.0` and
+`+0xE44 = -100.0` before backend refresh, but it still does not store
+`+0xECC`. The live session now applies that modeled prefix after the
+`0x433C00` record-transform handoff, persists `+0xE44` in the PCAR byte owner,
+and includes it in fixed-step traces. The later `0x433570` update may advance
+the field only when its ordinal-record lookup succeeds; the slot-to-pair record
+mapping remains unresolved, so that timer update is not connected. This
+distinguishes the known PCAR constructor sentinel from the unknown runtime
+producer.
 Setup initializer `0x433C00` also has no direct field reference in the
 `+0xEC0..+0xF00` range. The PCAR factory `0x422580` allocates exactly
 `0xEF0` bytes through `0x414170` before invoking `0x4381E0`. That allocator

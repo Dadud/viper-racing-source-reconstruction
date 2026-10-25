@@ -61,6 +61,7 @@ try {
     $tickTimeColumn = [Array]::IndexOf($tickHeader, 'simulation_time')
     $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
     $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
+    $bodyTimerColumn = [Array]::IndexOf($tickHeader, 'body_timer_0xe44')
     $bodyBasisColumns = [int[]]::new(9)
     for ($basis = 0; $basis -lt 9; ++$basis) {
         $bodyBasisColumns[$basis] = [Array]::IndexOf(
@@ -93,7 +94,8 @@ try {
     }
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
-        $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0) {
+        $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0 -or
+        $bodyTimerColumn -lt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
     if (@($bodyBasisColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -140,6 +142,14 @@ try {
             if ([single]::IsNaN($value) -or [single]::IsInfinity($value)) {
                 throw "Body position snapshot is non-finite at line $($index + 1)"
             }
+        }
+        $bodyTimer = [single]::Parse(
+            $fields[$bodyTimerColumn], [cultureinfo]::InvariantCulture)
+        if ($tickIndex -eq 0 -and [Math]::Abs($bodyTimer - (-100.0)) -gt 0.00001) {
+            throw 'PCAR body trace does not show the native constructor +0xE44 sentinel'
+        }
+        if ([Math]::Abs($bodyTimer - (-100.0)) -gt 0.00001) {
+            throw 'PCAR +0xE44 changed without its runtime timer/ordinal producer being connected'
         }
         foreach ($column in $bodyMotionColumns) {
             if ([string]::IsNullOrWhiteSpace($fields[$column])) { continue }
