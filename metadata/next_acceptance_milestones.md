@@ -38,9 +38,11 @@ effects apply only when every consumed byte is initialized in the session body;
 otherwise those fields remain unknown without aborting the race update.
 The timer phase is resolved: the original task dispatcher runs before its
 global tick increment, so `0x425790` observes the current pre-increment tick.
-The runtime applies the `+0xECC` timestamp latch only when the body byte mask
-proves that DWORD initialized; the current constructor leaves it unknown, so
-the latch and backend request remain inactive. The earlier `0x434A80` /
+The runtime now applies the false-gate `+0xECC = 0` store even when the prior
+DWORD is unknown, since the native false branch does not read it. The enabled
+branch still requires an initialized timestamp. A controlled original capture
+observed the false gate and zero value at the callback join; the enabled
+backend path remains unavailable. The earlier `0x434A80` /
 `0x43B880` callback effects, the native task factory, interpolation ring,
 post-integrator callback work, and shared body-step integrator are not
 connected. Route kinematics still own player and opponent motion.

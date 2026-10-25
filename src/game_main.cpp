@@ -2612,9 +2612,14 @@ struct WindowState {
         // +0x3C call still has no session-owned target/backend implementation.
         const auto timestamp_bits = body_word(0xeccU);
         pcar_timestamp_backend_callback_requested = false;
-        if (timestamp_bits.has_value()) {
+        // The native false-gate branch clears +0xECC without reading it.
+        // Preserve that known store even while constructor state is unknown;
+        // the enabled branch still requires the original latch value.
+        if (timestamp_bits.has_value() ||
+            !pcar_callback_globals.gate_0x509360) {
             const auto timestamp = viper::update_pcar_timestamp(
-                *timestamp_bits, pcar_callback_globals.gate_0x509360,
+                timestamp_bits.value_or(0U),
+                pcar_callback_globals.gate_0x509360,
                 static_cast<float>(physics_step_count) * 0.016F);
             pcar_timestamp_backend_callback_requested =
                 timestamp.request_backend_callback;
