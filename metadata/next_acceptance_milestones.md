@@ -220,13 +220,15 @@ capture provenance are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 A bounded checked-in Frida probe now samples the native `elapsed < 6.2` branch,
 retains a capped transition-window and sparse out-of-branch sample, and records
-the participant-pair lookup if reached. A recent suspended-child retry created
-the engine child, but its startup-memory override produced no query event and
-the child exited before recording a timer row. The successful original-client
-launch path is already established with the documented first-query video-memory
-override; use that path for the next timer capture instead of treating the retry
-as a startup blocker. The transfer into wheel `+0x158` is known; the live body
-`+0x50C` timer value and callback order remain unresolved.
+the participant-pair lookup if reached. Two suspended-child attempts against
+the external staged copy created the engine child, but neither startup-memory
+override reported a query and neither produced a timer row. One attempt used
+`-1`, and the other matched the successful manifest's no-argument launch shape;
+the retries still do not identify the early startup exit branch. The successful
+original-client launch path is already established with the documented
+first-query video-memory override. Resolve the staged-copy startup divergence
+before repeating that capture. The transfer into wheel `+0x158` is known; the
+live body `+0x50C` timer value and callback order remain unresolved.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`

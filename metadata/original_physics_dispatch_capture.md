@@ -512,8 +512,9 @@ it computes elapsed time from `FUN_00425790() - body+0xE44`, applies the
 captured 6.2-second ramp gate, and advances `+0xE44` by `0.016` only on its
 near-participant branch. The live wheel-history capture saw `+0xE44 == -100`
 and `+0x50C == 1` throughout the selected eight updates, so it did not observe
-this ramp advancing. This leaves the runtime invocation/input and wheel-field
-copy producer unresolved. Ghidra Evidence ID:
+this ramp advancing. The `0x4329C0` body-to-wheel `+0x158` copy is known; the
+runtime `+0x50C` branch inputs and callback order remain unresolved. Ghidra
+Evidence ID:
 `ev_98635cd43aa39a1c3cd84a9f9cd488bca08e122c47540014cd16fec738b76d7c`.
 
 A bounded read-only Frida hook at `0x433570` then observed 16 calls for the
@@ -544,15 +545,15 @@ and performs no target writes. This is a capture tool, not gameplay code.
 
 An initial inline attempt to hook these branch sites was loaded after the
 previous race had already accumulated a large number of fixed-step updates;
-the child Frida session detached before a completion row was returned. A later
-suspended-child retry loaded the probe before resume, but its startup-memory
-override did not report a query and the child exited before recording a timer
-row. These failures do not overturn the separate successful Quick Race capture
-documented in [`graphics_startup.md`](graphics_startup.md): that capture used
-the proven first-query video-memory override. Reuse that verified startup
-intervention for the next timer-branch attempt. No branch-input values were
-recovered in these retries, and the probe still does not trace writes to each
-wheel object's `+0x158`.
+the child Frida session detached before a completion row was returned. Two
+later suspended-child retries loaded the corrected probe before resume, but
+the startup-memory override reported no query in either run and neither child
+recorded a timer row. One used `-1`; the other matched the successful capture's
+no-argument launch shape. These retries do not overturn the successful Quick
+Race capture documented in [`graphics_startup.md`](graphics_startup.md), but
+they expose an unresolved early-startup divergence in the staged-copy path.
+Resolve that divergence before repeating the timer capture. No branch-input
+values were recovered in these retries.
 
 ### Fresh external-copy launcher retry (2026-10-25)
 
@@ -596,3 +597,25 @@ of a graphics-startup failure in the launcher window, but it does not by itself
 prove that this dialog caused the child `race.bin` exit. The parent Frida
 session later reported detachment (evidence
 `ev_4c997030884f5a6db6d2906378d92598cfacb1240f6ef2afa7157e0d3e1e7f2d`).
+
+### Isolated no-argument handoff retry (2026-10-25)
+
+Retried the same staged launcher with no engine argument, matching the
+successful Quick Race manifest's `Data\\race.bin` command. Staged launcher and
+engine hashes remained `D75B38228D4B68B2C5EF39252B95E43A9DE16976005C26FAB4491D05CE3D32D4`
+and `F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`; the
+staged `Config/options.cfg` still matched its pre-capture hash. The launcher
+created PID 17248/TID 40720 suspended. Before resuming it, the child session
+loaded the corrected timer probe and the same first-query VRAM override logic
+as the earlier successful capture, changed only to detach its own hook rather
+than all Frida hooks. The primary thread resumed with prior suspend count 1,
+and both engine semaphore scopes were observed. However, the override emitted
+only `hook_ready`, with no `GetAvailableVidMem` query event; no timer row was
+recorded, and the child session detached. The parent displayed the generic
+video-driver error. REA child-session evidence:
+`ev_36304f94155678f60c5af2b74934fa0a2288ecb5651432502f57f921fa5c38e0`.
+This rules out `-1` as the only condition behind the staged retries, but does
+not identify the child's exit branch or overturn the separately successful
+original-client capture. Preserve the staged process logs outside Git and do
+not repeat the same staged launch shape without first resolving its early
+startup divergence.
