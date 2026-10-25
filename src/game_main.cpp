@@ -1616,6 +1616,7 @@ struct WindowState {
     bool physics_step_clock_initialized{};
     std::uint32_t physics_step_count{};
     std::uint32_t pcar_callback_step_count{};
+    bool pcar_timestamp_backend_callback_requested{};
     std::uint32_t playback_clock_milliseconds{};
     // The native binding evaluator consumes a post-poll device snapshot. The
     // DirectInput service supplies the original 256-byte keyboard snapshot;
@@ -2604,6 +2605,27 @@ struct WindowState {
             }
         }
 
+        // 0x425790 reads DAT_00508774 * 0.016. The recovered outer task
+        // loop calls 0x421050 before incrementing DAT_00508774, so this
+        // callback observes the current pre-increment fixed-step count.
+        // Preserve the timestamp latch write; the requested backend vtable
+        // +0x3C call still has no session-owned target/backend implementation.
+        const auto timestamp_bits = body_word(0xeccU);
+        pcar_timestamp_backend_callback_requested = false;
+        if (timestamp_bits.has_value()) {
+            const auto timestamp = viper::update_pcar_timestamp(
+                *timestamp_bits, pcar_callback_globals.gate_0x509360,
+                static_cast<float>(physics_step_count) * 0.016F);
+            pcar_timestamp_backend_callback_requested =
+                timestamp.request_backend_callback;
+            const viper::NcarObjectFieldWrite timestamp_write{
+                0xeccU, 4U, timestamp.timestamp_bits_0xecc};
+            if (!viper::apply_ncar_body_object_writes(
+                    player_runtime_state.body_object,
+                    std::span<const viper::NcarObjectFieldWrite>(
+                        &timestamp_write, 1U))) return false;
+        }
+
         // Preserve the native shared-global getter stores that precede the
         // late callback tail: 0x43BA00 -> +0x4F0 (float), then 0x43BA20
         // -> +0x4EC (byte). The earlier 0x434A80 and 0x43B880 effects are
@@ -3338,6 +3360,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_body_0x630,pcar_body_0x7d4"
               << ",pcar_body_0x978,pcar_body_0xb1c"
               << ",pcar_body_0x4f0,pcar_body_0x4ec"
+              << ",pcar_body_0xecc,pcar_timestamp_backend_callback_requested"
               << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier"
               << ",physics_steps_scheduled,physics_step_count"
               << ",pcar_callback_step_count"
@@ -3517,6 +3540,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 if (shared_byte_cache.has_value())
                     trace << ',' << static_cast<unsigned>(*shared_byte_cache);
                 else trace << ',';
+                const auto timestamp_cache = viper::read_ncar_body_object_u32(
+                    state.player_runtime_state.body_object, 0xeccU);
+                if (timestamp_cache.has_value())
+                    trace << ',' << std::bit_cast<float>(*timestamp_cache);
+                else trace << ',';
+                trace << ',' << state.pcar_timestamp_backend_callback_requested;
                 trace << ',' << state.pcar_callback_globals.gate_0x5093fc;
                 trace << ',' << state.player_pcar_callback_result
                     .callback_multiplier.value;

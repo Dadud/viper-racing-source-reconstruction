@@ -46,6 +46,28 @@ int main()
         return EXIT_FAILURE;
     }
 
+    const auto timestamp_clear = viper::update_pcar_timestamp(
+        0x3f800000U, false, 0.064F);
+    const auto timestamp_first = viper::update_pcar_timestamp(
+        0U, true, 0.064F);
+    const auto timestamp_recent = viper::update_pcar_timestamp(
+        std::bit_cast<std::uint32_t>(0.05F), true, 0.14F);
+    const auto timestamp_expired = viper::update_pcar_timestamp(
+        std::bit_cast<std::uint32_t>(0.05F), true, 0.2F);
+    if (timestamp_clear.timestamp_bits_0xecc != 0U ||
+        timestamp_clear.request_backend_callback ||
+        timestamp_first.timestamp_bits_0xecc !=
+            std::bit_cast<std::uint32_t>(0.064F) ||
+        !timestamp_first.request_backend_callback ||
+        timestamp_recent.timestamp_bits_0xecc !=
+            std::bit_cast<std::uint32_t>(0.05F) ||
+        timestamp_recent.request_backend_callback ||
+        timestamp_expired.timestamp_bits_0xecc != 0x4CEB79A3U ||
+        timestamp_expired.request_backend_callback) {
+        std::cerr << "PCAR +0xECC timestamp latch did not preserve its gate, callback request, and expiry transitions.\n";
+        return EXIT_FAILURE;
+    }
+
     viper::PcarCallbackGlobals globals{};
     globals.value_0x5093f4 = 0.5F;
     globals.value_0x509320 = 0.4F;

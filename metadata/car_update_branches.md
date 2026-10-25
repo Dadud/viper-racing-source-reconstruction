@@ -229,6 +229,21 @@ virtual itself is outside the model. Both paths continue through
 `0x434A80` and `0x43B880`, then cache values from `0x43BA00` and `0x43BA20` at
 `+0x4F0` and `+0x4EC`.
 
+The runtime's fixed-step phase is now checked against the outer dispatcher:
+`0x4207C0` calls the ordered `0x421050` task dispatcher and increments
+`DAT_00508774` only after that dispatch returns; `0x425790` returns
+`DAT_00508774 * 0.016`. Therefore the PCAR callback uses the current
+pre-increment task tick, matching the live session's `physics_step_count` at
+the bound PCAR entry. The runtime conditionally applies the recovered
+`+0xECC` latch transition only if that DWORD is initialized in its byte-backed
+body. The current constructor projection leaves it unknown, so production
+traces keep it blank and do not issue the backend `+0x3C` request. The latch
+model is covered for gate-clear, first-call, recent, and expired cases; this
+does not resolve the byte's producer or the backend behavior. Evidence:
+dispatcher `ev_fe4426a5bcbb23c30fad316f8eaeef291572c55b46ff256eb471d7f73ab37065`,
+ordered dispatcher `ev_fe23f6aa4f139a225258e4e3840980edb75f9054efbcb99f578d1c8659715581`,
+and time helper `ev_0a58326f5d24a379708f32a4362f904394176e74a0f11e0033471e13c34ec0bf`.
+
 When byte `+0xC3D` is set and the signed dword at `+0xC7C` is below
 `0x3C23D70A`, `0x4402D0` is called with `this+0xBFC`; it sets subobject byte
 `+0x40` to 1 when subobject byte `+0x41` is nonzero, which writes parent byte

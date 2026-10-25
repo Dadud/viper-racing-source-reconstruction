@@ -54,6 +54,10 @@ try {
     $pcarTaskIndex = [Array]::IndexOf($header, 'pcar_callback_task_stream_index')
     $pcarTaskDispatchIndex = [Array]::IndexOf(
         $header, 'pcar_task_projection_dispatch_steps')
+    $pcarTimestampIndex = [Array]::IndexOf($header, 'pcar_body_0xecc')
+    $pcarTimestampBackendIndex = [Array]::IndexOf(
+        $header, 'pcar_timestamp_backend_callback_requested')
+    $pcarTimestampGateIndex = [Array]::IndexOf($header, 'control_0x509360')
     $physicsTimeIndex = [Array]::IndexOf($header, 'physics_simulation_time')
     $sharedFloatSourceIndex = [Array]::IndexOf($header, 'control_0x509344')
     $sharedByteSourceIndex = [Array]::IndexOf($header, 'control_0x509420')
@@ -63,6 +67,8 @@ try {
         $pcarMultiplierIndex -lt 0 -or $physicsStepsIndex -lt 0 -or
         $physicsTickIndex -lt 0 -or $pcarCallbackTickIndex -lt 0 -or
         $pcarTaskIndex -lt 0 -or $pcarTaskDispatchIndex -lt 0 -or
+        $pcarTimestampIndex -lt 0 -or $pcarTimestampBackendIndex -lt 0 -or
+        $pcarTimestampGateIndex -lt 0 -or
         $physicsTimeIndex -lt 0 -or $sharedFloatSourceIndex -lt 0 -or
         $sharedByteSourceIndex -lt 0 -or $sharedFloatCacheIndex -lt 0 -or
         $sharedByteCacheIndex -lt 0) {
@@ -71,6 +77,7 @@ try {
     $observedPcarBodyState = $false
     $observedConfiguredPcarMultiplier = $false
     $observedPhysicsStep = $false
+    $observedPcarTimestamp = $false
     $previousPhysicsTick = -1
     for ($index = 1; $index -lt $replayedLines.Count; ++$index) {
         if ($replayedLines[$index] -cne $repeatedLines[$index]) {
@@ -112,6 +119,10 @@ try {
             [cultureinfo]::InvariantCulture)
         $pcarTaskDispatchSteps = [int]::Parse($fields[$pcarTaskDispatchIndex],
             [cultureinfo]::InvariantCulture)
+        $pcarTimestampBackendRequested = [int]::Parse(
+            $fields[$pcarTimestampBackendIndex], [cultureinfo]::InvariantCulture)
+        $pcarTimestampGate = [int]::Parse(
+            $fields[$pcarTimestampGateIndex], [cultureinfo]::InvariantCulture)
         $physicsTime = [single]::Parse($fields[$physicsTimeIndex],
             [cultureinfo]::InvariantCulture)
         if ($scheduledSteps -lt 0 -or $scheduledSteps -gt 2 -or
@@ -123,6 +134,28 @@ try {
             throw "Fixed-step clock, PCAR task binding, or callback cadence is inconsistent at frame $($index - 1)"
         }
         if ($physicsTick -gt 0) { $observedPhysicsStep = $true }
+        if ($scheduledSteps -gt 0) {
+            if ($pcarTimestampBackendRequested -ne 0 -and
+                $pcarTimestampBackendRequested -ne 1) {
+                throw "PCAR timestamp latch violated its initialized gate at frame $($index - 1)"
+            }
+            if ([string]::IsNullOrEmpty($fields[$pcarTimestampIndex])) {
+                if ($pcarTimestampBackendRequested -ne 0) {
+                    throw "PCAR requested the timestamp backend without an initialized +0xECC field at frame $($index - 1)"
+                }
+            } else {
+                $pcarTimestamp = [single]::Parse(
+                    $fields[$pcarTimestampIndex], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($pcarTimestamp) -or
+                    [single]::IsInfinity($pcarTimestamp) -or
+                    ($pcarTimestampBackendRequested -eq 1 -and
+                        $pcarTimestampGate -eq 0) -or
+                    ($pcarTimestampGate -eq 0 -and $pcarTimestamp -ne 0.0)) {
+                    throw "PCAR timestamp latch violated its initialized gate at frame $($index - 1)"
+                }
+            }
+            $observedPcarTimestamp = $true
+        }
         $previousPhysicsTick = $physicsTick
         for ($field = 0; $field -lt 4; ++$field) {
             if ([string]::IsNullOrEmpty($fields[$pcarBodyStart + $field])) { continue }
@@ -141,6 +174,9 @@ try {
     }
     if (-not $observedPhysicsStep) {
         throw 'Trace playback did not advance the recovered fixed-step clock'
+    }
+    if (-not $observedPcarTimestamp) {
+        throw 'Trace playback did not record the PCAR timestamp boundary on a callback step'
     }
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }
