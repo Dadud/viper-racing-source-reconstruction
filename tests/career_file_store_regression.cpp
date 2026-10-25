@@ -43,6 +43,47 @@ int main()
     const auto missing = viper::load_career_slot(root, 0);
     check(missing.file.status == viper::CareerFileLoadStatus::open_failed,
         "reports a missing slot as an open failure");
+
+    const std::array<std::uint8_t, 6> player_name{'A', 'l', 'e', 'x', 0, 0};
+    const auto created = viper::create_career_slot(
+        root, 0,
+        std::span<const std::uint8_t>(player_name.data(), player_name.size() - 1),
+        0x12345678U, 0x5aU);
+    check(created.saved, "creates and persists a native initialized career slot");
+    const auto created_load = viper::load_career_slot(root, 0);
+    check(created_load.file.returns_success,
+        "newly created career slot reloads through native validation");
+    if (created_load.file.returns_success) {
+        const auto& created_payload = created_load.file.decoded_payload;
+        const auto read_u32 = [&created_payload](const std::size_t offset) {
+            return static_cast<std::uint32_t>(created_payload[offset]) |
+                (static_cast<std::uint32_t>(created_payload[offset + 1]) << 8U) |
+                (static_cast<std::uint32_t>(created_payload[offset + 2]) << 16U) |
+                (static_cast<std::uint32_t>(created_payload[offset + 3]) << 24U);
+        };
+        check(created_payload[0] == 'A' && created_payload[1] == 'l' &&
+            created_payload[2] == 'e' && created_payload[3] == 'x' &&
+            created_payload[4] == 0,
+            "created payload retains the NUL-terminated player name");
+        check(read_u32(0x10) == 0x12345678U && created_payload[0x14] == 0x5aU,
+            "created payload retains raw settings at their observed offsets");
+        check(created_payload[0x1c] == 1,
+            "created payload sets the observed initialized flag");
+        bool seeded_rows_match = true;
+        for (std::uint32_t row = 0; row < 8; ++row) {
+            seeded_rows_match = seeded_rows_match &&
+                read_u32(0x170 + row * 0x88) == row;
+        }
+        check(seeded_rows_match,
+            "created payload seeds all eight observed row indices");
+    }
+    const std::array<std::uint8_t, 2> unterminated_name{'N', 'o'};
+    const auto rejected_create = viper::create_career_slot(
+        root, 1, unterminated_name, 0, 0);
+    check(!rejected_create.saved && !std::filesystem::exists(
+        root / "career" / "career1.dat"),
+        "rejects an unterminated name without creating a slot file");
+
     std::vector<std::uint8_t> payload(viper::career_file_payload_size);
     for (std::size_t i = 0; i < payload.size(); ++i)
         payload[i] = static_cast<std::uint8_t>((i * 37U + 11U) & 0xffU);

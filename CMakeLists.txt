@@ -6,6 +6,13 @@ project(viper_racing_reconstruction
     LANGUAGES CXX
 )
 
+add_library(viper_network_session src/network_session.cpp)
+target_include_directories(viper_network_session PUBLIC include)
+target_compile_features(viper_network_session PUBLIC cxx_std_20)
+if(WIN32)
+    target_link_libraries(viper_network_session PUBLIC ws2_32)
+endif()
+
 add_library(viper_asset_catalog src/asset_catalog.cpp)
 target_include_directories(viper_asset_catalog PUBLIC include)
 target_compile_features(viper_asset_catalog PUBLIC cxx_std_20)
@@ -250,6 +257,9 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_network_session_regression tests/network_session_regression.cpp)
+    target_link_libraries(viper_network_session_regression PRIVATE viper_network_session)
+    add_test(NAME network_session_regression COMMAND viper_network_session_regression)
     add_executable(viper_vehicle_pair_registry_regression
         tests/vehicle_pair_registry_regression.cpp)
     target_link_libraries(viper_vehicle_pair_registry_regression PRIVATE

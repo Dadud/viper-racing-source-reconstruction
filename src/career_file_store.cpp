@@ -169,6 +169,30 @@ CareerSlotSaveResult save_career_slot(
     return result;
 }
 
+CareerSlotSaveResult create_career_slot(
+    const std::filesystem::path& config_directory, const int slot,
+    const std::span<const std::uint8_t> player_name_with_terminator,
+    const std::uint32_t raw_setting_at_0x10,
+    const std::uint8_t raw_setting_at_0x14)
+{
+    CareerSlotSaveResult result{};
+    try {
+        result.path = slot_path(config_directory, slot);
+    } catch (const std::exception& error) {
+        result.error = error.what();
+        return result;
+    }
+
+    const auto payload = make_new_career_payload(
+        player_name_with_terminator, raw_setting_at_0x10,
+        raw_setting_at_0x14);
+    if (!payload) {
+        result.error = "career player name must include a NUL terminator and fit the native payload";
+        return result;
+    }
+    return save_career_slot(config_directory, slot, *payload);
+}
+
 CareerSlotDeleteResult delete_career_slot(
     const std::filesystem::path& config_directory, const int slot)
 {
