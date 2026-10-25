@@ -232,11 +232,36 @@ the 32-byte model rows using XYZ at offsets 0/4/8, computes Euclidean distance,
 and replaces the current candidate only on a strict decrease. Equal-distance
 ties therefore retain the earliest vertex. The four selected pointers are
 passed in wheel order to `0x441C10`, whose subobjects advance by `0x1A4` bytes.
+This selection is gated by `DAT_0050878c`: `0x425870` returns that byte, and
+`0x433C00` substitutes the shared static zero vector at `0x508E80` for each
+wheel when the gate is clear. `0x425420` initializes the global from byte
+`param_1 + 0x24` of its 52-byte physics-options block (decompiler expression
+`param_1[9]`). `0x45B6B0` passes its session-options block at `param_1 + 0x32B`
+to that initializer after config loading. In the two frontend session
+constructors reached by `0x401460` (states 1 and 4), the shared session block
+is first zeroed by `0x45C5B0`; each constructor then explicitly writes zero to
+its stack byte `local_4`, which maps to `param_1 + 0x32B + 0x24`. Thus both
+observed standard frontend paths disable model-vertex anchors. A separate
+session setup path copies ten DWORDs from an indirect interface into this
+block, so the value is not established for every mode. The option's
+user-facing name remains unknown. The reconstruction's current standard race
+session now passes the observed disabled value for both player and AI wheel
+construction; other-mode values remain an explicit caller input.
+
+Evidence: `0x425420` `ev_12c695647221e53dece26052d3d7b84b933b06d1af01480a3434c290c15070c`;
+`0x45B6B0` `ev_4abfbb4c9991adc2ebb5fca15af5295b2be70722a167310868a0677fb71b030c`;
+frontend dispatch `0x401460` `ev_c7c18a9dcc426b9ff1eaaba54e5af0db5fe4b4bb0a49174a0b61231e91ec9e4d`;
+constructors `0x402AA0` `ev_9cc01f759388c9b0d13188f6adc39efa7c9c2a2a93595ffaf92d25eedd8f0b71`
+and `0x402BE0` `ev_d27099cd9321404cbb86a6c0b51995dc966c7461fa4e1bedf02d6860f1780bbd`;
+zero initialization `0x45C5B0` `ev_f687535aeff249913ec3344367831ed6fcf2bca54e46c529c02ba3acdd99db9a`;
+alternate session copy `0x40A230` `ev_fc90b637c18db8a674655d716f90da0301591c46bf5aab0d5f4da4aba24ba8bf`.
 
 `select_ncar_wheel_vertex_anchors` reconstructs these formulas and scan using
 the three mapped runtime fields and parsed model-space XYZ positions. It leaves
-an index unset for an empty mesh. This is setup geometry only: it does not
-establish a body pose, suspension travel, contact state, or a live physics step.
+an index unset for an empty mesh when the vertex gate is enabled; when disabled,
+it records the shared-zero source and anchor value without a model index. This
+is setup geometry only: it does not establish a body pose, suspension travel,
+contact state, or a live physics step.
 `select_ncar_wheel_vertex_anchors_from_runtime_record` reads the three
 little-endian mapped fields from a bounded record and consumes parsed FNIM rows
 directly; it rejects records shorter than the last required DWORD.

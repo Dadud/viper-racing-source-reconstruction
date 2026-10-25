@@ -469,6 +469,12 @@ NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
     for (std::size_t wheel = 0; wheel < result.candidate_positions.size(); ++wheel) {
         const auto z = axle_z[wheel < 2U ? 0U : 1U];
         result.candidate_positions[wheel] = {x[wheel], y, z};
+        if (!input.model_vertex_anchor_enabled) {
+            result.sources[wheel] = NcarWheelAnchorSource::shared_zero_vector;
+            result.selected_anchor_positions[wheel] = {0.0F, 0.0F, 0.0F};
+            continue;
+        }
+        result.sources[wheel] = NcarWheelAnchorSource::model_vertex;
         float nearest_distance = 100000.0F;
         for (std::size_t vertex = 0; vertex < input.model_vertices.size(); ++vertex) {
             const auto& point = input.model_vertices[vertex].fields;
@@ -482,6 +488,12 @@ NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
             }
         }
         result.nearest_distances[wheel] = nearest_distance;
+        if (result.vertex_indices[wheel].has_value()) {
+            const auto& selected = input.model_vertices[
+                *result.vertex_indices[wheel]].fields;
+            result.selected_anchor_positions[wheel] = {
+                selected[0], selected[1], selected[2]};
+        }
     }
     return result;
 }
@@ -489,7 +501,8 @@ NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
 std::optional<NcarWheelVertexAnchorResult>
 select_ncar_wheel_vertex_anchors_from_runtime_record(
     const std::span<const std::byte> runtime_record,
-    const std::span<const ModelVertex> model_vertices) noexcept
+    const std::span<const ModelVertex> model_vertices,
+    const bool model_vertex_anchor_enabled) noexcept
 {
     constexpr std::size_t width_offset = 0x58U;
     constexpr std::size_t ratio_offset = 0x5cU;
@@ -507,7 +520,7 @@ select_ncar_wheel_vertex_anchors_from_runtime_record(
     };
     return select_ncar_wheel_vertex_anchors({
         read_float(width_offset), read_float(ratio_offset),
-        read_float(body_offset), model_vertices});
+        read_float(body_offset), model_vertex_anchor_enabled, model_vertices});
 }
 
 std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
@@ -633,16 +646,19 @@ NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
 {
     NcarFourWheelCoreInitialization result{};
     const auto anchors = select_ncar_wheel_vertex_anchors_from_runtime_record(
-        input.runtime_record, input.model_vertices);
+        input.runtime_record, input.model_vertices,
+        input.model_vertex_anchor_enabled);
     if (!anchors.has_value()) return result;
     result.anchors = *anchors;
     for (std::size_t wheel = 0; wheel < result.wheels.size(); ++wheel) {
         const auto vertex_index = result.anchors.vertex_indices[wheel];
-        if (!vertex_index.has_value()) return result;
-        const auto& vertex = input.model_vertices[*vertex_index].fields;
+        if (result.anchors.sources[wheel] ==
+                NcarWheelAnchorSource::model_vertex &&
+            !vertex_index.has_value()) return result;
+        const auto& vertex = result.anchors.selected_anchor_positions[wheel];
         result.wheels[wheel] = initialize_ncar_wheel_core({
             input.runtime_record, wheel,
-            {vertex[0], vertex[1], vertex[2]},
+            vertex,
             input.body_mass_scale_0x1f0,
             input.fdiv_compatibility_enabled});
         if (!result.wheels[wheel].has_value()) return result;

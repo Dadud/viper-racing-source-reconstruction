@@ -529,6 +529,36 @@ int main()
         }
         require(anchors->vertex_indices[0] == 0U,
             "strict nearest-distance comparison must keep the first tied model vertex");
+        const auto zero_source_anchors =
+            viper::select_ncar_wheel_vertex_anchors_from_runtime_record(
+                anchor_record, anchor_vertices, false);
+        require(zero_source_anchors.has_value() &&
+                std::all_of(zero_source_anchors->sources.begin(),
+                    zero_source_anchors->sources.end(),
+                    [](const auto source) {
+                        return source == viper::NcarWheelAnchorSource::shared_zero_vector;
+                    }) &&
+                std::all_of(zero_source_anchors->selected_anchor_positions.begin(),
+                    zero_source_anchors->selected_anchor_positions.end(),
+                    [](const auto& point) {
+                        return point == std::array<float, 3>{0.0F, 0.0F, 0.0F};
+                    }) &&
+                std::all_of(zero_source_anchors->vertex_indices.begin(),
+                    zero_source_anchors->vertex_indices.end(),
+                    [](const auto& index) { return !index.has_value(); }),
+            "disabled option must retain the shared-zero source for each wheel");
+        const auto zero_source_four_wheels =
+            viper::initialize_ncar_four_wheel_core({
+                anchor_record, anchor_vertices, 0.5F, false, false});
+        require(zero_source_four_wheels.input_complete &&
+                std::all_of(zero_source_four_wheels.wheels.begin(),
+                    zero_source_four_wheels.wheels.end(),
+                    [](const auto& wheel) {
+                        return wheel.has_value() &&
+                            wheel->selected_model_vertex ==
+                                std::array<float, 3>{0.0F, 0.0F, 0.0F};
+                    }),
+            "four-wheel initialization must consume the shared-zero source without FNIM indices");
         const auto four_wheels = viper::initialize_ncar_four_wheel_core({
             anchor_record, anchor_vertices, 0.5F, false});
         require(four_wheels.input_complete &&

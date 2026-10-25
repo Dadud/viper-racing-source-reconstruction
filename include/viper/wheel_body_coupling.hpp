@@ -581,17 +581,27 @@ struct NcarWheelVertexAnchorInput {
     float source_width_0x58{};
     float source_ratio_0x5c{};
     float source_offset_0x128{};
+    // Physics-options byte copied by 0x425420 from param_1 + 0x24 and
+    // queried by 0x425870 before the constructor selects the model vertex.
+    bool model_vertex_anchor_enabled{true};
     std::span<const ModelVertex> model_vertices;
+};
+
+enum class NcarWheelAnchorSource : std::uint8_t {
+    model_vertex,
+    shared_zero_vector
 };
 
 struct NcarWheelVertexAnchorResult {
     std::array<std::array<float, 3>, 4> candidate_positions{};
     std::array<std::optional<std::size_t>, 4> vertex_indices{};
     std::array<float, 4> nearest_distances{};
+    std::array<NcarWheelAnchorSource, 4> sources{};
+    std::array<std::array<float, 3>, 4> selected_anchor_positions{};
 };
 
-// Reconstructs the four candidate-point formulas and strict nearest-vertex
-// scan in NCAR constructor 0x433C00. Empty vertex spans leave indices unset.
+// Reconstructs the constructor's option-gated source selection and strict
+// nearest-vertex scan. A disabled gate selects the shared zero vector.
 [[nodiscard]] NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
     const NcarWheelVertexAnchorInput& input) noexcept;
 
@@ -600,7 +610,8 @@ struct NcarWheelVertexAnchorResult {
 [[nodiscard]] std::optional<NcarWheelVertexAnchorResult>
 select_ncar_wheel_vertex_anchors_from_runtime_record(
     std::span<const std::byte> runtime_record,
-    std::span<const ModelVertex> model_vertices) noexcept;
+    std::span<const ModelVertex> model_vertices,
+    bool model_vertex_anchor_enabled = true) noexcept;
 
 struct NcarWheelCoreInitializationInput {
     std::span<const std::byte> runtime_record;
@@ -650,6 +661,8 @@ struct NcarFourWheelCoreInitializationInput {
     // Car-object +0x1F0, set by the observed NCAR body initializer.
     float body_mass_scale_0x1f0{};
     bool fdiv_compatibility_enabled{};
+    // Resolved byte copied by the game into DAT_0050878c before 0x433C00.
+    bool model_vertex_anchor_enabled{true};
 };
 
 struct NcarFourWheelCoreInitialization {

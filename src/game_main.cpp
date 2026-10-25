@@ -2170,7 +2170,8 @@ struct WindowState {
             viper::initialize_ncar_four_wheel_core({
                 player_runtime_car_record, model_vertices,
                 player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0],
-                host_fdiv_compatibility});
+                host_fdiv_compatibility,
+                false}); // standard frontend session initializes param+0xCD0 to zero
         if (!player_wheel_core_initialization->input_complete) {
             player_runtime_car_record.clear();
             player_body_constructor_plan.reset();
@@ -3832,7 +3833,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     body_state.wheel_core_initialization =
                         viper::initialize_ncar_four_wheel_core({
                             record_bytes, ai_model.vertices,
-                            body_plan.scaled_dimensions_0x1f0_to_0x1fc[0], false});
+                            body_plan.scaled_dimensions_0x1f0_to_0x1fc[0], false,
+                            false}); // same session-wide physics-options byte as player
                     if (!body_state.wheel_core_initialization->input_complete) {
                         stream_ok = false;
                         break;
