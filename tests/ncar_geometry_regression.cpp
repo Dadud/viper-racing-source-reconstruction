@@ -86,6 +86,9 @@ int main()
                 body_runtime_state.initialized_bytes[0x234U] != 0U &&
                 body_runtime_state.initialized_bytes[0x50cU] == 0U,
             "body constructor state must preserve initialized pose/velocity while leaving runtime-only fields unknown");
+        require(viper::read_ncar_body_object_u32(body_runtime_state, 0x234U) == 0U &&
+                !viper::read_ncar_body_object_u32(body_runtime_state, 0x50cU),
+            "body reads must expose initialized velocity but keep unwritten derived state unknown");
         const std::array<viper::NcarObjectFieldWrite, 2> pcar_derived_writes{{
             {0x50cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
             {0x00U, 4U, 0x004c8188U},
@@ -96,6 +99,26 @@ int main()
                 read_body_dword(0x50cU) == std::bit_cast<std::uint32_t>(1.0F) &&
                 body_runtime_state.initialized_bytes[0x50cU] != 0U,
             "derived PCAR constructor stores must update the same persistent object");
+        const std::array<viper::NcarObjectFieldWrite, 4> pcar_scalar_writes{{
+            {0xde0U, 4U, std::bit_cast<std::uint32_t>(0.25F)},
+            {0xde4U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+            {0xde8U, 4U, std::bit_cast<std::uint32_t>(0.75F)},
+            {0xdecU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        }};
+        require(viper::apply_ncar_body_object_writes(
+                    body_runtime_state, pcar_scalar_writes) &&
+                viper::read_ncar_body_object_u32(body_runtime_state, 0xde0U) ==
+                    std::bit_cast<std::uint32_t>(0.25F) &&
+                viper::read_ncar_body_object_u32(body_runtime_state, 0xde4U) ==
+                    std::bit_cast<std::uint32_t>(0.5F) &&
+                viper::read_ncar_body_object_u32(body_runtime_state, 0xde8U) ==
+                    std::bit_cast<std::uint32_t>(0.75F) &&
+                viper::read_ncar_body_object_u32(body_runtime_state, 0xdecU) ==
+                    std::bit_cast<std::uint32_t>(1.0F),
+            "PCAR callback scalar outputs must persist in the byte-backed body object");
+        require(!viper::read_ncar_body_object_u32(body_runtime_state,
+                    static_cast<std::uint32_t>(viper::ncar_body_runtime_object_bytes)),
+            "body reads must reject out-of-bounds offsets");
         const auto prior_body_bytes = body_runtime_state.bytes;
         const auto prior_body_mask = body_runtime_state.initialized_bytes;
         const std::array<viper::NcarObjectFieldWrite, 1> invalid_body_write{{

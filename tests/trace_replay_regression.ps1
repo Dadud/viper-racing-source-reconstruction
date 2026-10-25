@@ -42,6 +42,13 @@ try {
     }
     $observedThrottle = $false
     $observedSteering = $false
+    $header = $replayedLines[0].Split(',')
+    $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
+    $pcarBodyStart = [Array]::IndexOf($header, 'pcar_body_0xde0')
+    if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0) {
+        throw 'Trace is missing PCAR prefix or byte-backed body fields'
+    }
+    $observedPcarBodyState = $false
     for ($index = 1; $index -lt $replayedLines.Count; ++$index) {
         if ($replayedLines[$index] -cne $repeatedLines[$index]) {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
@@ -54,6 +61,17 @@ try {
                 $fields[10], [cultureinfo]::InvariantCulture)) -gt 0) {
             $observedSteering = $true
         }
+        for ($field = 0; $field -lt 4; ++$field) {
+            if ([string]::IsNullOrEmpty($fields[$pcarBodyStart + $field])) { continue }
+            if ($fields[$pcarPrefixStart + $field] -cne
+                    $fields[$pcarBodyStart + $field]) {
+                throw "PCAR callback scalar $field differs from its persistent body bytes at frame $($index - 1)"
+            }
+            $observedPcarBodyState = $true
+        }
+    }
+    if (-not $observedPcarBodyState) {
+        throw 'No trace frame recorded the materialized PCAR body scalar fields'
     }
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }

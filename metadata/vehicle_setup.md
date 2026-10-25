@@ -665,7 +665,10 @@ writer belongs to the separate GCAR GhostBegin playback ring and is not the
 player's live ring. These per-frame effects are modeled, and the runtime now
 stores the known shared-constructor body bytes, PCAR vtable/initial `+0x50C`,
 settings-derived shift/clutch/yaw bytes, and per-wheel traction/ABS stores in
-persistent byte-backed state. It still does not dispatch the PCAR callback or
+persistent byte-backed state. Each race update also writes the modeled opening
+PCAR scalar stores at `+0xDE0..+0xDEC` to the body, and traces those bytes;
+the `0x40D270` multiplier remains the explicit startup fallback `1.0`. It
+still does not dispatch the PCAR callback or
 own its mutable frame transitions, callback inputs, and live wheel-history
 producer. Consequently, wheel `+0x158` remains
 unavailable to live suspension and must not be guessed from constructor state.

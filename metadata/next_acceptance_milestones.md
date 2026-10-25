@@ -115,7 +115,11 @@ The production session stores the shared body constructor's position, basis,
 dimensions, inertia matrices, velocity/accumulator clears, derived PCAR
 constructor vtable/`+0x50C`, and settings-derived shift/clutch/yaw plus wheel
 traction/ABS fields in persistent byte-backed body/wheel objects with
-initialized-byte masks. It still does not dispatch native PCAR callback
+initialized-byte masks. On each race update, the modeled callback's opening
+`+0xDE0/+0xDE4/+0xDE8/+0xDEC` scalar stores are now written into that same
+body owner and traced alongside their modeled values; the current multiplier
+remains the explicit `0x40D270 = 1.0` startup fallback. This does not execute
+the callback or its smoother branch. It still does not dispatch native PCAR callback
 `0x4384D0` or execute shared integrator `0x431150`; it lacks their runtime
 body, timer, table, and callback transitions. Two constructor inputs also
 remain unresolved: `+0x4F4` copies global `0x508794`, set from the physics

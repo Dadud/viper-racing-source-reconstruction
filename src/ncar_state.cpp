@@ -2321,6 +2321,24 @@ bool apply_ncar_body_object_writes(
     return true;
 }
 
+std::optional<std::uint32_t> read_ncar_body_object_u32(
+    const NcarBodyRuntimeObjectState& source,
+    const std::uint32_t offset) noexcept
+{
+    if (static_cast<std::uint64_t>(offset) + sizeof(std::uint32_t) >
+        ncar_body_runtime_object_bytes) {
+        return std::nullopt;
+    }
+    const auto start = static_cast<std::size_t>(offset);
+    std::uint32_t value{};
+    for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+        if (source.initialized_bytes[start + byte] == 0U) return std::nullopt;
+        value |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+            source.bytes[start + byte])) << (byte * 8U);
+    }
+    return value;
+}
+
 bool materialize_ncar_body_constructor(
     NcarBodyRuntimeObjectState& destination,
     const NcarBodyConstructorPlan& plan) noexcept

@@ -281,6 +281,12 @@ struct NcarBodyRuntimeObjectState {
     NcarBodyRuntimeObjectState& destination,
     std::span<const NcarObjectFieldWrite> writes) noexcept;
 
+// Reads one little-endian DWORD only when all four bytes have an observed
+// initialization/write owner. Unknown native storage remains unavailable.
+[[nodiscard]] std::optional<std::uint32_t> read_ncar_body_object_u32(
+    const NcarBodyRuntimeObjectState& source,
+    std::uint32_t offset) noexcept;
+
 // Materializes the shared 0x43E490 body constructor's known direct writes,
 // derived dimensions/matrices, subobject initialization and finalizer stores.
 // It does not apply a derived PCAR/NCAR constructor or initialize unknown

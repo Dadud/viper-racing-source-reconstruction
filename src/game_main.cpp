@@ -1958,7 +1958,7 @@ struct WindowState {
     bool advance(float delta_seconds, const bool update_graphics = true)
     {
         if (route.size() < 2U || terrain == nullptr) return false;
-        update_native_control_state(delta_seconds);
+        if (!update_native_control_state(delta_seconds)) return false;
         auto candidate_motion = motion;
         const auto route_result = viper::advance_route_motion(candidate_motion, route,
             left, right, accelerate, brake, delta_seconds, target_laps);
@@ -2011,7 +2011,7 @@ struct WindowState {
         return true;
     }
 
-    void update_native_control_state(const float delta_seconds)
+    bool update_native_control_state(const float delta_seconds)
     {
         viper::RaceLoop43B290Observation observation{};
         observation.simulation_delta = delta_seconds;
@@ -2080,6 +2080,20 @@ struct WindowState {
             control_update_state.controls.flag_0x509420 != 0U;
         viper::update_pcar_callback_scalar_prefix(
             player_pcar_control_prefix, pcar_callback_globals, 1.0F);
+        const std::array<viper::NcarObjectFieldWrite, 4> pcar_callback_scalar_writes{{
+            {0xde0U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xde0)},
+            {0xde4U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xde4)},
+            {0xde8U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xde8)},
+            {0xdecU, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xdec)},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, pcar_callback_scalar_writes)) {
+            return false;
+        }
 
         // The current route motion model accepts digital inputs. Preserve the
         // recovered analog values in session state and trace; this threshold
@@ -2088,6 +2102,7 @@ struct WindowState {
         right = control_update_state.steering.value_0x509358 > 0.2F;
         accelerate = control_update_state.analog_0x5093f4.value > 0.2F;
         brake = control_update_state.analog_0x509320.value > 0.2F;
+        return true;
     }
 
     bool results_ready() const noexcept
@@ -2478,7 +2493,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_prefix_0xde0,pcar_prefix_0xde4"
               << ",pcar_prefix_0xde8,pcar_prefix_0xdec"
               << ",pcar_traction_control,pcar_abs_braking"
-              << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control";
+              << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control"
+              << ",pcar_body_0xde0,pcar_body_0xde4"
+              << ",pcar_body_0xde8,pcar_body_0xdec";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2586,6 +2603,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.player_pcar_constructor_controls.auto_shifting
                       << ',' << state.player_pcar_constructor_controls.auto_clutch_0x534
                       << ',' << state.player_pcar_constructor_controls.yaw_control;
+                for (const auto offset : {0xde0U, 0xde4U, 0xde8U, 0xdecU}) {
+                    const auto bits = viper::read_ncar_body_object_u32(
+                        state.player_runtime_state.body_object, offset);
+                    if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
+                    else trace << ',';
+                }
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";
