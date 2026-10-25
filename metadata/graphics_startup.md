@@ -47,3 +47,19 @@ Evidence:
 - `0x44EE00` callback bytes: `ev_83ced40ae522b925b9aa5519d3612ade5290e2c2aebae303af1304cc029a4ba9`
 - `0x458470`: `ev_9665ed7bfb7c711d15f2d19e30313017cae5cd70c8d2de5dc7b7b04c2314d542`
 - `0x458D60`: `ev_911568a9e79753d182e2e1c1fbd2ef053ac328ddae00b0334aa3da6d00c83bfb`
+
+## Controlled original-client failure capture
+
+The private run `../../analysis/reference_captures/original_primary_adapter_20261025T022451Z.json`
+uses the recovered `-1` primary-adapter switch, a temporary hash-verified
+`Data` junction, and the original ISO mounted as `VIPER`. The launcher passes
+its data/CD checks and starts `race.bin`, then presents the generic video-card
+error before gameplay. The dialog localizes the failure only to the graphics
+startup path (`0x44E080` calling `0x44E460`); it does not reveal whether
+DirectDraw creation, DirectDraw2 QI/capability checks, required 640x480 mode
+enumeration, or exclusive-mode setup failed. A sibling 408x149 screenshot is
+kept outside the repository. Pre/post artifact/data hashes match, and the
+temporary links and mount were removed. The prior `-no3dfx` launch argument is
+not recognized by the recovered command-line parser and should not be treated
+as a valid bypass test. A 32-bit API trace is required to identify the failing
+DirectDraw boundary before another workaround is selected.

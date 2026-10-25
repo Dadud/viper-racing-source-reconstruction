@@ -15,13 +15,23 @@ they do not constitute a gameplay comparison or replace the paired playable
 scenario below.
 
 A private original-client startup attempt is recorded at
-`../analysis/reference_captures/original_graphics_failure.json`. The extracted
-local layout was adapted temporarily to the launcher's expected `Data` path;
-the client passed its data/CD checks but stopped during graphics initialization
-with its own video-driver error dialog, including when started with `-no3dfx`.
-The capture includes the window image, artifact/data hashes, launch setup, and
-host OS details. This is a measured startup failure, not a paired gameplay
-capture; gameplay behavior remains unverified against the original.
+`../analysis/reference_captures/original_graphics_failure.json`. Its
+`-no3dfx` argument is not valid evidence for a graphics workaround: the
+recovered command-line parser does not recognize that switch. A controlled
+retry with the documented `-1` primary-adapter switch is recorded at
+`../../analysis/reference_captures/original_primary_adapter_20261025T022451Z.json`,
+with a 408x149 dialog screenshot beside it. The unmodified launcher passed its
+data/CD checks, started `race.bin`, then stopped before gameplay and displayed
+`Our Apologies`: `Your video card returned an error. Are your video drivers up
+to date?` The run used a temporary `Data` junction backed by hard links to all
+32 inputs, with the original ISO mounted as `VIPER`; pre/post hashes matched
+for the executable, engine, ISO, and staged data files, and the temporary
+setup was removed afterward. This establishes a reproducible startup failure
+with a recognized adapter-selection switch, not a paired gameplay capture.
+The dialog alone does not identify which DirectDraw call failed. A 32-bit
+trace of `DirectDrawCreate`, `QueryInterface`, mode enumeration (especially
+640x480), and exclusive-mode setup is the next probe needed to localize it.
+Gameplay behavior remains unverified against the original.
 
 ## Pairing a scenario
 
