@@ -466,9 +466,12 @@ instruction decoding confirmed the intended sites are `0x4430A0`, `0x4430B2`,
 `0x4430BE`, `0x4430D8`, and `0x443C04`, all inside `0x442530`. The script now
 uses those addresses, rejects any address outside the loaded image, stays armed
 through race navigation (up to 120 seconds), and detaches as soon as the eighth
-selected-PCAR integrator returns. Two earlier staged runs crashed in
-`frida-agent.dll` with `0xC0000409`; the invalid hook addresses are the likely
-cause, not a proven crash diagnosis.
+selected-PCAR integrator returns. Two earlier staged runs failed. Windows
+Application events later identified `frida-agent.dll` as the faulting module
+for affected `race.bin` processes, with exception `0xC0000409` (BEX). This
+establishes an instrumentation-agent crash for those logged processes; it does
+not establish why the agent failed. The invalid hook addresses are a plausible
+contributor, but the event records do not prove that diagnosis.
 
 A hash-verified staging tree launched the original ISO client into a Bemidji
 Quick Race. The capture used the same first-query, process-local
@@ -669,3 +672,26 @@ is diagnostic evidence only. Its JavaScript syntax and repository diff checks
 pass; it has not run because the current original process is at the
 startup-abort dialog. Static scan Evidence ID:
 `ev_91884f19b8507dbff17b2371fb583d90bd02e1970601c25ad3c3093a39bfc374`.
+
+### Windows crash-event correlation (2026-10-25)
+
+The Windows Application log contains repeated Event 1000/1001 reports for
+instrumented `race.bin` processes. The reports name the temporary
+`frida-agent.dll` as the faulting module and show exception `0xC0000409`,
+fault offset `0x00C0DF07`, and WER event name `BEX`. Two examples from the
+`wheel_history_probe_20261025` staged tree are Event 1000 at 09:11:19 with
+Report ID `e9b9a82b-dcb8-4603-b4df-c6a1c90edd80` and Event 1000 at 09:10:13
+with Report ID `14fe7530-b1af-42da-9416-fce76af64efa`; Event 1001 at the
+corresponding times records the same BEX signature. These logs show that
+Frida-agent failures explain those particular process crashes. They do not
+show the agent's internal failure cause, and they do not identify the cause
+for a separate Quick Race startup-abort capture unless process identity and
+time match one of these reports.
+
+Do not launch the Stalker-based wheel-field probe in the same capture setup
+until the instrumentation failure has a safer diagnosis or replacement. A
+search on this host did not find `cdb.exe`, `windbg.exe`, `windbgx.exe`, or
+`ntsd.exe` on PATH or in the checked Windows Kits / Visual Studio debugger
+locations. The next writer-capture attempt needs an available native debugger
+or a validated lower-overhead instrumentation plan; no original-game run was
+started for this correlation.
