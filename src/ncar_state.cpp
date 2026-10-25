@@ -2321,6 +2321,20 @@ bool apply_ncar_body_object_writes(
     return true;
 }
 
+bool copy_ncar_runtime_record_transform_to_body(
+    NcarBodyRuntimeObjectState& destination,
+    const std::array<float, 12>& transform) noexcept
+{
+    std::array<NcarObjectFieldWrite, 12> writes{};
+    for (std::size_t index = 0; index < transform.size(); ++index) {
+        writes[index] = {
+            static_cast<std::uint32_t>(0x38U + index * sizeof(std::uint32_t)),
+            static_cast<std::uint8_t>(sizeof(std::uint32_t)),
+            std::bit_cast<std::uint32_t>(transform[index])};
+    }
+    return apply_ncar_body_object_writes(destination, writes);
+}
+
 std::optional<std::uint32_t> read_ncar_body_object_u32(
     const NcarBodyRuntimeObjectState& source,
     const std::uint32_t offset) noexcept

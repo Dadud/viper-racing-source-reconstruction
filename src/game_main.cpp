@@ -1967,6 +1967,16 @@ struct WindowState {
             player_runtime_state = {};
             return false;
         }
+        // PCAR constructor helper 0x433C00 copies runtime-record +0x18..+0x44
+        // verbatim into body +0x38..+0x64 (basis followed by world position).
+        // Keep the same transform in the byte-backed body owner instead of
+        // leaving only the scene/render-side copy initialized.
+        if (!viper::copy_ncar_runtime_record_transform_to_body(
+                player_runtime_state.body_object,
+                player_runtime_state.placement_transform)) {
+            player_runtime_state = {};
+            return false;
+        }
         for (std::size_t wheel = 0; wheel < player_runtime_state
                 .initial_wheel_world_positions.size(); ++wheel) {
             const auto& core = player_wheel_core_initialization->wheels[wheel];

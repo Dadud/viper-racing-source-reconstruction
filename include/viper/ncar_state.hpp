@@ -281,6 +281,12 @@ struct NcarBodyRuntimeObjectState {
     NcarBodyRuntimeObjectState& destination,
     std::span<const NcarObjectFieldWrite> writes) noexcept;
 
+// Models the twelve-DWORD placement handoff in PCAR helper 0x433C00: the
+// runtime-record transform at +0x18..+0x44 is copied to body +0x38..+0x64.
+[[nodiscard]] bool copy_ncar_runtime_record_transform_to_body(
+    NcarBodyRuntimeObjectState& destination,
+    const std::array<float, 12>& transform) noexcept;
+
 // Reads one little-endian DWORD only when all four bytes have an observed
 // initialization/write owner. Unknown native storage remains unavailable.
 [[nodiscard]] std::optional<std::uint32_t> read_ncar_body_object_u32(

@@ -1360,6 +1360,27 @@ reconstructed, so runtime leaves `+0xD74` unknown. Evidence:
 
 ### Controlled PCAR shared-integrator state sample
 
+#### PCAR constructor placement-to-body copy (`0x433C00`)
+
+The missing initial pose handoff is a direct constructor copy. `0x42FF90`
+calls `0x433C00(this, runtime_record)` after the shared body constructor.
+`0x433C00` loops over 12 DWORDs from `runtime_record + 0x18` into body
+`+0x38..+0x64`: the row-major 3x3 basis followed by the three position floats.
+No axis conversion or route-derived reconstruction occurs in this copy. The
+runtime's validated `CarTrackConstructionPlan::transform` is the same 12-float
+payload used to build runtime-record `+0x18`, so `WindowState` now applies this
+exact copy to its persistent `NcarBodyRuntimeObjectState` byte owner. This
+connects constructor pose state only; `advance_route_motion` still controls
+the live player and renderer, and the native body integrator is not connected.
+
+Evidence: `0x42FF90`
+`ev_188f23266930a8dddb21b4d48cc3f890b1c8ef3c31663ffc607bcccc229a5f96` calls
+the helper; `0x433C00`
+`ev_7884fb79acfb26d4c7b0004cd2a1679669a9b097e9fd4e49a6650ec607b8731e` shows
+the exact 12-DWORD source and destination loop. A regression now checks every
+float bit pattern, basis/position ordering, and the untouched byte immediately
+after the copy.
+
 #### Second registration dispatch (`0x49C1F0`)
 
 Static Ghidra analysis shows `0x43DFB0` calls `0x49C1F0` during the derived

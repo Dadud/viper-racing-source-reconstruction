@@ -24,6 +24,13 @@ The player now owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
 and persistent contact outputs. This closes object-state materialization only;
 the live loop still does not consume those bytes as suspension inputs.
+The PCAR body owner now receives the exact initial pose copy performed by
+`0x433C00`: the twelve runtime-record floats at `+0x18..+0x44` go to body
+`+0x38..+0x64`. A focused regression checks exact bit ordering, and the
+separate Release validation build passed a Viper/Bemidji software smoke against
+the external asset installation. This initializes body bytes from the observed
+constructor handoff; the body integrator still does not advance them and the
+route prototype still owns player motion/render pose.
 The Win32 loop now uses the recovered `0.016` physics-task schedule and
 two-step catch-up cap to advance its current route/contact prototype, while
 sampling controls once per outer update and retaining the latest accepted
@@ -50,16 +57,18 @@ Three paired Frida snapshots at the original PCAR integrator entry/return prove
 that `0x431150` changes position and linear/angular velocity for a grounded
 near-stationary object (`metadata/car_update_branches.md`). The PCAR constructor
 receives the serialized record through the `0x463510` → `0x425720` → `0x422580`
-loader/factory path. Its base constructor initializes position to zero and a
-separate basis to `(0,0,1)`; the post-constructor loader only assigns the native
-ordinal. A runtime-resolved manager slot points to `0x43CA90`; its registrar
-stores the body pointer by ordinal and initializes sidecar state but does not
-copy placement into body pose. The second registration dispatch was traced to a
+loader/factory path. After base constructor defaults, the PCAR constructor
+helper `0x433C00` copies all twelve runtime transform floats from record
+`+0x18` into body basis and position `+0x38..+0x64`; the session now applies
+that exact mapping to its byte-backed body. A runtime-resolved manager slot
+points to `0x43CA90`; its registrar stores the body pointer by ordinal and
+initializes sidecar state but does not copy placement. The second registration dispatch was traced to a
 `LiveMultiInfo`/`Multiplayer` service context and is deferred to the multiplayer
 milestone; it does not explain single-player pose initialization. The later
-single-player runtime synchronization remains unresolved. This is evidence
-that native body state evolves, not a runtime integration or an input-driven
-baseline.
+per-step body integration and renderer consumption of body-owned pose remain
+unresolved. This is evidence that native body state evolves and initial
+placement now reaches session body bytes, not a runtime integration or an
+input-driven baseline.
 The session now also retains one ordered semantic task collection from the
 validated serialized stream: finite CHKP geometry and supported inactive STAT
 state are materialized, while other records remain explicit as unavailable

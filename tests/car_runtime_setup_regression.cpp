@@ -139,6 +139,26 @@ int main()
         require(offset_write != offset_plan.inherited_base_writes_0x4375c0.end() &&
                 offset_write->value_bits == 0x12345678U,
             "body base constructor must preserve the serialized object stream offset at +0x08");
+        const std::array<float, 12> placement_transform{
+            0.0F, -1.0F, 0.0F,
+            1.0F, 0.0F, 0.0F,
+            0.0F, 0.0F, 1.0F,
+            12.5F, 3.25F, -44.0F};
+        viper::NcarBodyRuntimeObjectState placed_body{};
+        require(viper::copy_ncar_runtime_record_transform_to_body(
+                    placed_body, placement_transform),
+            "PCAR 0x433C00 transform handoff must populate body state");
+        for (std::size_t index = 0; index < placement_transform.size(); ++index) {
+            const auto body_word = viper::read_ncar_body_object_u32(
+                placed_body, static_cast<std::uint32_t>(0x38U + index * 4U));
+            require(body_word.has_value() &&
+                    *body_word == std::bit_cast<std::uint32_t>(
+                        placement_transform[index]),
+                "0x433C00 must preserve all 12 runtime transform DWORDs in order");
+        }
+        require(viper::read_ncar_body_object_u32(placed_body, 0x68U) ==
+                    std::nullopt && placed_body.initialized_bytes[0x68U] == 0U,
+            "placement copy must stop after the three body-position DWORDs");
         const auto body_shift_write = std::find_if(
             preparation.mapping->writes.begin(), preparation.mapping->writes.end(),
             [](const viper::CarFileRuntimeFieldWrite& write) {
