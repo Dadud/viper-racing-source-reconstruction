@@ -879,6 +879,81 @@ materialize_inactive_stat_task_runtime_state(
     return result;
 }
 
+PhysicsCheckpointTaskRuntimeMaterialization
+materialize_checkpoint_task_runtime_state(
+    const std::span<const std::byte> record_bytes,
+    const std::size_t stream_record_index,
+    const std::uint32_t serialized_stream_cursor,
+    const bool fdiv_compatibility_enabled)
+{
+    PhysicsCheckpointTaskRuntimeMaterialization result{};
+    const auto read_u32 = [&](const std::size_t offset) {
+        return std::to_integer<std::uint32_t>(record_bytes[offset]) |
+            (std::to_integer<std::uint32_t>(record_bytes[offset + 1U]) << 8U) |
+            (std::to_integer<std::uint32_t>(record_bytes[offset + 2U]) << 16U) |
+            (std::to_integer<std::uint32_t>(record_bytes[offset + 3U]) << 24U);
+    };
+    if (record_bytes.size() != 0x20U || read_u32(0U) != 0x43484b50U ||
+        read_u32(4U) != record_bytes.size()) {
+        result.status =
+            PhysicsCheckpointTaskRuntimeMaterializationStatus::malformed_record;
+        return result;
+    }
+
+    PhysicsCheckpointTaskConstructorObservation observation{};
+    for (std::size_t axis = 0U; axis < observation.first_vertex.size(); ++axis) {
+        observation.first_vertex[axis] = std::bit_cast<float>(
+            read_u32(0x08U + axis * sizeof(std::uint32_t)));
+        observation.second_vertex[axis] = std::bit_cast<float>(
+            read_u32(0x14U + axis * sizeof(std::uint32_t)));
+        if (!std::isfinite(observation.first_vertex[axis]) ||
+            !std::isfinite(observation.second_vertex[axis])) {
+            result.status = PhysicsCheckpointTaskRuntimeMaterializationStatus::
+                non_finite_geometry;
+            return result;
+        }
+    }
+
+    // The serialized CHKP contains endpoints only. The shipped constructor
+    // derives its basis from them; it has no independent yaw input. The
+    // retained semantic collection supplies its own registration owner.
+    observation.yaw_degrees = 0.0F;
+    observation.fdiv_compatibility_enabled = fdiv_compatibility_enabled;
+    observation.constructor_backend_nonnull = true;
+    const auto constructor = plan_physics_checkpoint_task_constructor(observation);
+    if (constructor.status != PhysicsCheckpointTaskConstructorStatus::constructed) {
+        result.status =
+            PhysicsCheckpointTaskRuntimeMaterializationStatus::constructor_failed;
+        return result;
+    }
+    const auto finite = [](const float value) { return std::isfinite(value); };
+    if (!std::all_of(constructor.rotated_basis.begin(),
+                     constructor.rotated_basis.end(), finite) ||
+        !std::all_of(constructor.center.begin(), constructor.center.end(), finite) ||
+        !std::all_of(constructor.transformed_vertices.begin(),
+                     constructor.transformed_vertices.end(),
+                     [&](const auto& vertex) {
+                         return vertex.has_value() &&
+                             std::all_of(vertex->begin(), vertex->end(), finite);
+                     })) {
+        result.status = PhysicsCheckpointTaskRuntimeMaterializationStatus::
+            non_finite_geometry;
+        return result;
+    }
+
+    PhysicsCheckpointTaskRuntimeState state{};
+    state.stream_record_index = stream_record_index;
+    state.serialized_stream_cursor = serialized_stream_cursor;
+    state.first_vertex = observation.first_vertex;
+    state.second_vertex = observation.second_vertex;
+    state.constructor = constructor;
+    state.active_gate = false;
+    state.update_callback_is_noop = true;
+    result.status = PhysicsCheckpointTaskRuntimeMaterializationStatus::complete;
+    result.state = std::move(state);
+    return result;
+}
+
 PhysicsWoblTaskConstructorPlan plan_physics_wobl_task_constructor(
     const PhysicsWoblTaskConstructorObservation& observation)
 {

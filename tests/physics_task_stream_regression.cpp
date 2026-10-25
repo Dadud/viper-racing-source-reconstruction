@@ -521,6 +521,87 @@ int main()
                     viper::PhysicsStatTaskRuntimeMaterializationStatus::malformed_record &&
                     !malformed_stat.state.has_value(),
                 "STAT runtime materializer accepted an inconsistent declared size");
+        write_stat_word(0x38U, 0U);
+        write_stat_word(4U, 0x48U);
+
+        auto checkpoint_record = make_physics_record(0x43484b50U, 0x20U);
+        const auto write_checkpoint_word = [&checkpoint_record](
+            const std::size_t offset, const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte) {
+                checkpoint_record[offset + byte] = static_cast<std::byte>(
+                    (value >> (byte * 8U)) & 0xffU);
+            }
+        };
+        const std::array<float, 6> checkpoint_endpoints{
+            0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 10.0F};
+        for (std::size_t field = 0U; field < checkpoint_endpoints.size(); ++field)
+            write_checkpoint_word(0x08U + field * 4U,
+                std::bit_cast<std::uint32_t>(checkpoint_endpoints[field]));
+        auto unsupported_active_record = make_physics_record(0x4f425354U, 0x38U);
+        const std::array<viper::PhysicsTaskRecordInput, 3> runtime_records{{
+            {checkpoint_record}, {stat_record}, {unsupported_active_record}}};
+        const auto runtime_serialized = viper::serialize_physics_task_records(
+            runtime_records, 0x40U);
+        const auto runtime_decoded = viper::read_physics_task_record_stream(
+            runtime_serialized.bytes);
+        const auto runtime_tasks = viper::materialize_physics_task_runtime_collection(
+            runtime_decoded, runtime_serialized.bytes, false);
+        require(runtime_serialized.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::complete &&
+                    runtime_decoded.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::complete &&
+                    runtime_tasks.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::complete &&
+                    runtime_tasks.entries.size() == 3U,
+                "semantic task runtime did not retain the complete ordered stream");
+        require(runtime_tasks.entries[0].record_tag == 0x43484b50U &&
+                    runtime_tasks.entries[0].stream_record_index == 0U &&
+                    runtime_tasks.entries[0].stream_cursor == 0x40U &&
+                    runtime_tasks.entries[0].status ==
+                        viper::PhysicsTaskRuntimeEntryStatus::inert_checkpoint_retained &&
+                    runtime_tasks.entries[0].checkpoint.has_value() &&
+                    runtime_tasks.entries[0].checkpoint->first_vertex ==
+                        std::array<float, 3>{0.0F, 0.0F, 0.0F} &&
+                    runtime_tasks.entries[0].checkpoint->second_vertex ==
+                        std::array<float, 3>{0.0F, 0.0F, 10.0F} &&
+                    runtime_tasks.entries[0].checkpoint->constructor.center ==
+                        std::array<float, 3>{0.0F, 0.0F, 5.0F} &&
+                    !runtime_tasks.entries[0].checkpoint->active_gate &&
+                    runtime_tasks.entries[0].checkpoint->update_callback_is_noop,
+                "CHKP record did not become retained inert checkpoint geometry");
+        require(runtime_tasks.entries[1].record_tag == 0x53544154U &&
+                    runtime_tasks.entries[1].status ==
+                        viper::PhysicsTaskRuntimeEntryStatus::inactive_stat_retained &&
+                    runtime_tasks.entries[1].stat.has_value() &&
+                    runtime_tasks.entries[1].stat->serialized_stream_cursor ==
+                        runtime_decoded.records[1].cursor_offset &&
+                    runtime_tasks.entries[2].record_tag == 0x4f425354U &&
+                    runtime_tasks.entries[2].status ==
+                        viper::PhysicsTaskRuntimeEntryStatus::
+                            active_callback_unavailable &&
+                    !runtime_tasks.entries[2].checkpoint.has_value() &&
+                    !runtime_tasks.entries[2].stat.has_value(),
+                "semantic task runtime did not preserve order and unsupported active gates");
+
+        auto invalid_runtime_bytes = runtime_serialized.bytes;
+        const auto write_nan_word = [&invalid_runtime_bytes](
+            const std::size_t offset, const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte) {
+                invalid_runtime_bytes[offset + byte] = static_cast<std::byte>(
+                    (value >> (byte * 8U)) & 0xffU);
+            }
+        };
+        write_nan_word(4U + 0x08U, 0x7fc00000U);
+        const auto invalid_runtime_read =
+            viper::read_physics_task_record_stream(invalid_runtime_bytes);
+        const auto invalid_runtime = viper::materialize_physics_task_runtime_collection(
+            invalid_runtime_read, invalid_runtime_bytes, false);
+        require(invalid_runtime.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::
+                        entry_materialization_failed &&
+                    invalid_runtime.failed_record_index == 0U &&
+                    invalid_runtime.entries.empty(),
+                "semantic task runtime accepted non-finite CHKP endpoints");
 
         constexpr std::array<std::uint32_t, 1> car_tag{0x50434152U};
         const auto overflow = viper::plan_physics_task_stream_offsets(

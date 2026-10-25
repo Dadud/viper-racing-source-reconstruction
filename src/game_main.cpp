@@ -1579,6 +1579,7 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamSession> full_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
     std::vector<viper::PhysicsTaskObjectInventoryEntry> physics_task_object_inventory;
+    std::optional<viper::PhysicsTaskRuntimeCollection> physics_task_runtime_collection;
     std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
     std::vector<AcarCurveSourceRuntimeState> ai_acar_curve_sources;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
@@ -2998,6 +2999,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     state.physics_task_object_inventory = inventory.entries;
             }
             if (stream_ok) {
+                auto runtime_collection =
+                    viper::materialize_physics_task_runtime_collection(
+                        decoded, stream.bytes, false);
+                stream_ok = runtime_collection.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::complete;
+                if (stream_ok)
+                    state.physics_task_runtime_collection =
+                        std::move(runtime_collection);
+            }
+            if (stream_ok) {
                 const auto bindings = viper::bind_configured_car_task_records_to_stream(
                     ordered_track_records, decoded, stream.bytes);
                 stream_ok = bindings.status ==
@@ -3057,25 +3068,33 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 stream_ok = false;
             }
         }
-        std::size_t materialized_inactive_stat_count = 0U;
-        std::size_t unresolved_stat_count = 0U;
-        if (stream_ok) {
+        std::size_t retained_checkpoint_count = 0U;
+        std::size_t retained_inactive_stat_count = 0U;
+        std::size_t unsupported_stat_variant_count = 0U;
+        std::size_t unavailable_active_callback_count = 0U;
+        if (stream_ok && state.physics_task_runtime_collection.has_value()) {
             state.inactive_stat_task_states.clear();
-            for (const auto& readback : state.full_task_record_readback->records) {
-                if (readback.record_tag != 0x53544154U) continue;
-                const auto record_bytes = std::span<const std::byte>(stream.bytes)
-                    .subspan(readback.record_bytes_offset, readback.record_size);
-                const auto task = viper::materialize_inactive_stat_task_runtime_state(
-                    record_bytes, readback.cursor_offset);
-                if (task.status ==
-                        viper::PhysicsStatTaskRuntimeMaterializationStatus::complete &&
-                    task.state.has_value()) {
-                    state.inactive_stat_task_states.push_back(*task.state);
-                    ++materialized_inactive_stat_count;
-                } else {
-                    ++unresolved_stat_count;
+            for (const auto& entry :
+                 state.physics_task_runtime_collection->entries) {
+                switch (entry.status) {
+                case viper::PhysicsTaskRuntimeEntryStatus::inert_checkpoint_retained:
+                    ++retained_checkpoint_count;
+                    break;
+                case viper::PhysicsTaskRuntimeEntryStatus::inactive_stat_retained:
+                    if (entry.stat.has_value())
+                        state.inactive_stat_task_states.push_back(*entry.stat);
+                    ++retained_inactive_stat_count;
+                    break;
+                case viper::PhysicsTaskRuntimeEntryStatus::unsupported_stat_variant:
+                    ++unsupported_stat_variant_count;
+                    break;
+                case viper::PhysicsTaskRuntimeEntryStatus::active_callback_unavailable:
+                    ++unavailable_active_callback_count;
+                    break;
                 }
             }
+        } else {
+            stream_ok = false;
         }
         if (stream_ok) {
             std::cout << "; serialized " << stream.records.size()
@@ -3093,15 +3112,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ", four wheel anchors/core setups and tire responses); retained "
                       << state.ai_acar_curve_sources.size()
                       << " AI ACAR curve source records; materialized "
-                      << materialized_inactive_stat_count
-                      << " inactive STAT task states";
-            if (unresolved_stat_count != 0U)
-                std::cout << " (" << unresolved_stat_count
-                          << " STAT constructors remain unresolved)";
+                      << retained_checkpoint_count
+                      << " inert CHKP records and "
+                      << retained_inactive_stat_count
+                      << " inactive STAT task states; "
+                      << unsupported_stat_variant_count
+                      << " unsupported STAT variants and "
+                      << unavailable_active_callback_count
+                      << " active callback records remain unavailable";
         } else {
             state.full_task_record_stream.reset();
             state.full_task_record_readback.reset();
             state.physics_task_object_inventory.clear();
+            state.physics_task_runtime_collection.reset();
+            state.inactive_stat_task_states.clear();
             state.configured_car_stream_bindings.clear();
             state.ai_acar_curve_sources.clear();
             state.player_pcar_task_binding.reset();

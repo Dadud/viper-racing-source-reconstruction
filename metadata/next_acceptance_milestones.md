@@ -31,6 +31,11 @@ pose for rendering. Trace rows include scheduled steps, task tick count, and
 derived task time. This improves timing ownership only: the native task factory,
 interpolation ring, PCAR callback, and body-step integrator are not connected,
 and route kinematics still own player and opponent motion.
+The session now also retains one ordered semantic task collection from the
+validated serialized stream: finite CHKP geometry and supported inactive STAT
+state are materialized, while other records remain explicit as unavailable
+active callbacks. This does not connect native allocation, registration, or
+fixed-step task dispatch.
 
 The bounded video-memory override reached the original main menu, Quick Race
 setup, and a rendered race-start scene (`metadata/graphics_startup.md`). No

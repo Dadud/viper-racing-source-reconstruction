@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <bit>
 #include <limits>
+#include <utility>
 
 namespace viper {
 
@@ -312,6 +313,78 @@ PhysicsTaskObjectInventory inventory_physics_task_objects(
     }
     inventory.status = PhysicsTaskObjectInventoryStatus::complete;
     return inventory;
+}
+
+PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    const std::span<const std::byte> serialized_stream_bytes,
+    const bool fdiv_compatibility_enabled)
+{
+    PhysicsTaskRuntimeCollection collection{};
+    const auto inventory = inventory_physics_task_objects(
+        decoded_stream, serialized_stream_bytes);
+    if (inventory.status != PhysicsTaskObjectInventoryStatus::complete ||
+        inventory.entries.size() != decoded_stream.records.size()) {
+        collection.status = PhysicsTaskRuntimeCollectionStatus::invalid_readback;
+        collection.failed_record_index = inventory.failed_record_index;
+        return collection;
+    }
+
+    collection.entries.reserve(decoded_stream.records.size());
+    for (std::size_t index = 0U; index < decoded_stream.records.size(); ++index) {
+        const auto& record = decoded_stream.records[index];
+        const auto& identity = inventory.entries[index];
+        const auto record_bytes = serialized_stream_bytes.subspan(
+            identity.record_bytes_offset, identity.record_size);
+        PhysicsTaskRuntimeEntry entry{};
+        entry.stream_record_index = identity.stream_record_index;
+        entry.record_tag = identity.record_tag;
+        entry.stream_cursor = identity.stream_cursor;
+
+        if (record.record_tag == 0x43484b50U) { // CHKP
+            const auto checkpoint = materialize_checkpoint_task_runtime_state(
+                record_bytes, index, record.cursor_offset,
+                fdiv_compatibility_enabled);
+            if (checkpoint.status !=
+                    PhysicsCheckpointTaskRuntimeMaterializationStatus::complete ||
+                !checkpoint.state.has_value()) {
+                collection.entries.clear();
+                collection.status =
+                    PhysicsTaskRuntimeCollectionStatus::entry_materialization_failed;
+                collection.failed_record_index = index;
+                return collection;
+            }
+            entry.status = PhysicsTaskRuntimeEntryStatus::inert_checkpoint_retained;
+            entry.checkpoint = *checkpoint.state;
+        } else if (record.record_tag == 0x53544154U) { // STAT
+            const auto stat = materialize_inactive_stat_task_runtime_state(
+                record_bytes, record.cursor_offset);
+            if (stat.status ==
+                    PhysicsStatTaskRuntimeMaterializationStatus::complete &&
+                stat.state.has_value()) {
+                entry.status = PhysicsTaskRuntimeEntryStatus::inactive_stat_retained;
+                entry.stat = *stat.state;
+            } else if (stat.status ==
+                       PhysicsStatTaskRuntimeMaterializationStatus::
+                           unsupported_collision_volume) {
+                entry.status = PhysicsTaskRuntimeEntryStatus::unsupported_stat_variant;
+            } else {
+                collection.entries.clear();
+                collection.status =
+                    PhysicsTaskRuntimeCollectionStatus::entry_materialization_failed;
+                collection.failed_record_index = index;
+                return collection;
+            }
+        } else {
+            // Preserve order and identity while refusing to invent active
+            // callback state for PCAR/ACAR/OBST/WOBL and other known classes.
+            entry.status = PhysicsTaskRuntimeEntryStatus::active_callback_unavailable;
+        }
+        collection.entries.push_back(std::move(entry));
+    }
+
+    collection.status = PhysicsTaskRuntimeCollectionStatus::complete;
+    return collection;
 }
 
 PlayerPcarTaskBindingResult bind_player_pcar_task_record(

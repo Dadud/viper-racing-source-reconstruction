@@ -625,6 +625,41 @@ struct PhysicsCheckpointTaskConstructorPlan {
     bool x87_extended_precision_approximated{true};
 };
 
+enum class PhysicsCheckpointTaskRuntimeMaterializationStatus : std::uint8_t {
+    complete,
+    malformed_record,
+    non_finite_geometry,
+    constructor_failed,
+};
+
+// Semantic state retained from a validated CHKP record. The record stores two
+// XYZ endpoints and no yaw scalar; the native constructor builds its basis
+// from those endpoints. The retained plan therefore uses zero additional yaw.
+// This is not a native allocation or a claim that the full task dispatcher is
+// connected.
+struct PhysicsCheckpointTaskRuntimeState {
+    std::size_t stream_record_index{};
+    std::uint32_t serialized_stream_cursor{};
+    std::array<float, 3> first_vertex{};
+    std::array<float, 3> second_vertex{};
+    PhysicsCheckpointTaskConstructorPlan constructor{};
+    bool active_gate{};
+    bool update_callback_is_noop{true};
+};
+
+struct PhysicsCheckpointTaskRuntimeMaterialization {
+    PhysicsCheckpointTaskRuntimeMaterializationStatus status{
+        PhysicsCheckpointTaskRuntimeMaterializationStatus::malformed_record};
+    std::optional<PhysicsCheckpointTaskRuntimeState> state;
+};
+
+[[nodiscard]] PhysicsCheckpointTaskRuntimeMaterialization
+materialize_checkpoint_task_runtime_state(
+    std::span<const std::byte> record_bytes,
+    std::size_t stream_record_index,
+    std::uint32_t serialized_stream_cursor,
+    bool fdiv_compatibility_enabled);
+
 // Projects CHKP endpoint, basis, center, rotation, and backend-call effects.
 [[nodiscard]] PhysicsCheckpointTaskConstructorPlan
 plan_physics_checkpoint_task_constructor(

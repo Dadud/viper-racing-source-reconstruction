@@ -171,6 +171,18 @@ record-copy and single-child semantic state for valid STAT records, keeps the
 stream cursor for identity, and represents the known inactive/no-op gates. It
 does not claim the omitted common-base bytes or native pointer layout.
 
+`materialize_physics_task_runtime_collection` now retains semantic task state
+in the exact order of the fully validated serialized stream. It materializes
+finite `CHKP` endpoint geometry through the existing constructor planner and
+retains supported inactive `STAT` state; unsupported STAT collision-volume
+variants remain explicit. Other records retain identity and order with status
+`active_callback_unavailable`. Race `WindowState` owns this collection for the
+session and reports the retained and unavailable counts. This is not native
+object allocation, registration, or fixed-step dispatch, and the collection's
+`complete` status means the record sequence was represented without loss, not
+that every task callback is implemented. Regression verifies mixed CHKP/STAT/
+OBST ordering, retained fields, and atomic rejection of non-finite CHKP geometry.
+
 The player race session now binds exactly one decoded `PCAR` entry back to
 the setup/placement-derived player record. The binding requires a complete
 readback, the expected logical cursor, a `0x1E4`-byte record, and exact byte

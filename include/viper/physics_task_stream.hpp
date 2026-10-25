@@ -1,5 +1,7 @@
 #pragma once
 
+#include "viper/physics_task_factory.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -216,5 +218,46 @@ struct PhysicsTaskObjectInventory {
 [[nodiscard]] PhysicsTaskObjectInventory inventory_physics_task_objects(
     const PhysicsTaskRecordStreamRead& decoded_stream,
     std::span<const std::byte> serialized_stream_bytes);
+
+enum class PhysicsTaskRuntimeEntryStatus : std::uint8_t {
+    inert_checkpoint_retained,
+    inactive_stat_retained,
+    unsupported_stat_variant,
+    active_callback_unavailable,
+};
+
+// Ordered semantic runtime state for validated records. This is explicitly
+// separate from native allocation and fixed-step dispatch: currently only
+// CHKP geometry and the inactive STAT class have retained state.
+struct PhysicsTaskRuntimeEntry {
+    std::size_t stream_record_index{};
+    std::uint32_t record_tag{};
+    std::uint32_t stream_cursor{};
+    PhysicsTaskRuntimeEntryStatus status{
+        PhysicsTaskRuntimeEntryStatus::active_callback_unavailable};
+    std::optional<PhysicsCheckpointTaskRuntimeState> checkpoint;
+    std::optional<PhysicsStatTaskRuntimeState> stat;
+};
+
+enum class PhysicsTaskRuntimeCollectionStatus : std::uint8_t {
+    complete,
+    invalid_readback,
+    entry_materialization_failed,
+};
+
+struct PhysicsTaskRuntimeCollection {
+    PhysicsTaskRuntimeCollectionStatus status{
+        PhysicsTaskRuntimeCollectionStatus::invalid_readback};
+    std::vector<PhysicsTaskRuntimeEntry> entries;
+    std::optional<std::size_t> failed_record_index;
+};
+
+// Retains supported inert semantic objects in serialized stream order and
+// leaves active or unresolved classes explicit. It does not allocate native
+// objects or claim that their callbacks are connected to the live scheduler.
+[[nodiscard]] PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    std::span<const std::byte> serialized_stream_bytes,
+    bool fdiv_compatibility_enabled);
 
 } // namespace viper
