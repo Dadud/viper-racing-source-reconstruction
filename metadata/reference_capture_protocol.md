@@ -181,3 +181,22 @@ reference. Public CI should use synthetic/free fixtures and must not fetch or
 embed original assets. CI can validate parsers, deterministic synthetic
 scenarios, and artifact handling; original-game comparison remains a separate
 local acceptance activity using the external installation.
+
+## Read-only target-window idle checkpoint (2026-10-25)
+
+A later passive observation captured the existing original `race.bin` window
+directly with `PrintWindow`, without capturing the desktop or sending input.
+The private 640x480 image is
+`../../analysis/reference_captures/original_race_window_checkpoint_20261025.png`
+(SHA-256 `EFFCCA4D5EB331FCEF76D254DC054594ADE38E76E7256C95879ACE4FB1E3DA77`).
+The adjacent record
+`../../analysis/reference_captures/original_race_window_checkpoint_20261025.json`
+(SHA-256 `2D24306A3BC134A3072C24A0867BB317A18CE54DE16571CD8DF07D558FFA6F87`)
+binds the screenshot to the hash-verified external `race.bin`, visible HUD
+state, and a contemporaneous read-only Frida snapshot (`ev_6c18c8b53be1dd8676677d228ea00094582c514c08615b3c2425382c850583c0`).
+The HUD showed lap 1/3, position 8/8, 16:30.0, 0 MPH, and a reset prompt;
+track identity is unverified. The sampled PCAR velocity was near zero, and the
+last 30 input samples had zero steering, throttle, brake, DIK_UP, and DIK_SPACE.
+The screenshot and state samples do not share a per-frame timestamp. This is
+an idle-state observation only; it is not input-to-motion evidence, a controlled
+scenario, or a paired visual comparison.
