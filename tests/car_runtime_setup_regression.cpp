@@ -740,6 +740,14 @@ int main()
                     wheel_object.initialized_bytes[0x18cU] != 0U &&
                     wheel_object.initialized_bytes[0x1a3U] == 0U,
                 "wheel storage must retain constructor bytes and distinguish unwritten bytes");
+            require(viper::read_ncar_wheel_object_u32(wheel_object, 0x18cU) ==
+                        0x44e10000U &&
+                    viper::read_ncar_wheel_object_u8(wheel_object, 0x18cU) ==
+                        std::optional<std::uint8_t>{0U} &&
+                    !viper::read_ncar_wheel_object_u32(wheel_object, 0x1a0U) &&
+                    !viper::read_ncar_wheel_object_u8(wheel_object, 0x1a3U) &&
+                    !viper::read_ncar_wheel_object_u32(wheel_object, 0x1a1U),
+                "wheel readers must expose only fully initialized in-bounds bytes");
         }
         viper::NcarWheelRuntimeObjectState untouched_wheel{};
         const auto unresolved_wheel_plan = viper::plan_ncar_wheel_constructor(

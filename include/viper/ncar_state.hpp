@@ -349,6 +349,15 @@ struct NcarWheelRuntimeObjectState {
     std::array<std::uint8_t, ncar_wheel_object_bytes> initialized_bytes{};
 };
 
+// Reads initialized wheel-object bytes only. Untouched native storage remains
+// unavailable rather than being interpreted as a zero-valued runtime field.
+[[nodiscard]] std::optional<std::uint32_t> read_ncar_wheel_object_u32(
+    const NcarWheelRuntimeObjectState& source,
+    std::uint32_t offset) noexcept;
+[[nodiscard]] std::optional<std::uint8_t> read_ncar_wheel_object_u8(
+    const NcarWheelRuntimeObjectState& source,
+    std::uint32_t offset) noexcept;
+
 [[nodiscard]] NcarWheelConstructorPlan plan_ncar_wheel_constructor(
     std::uint32_t wheel_object_offset,
     const NcarWheelConstructorObservation& observation);

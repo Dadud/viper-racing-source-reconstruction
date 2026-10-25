@@ -2614,6 +2614,31 @@ bool apply_ncar_wheel_object_writes(
     return true;
 }
 
+std::optional<std::uint32_t> read_ncar_wheel_object_u32(
+    const NcarWheelRuntimeObjectState& source,
+    const std::uint32_t offset) noexcept
+{
+    if (static_cast<std::uint64_t>(offset) + sizeof(std::uint32_t) >
+        ncar_wheel_object_bytes) return std::nullopt;
+    const auto start = static_cast<std::size_t>(offset);
+    std::uint32_t value{};
+    for (std::size_t byte = 0U; byte < sizeof(value); ++byte) {
+        if (source.initialized_bytes[start + byte] == 0U) return std::nullopt;
+        value |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+            source.bytes[start + byte])) << (byte * 8U);
+    }
+    return value;
+}
+
+std::optional<std::uint8_t> read_ncar_wheel_object_u8(
+    const NcarWheelRuntimeObjectState& source,
+    const std::uint32_t offset) noexcept
+{
+    if (offset >= ncar_wheel_object_bytes ||
+        source.initialized_bytes[offset] == 0U) return std::nullopt;
+    return std::to_integer<std::uint8_t>(source.bytes[offset]);
+}
+
 bool materialize_ncar_wheel_constructor(
     NcarWheelRuntimeObjectState& destination,
     const std::uint32_t wheel_object_offset,
