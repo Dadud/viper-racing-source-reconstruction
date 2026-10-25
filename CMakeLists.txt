@@ -22,6 +22,7 @@ add_library(viper_frontend_model
     src/replay_load.cpp
     src/replay_format.cpp
     src/replay_save.cpp
+    src/replay_file.cpp
     src/replay_screen.cpp
     src/startup_command_line.cpp
     src/setup_preferences.cpp
@@ -262,6 +263,14 @@ if(BUILD_TESTING)
     target_link_libraries(viper_setup_preferences_regression PRIVATE viper_frontend_model)
     add_test(NAME setup_preferences_regression
         COMMAND viper_setup_preferences_regression)
+    add_executable(viper_replay_file_regression tests/replay_file_regression.cpp)
+    target_link_libraries(viper_replay_file_regression PRIVATE viper_frontend_model)
+    add_test(NAME replay_file_regression COMMAND viper_replay_file_regression)
+    set(VIPER_BENCH_REPLAY "${CMAKE_SOURCE_DIR}/../game_install/GameData/bench.rpl")
+    if(EXISTS "${VIPER_BENCH_REPLAY}")
+        target_compile_definitions(viper_replay_file_regression PRIVATE
+            VIPER_BENCH_REPLAY_PATH="${VIPER_BENCH_REPLAY}")
+    endif()
     add_executable(viper_career_file_store_regression
         tests/career_file_store_regression.cpp)
     target_link_libraries(viper_career_file_store_regression PRIVATE viper_frontend_model)

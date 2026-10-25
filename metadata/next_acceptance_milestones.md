@@ -181,8 +181,12 @@ captured baseline.
 ## Full-scope work that follows
 
 Passing these three milestones would establish only the first validated race,
-not the final objective. Continue through all original-supported tracks,
-vehicles, modes, frontend/settings, career/upgrades/saves, compatible replay,
-modern multiplayer between reconstructed clients, error/resource lifecycle,
-clean-checkout asset discovery, and a requirement-by-requirement completion
-audit. Keep original assets and private captures outside the public repo.
+not the final objective. A lossless v6 replay container codec is now implemented
+and byte-round-tripped against the shipped `bench.rpl`; compatible playback,
+packet interpretation, and native replay UI remain open
+([replay container notes](replay_container_codec.md)). Continue through all
+original-supported tracks, vehicles, modes, frontend/settings,
+career/upgrades/saves, compatible replay, modern multiplayer between
+reconstructed clients, error/resource lifecycle, clean-checkout asset
+discovery, and a requirement-by-requirement completion audit. Keep original
+assets and private captures outside the public repo.
