@@ -32,7 +32,7 @@ int main()
         "missing preference is a safe first-run state");
 
     const std::array<std::optional<std::string>, 13> bindings{
-        "Key_A", "Key_D", "Key_W", std::string{}, "Key_S", "Key_R",
+        "Key_LEFT", "Key_RIGHT", "Key_UP", "Key_DOWN", std::string{}, "Key_R",
         "Key_C", "Key_L", "Key_Q", "Key_E", "Key_B", "Key_Z", "Key_X"};
     const auto first_save = viper::save_setup_selection_preference(root,
         {"Bemidji", "Sports", 3U, std::nullopt, bindings});
@@ -42,11 +42,11 @@ int main()
     check(loaded.selection && loaded.selection->track == "bemidji" &&
         loaded.selection->car == "sports" && loaded.selection->laps == 3U &&
         loaded.selection->opponent_strength == 0U &&
-        loaded.selection->control_bindings[0] == "Key_A" &&
-        loaded.selection->control_bindings[1] == "Key_D" &&
-        loaded.selection->control_bindings[2] == "Key_W" &&
-        loaded.selection->control_bindings[3] == "" &&
-        loaded.selection->control_bindings[4] == "Key_S" &&
+        loaded.selection->control_bindings[0] == "Key_LEFT" &&
+        loaded.selection->control_bindings[1] == "Key_RIGHT" &&
+        loaded.selection->control_bindings[2] == "Key_UP" &&
+        loaded.selection->control_bindings[3] == "Key_DOWN" &&
+        loaded.selection->control_bindings[4] == "" &&
         loaded.selection->control_bindings[7] == "Key_L" &&
         loaded.selection->control_bindings[12] == "Key_X",
         "round-trips all 13 keyboard overrides and explicit unbound state");

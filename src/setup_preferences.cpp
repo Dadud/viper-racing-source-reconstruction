@@ -31,20 +31,6 @@ constexpr std::array<std::string_view, 13> binding_names{
     "reverse", "clutch", "airlift", "look_left", "look_right",
     "look_back", "downshift", "upshift"};
 
-bool valid_binding(const std::string_view value) noexcept
-{
-    if (value.empty()) return true;
-    std::string_view key = value;
-    if (key.starts_with("Key_")) key.remove_prefix(4U);
-    if (key == "Left" || key == "Right" || key == "Up" || key == "Down" ||
-        key == "Space" || key == "Return" || key == "Enter" || key == "Tab")
-        return true;
-    return key.size() == 1U &&
-        ((key[0] >= 'A' && key[0] <= 'Z') ||
-         (key[0] >= 'a' && key[0] <= 'z') ||
-         (key[0] >= '0' && key[0] <= '9'));
-}
-
 char ascii_lower(const char value) noexcept
 {
     return value >= 'A' && value <= 'Z'
@@ -58,6 +44,25 @@ bool equal_ascii_case_insensitive(const std::string_view left,
     for (std::size_t index = 0; index < left.size(); ++index)
         if (ascii_lower(left[index]) != ascii_lower(right[index])) return false;
     return true;
+}
+
+bool valid_binding(const std::string_view value) noexcept
+{
+    if (value.empty()) return true;
+    std::string_view key = value;
+    if (key.starts_with("Key_")) key.remove_prefix(4U);
+    constexpr std::array<std::string_view, 8> named_keys{
+        "Left", "Right", "Up", "Down", "Space", "Return", "Enter", "Tab"};
+    if (std::any_of(named_keys.begin(), named_keys.end(),
+            [key](const std::string_view candidate) {
+                return equal_ascii_case_insensitive(key, candidate);
+            })) {
+        return true;
+    }
+    return key.size() == 1U &&
+        ((key[0] >= 'A' && key[0] <= 'Z') ||
+         (key[0] >= 'a' && key[0] <= 'z') ||
+         (key[0] >= '0' && key[0] <= '9'));
 }
 
 std::optional<std::string> normalized_stem(const std::string_view value)
