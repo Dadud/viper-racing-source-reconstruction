@@ -53,18 +53,44 @@ loaded 64 against the accumulated candidate and its carry flag selects whether
 the current half-step is added. The step begins at 0.5 and is halved 24 times.
 Constants used include 1/177, 177, 1/169, 178, 169, 179, 53, 1, 64, 32, and
 0.5. Exact generated output has not been checked against a native table
-fixture. The full x87 register-stack dataflow and the control word active at
-this initializer remain unknown; CRT initialization reaches `0x4BE300` and
-game setup reaches `0x415C60`, which modifies the control word. Do not
-substitute a fixed seed or claim a source-level C++ port is bit-exact: x64 MSVC
-uses SSE2 and binary64 `long double`, unlike native x87 extended intermediates.
-Exact implementation needs an explicit x87-compatible emulator/assembly path,
-the startup control word, and seed/table fixtures, or must retain a documented
-approximation status. Evidence:
+fixture. The x87 register-stack trace is unresolved: `0x4BD45A` jumps to the
+descriptor-driven `fmod` CRT dispatcher at `0x4C0580`; the adjacent
+`0x4BD464` sequence is not reached by fallthrough. The dispatcher saves both
+operands without popping them, then selects class- and exception-specific
+handlers through the descriptor table. Its first handler pointer at
+`0x4E98E0` targets `0x4BD464`, whose `FPREM` loop ends with `FSTP ST(1),ST`,
+leaving one remainder and reducing stack depth by one. This is a likely normal
+finite-input path, but the status-class index selecting that slot has not been
+verified; therefore the initializer's complete x87 stack trace and exact
+`std::fmod` equivalence remain unresolved. The startup precision path is also
+partly resolved: CRT entry `0x4BD690` calls
+`0x4BF720`, which invokes `__fpmath` and `__setdefaultprecision` (`0x4BE300`).
+Its `__controlfp(0x10000,0x30000)` call sets x87 precision control to 53
+significand bits. The pre-initializer game setup `0x415C60` changes
+exception-mask/infinity-control fields, but its mask does not include
+precision or rounding control. The other precision setter, `0x415C80(1)`, is
+reached through `0x447980` → `0x4014D0`, after `0x417270` has completed the
+initializer. Thus binary64 precision is supported by the observed startup
+path; the rounding-control bits and initial x87 stack state are not explicitly
+established by these routines. Do not claim byte-for-byte table parity until
+the port is checked against a native fixed-seed table fixture. Evidence:
 `ev_e4863482e00c2d90193abc28b0d55365db2fc169b52bc487a057b46678bd7999`,
 `ev_1f0144ba5ff39e36ced30debe4cd8e2dd002c63683863cfffa1cf6bf82c65226e`,
 `ev_2b0070a9b6408f68a767b443f65869aaaa4cdf495898834d6094addf0835c787`,
 `ev_bd81caa3c16b9850abb706f99758614c9bd9b6f5d94e30edee61fc0aa582e737`.
+
+The `fmod` descriptor and handler pointer are directly observed in
+`ev_831f99655f66f55f6b5d1d67f4e9d8ab614b346d99a3c2366f48895f5edf84f2`;
+the `__trandisp2` class-table dispatch is observed in
+`ev_4818ba019dd88b819e85fc77487ad6e489a537923d6706150559fb44f4fb5d58`.
+
+The precision-path call-chain evidence is `ev_5a5d630562475ee9e0a0e94a7961357c5b3b2c0e46c6817cbd917899342dd71b`
+(CRT entry), `ev_528ea60e8a455ee3e00b8b275c96ca8152c35467fa67f6bd80760ceba03d9755`
+(`__fpmath`), `ev_b9e5367c63490dd289f874fc6d75fefba7b58c74818342adc82c55589f88b940`
+(`__setdefaultprecision`), `ev_ebdb653dcf9cd568c625e8922d6b1f09c817fd8fb6dcfa5e34c4ef126130df5c`
+(`0x415C60`), and `ev_67e0c02bf7c8335ad0fa252f59c3e96f8b324a5018876ad6da55254b6e4aa0b9`
+(`0x447980` call chain). These establish the precision-control path, but not
+the initial rounding mode or a native generated-table output.
 
 ## Runtime consumer order
 
