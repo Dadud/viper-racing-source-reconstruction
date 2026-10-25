@@ -493,9 +493,12 @@ visible in the ledger.
 selected PCAR updates and 32 ordered wheel observations, including downstream
 suspension and tire projection fields. Static analysis maps the four varying
 differential operands to wheel `+0xE8`; four `0x442530` calls update those
-fields before the reads. The producer ordering is understood, but its live
-inputs are not: native contact/query, suspension parameters, surface polarity,
-and tire response/query producers remain unresolved. Do not repeat a capture
+fields before the reads. The portable body-step now derives the paired
+`+0x158` results from the four wheel updates' newly finalized `+0xE8` values,
+in native order. This closes the model's internal handoff only. Its live inputs
+remain incomplete: native contact/query semantics, prior `+0x158` state, pair
+scales, suspension parameters, surface polarity, and tire response/query
+producers are not session-owned. Do not repeat a capture
 that only rereads the six pair operands. Capture the missing upstream inputs
 and timestamp-correlated wheel/accumulator/body samples for throttle, steering,
 braking, and coast. The captured `+0xF4` row is sampled after the

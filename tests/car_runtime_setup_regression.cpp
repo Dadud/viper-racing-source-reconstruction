@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -765,6 +766,45 @@ int main()
         require(std::fabs(body_step.force_collection.accumulated_linear_force.y +
                     78.48F) < 1.0e-4F,
             "four-wheel composition must source its gravity term from the body kinematics input");
+        std::array<viper::TerrainPartitionNode, 1> pair_terrain_nodes{{
+            {0.0F, 0.0F, 0.0F, 0, 0, -1, -1}}};
+        std::array<viper::TerrainSurfacePlane, 1> pair_terrain_planes{{
+            {0.0F, 1.0F, 0.0F, 0.0F, {}, 1, 0}}};
+        const viper::TerrainSurfaceQueryInput pair_terrain{
+            {}, pair_terrain_nodes, pair_terrain_planes, 0, false};
+        auto paired_history_step_input = body_step_input;
+        paired_history_step_input.wheel_pair_differential_input.first_scale_0xdd4 =
+            2.0F;
+        paired_history_step_input.wheel_pair_differential_input.second_scale_0xdd8 =
+            3.0F;
+        for (std::size_t wheel = 0; wheel < 4U; ++wheel) {
+            auto& wheel_input = paired_history_step_input
+                .wheel_update_pipeline_inputs[wheel];
+            wheel_input.contact.body_query_enabled = true;
+            wheel_input.contact.contact_direction = {0.0F, 1.0F, 0.0F};
+            wheel_input.contact.wheel_depth_limit_0x44 = 2.0F;
+            wheel_input.point_transform.body_transform_0x38_to_0x64 = {
+                1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F,
+                0.0F, 0.0F, 1.0F, 0.0F,
+                -1.0F - static_cast<float>(wheel), 0.0F};
+            wheel_input.suspension.base.spring_scale_0x3c = 1.0F;
+            wheel_input.terrain = pair_terrain;
+        }
+        const auto paired_history_step =
+            viper::advance_four_wheel_body_step(paired_history_step_input);
+        require(paired_history_step.wheel_pair_history_derived_from_updates &&
+                paired_history_step.wheel_pair_differentials.value_0x850 == 2.0F &&
+                paired_history_step.wheel_pair_differentials.value_0x6ac == -2.0F &&
+                paired_history_step.wheel_pair_differentials.value_0xb98 == 3.0F &&
+                paired_history_step.wheel_pair_differentials.value_0x9f4 == -3.0F,
+            "four-wheel composition must derive paired +0x158 writes from the just-updated +0xE8 values in native order");
+        auto invalid_pair_updates =
+            paired_history_step.wheel_contact_pipeline_results;
+        invalid_pair_updates[2].suspension.finalized.next_contact_depth_0xe8 =
+            std::numeric_limits<float>::quiet_NaN();
+        require(!viper::make_ncar_integrator_wheel_pair_differential_input_from_updates(
+                    invalid_pair_updates, 2.0F, 3.0F, {1U, 1U, 1U, 1U}),
+            "paired +0x158 derivation must reject a non-finite updated wheel +0xE8");
         viper::FourWheelBodyStepInput incomplete_timeout_body_step{};
         incomplete_timeout_body_step.post_body_state.timeout_pending_0x48c = 1U;
         incomplete_timeout_body_step.post_body_state.timeout_start_0x488 = 0.0F;

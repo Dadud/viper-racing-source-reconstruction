@@ -30,6 +30,16 @@ struct NcarIntegratorWheelPairDifferentialResult {
     float value_0x9f4{};
 };
 
+// Builds the paired differential inputs from the four wheel updates that
+// precede those reads in 0x431150. The scales and contact gates remain
+// explicit body-step inputs; updated +0xE8 values come from each wheel result.
+[[nodiscard]] std::optional<NcarIntegratorWheelPairDifferentialInput>
+make_ncar_integrator_wheel_pair_differential_input_from_updates(
+    const std::array<WheelUpdatePipelineResult, 4>& wheel_updates,
+    float first_scale_0xdd4,
+    float second_scale_0xdd8,
+    std::array<std::uint8_t, 4> contact_bytes) noexcept;
+
 // Projects two paired wheel differences into the four observed car fields.
 [[nodiscard]] NcarIntegratorWheelPairDifferentialResult
 apply_ncar_integrator_wheel_pair_differentials(
@@ -889,6 +899,7 @@ struct FourWheelBodyStepResult {
     NcarIntegratorWheelScalarResult integrator_wheel_scalars{};
     NcarIntegratorModeForceResult mode_force{};
     NcarIntegratorWheelPairDifferentialResult wheel_pair_differentials{};
+    bool wheel_pair_history_derived_from_updates{};
     NcarIntegratorCommonForceResult common_force{};
     NcarIntegratorVelocityForceResult velocity_forces{};
     std::vector<NcarIntegratorVirtualRecordCallbackResult>

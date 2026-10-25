@@ -1451,6 +1451,32 @@ apply_ncar_integrator_wheel_pair_differentials(
         second_applied};
 }
 
+std::optional<NcarIntegratorWheelPairDifferentialInput>
+make_ncar_integrator_wheel_pair_differential_input_from_updates(
+    const std::array<WheelUpdatePipelineResult, 4>& wheel_updates,
+    const float first_scale_0xdd4,
+    const float second_scale_0xdd8,
+    const std::array<std::uint8_t, 4> contact_bytes) noexcept
+{
+    if (!std::isfinite(first_scale_0xdd4) || !std::isfinite(second_scale_0xdd8)) {
+        return std::nullopt;
+    }
+    std::array<float, 4> updated_contact_depths{};
+    for (std::size_t wheel = 0; wheel < wheel_updates.size(); ++wheel) {
+        updated_contact_depths[wheel] = wheel_updates[wheel]
+            .suspension.finalized.next_contact_depth_0xe8;
+        if (!std::isfinite(updated_contact_depths[wheel])) return std::nullopt;
+    }
+    return NcarIntegratorWheelPairDifferentialInput{
+        updated_contact_depths[0],
+        updated_contact_depths[1],
+        first_scale_0xdd4,
+        updated_contact_depths[2],
+        updated_contact_depths[3],
+        second_scale_0xdd8,
+        contact_bytes};
+}
+
 NcarIntegratorCommonForceResult apply_ncar_integrator_common_force(
     NcarForceMomentAccumulator& accumulator,
     const NcarIntegratorCommonForceInput& input) noexcept
@@ -2203,10 +2229,26 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     }
     result.mode_force = apply_ncar_integrator_mode_force(
         result.force_moment_state, mode_force_input);
-    auto wheel_pair_input = input.wheel_pair_differential_input;
-    wheel_pair_input.contact_bytes = mode_force_input.contact_bytes;
-    result.wheel_pair_differentials =
-        apply_ncar_integrator_wheel_pair_differentials(wheel_pair_input);
+    if (input.wheel_contact_pipeline_enabled) {
+        const auto wheel_pair_input =
+            make_ncar_integrator_wheel_pair_differential_input_from_updates(
+                result.wheel_contact_pipeline_results,
+                input.wheel_pair_differential_input.first_scale_0xdd4,
+                input.wheel_pair_differential_input.second_scale_0xdd8,
+                mode_force_input.contact_bytes);
+        if (wheel_pair_input.has_value()) {
+            result.wheel_pair_differentials =
+                apply_ncar_integrator_wheel_pair_differentials(*wheel_pair_input);
+            result.wheel_pair_history_derived_from_updates = true;
+        } else {
+            result.input_complete = false;
+        }
+    } else {
+        auto wheel_pair_input = input.wheel_pair_differential_input;
+        wheel_pair_input.contact_bytes = mode_force_input.contact_bytes;
+        result.wheel_pair_differentials =
+            apply_ncar_integrator_wheel_pair_differentials(wheel_pair_input);
+    }
     auto common_force_input = input.common_force_input;
     common_force_input.contact_bytes = mode_force_input.contact_bytes;
     common_force_input.body_center = kinematics_at_step_start.position;
