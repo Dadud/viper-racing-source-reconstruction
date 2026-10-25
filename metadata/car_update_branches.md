@@ -89,16 +89,28 @@ difference fields. The first callback compares their squared magnitudes,
 returning equality within its observed 0.1f tolerance; the second callback
 sorts the separate last array using the row's second two-dimensional values.
 This resolves the storage class and index semantics, but not the exact live
-record selected when runtime positions, descriptor dimension, participant
-slots, or comparator-equal records are unknown. The current PCAR capture still
-lacks those table bytes and the native comparator's tie ordering, so the
-production timer must continue to require a resolved lookup input.
+record selected without the runtime descriptor dimension and participant
+position rows. The helper `0x4BD250` is the Visual Studio 1998 release
+quicksort, with `_shortsort` for partitions of at most eight elements; its
+ordering can be reproduced from the complete input rows and comparator, but
+the current runtime does not yet build this table or supply those rows to the
+timer. It therefore continues to require a resolved lookup input.
+
+The next original-client capture can use the passive one-shot Frida probe at
+[`../../analysis/reference_captures/ordinal_pair_lookup_probe.js`](../../analysis/reference_captures/ordinal_pair_lookup_probe.js).
+It hooks `0x4335E5` after the lookup load and records the live descriptor,
+ordinal, middle row, all row entries and pair bytes, plus the actual EAX record
+pointer consumed by the gate. It emits one row per observed ordinal and does
+not modify game state. The original client is currently not in a race process,
+so this probe has only passed JavaScript syntax validation; it has not produced
+a runtime capture.
 
 Evidence: `0x41EAB0` `ev_af5da57252f41fcd0aa04bb6653499d28865bacdb9057d9ecb6f8436ce4f6c71`,
 `0x41EC40` `ev_240938eecb93f46cc2581792cf643ca862b6427ce48841acbc367ee45c29d819`,
 `0x433570` lookup `ev_462be6c361e430d2d6f17c1b65e4fe874ed37f24c3fe957a3ccb1b3f165a2dcf`,
 callback wrapper `0x41EF40` `ev_c7723ce59ab25fa92f0d679c559403b936f3d5f08d82151a1ae6d45ae5a5dcef`,
-and quicksort helper `0x4BD250` `ev_45675e68348a2e95079fa31ed9e7db1a1e051a7d5a44277b3c965fa872dab04b`.
+quicksort helper `0x4BD250` `ev_45675e68348a2e95079fa31ed9e7db1a1e051a7d5a44277b3c965fa872dab04b`,
+and `_shortsort` `0x4BD3B0` `ev_a7bdc8537c7d220081a9416d581309ccd3243adaecd374df1893ac47f0b19bbd`.
 The callback bodies are internal assembly labels rather than separate Ghidra
 functions; the exact-address instruction observations are
 `ev_5c4d74705609478fa9a4515b303887ec3080605ae848db297a1b180ae7f45748`,
@@ -111,10 +123,10 @@ and `ev_09e704ed377bb84b2afda61893919a6c902c3da9b693c3b50d784668040bcc52`.
 `0x41F160` destroys the descriptor by calling `0x41EA70` to free the owned
 `+0x10` and `+8` buffers, freeing the descriptor, and clearing both published
 globals. The independent `0x41EAA1` cleanup store clears only `0x4D45B0` and
-is not the same lifecycle path. The static slot-to-list mapping is now known,
-but timer integration still requires exact list contents and sort output;
-`advance_ncar_integrator_timer` continues to require a resolved lookup input
-and marks unavailable lookups incomplete.
+is not the same lifecycle path. The static slot-to-list mapping and sorter
+are now known. The runtime does not yet construct the complete participant
+rows or run that sorter, so `advance_ncar_integrator_timer` continues to
+require a resolved lookup input and marks unavailable lookups incomplete.
 
 Evidence: `0x41E9B0` `ev_3b7f7d190ea4c86c09a2da3c5380c479bbbd775a95dff54ed7ecebb5eb43a7a1`,
 `0x41EAB0` `ev_af5da57252f41fcd0aa04bb6653499d28865bacdb9057d9ecb6f8436ce4f6c71`,
