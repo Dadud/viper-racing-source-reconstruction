@@ -68,13 +68,18 @@ vectors identified above; the pair-state producer remains unresolved.
 
 ## Reconstruction status
 
-This registry has no live equivalent in the current source runtime. The
-route-opponent pacing controller is an authored prototype and does not consume
-this native pair state. Do not treat these static findings as runtime-validated
-physics or as proof of original AI policy. Next evidence needed: identify the
-native pair-record writers, establish both coordinate bases and units, capture
-the full callback caller, and compare controlled original-game runs against
-the source runtime before integrating any behavior.
+The native constructor and lookup layout now have a source model in
+`include/viper/vehicle_pair_registry.hpp` and
+`src/vehicle_pair_registry.cpp`, with a focused regression in
+`tests/vehicle_pair_registry_regression.cpp`. The model reconstructs pair
+allocation order, three shared lookup layers, row-stride byte offsets, and the
+observed sign reversal in accessors. It remains a standalone model: the live
+route-opponent controller does not consume it, and no pair-record writer has
+been identified. Do not treat this as runtime-validated physics or proof of
+original AI policy. Next evidence needed: identify the native pair-record
+writers, establish both coordinate bases and units, capture the full callback
+caller, and compare controlled original-game runs against the source runtime
+before integrating any behavior.
 
 ## Evidence
 

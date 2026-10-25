@@ -198,6 +198,10 @@ target_link_libraries(viper_ncar_model PUBLIC
     viper_matrix_quaternion
 )
 
+add_library(viper_vehicle_pair_registry src/vehicle_pair_registry.cpp)
+target_include_directories(viper_vehicle_pair_registry PUBLIC include)
+target_compile_features(viper_vehicle_pair_registry PUBLIC cxx_std_20)
+
 add_executable(viper_reconstruction src/main.cpp)
 target_link_libraries(viper_reconstruction PRIVATE
     viper_race_scene_flow
@@ -246,6 +250,13 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_vehicle_pair_registry_regression
+        tests/vehicle_pair_registry_regression.cpp)
+    target_link_libraries(viper_vehicle_pair_registry_regression PRIVATE
+        viper_vehicle_pair_registry)
+    add_test(NAME vehicle_pair_registry_regression
+        COMMAND viper_vehicle_pair_registry_regression)
+
     add_executable(viper_directinput_keyboard_state_regression
         tests/directinput_keyboard_state_regression.cpp)
     target_include_directories(viper_directinput_keyboard_state_regression
