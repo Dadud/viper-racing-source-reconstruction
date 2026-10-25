@@ -70,6 +70,16 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25, original Quick Race reaches a rendered start scene:** Using
+  the bounded first-query video-memory override, three controlled clicks opened
+  Quick Race, retained its default Dodge Viper/Bemidji/Easy/Arcade/3-lap setup,
+  and selected RACE. The retained 640×480 capture shows the Bemidji 3D grid,
+  Lap 1/3, Position 8/8, and countdown lights. This is a rendered race-start
+  scene from the original client in the instrumented environment. A brief Up
+  key attempt did not have a post-input capture, so car movement and race
+  completion remain unverified. Details, screenshot paths, DirectDraw counts,
+  trace hash, and cleanup verification are in `metadata/graphics_startup.md`.
+
 - **2026-10-25, original main-menu rendering under a bounded startup override:**
   With hooks confirmed on the suspended original child, the probe changed only
   the first successful `GetAvailableVidMem` total from `0xFFFF0000` to

@@ -161,16 +161,25 @@ before resume. It changed only the first successful query's total output from
 `0xFFFF0000` to `0x00200000`; the free output and later queries were left
 alone. The classifier returned class 4 and stored 4 at `0x509C2C`. Both
 DirectDraw `CreateSurface` calls returned S_OK, including the 640x480 surface
-with descriptor flags `0x47`. A follow-up run with the same bounded override
-hooked DirectDraw surface `Blt`, `Flip`, `Lock`, and `Unlock` calls. It observed
-12 successful blits, 24 successful locks, 24 unlocks (23 S_OK and one
-`0x887601C2`), and no Flip calls during the 30-second observation. The retained
-640x480 screenshot
-`../../analysis/reference_captures/original_menu_render_20261025.png`
-(SHA-256 `DD27A87189FFD5673D1BFB87F4E97EEA76770CF2469062B5398A1AC7DB0667F2`)
-shows the rendered Viper Racing title/menu screen. Its event trace is
-`../../analysis/reference_captures/original_menu_render_20261025_events.json`.
-This confirms main-menu rendering after the process-only memory override; it
-does not confirm an in-race frame or general-purpose compatibility. Cleanup is
-verified and hashes of the launcher, engine, ISO, and all 31 GameData files
-match their baselines.
+with descriptor flags `0x47`. The follow-up with the same bounded override
+hooked DirectDraw surface `Blt`, `Flip`, `Lock`, and `Unlock` calls. It used
+three controlled clicks to open Quick Race, keep the default Dodge Viper /
+Bemidji / Easy / Arcade / 3-lap setup, and select RACE. Captures show the main
+menu, Quick Race setup, Bemidji starting-grid panel, and the 640x480 3D race
+scene at Lap 1/3, Position 8/8, with countdown lights and 0 MPH. The final
+frame
+`../../analysis/reference_captures/viper-quickrace-frame_03_after_action_2.png`
+confirms a rendered gameplay start scene, but no vehicle movement or completed
+lap was confirmed. Across the 55-second post-resume trace, the hooks observed
+2,484 successful blits, 3,969 locks, and 3,969 unlocks (3,968 S_OK and one
+`0x887601C2`), 137 successful surface creations, and no Flip calls. The full
+event trace is
+`../../analysis/reference_captures/viper-quickrace-trace.json` (SHA-256
+`8C951CC238686BBA97C9342A83327757821BB848817175BFDF251E975A7EDD96`). The
+first menu screenshot is
+`../../analysis/reference_captures/original_menu_render_20261025.png` (SHA-256
+`DD27A87189FFD5673D1BFB87F4E97EEA76770CF2469062B5398A1AC7DB0667F2`). These
+captures prove startup and drawing only under the process-only video-memory
+override in this environment; they do not establish general compatibility.
+Cleanup is verified and hashes of the launcher, engine, ISO, and all 31
+GameData files match their baselines.
