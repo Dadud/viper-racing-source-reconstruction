@@ -115,6 +115,7 @@ target_compile_features(viper_pcar_model PUBLIC cxx_std_20)
 add_library(viper_update_curve src/update_curve.cpp)
 target_include_directories(viper_update_curve PUBLIC include)
 target_compile_features(viper_update_curve PUBLIC cxx_std_20)
+target_link_libraries(viper_pcar_model PUBLIC viper_update_curve)
 
 add_library(viper_language_resource src/language_resource.cpp)
 target_include_directories(viper_language_resource PUBLIC include)

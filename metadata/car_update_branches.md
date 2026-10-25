@@ -190,18 +190,17 @@ Both paths join at `0x43B950`/`0x4331C0`. If `0x43B9F0` returns true,
 `advance_pcar_callback_branch` now projects this split and its direct stores.
 The constant at `0x4C814C` is verified from the executable bytes as
 `9A 99 99 3E` (`0x3E99999A`, 0.3f), used for the `max` written to `+0x54`.
-The wrapper effects of `0x4331E0` and `0x433210` remain explicit optional raw
-DWORD observations: if a selected call lacks its copied `+0xD64` result, the
-model returns incomplete without mutation. In the false-gate, clear-`+0xEC8`
-arm, `0x43B9A0`'s EAX result is also an explicit input: native code passes it
-to `0x4331E0` when the `+0xEC9`/`+0xC7C` condition is true. After that optional
-helper, native code reloads object `+0xD64` and passes that final DWORD to
-`0x43B9B0`; it does not store the helper argument or a global value directly.
-Regression covers gate precedence,
-`+0xEC8`, `+0xEC9`, the strict signed `+0xC7C` threshold, the observed helper
-copy, the `+0x54` floor, and status bits. This remains a standalone model;
-runtime callback dispatch and the embedded selector helper internals are not
-implemented.
+The branch model now performs the `0x4331E0` selector setter and `+0xCBC` to
+`+0xD64` copy directly, sourcing its conditional argument from global
+`0x5093BC` returned by `0x43B9A0`. The `0x433210` path invokes the numeric
+`update_embedded_selection` model and copies its resulting `+0xCBC` to
+`+0xD64`; selector and curve snapshots are required for that path. The
+false-gate, clear-`+0xEC8` arm then reports the post-helper `+0xD64` value
+passed to `0x43B9B0`. Regression covers gate precedence, the direct wrapper
+copies, `+0xEC8`, `+0xEC9`, the strict signed `+0xC7C` threshold, the
+`+0x54` floor, missing-input atomicity, and status bits. This remains a
+standalone model; runtime callback dispatch and live selector/curve snapshots
+are not yet connected.
 The floor constant bytes were read from the shipped `race.bin` at `0x4C814C`
 (`ev_c1a1c96bc554d4b7efe42229fd89168076d2116e4f6cb2b020456143cbca6054`).
 

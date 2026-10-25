@@ -6,6 +6,8 @@
 #include <optional>
 #include <span>
 
+#include "viper/update_curve.hpp"
+
 namespace viper {
 
 // Raw fields used by 0x4330F0. Names preserve offsets because their game
@@ -171,14 +173,14 @@ struct PcarCallbackControlResult {
     PcarCallbackControlState& state,
     const PcarCallbackControlObservation& observation) noexcept;
 
-// State and helper-result observations for the 0x4384D0 branch at 0x438552.
-// Optional raw DWORD copies represent unresolved 0x4331E0/0x433210 effects.
+// Byte-backed state for the 0x4384D0 branch at 0x438552.
 struct PcarCallbackBranchFields {
     PcarScalarFields scalars{};
     float value_0x54{};
     std::uint8_t value_0xec8{};
     std::uint8_t value_0xec9{};
     float value_0xc7c{};
+    std::uint32_t value_0xcbc{};
     std::uint32_t value_0xd64{};
     float value_0xc34{};
     std::uint32_t value_0x4{};
@@ -186,10 +188,9 @@ struct PcarCallbackBranchFields {
 
 struct PcarCallbackBranchObservation {
     PcarCallbackGlobals globals{};
-    // Raw EAX returned by 0x43B9A0 in the false-gate, +0xEC8-clear arm.
-    std::optional<std::uint32_t> value_from_0x43b9a0;
-    std::optional<std::uint32_t> copied_value_0xd64_from_0x4331e0;
-    std::optional<std::uint32_t> copied_value_0xd64_from_0x433210;
+    // Numeric snapshots consumed by the embedded 0x43FDD0 selector.
+    std::optional<EmbeddedSelectionFields> selector_0xc98;
+    std::optional<UpdateCurveFields> curve_0xbfc;
 };
 
 struct PcarCallbackBranchResult {
@@ -203,8 +204,9 @@ struct PcarCallbackBranchResult {
     std::optional<std::int32_t> argument_0x4331e0;
 };
 
-// Reconstructs the branch routing and direct stores. Returns incomplete
-// without mutation if a selected unresolved helper result is unknown.
+// Reconstructs the branch routing, 0x4331E0 setter/copy, and numeric
+// 0x433210 selector/copy. Returns incomplete without mutation when a selected
+// 0x433210 call lacks its selector or curve state.
 [[nodiscard]] PcarCallbackBranchResult advance_pcar_callback_branch(
     PcarCallbackBranchFields& fields,
     const PcarCallbackBranchObservation& observation) noexcept;

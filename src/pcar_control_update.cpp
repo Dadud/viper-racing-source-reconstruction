@@ -176,45 +176,46 @@ PcarCallbackBranchResult advance_pcar_callback_branch(
 {
     PcarCallbackBranchResult result{};
     const auto& globals = observation.globals;
-    const bool call_4331e0 = globals.gate_0x5093f0 ||
-        (fields.value_0xec8 == 0U &&
-         (fields.value_0xec9 != 0U ||
-          std::bit_cast<std::int32_t>(fields.value_0xc7c) < 0x3f666666));
     const bool call_433210 = !globals.gate_0x5093f0 && fields.value_0xec8 != 0U;
     const bool call_43b9a0 = !globals.gate_0x5093f0 && fields.value_0xec8 == 0U;
-    if ((call_4331e0 && !observation.copied_value_0xd64_from_0x4331e0) ||
-        (call_433210 && !observation.copied_value_0xd64_from_0x433210) ||
-        (call_43b9a0 && !observation.value_from_0x43b9a0)) {
+    const bool call_4331e0_after_value = call_43b9a0 &&
+        (fields.value_0xec9 != 0U ||
+         std::bit_cast<std::int32_t>(fields.value_0xc7c) < 0x3f666666);
+    if (call_433210 && (!observation.selector_0xc98 ||
+                        !observation.curve_0xbfc)) {
         return result;
     }
 
-    if (call_4331e0) {
-        fields.value_0xd64 = *observation.copied_value_0xd64_from_0x4331e0;
+    if (globals.gate_0x5093f0) {
+        constexpr std::int32_t argument = -1;
+        fields.value_0xcbc = std::bit_cast<std::uint32_t>(argument);
+        fields.value_0xd64 = fields.value_0xcbc;
         result.called_0x4331e0 = true;
-        result.argument_0x4331e0 = globals.gate_0x5093f0
-            ? -1
-            : std::bit_cast<std::int32_t>(globals.value_0x5093bc);
-        if (globals.gate_0x5093f0) {
-            constexpr float constant_0x4c814c =
-                std::bit_cast<float>(std::uint32_t{0x3e99999aU});
-            fields.value_0x54 = globals.value_0x5093f4;
-            if (fields.value_0x54 < constant_0x4c814c) {
-                fields.value_0x54 = constant_0x4c814c;
-            }
+        result.argument_0x4331e0 = argument;
+        constexpr float constant_0x4c814c =
+            std::bit_cast<float>(std::uint32_t{0x3e99999aU});
+        fields.value_0x54 = globals.value_0x5093f4;
+        if (fields.value_0x54 < constant_0x4c814c) {
+            fields.value_0x54 = constant_0x4c814c;
         }
     } else if (call_433210) {
-        fields.value_0xd64 = *observation.copied_value_0xd64_from_0x433210;
+        auto selection = *observation.selector_0xc98;
+        selection.current_index_0x24 = std::bit_cast<std::int32_t>(
+            fields.value_0xcbc);
+        const auto selected = update_embedded_selection(
+            selection, *observation.curve_0xbfc);
+        fields.value_0xcbc = std::bit_cast<std::uint32_t>(selected);
+        fields.value_0xd64 = fields.value_0xcbc;
         result.called_0x433210 = true;
-    }
-    if (call_43b9a0) {
-        const bool call_4331e0_after_value = fields.value_0xec9 != 0U ||
-            std::bit_cast<std::int32_t>(fields.value_0xc7c) < 0x3f666666;
+    } else if (call_43b9a0) {
         if (call_4331e0_after_value) {
-            result.argument_0x4331e0 = std::bit_cast<std::int32_t>(
-                *observation.value_from_0x43b9a0);
+            const auto argument = std::bit_cast<std::int32_t>(
+                globals.value_0x5093bc);
+            fields.value_0xcbc = std::bit_cast<std::uint32_t>(argument);
+            fields.value_0xd64 = fields.value_0xcbc;
+            result.argument_0x4331e0 = argument;
+            result.called_0x4331e0 = true;
         }
-    }
-    if (call_43b9a0) {
         // After optional 0x4331E0, native code reloads +0xD64 for 0x43B9B0.
         result.wrote_0x5093bc = true;
         result.output_0x5093bc = fields.value_0xd64;
