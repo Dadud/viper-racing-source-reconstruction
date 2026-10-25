@@ -114,6 +114,10 @@ success for WM_KEYDOWN/WM_KEYUP, but the window title did not change. These
 results do not show that either input was consumed by the frontend and produced
 no gameplay evidence. The next attempt needs a confirmed foregrounded original
 window and an observed accepted menu transition before arming the wheel probe.
+At the latest read-only foreground check, Windows reported a separate
+`PickerHost`/`Shell_SystemDialog` window titled `Windows Security` as active;
+the staged `race.bin` window was still in the background. No global keyboard
+input was sent while another application's dialog owned the foreground.
 
 ## Pairing a scenario
 

@@ -1583,6 +1583,21 @@ the constant is not proof of a fixed 60 Hz simulation.
 
 ## Shared terrain surface query
 
+Revalidation against the hash-matched original on 2026-10-25 confirms that the
+current plane sampler models the query performed by the wheel caller: `0x45F760`
+constructs `(x, 0, z)`, invokes `0x4672B0`, and copies the returned plane
+intersection plus the signed 16-bit feature at plane offset `+0x34`. The shared
+helper quantizes coordinates for partition lookup but uses the original X/Z to
+solve plane height; Y does not select the plane or affect that height. Thus the
+live `sample_terrain_surface` call uses the reconstructed terrain-query
+algorithm. Its remaining limitation is the supplied origin and missing
+downstream response: the current runtime derives the origin from route pose
+plus constructor wheel anchors and keeps the initial PCAR basis, rather than
+from an evolving native body transform, and does not feed query output into
+the live suspension/force/body step. Ghidra Evidence for the wrapper and
+sampler: `0x45F760` `ev_4acbfe6d2397810fe55e429197e8f54269e4440fad4631decd123f188e3a5652`;
+`0x4672B0` `ev_02a12b56b8da3a7c9bbd70acea0ae1696edd55d1a9b5d5edc3fa23baaf6dc868`.
+
 The shared terrain query used by wheel contact, camera placement, and track-object queries is reconstructed in `terrain_surface`. It quantizes each input coordinate by dividing by `0.001`, adding `0.5`, converting to a signed integer with truncation, then multiplying by `0.001`. It uses quantized X/Z for a binary partition walk; each node evaluates `split_x * x + split_z * z + offset` and follows the positive side only when the result is greater than zero. A selected plane is valid only when `abs(normal_y) > 2^-23`. Height is computed from the original, unquantized X/Z as `-(x*normal_x + z*normal_z + offset)/normal_y`, and the returned X/Z remain the original coordinates. The 56-byte plane row retains its nine unused float values and signed feature at `+0x34`.
 
 `update_wheel_contact_from_terrain` now feeds a successful terrain result into the already reconstructed contact gate and stores: the sampled point, plane normal, and sign-extended feature. The query runs only when the body-query gate is enabled. The `track.bpp` TPPB v2 resource loader, 20-byte header, 56-byte planes, 28-byte partition nodes, and child-index fixup are now modeled in `terrain_surface`; its adapter supplies the parsed arrays to the sampler. The bounded parser rejects malformed records before building spans, while the original loader reports invalid child references through its panic helper. Portable long-double arithmetic approximates the original x87/`FDIV` paths; exact rounding and the compatibility software-division implementation remain open. Evidence: `ev_02a12b56b8da3a7c9bbd70acea0ae1696edd55d1a9b5d5edc3fa23baaf6dc868` (`0x4672B0`), `ev_3b54b33fed139732b6d29cd5b02c95e11ebe5e2b455a9b2de89bc3e48b4e4ae5` (`0x467260`), and `ev_4acbfe6d2397810fe55e429197e8f54269e4440fad4631decd123f188e3a5652` (`0x45F760`).

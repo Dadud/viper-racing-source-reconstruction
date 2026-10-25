@@ -16,11 +16,14 @@ Viper/Bemidji, Sports/Bemidji, and Sports/Dundas additionally exercise selector
 changes and saved-selection reload. `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
-body accumulators, collisions, or pose integration. The terrain projection
-uses the last committed route-pose position when available and keeps the
-initialized PCAR basis; it does not write route state into PCAR. The body
-remains static in the live session, and the projection remains a terrain sample
-rather than the native collision-world query. This is explicitly
+body accumulators, collisions, or pose integration. The terrain plane sampler
+matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result,
+but the live query origin uses the last committed route-pose position when
+available and the constructor-initialized PCAR basis. It does not write route
+state into PCAR. The body remains static in the live session, so these queries
+do not use a physics-updated wheel/body transform and their results are still
+not connected to collision response, suspension force, or pose integration.
+This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
 [`completion_ledger.md`](completion_ledger.md). Existing portable physics
 models are substantial but many still accept caller observations and are not
@@ -54,8 +57,9 @@ Four wheel contact projections now transform constructor wheel anchors through
 the initialized byte-backed PCAR body basis and position and project along its
 up axis. `trace_replay_regression.ps1` confirms the supported terrain query
 samples remain valid through a deterministic full Viper/Bemidji race. This
-does not advance body pose, run the native collision query, produce native
-forces, or transfer pose authority from the route prototype.
+does not advance body pose, use a physics-updated native wheel/body query
+origin, produce native forces, or transfer pose authority from the route
+prototype.
 The native wheel-query origin producer is now pinned to the exact inputs at
 `0x442530`: wheel local position `+0x04..+0x0C` plus the referenced point at
 `+0x10`, transformed by all twelve body floats `+0x38..+0x64` through
