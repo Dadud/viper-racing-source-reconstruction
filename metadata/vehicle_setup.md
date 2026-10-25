@@ -287,9 +287,9 @@ position at `+0x04..+0x0C`, piecewise terms at `+0x24..+0x30`, geometry and
 steering fields at `+0x3C..+0x64`, and surface coefficients at `+0x9C/+0xA0`.
 Each store marks only its four bytes initialized. This keeps the setup-derived
 values in the same persistent objects as later contact outputs; it does not
-run the per-frame suspension path. Wheel `+0x158` is still copied from the
-mutable body `+0x50C` during the native frame update, whose callback and sample
-state are not yet owned by the live session.
+run the per-frame suspension path. The mutable source and writer for the actual
+wheel object's `+0x158` remain unresolved; do not infer them from the separate
+frame-context row produced by `0x4329C0`.
 
 ### TIRE field consumption at `0x435BF0`
 
@@ -658,16 +658,19 @@ flag at `+0x20` is set, the `+0x3C` product is reduced by 90 percent. The
 combined scalar corresponds to the wheel store at `+0x178`; field meanings
 remain raw offsets.
 
-The per-frame wheel update context at `0x4329C0` copies body `+0x50C` into
-wheel-context `+0x158` before calling the wheel routine. The local player uses
-the PCAR callback `0x4384D0`; the PCAR derived constructor `0x42FF90` sets
-`+0x50C = 1.0`, which is constructor state only. The shared integrator path
-contains a ramp/reset writer at `0x433570`; NCAR callback `0x439200` has
-additional gated decrement/assignment paths. The record-driven `0x432420`
-writer belongs to the separate GCAR GhostBegin playback ring and is not the
-player's live ring. Thus the transfer into wheel `+0x158` is identified; the
-unresolved live value is the mutable body `+0x50C` produced by the PCAR timer
-branch and its callback ordering. These per-frame effects are modeled, and the
+The frame-context builder at `0x4329C0` copies body `+0x50C` into a separate
+context row at `+0x158`, then calls `0x444120` to populate that row. This does
+not establish a write to the actual wheel object's `+0x158`: PCAR integrator
+`0x431150` passes the four car-owned wheel objects directly to `0x442530`, and
+no call from that path to `0x4329C0` is present in its recovered body. The PCAR
+derived constructor `0x42FF90` sets body `+0x50C = 1.0`, which is constructor
+state only. The shared integrator path contains a ramp/reset writer at
+`0x433570`; NCAR callback `0x439200` has additional gated decrement/assignment
+paths. The record-driven `0x432420` writer belongs to the separate GCAR
+GhostBegin playback ring and is not the player's live ring. The actual wheel
+`+0x158` writer and its relationship, if any, to the `0x4329C0` context row
+remain unresolved, as do the live body timer inputs and callback ordering.
+These per-frame effects are modeled, and the
 runtime now stores the known shared-constructor body bytes, PCAR vtable/initial
 `+0x50C`, settings-derived shift/clutch/yaw bytes, and per-wheel traction/ABS
 stores in persistent byte-backed state. Each race update also writes the

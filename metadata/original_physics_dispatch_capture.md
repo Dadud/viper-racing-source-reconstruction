@@ -512,8 +512,12 @@ it computes elapsed time from `FUN_00425790() - body+0xE44`, applies the
 captured 6.2-second ramp gate, and advances `+0xE44` by `0.016` only on its
 near-participant branch. The live wheel-history capture saw `+0xE44 == -100`
 and `+0x50C == 1` throughout the selected eight updates, so it did not observe
-this ramp advancing. The `0x4329C0` body-to-wheel `+0x158` copy is known; the
-runtime `+0x50C` branch inputs and callback order remain unresolved. Ghidra
+this ramp advancing. `0x4329C0` copies body `+0x50C` into a separate
+frame-context row at `+0x158`; it does not prove a write to the actual wheel
+object. The PCAR integrator passes its car-owned wheel objects directly to
+`0x442530`, and the recovered `0x431150` body contains no call to `0x4329C0`.
+The actual wheel `+0x158` writer, runtime `+0x50C` branch inputs, and callback
+order remain unresolved. Ghidra
 Evidence ID:
 `ev_98635cd43aa39a1c3cd84a9f9cd488bca08e122c47540014cd16fec738b76d7c`.
 

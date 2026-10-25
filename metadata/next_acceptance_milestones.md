@@ -249,8 +249,10 @@ override reported a query and neither produced a timer row. One attempt used
 the retries still do not identify the early startup exit branch. The successful
 original-client launch path is already established with the documented
 first-query video-memory override. Resolve the staged-copy startup divergence
-before repeating that capture. The transfer into wheel `+0x158` is known; the
-live body `+0x50C` timer value and callback order remain unresolved.
+before repeating that capture. `0x4329C0` copies body `+0x50C` into a separate
+frame-context row at `+0x158`; this does not identify the writer of the actual
+wheel object's `+0x158`. The live body `+0x50C` timer value and callback order
+remain unresolved.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
@@ -392,14 +394,19 @@ gate/global values and obstacle model lookup order, and feed the stream through
 the observed task factory while retaining its objects for fixed-step dispatch.
 Then reconstruct mutable
 PCAR callback/force state and establish tick/fraction and callback ordering.
-The transfer from body `+0x50C` to wheel `+0x158` is already identified at
-`0x4329C0`; the remaining timer dependency is the live `+0x50C` value produced
-by the gated `0x433570` branch. The GCAR GhostBegin ring is separate and must
-not be used as a substitute for that PCAR value. Only when the full per-frame
-inputs are sourced can the session connect the shared integrator and feed
-evidence-backed `+0x50C` and `+0xE8` values into the wheel/body composition. In
-parallel, the polarity initializer still needs the actual common-startup timer
-backend and a single shared stream whose call order includes non-wheel
+`0x4329C0` is a separate context-row producer: its row `+0x158` receives body
+`+0x50C`, but the routine calls `0x444120` to populate that row. The PCAR
+integrator's four car-owned wheel objects are passed directly to `0x442530`;
+the actual wheel-object `+0x158` writer and any relationship to the context
+row remain unknown. The gated `0x433570` branch is a candidate body timer
+producer, but the capture did not observe its ramp advancing, so its live
+inputs and callback ordering remain unresolved. The GCAR GhostBegin ring is
+separate and must not be used as a substitute for PCAR callback state. Only
+when the complete per-frame inputs and object mapping are sourced can the
+session connect the shared integrator and feed evidence-backed `+0x158` and
+`+0xE8` values into the wheel/body composition. In parallel, the polarity
+initializer still needs the actual common-startup timer backend and a single
+shared stream whose call order includes non-wheel
 consumers. Keep these as
 explicit dependencies; do not claim the existing models are live physics.
 
