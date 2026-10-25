@@ -10,8 +10,10 @@ requirements and final gates remain in [`completion_ledger.md`](completion_ledge
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
-placeholders, standings, and a return-to-setup path. Trace-driven sessions
-exercise a Viper/Bemidji lap and results lifecycle. `src/game_main.cpp`
+placeholders, standings, and a return-to-setup path. The trace-driven frontend
+lifecycle now reaches results on all eight tracks through the route prototype;
+Viper/Bemidji, Sports/Bemidji, and Sports/Dundas additionally exercise selector
+changes and saved-selection reload. `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
 body accumulators, collisions, or pose integration. This is explicitly

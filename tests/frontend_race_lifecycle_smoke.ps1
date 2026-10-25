@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_frontend_race_$([guid]::NewGuid().ToString('N'))"
 $capture = Join-Path $root 'capture.csv'
-$raceTrace = Join-Path $root 'viper-bemidji-two-lap.csv'
+$raceTrace = Join-Path $root 'two-lap-full-throttle.csv'
 $config = Join-Path $root 'Config'
 
 Add-Type @'
@@ -190,7 +190,53 @@ try {
     if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after the persisted-selection check' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "relaunch exited with code $($process.ExitCode)" }
-    Write-Output 'Two-lap Viper/Bemidji, Sports/Bemidji, and Sports/Dundas trace races reached results; track, car, and lap count persisted across a clean relaunch.'
+    Write-Output 'Viper/Bemidji, Sports/Bemidji, and Sports/Dundas trace races reached results; track, car, and lap count persisted across a clean relaunch.'
+
+    # Exercise setup-to-results lifecycle on every other shipped track. Seed
+    # each isolated Config with the selected track so this does not depend on
+    # undocumented tracks.tab ordering or selector wrap counts.
+    foreach ($track in @('hastings', 'heaven', 'kenyon', 'limbo', 'nfield', 'uptown')) {
+        $trackConfig = Join-Path $root "Config-$track"
+        New-Item -ItemType Directory -Path $trackConfig | Out-Null
+        $selection = "VIPER-RACING-SETUP 2`ntrack=$track`ncar=sports`nlaps=2`n"
+        $preferencePath = Join-Path $trackConfig 'viper-racing-setup.cfg'
+        [System.IO.File]::WriteAllText($preferencePath, $selection,
+            [System.Text.Encoding]::ASCII)
+
+        $startInfo = [Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = $GameExe
+        $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$trackConfig`" --software --play-trace `"$raceTrace`""
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $process = [Diagnostics.Process]::Start($startInfo)
+        $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
+        Press-Key $setup 13
+        $race = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30
+        $trackTitle = [System.Text.StringBuilder]::new(256)
+        for ($attempt = 0; $attempt -lt 20 -and $trackTitle.Length -eq 0; ++$attempt) {
+            [void][ViperRaceFrontendWin32]::GetWindowText($race, $trackTitle, $trackTitle.Capacity)
+            if ($trackTitle.Length -eq 0) { Start-Sleep -Milliseconds 50 }
+        }
+        if ($trackTitle.ToString() -notmatch "$([regex]::Escape($track)).*sports" -or
+            $trackTitle.ToString() -notmatch 'Lap 1/2') {
+            throw "Setup did not start the selected two-lap Sports/$track race: $($trackTitle.ToString())"
+        }
+        $setup = Wait-ResultsReturn $process 60
+        Press-Key $setup 27
+        if (-not $process.WaitForExit(15000)) {
+            throw "Viper Racing did not exit after the Sports/$track results lifecycle"
+        }
+        $process.Refresh()
+        if ($process.ExitCode -ne 0) { throw "Sports/$track lifecycle exited with code $($process.ExitCode)" }
+        $preference = [System.IO.File]::ReadAllText($preferencePath)
+        if ($preference -notmatch "(?m)^track=$track$" -or
+            $preference -notmatch '(?m)^car=sports$' -or
+            $preference -notmatch '(?m)^laps=2$') {
+            throw "Sports/$track setup selection was not retained: $preference"
+        }
+        Write-Output "Sports/$track trace race reached results and returned to setup."
+    }
+    Write-Output 'Trace-driven setup/result lifecycle reached all eight shipped tracks; original-game parity and physical simulation remain unverified.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
