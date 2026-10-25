@@ -144,7 +144,11 @@ bool Session::receive_state(StateSnapshot& snapshot) {
     std::vector<std::uint8_t> body(length); receive_all(impl_->socket,body.data(),body.size());
     if (body[0]!=1) throw std::runtime_error("unknown multiplayer frame type");
     const auto sequence=get_u32(body.data()+1);
-    if (impl_->received_any && static_cast<std::int32_t>(sequence-impl_->last_received)<=0) return false;
+    // RFC-style serial-number ordering without converting an out-of-range
+    // unsigned value to a signed integer (whose result is implementation-defined).
+    const auto sequence_delta = sequence - impl_->last_received;
+    if (impl_->received_any &&
+        (sequence_delta == 0 || sequence_delta >= (std::uint32_t{1} << 31))) return false;
     impl_->last_received=sequence; impl_->received_any=true;
     snapshot.sequence=sequence; snapshot.simulation_tick=get_u32(body.data()+5);
     snapshot.payload.assign(body.begin()+9,body.end()); return true;
