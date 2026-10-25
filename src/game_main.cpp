@@ -1765,10 +1765,14 @@ struct WindowState {
             return false;
         }
         const auto constructor_subobjects =
-            viper::plan_ncar_constructor_subobject_defaults();
+            viper::plan_ncar_constructor_subobject_defaults(
+                read_u32_le(player_runtime_car_record.data() + 0x194U));
         if (!viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object,
-                constructor_subobjects.embedded_curve_selector_writes)) {
+                constructor_subobjects.embedded_curve_selector_writes) ||
+            !viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                constructor_subobjects.source_record_identity_writes)) {
             player_runtime_car_record.clear();
             player_body_constructor_plan.reset();
             return false;
@@ -3176,6 +3180,22 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::cout << " at entry " << *ordered_track_records.failed_manifest_entry;
     bool player_constructor_ready = false;
     if (ordered_track_records.complete) {
+        const auto ordered_player_record = std::find_if(
+            ordered_track_records.records.begin(), ordered_track_records.records.end(),
+            [&](const auto& record) {
+                return record.configured_car_index == player_car_index &&
+                    record.record_tag == 0x50434152U;
+            });
+        if (ordered_player_record == ordered_track_records.records.end() ||
+            ordered_player_record->record_bytes.size() !=
+                viper::CarFileRuntimeMapping::runtime_record_size) {
+            std::cerr << "The ordered stream has no complete PCAR for the selected player.\n";
+            DestroyWindow(hwnd);
+            return 1;
+        }
+        // The ordered join supplies the native car ordinal at +0x194. Keep the
+        // expected player record identical to the bytes that will be serialized.
+        state.player_runtime_car_record = ordered_player_record->record_bytes;
         state.full_task_record_stream.emplace(
             state.physics_task_manifest->initial_cursor);
         bool stream_ok = true;

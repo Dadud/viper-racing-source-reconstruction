@@ -202,18 +202,22 @@ void check_car_record_deferral_is_ordered_and_explicit()
     car_records[0].record_bytes.resize(0x1e4U);
     write_u32(car_records[0].record_bytes, 0U, 0x50434152U);
     write_u32(car_records[0].record_bytes, 4U, 0x1e4U);
+    write_u32(car_records[0].record_bytes, 0x194U, 0xffffffffU);
     car_records[1].configured_car_index = 1U;
     car_records[1].record_bytes.resize(0x1e4U);
     write_u32(car_records[1].record_bytes, 0U, 0x41434152U);
     write_u32(car_records[1].record_bytes, 4U, 0x1e4U);
+    write_u32(car_records[1].record_bytes, 0x194U, 0xffffffffU);
     const auto completed = viper::plan_ordered_track_task_records(
         materialized, manifest, car_records);
     require(completed.complete && completed.records.size() == 4U &&
-            completed.records[1].record_bytes == car_records[0].record_bytes &&
-            completed.records[3].record_bytes == car_records[1].record_bytes &&
+            completed.records[1].record_bytes != car_records[0].record_bytes &&
+            completed.records[3].record_bytes != car_records[1].record_bytes &&
+            read_u32(completed.records[1].record_bytes, 0x194U) == 0U &&
+            read_u32(completed.records[3].record_bytes, 0x194U) == 1U &&
             completed.records[1].cursor_offset == manifest.entries[1].cursor_offset &&
             completed.records[3].cursor_offset == manifest.entries[3].cursor_offset,
-        "complete car inputs must fill their track and appended positions");
+        "complete configured cars must fill their ordered positions with source ordinals");
 
     std::vector<viper::PhysicsTaskRecordInput> stream_inputs;
     stream_inputs.reserve(completed.records.size());

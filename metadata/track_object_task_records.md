@@ -17,12 +17,16 @@ setup, model-name, and placement inputs. It checks their tag/size headers and
 the matching deferred source row before joining them. It reports the first
 manifest entry without a complete matching record and is complete only when
 the manifest and all record rows are covered. This is an ordering/validation
-layer, not a serializer or native task-array loader. The runtime now produces
-the player's PCAR and selected AI ACAR record bytes from their setup, CARF,
-model name, and placement inputs, then checks their configured indices and tags
-against the manifest. It still does not pass those records through this ordered
-join or load a full task stream; NCAR/GCAR entries and all materialized
-non-car records also remain unresolved at runtime.
+layer, not a native task-array loader. For PCAR/ACAR records it writes the
+zero-based car-record ordinal at `+0x194` from their position among car-tagged
+manifest entries, matching the native parser's incrementing ordinal. The
+runtime produces the player's PCAR and selected AI ACAR records from setup,
+CARF, model name, and placement inputs; it runs the ordered join, serializes
+the full manifest stream, reads it back, and initializes the player from its
+bound PCAR bytes. Runtime task-object materialization is still partial:
+callback-bearing NCAR/GCAR work and some active track-object records remain
+unavailable, so this framing/readback is not proof of native physics-task
+allocation or a complete simulation.
 
 The materializer uses the existing line/record models for:
 

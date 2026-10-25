@@ -92,6 +92,7 @@ int main()
         const auto constructor_subobjects =
             viper::plan_ncar_constructor_subobject_defaults();
         require(constructor_subobjects.constructor_tail_source_unknown &&
+                constructor_subobjects.source_record_identity_writes.empty() &&
                 !constructor_subobjects.embedded_curve_selector_writes.empty() &&
                 viper::apply_ncar_body_object_writes(body_runtime_state,
                     constructor_subobjects.embedded_curve_selector_writes) &&
@@ -102,6 +103,14 @@ int main()
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0xc9cU) &&
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0xcc4U),
             "known curve/selector defaults must preserve native links and leave the runtime table unknown");
+        const auto constructor_subobjects_with_identity =
+            viper::plan_ncar_constructor_subobject_defaults(7U);
+        require(!constructor_subobjects_with_identity.constructor_tail_source_unknown &&
+                constructor_subobjects_with_identity.source_record_identity_writes.size() == 2U &&
+                viper::apply_ncar_body_object_writes(body_runtime_state,
+                    constructor_subobjects_with_identity.source_record_identity_writes) &&
+                read_body_dword(0x510U) == 7U && read_body_dword(0xd78U) == 7U,
+            "body constructor must copy the serialized car ordinal into both identity fields");
         const std::array<viper::NcarObjectFieldWrite, 2> selector_offset_writes{{
             {0xca0U, 4U, 0x3e587910U},
             {0xcb0U, 4U, 0U},

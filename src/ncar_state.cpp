@@ -2419,6 +2419,9 @@ NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
             (offset >= 0x0c98U && offset < 0x0d04U)) {
             result.embedded_curve_selector_writes.push_back(field);
         }
+        if (offset == 0x0510U || offset == 0x0d78U) {
+            result.source_record_identity_writes.push_back(field);
+        }
     };
 
     // 0x440100 at parent +0xBFC. Its inherited 0x43F8F0 base is followed

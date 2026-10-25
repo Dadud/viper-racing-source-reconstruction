@@ -315,6 +315,9 @@ struct NcarConstructorSubobjectDefaultsPlan {
     // Known embedded curve/selector defaults only; excludes unresolved source
     // record tail values and runtime-populated selector table entries.
     std::vector<NcarObjectFieldWrite> embedded_curve_selector_writes;
+    // Identity ordinal copied from runtime-record dword +0x194 into the body
+    // constructor's +0x510 and +0xD78 fields when that source is available.
+    std::vector<NcarObjectFieldWrite> source_record_identity_writes;
     std::size_t update_curve_subobjects_initialized{};
     std::size_t selector_subobjects_initialized{};
     std::size_t linked_state_subobjects_initialized{};

@@ -381,6 +381,15 @@ OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
             (std::to_integer<std::uint32_t>(bytes[offset + 2U]) << 16U) |
             (std::to_integer<std::uint32_t>(bytes[offset + 3U]) << 24U);
     };
+    const auto write_u32_le = [](const std::span<std::byte> bytes,
+                                 const std::size_t offset,
+                                 const std::uint32_t value) {
+        for (std::size_t byte = 0U; byte < sizeof(value); ++byte) {
+            bytes[offset + byte] = static_cast<std::byte>(
+                (value >> (byte * 8U)) & 0xffU);
+        }
+    };
+    std::uint32_t source_car_ordinal = 0U;
 
     for (std::size_t index = 0; index < manifest.entries.size(); ++index) {
         const auto& entry = manifest.entries[index];
@@ -430,7 +439,17 @@ OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
                 if (valid_header && matching_deferred_row) {
                     record.source_status = TrackObjectTaskRecordStatus::complete_record;
                     record.record_bytes = car_input.record_bytes;
-                    complete_bytes = true;
+                    if (entry.record_tag == 0x50434152U ||
+                        entry.record_tag == 0x41434152U) {
+                        constexpr std::size_t ordinal_offset = 0x194U;
+                        if (record.record_bytes.size() >= ordinal_offset + 4U) {
+                            write_u32_le(record.record_bytes, ordinal_offset,
+                                source_car_ordinal);
+                            complete_bytes = true;
+                        }
+                    } else {
+                        complete_bytes = true;
+                    }
                     configured_car_record_used[*car_input_index] = true;
                 }
             } else if (entry.track_object_row.has_value()) {
@@ -471,6 +490,10 @@ OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
             result.complete = false;
             if (!result.failed_manifest_entry.has_value())
                 result.failed_manifest_entry = index;
+        }
+        if (entry.record_tag == 0x50434152U ||
+            entry.record_tag == 0x41434152U) {
+            ++source_car_ordinal;
         }
         result.records.push_back(std::move(record));
     }
