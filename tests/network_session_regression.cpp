@@ -63,6 +63,27 @@ int main() {
         std::cerr << "race state codec accepted speed outside route model bounds\n";
         return 1;
     }
+    auto next_race_state = expected_race_state;
+    next_race_state.race.elapsed_seconds += 0.016F;
+    if (!valid_race_state_update(expected_race_state, expected_race_state,
+            10U, 10U) ||
+        valid_race_state_update(expected_race_state, next_race_state, 10U, 10U) ||
+        !valid_race_state_update(expected_race_state, next_race_state, 10U, 13U) ||
+        !valid_race_state_update(expected_race_state, next_race_state,
+            0xffffffffU, 0U)) {
+        std::cerr << "race state tick validation mishandled repeats, advances, or wraparound\n";
+        return 1;
+    }
+    auto regressed_race_state = next_race_state;
+    regressed_race_state.race.completed_laps = 1U;
+    auto unfinished_race_state = next_race_state;
+    unfinished_race_state.race.finished = false;
+    if (valid_race_state_update(expected_race_state, next_race_state, 10U, 9U) ||
+        valid_race_state_update(expected_race_state, regressed_race_state, 10U, 11U) ||
+        valid_race_state_update(expected_race_state, unfinished_race_state, 10U, 11U)) {
+        std::cerr << "race state tick validation accepted a backwards or regressed state\n";
+        return 1;
+    }
     const RaceConfiguration expected_configuration{
         "bemidji", "viper", 3U, 0U, 8U, 2U};
     const auto encoded_configuration = encode_race_configuration(

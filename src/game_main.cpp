@@ -4464,18 +4464,22 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     viper::net::StateSnapshot remote_snapshot;
                     if (!state.network_session->receive_state(remote_snapshot))
                         throw std::runtime_error("stale multiplayer race state snapshot");
-                    if (state.remote_simulation_tick.has_value()) {
-                        const auto tick_delta = remote_snapshot.simulation_tick -
-                            *state.remote_simulation_tick;
-                        if (tick_delta != 0U &&
-                            tick_delta >= (std::uint32_t{1} << 31U))
-                            throw std::runtime_error(
-                                "multiplayer race state tick moved backwards");
-                    }
                     viper::RouteMotionState remote_state{};
                     if (!viper::net::decode_race_state(remote_snapshot.payload,
-                            remote_state) ||
-                        !state.apply_remote_race_state(remote_state))
+                            remote_state))
+                        throw std::runtime_error(
+                            "invalid multiplayer route state payload");
+                    if (state.remote_simulation_tick.has_value() &&
+                        (!state.remote_player_car_index.has_value() ||
+                         *state.remote_player_car_index >=
+                            state.opponent_motions.size() ||
+                         !viper::net::valid_race_state_update(
+                            state.opponent_motions[*state.remote_player_car_index],
+                            remote_state, *state.remote_simulation_tick,
+                            remote_snapshot.simulation_tick)))
+                        throw std::runtime_error(
+                            "multiplayer route state violates tick progression");
+                    if (!state.apply_remote_race_state(remote_state))
                         throw std::runtime_error(
                             "invalid multiplayer route state or terrain projection");
                     state.remote_simulation_tick = remote_snapshot.simulation_tick;

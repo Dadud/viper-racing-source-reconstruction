@@ -122,6 +122,29 @@ bool decode_race_state(const std::span<const std::uint8_t> bytes,
     return true;
 }
 
+bool valid_race_state_update(const RouteMotionState& previous,
+                             const RouteMotionState& current,
+                             const std::uint32_t previous_tick,
+                             const std::uint32_t current_tick) noexcept
+{
+    const auto tick_delta = current_tick - previous_tick;
+    if (tick_delta >= (std::uint32_t{1} << 31U)) return false;
+    if (tick_delta == 0U) {
+        return previous.route_segment == current.route_segment &&
+            previous.route_fraction == current.route_fraction &&
+            previous.steering == current.steering &&
+            previous.speed == current.speed &&
+            previous.race.lap_start_segment == current.race.lap_start_segment &&
+            previous.race.completed_laps == current.race.completed_laps &&
+            previous.race.elapsed_seconds == current.race.elapsed_seconds &&
+            previous.race.finished == current.race.finished &&
+            previous.route_distance_travelled == current.route_distance_travelled;
+    }
+    return current.race.completed_laps >= previous.race.completed_laps &&
+        current.race.elapsed_seconds >= previous.race.elapsed_seconds &&
+        (!previous.race.finished || current.race.finished);
+}
+
 std::vector<std::uint8_t> encode_race_configuration(
     const RaceConfiguration& configuration)
 {

@@ -31,8 +31,10 @@ binary32 elapsed seconds and signed route distance; one finished flag; and
 three reserved zero bytes. Segment bounds are checked against the receiving
 track, lap counts against the agreed race setup, and the decoded state must
 remain inside the route adapter's finite value ranges. The receiver also
-rejects a simulation tick that moves backwards under 32-bit serial arithmetic,
-while allowing repeated ticks when no fixed update occurred.
+validates simulation ticks with 32-bit serial arithmetic. Repeated ticks are
+accepted only when route state is byte-for-byte equivalent at the field level;
+forward ticks may skip values, but laps/time cannot regress and a finisher
+cannot become active again.
 
 Before opening the race window, both clients send a `VRC2` configuration as
 state sequence 0. The bounded record contains track and car resource stems,
@@ -59,7 +61,8 @@ route-motion prototype, this is not accepted gameplay multiplayer.
 `network_session_regression` checks handshake, bidirectional framing, tick and
 payload preservation, stale sequence rejection and wraparound, exact race
 state/configuration bytes, malformed state flags, bounded state values,
-configuration bounds, and distinct compatible player slots.
+configuration bounds, distinct compatible player slots, and tick/state
+progression including repeated-tick equivalence and wraparound.
 `race_progression_regression` verifies that projecting
 a replicated route state reproduces its pose without advancing it. With
 external game assets installed, `game_network_race_smoke` verifies mismatched

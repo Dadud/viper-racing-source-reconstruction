@@ -20,6 +20,13 @@ std::array<std::uint8_t, race_state_payload_size> encode_race_state(
 bool decode_race_state(std::span<const std::uint8_t> bytes,
                        RouteMotionState& state) noexcept;
 
+// Validates monotonic runtime state against the preceding peer snapshot.
+// Forward tick gaps are allowed; a repeated tick must carry identical state.
+bool valid_race_state_update(const RouteMotionState& previous,
+                             const RouteMotionState& current,
+                             std::uint32_t previous_tick,
+                             std::uint32_t current_tick) noexcept;
+
 // Reconstructed-client race agreement. Resource names and the selected
 // single-race parameters must match before either client enters the race.
 struct RaceConfiguration {
