@@ -50,6 +50,22 @@ unverified. `0x42b3e0` stores a selected candidate in fields around `+0xEDC` to
 consistent with retaining a nearest/strongest threat candidate but does not
 prove the original field names or AI response.
 
+The per-car update helper at `0x42a8a0` visits at most three pair records from
+the registry's third table layer. It invokes the car's virtual callback at
+`+0xECC` with each pair-record pointer, and calls `0x428a90` when that callback
+returns nonzero. `0x428a90` clamps the car field at `+0x1050` upward to 7.
+This establishes that pair records enter a native per-car callback before the
+rest of the update; it does not establish which concrete vtable target is
+installed for every car type.
+
+ACAR function `0x429e90` manipulates a circular per-car buffer addressed from
+`+0x1054`, with `+0x1058` as its slot count and 24-byte entries. The helper
+`0x428b10` computes a wrapped entry address from that base, count, current
+entry, and signed displacement. The callback path also queries four wheel
+subobjects and updates per-entry flag bytes. These operations connect the AI
+update to route/response history, but do not write the shared pair-record
+vectors identified above; the pair-state producer remains unresolved.
+
 ## Reconstruction status
 
 This registry has no live equivalent in the current source runtime. The
@@ -66,5 +82,12 @@ the source runtime before integrating any behavior.
 - Pair accessors: `0x41f0a0`, `0x41f0e0`.
 - Consumers and candidate selection: `0x42adb0`, `0x42b040`, `0x42b320`,
   `0x42b3e0`.
+- Pair dispatch and ACAR response-history path: `0x42a8a0`, `0x428a90`,
+  `0x429e90`, `0x428b10`.
 - Caller population and global references: `0x41a310`, `0x45b6b0`, and the
   cross-references to `DAT_004D45B0`.
+- Pair callback dispatch: `0x42a8a0` (`ev_16f7f8484a4d47a87caf8e6dd00ae2a2747a2e488626040b995bbc053d297bf9`),
+  `0x428a90` (`ev_5907d153d93267f5bd294d2550cd17f74e6f63a69e73c679fdd6398f61857f0f`),
+  `0x429e90` (`ev_a782385f42d81f8b92eded84ba2b914aade117a667fc70c44f3d2221ae779e16`),
+  and circular-buffer index helper `0x428b10`
+  (`ev_5fe8f92f19bf062e27beb6d2b20221b1b603a99728547928ac2741e215cea4a2`).
