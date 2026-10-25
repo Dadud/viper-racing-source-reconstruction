@@ -4,6 +4,69 @@
 
 namespace viper {
 
+DirectDrawVideoMemoryPlan plan_directdraw_video_memory_class(
+    const DirectDrawVideoMemoryObservation& observation) noexcept
+{
+    constexpr std::uint32_t adjustment = 0x96000U;
+    constexpr std::uint32_t two_megabytes = 2'000'000U;
+    constexpr std::uint32_t four_megabytes = 4'000'000U;
+    constexpr std::uint32_t eight_megabytes = 8'000'000U;
+    constexpr std::uint32_t sixteen_megabytes = 16'000'000U;
+
+    DirectDrawVideoMemoryPlan plan{};
+    plan.adjusted_video_memory_total =
+        observation.reported_video_memory_total + adjustment;
+    const auto adjusted = plan.adjusted_video_memory_total;
+    if (adjusted < two_megabytes) {
+        plan.initial_memory_class = 0U;
+    } else if (adjusted < four_megabytes) {
+        plan.initial_memory_class = 2U;
+    } else if (adjusted < eight_megabytes) {
+        plan.initial_memory_class = 4U;
+    } else if (adjusted < sixteen_megabytes) {
+        plan.initial_memory_class = 8U;
+    } else {
+        plan.initial_memory_class = 16U;
+    }
+
+    plan.final_memory_class = plan.initial_memory_class;
+    plan.low_texture_memory_warning = plan.final_memory_class > 2U &&
+        observation.reported_texture_memory_total < two_megabytes;
+    plan.agp_texture_memory_present =
+        observation.reported_agp_texture_memory_total != 0U;
+    if (plan.agp_texture_memory_present) {
+        if (plan.final_memory_class == 2U &&
+            observation.reported_agp_texture_memory_total > two_megabytes) {
+            plan.final_memory_class = 4U;
+        } else if (plan.final_memory_class == 4U &&
+                   observation.reported_agp_texture_memory_total > four_megabytes) {
+            plan.final_memory_class = 8U;
+        } else if (plan.final_memory_class == 8U &&
+                   observation.reported_agp_texture_memory_total > eight_megabytes) {
+            plan.final_memory_class = 16U;
+        }
+    }
+
+    switch (plan.final_memory_class) {
+    case 2U:
+        plan.resolution_flags_cleared[2] = true;
+        [[fallthrough]];
+    case 4U:
+        plan.resolution_flags_cleared[3] = true;
+        [[fallthrough]];
+    case 8U:
+        plan.resolution_flags_cleared[4] = true;
+        [[fallthrough]];
+    case 16U:
+        plan.supported_memory_class = true;
+        break;
+    default:
+        plan.process_exit_code = 5U;
+        break;
+    }
+    return plan;
+}
+
 DirectDrawStartupPlan plan_directdraw_startup(
     const DirectDrawStartupObservation& observation)
 {

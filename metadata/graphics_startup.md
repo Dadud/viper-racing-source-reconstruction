@@ -144,16 +144,27 @@ DWORD report and the engine's 32-bit addition, before surface creation.
 Later calls reported totals/free values `0xC0000000/0xBFED4000` for caps
 `0x10001000` and `0x3FFF0000/0x3FFF0000` for caps `0x20001000`.
 
-A child-only override probe
+A child-only override probes
 `../../analysis/reference_captures/vidmem_override_20261025T031500Z.json`
-did not reach the memory-query hook: the REA Frida child session detached
-before resume with a closed connection, and the retained handle reported
-`0xC0000409`. A fresh retry
-`../../analysis/reference_captures/vidmem_override_retry_20261025T031150Z.json`
-failed at the same point: the child script detached before reporting that its
-hooks were installed, so no resume marker was created and no override was
-applied. Both attempts used fresh launcher/child bindings. The repeated REA
-Frida child-script load failure prevents this process-only bypass with the
-current tool path; neither attempt reached gameplay. Cleanup is verified
-across captures, and hashes of the launcher, engine, ISO, and all 31 GameData
-files match their baselines.
+and `../../analysis/reference_captures/vidmem_override_retry_20261025T031150Z.json`
+did not reach the memory-query hook. In both, the child instrumentation
+detached before resume and the retained handle reported `0xC0000409`. The
+later successful direct-Frida run showed the scripts had confused the fixed
+module virtual address `0x44EC00` with an RVA and attempted invalid address
+`0x84EC00`; the correct RVA is `0x4EC00`. The failed attempts do not establish
+a REA provider limitation.
+
+The successful private capture
+`../../analysis/reference_captures/vidmem_python_success_20261025T031822Z.json`
+used Python 3.12 and Frida 17.24.3 with hooks confirmed on the suspended child
+before resume. It changed only the first successful query's total output from
+`0xFFFF0000` to `0x00200000`; the free output and later queries were left
+alone. The classifier returned class 4 and stored 4 at `0x509C2C`. Both
+DirectDraw `CreateSurface` calls returned S_OK, including the 640x480 surface
+with descriptor flags `0x47`. The child remained active with a visible
+`Viper Racing` window for the 30-second checkpoint, but no gameplay frame or
+screenshot was confirmed. The companion event trace is
+`../../analysis/reference_captures/vidmem_override_python_20261025T031736Z.json`.
+The probe is evidence for this particular instrumented environment, not a
+general-purpose fix. Cleanup is verified and hashes of the launcher, engine,
+ISO, and all 31 GameData files match their baselines.

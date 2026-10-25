@@ -240,6 +240,12 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_graphics_startup_regression
+        tests/graphics_startup_regression.cpp)
+    target_link_libraries(viper_graphics_startup_regression PRIVATE
+        viper_graphics_startup)
+    add_test(NAME graphics_startup_regression
+        COMMAND viper_graphics_startup_regression)
     add_executable(viper_pcar_control_regression
         tests/pcar_control_update_regression.cpp)
     target_link_libraries(viper_pcar_control_regression PRIVATE viper_pcar_model)

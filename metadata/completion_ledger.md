@@ -70,6 +70,18 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25, bounded DirectDraw startup classification regression:** Added
+  a source projection of the original engine's 32-bit video-memory adjustment,
+  class thresholds, AGP upgrade, and resolution-flag fallthrough at `0x44EC00`.
+  The regression covers the observed `0xFFFF0000` total wrapping to `0x86000`
+  and native exit code 5, plus the successful instrumented `0x00200000` total
+  reaching class 4 with both observed DirectDraw surfaces created. Release
+  target `viper_graphics_startup_regression` built and its focused CTest passed.
+  The child stayed alive with a visible window for 30 seconds, but no gameplay
+  frame or screenshot was confirmed; this does not close playable-game
+  acceptance. Detailed capture provenance and limitations are in
+  `metadata/graphics_startup.md`.
+
 - **2026-10-24, clean isolated Release build and full CTest rerun:** The first
   full-suite attempt used `build/Release/viper_game.exe` older than its source
   and smoke scripts and had three unbuilt regression executables; those eight

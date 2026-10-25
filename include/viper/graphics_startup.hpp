@@ -83,6 +83,29 @@ struct DirectDrawStartupPlan {
     std::vector<std::uint32_t> calls;
 };
 
+struct DirectDrawVideoMemoryObservation {
+    std::uint32_t reported_video_memory_total{};
+    std::uint32_t reported_texture_memory_total{};
+    std::uint32_t reported_agp_texture_memory_total{};
+};
+
+struct DirectDrawVideoMemoryPlan {
+    // 0x44EC00 performs this adjustment in 32-bit DWORD arithmetic.
+    std::uint32_t adjusted_video_memory_total{};
+    std::uint32_t initial_memory_class{};
+    std::uint32_t final_memory_class{};
+    bool agp_texture_memory_present{};
+    bool low_texture_memory_warning{};
+    bool supported_memory_class{};
+    std::array<bool, 5> resolution_flags_cleared{};
+    std::optional<std::uint32_t> process_exit_code;
+};
+
+// Models the available-video-memory classification and optional AGP upgrade
+// in 0x44EC00. The three DWORD totals are outputs of DirectDraw observations.
+[[nodiscard]] DirectDrawVideoMemoryPlan plan_directdraw_video_memory_class(
+    const DirectDrawVideoMemoryObservation& observation) noexcept;
+
 // Models the ordered startup path rooted at 0x44E080. Device enumeration,
 // display-mode support, and DirectDraw results are supplied as observations.
 [[nodiscard]] DirectDrawStartupPlan plan_directdraw_startup(
