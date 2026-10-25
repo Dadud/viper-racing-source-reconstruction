@@ -1,4 +1,5 @@
 #include "viper/physics_task_stream.hpp"
+#include "viper/physics_task_factory.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -251,6 +252,45 @@ PhysicsTaskRecordStreamRead read_physics_task_record_stream(
         : PhysicsTaskRecordStreamReadStatus::complete;
     result.consumed_bytes = input_offset;
     return result;
+}
+
+PhysicsTaskObjectInventory inventory_physics_task_objects(
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    const std::span<const std::byte> serialized_stream_bytes) {
+    PhysicsTaskObjectInventory inventory{};
+    if (decoded_stream.status != PhysicsTaskRecordStreamReadStatus::complete ||
+        decoded_stream.consumed_bytes != serialized_stream_bytes.size()) {
+        inventory.status = PhysicsTaskObjectInventoryStatus::invalid_readback;
+        return inventory;
+    }
+
+    inventory.entries.reserve(decoded_stream.records.size());
+    for (std::size_t index = 0U; index < decoded_stream.records.size(); ++index) {
+        const auto& record = decoded_stream.records[index];
+        if (record.record_bytes_offset > serialized_stream_bytes.size() ||
+            record.record_size > serialized_stream_bytes.size() -
+                record.record_bytes_offset) {
+            inventory.status = PhysicsTaskObjectInventoryStatus::record_out_of_bounds;
+            inventory.failed_record_index = index;
+            inventory.entries.clear();
+            return inventory;
+        }
+        const auto descriptor = physics_task_object_factory_descriptor(
+            record.record_tag);
+        if (!descriptor.has_value()) {
+            inventory.status = PhysicsTaskObjectInventoryStatus::unknown_factory_type;
+            inventory.failed_record_index = index;
+            inventory.entries.clear();
+            return inventory;
+        }
+        inventory.entries.push_back({
+            index, record.record_tag, record.cursor_offset,
+            record.record_bytes_offset, record.record_size,
+            descriptor->allocation_bytes, descriptor->constructor_address,
+            false, false});
+    }
+    inventory.status = PhysicsTaskObjectInventoryStatus::complete;
+    return inventory;
 }
 
 PlayerPcarTaskBindingResult bind_player_pcar_task_record(

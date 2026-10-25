@@ -183,6 +183,29 @@ int main()
                     decoded.records[1].cursor_offset == 0x28CU &&
                     decoded.records[2].cursor_offset == 0x28CU,
                 "reader must recover serialized records and native cursor positions");
+        const auto object_inventory = viper::inventory_physics_task_objects(
+            decoded, serialized.bytes);
+        require(object_inventory.status ==
+                    viper::PhysicsTaskObjectInventoryStatus::complete &&
+                    object_inventory.entries.size() == decoded.records.size() &&
+                    object_inventory.entries[0].stream_record_index == 0U &&
+                    object_inventory.entries[0].record_tag == 0x50434152U &&
+                    object_inventory.entries[0].stream_cursor == 0x100U &&
+                    object_inventory.entries[0].record_size == 0x1E4U &&
+                    object_inventory.entries[0].allocation_bytes == 0x0EF0U &&
+                    object_inventory.entries[0].constructor_address == 0x004381E0U &&
+                    !object_inventory.entries[0].native_object_materialized &&
+                    !object_inventory.entries[0].fixed_step_callback_supported,
+                "ordered task inventory must retain record identity and factory metadata without claiming construction");
+        auto truncated_decoded = decoded;
+        truncated_decoded.records[1].record_bytes_offset = serialized.bytes.size();
+        const auto invalid_inventory = viper::inventory_physics_task_objects(
+            truncated_decoded, serialized.bytes);
+        require(invalid_inventory.status ==
+                    viper::PhysicsTaskObjectInventoryStatus::record_out_of_bounds &&
+                    invalid_inventory.failed_record_index == 1U &&
+                    invalid_inventory.entries.empty(),
+                "task inventory must reject malformed payload spans atomically");
         const auto pcar_binding = viper::bind_player_pcar_task_record(
             decoded, serialized.bytes, car_record, 0x100U);
         require(pcar_binding.status ==

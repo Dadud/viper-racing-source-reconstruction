@@ -16,6 +16,17 @@ supplied slot. `0x426F20` assigns an object-local index at offset `+0x34` and
 advances a global index by the object's virtual `+0x18` result; it is not the
 main entity-registry insertion routine.
 
+The live runtime now retains an ordered task-object inventory beside its
+validated full-stream readback. Each entry records stream index, FourCC,
+logical cursor, exact payload span, and recovered factory allocation size and
+constructor address. Inventory construction rejects an invalid readback,
+out-of-bounds payload, or unknown factory type atomically. Entries explicitly
+report `native_object_materialized=false` and
+`fixed_step_callback_supported=false`: this is an identity/factory inventory,
+not native allocation, constructor execution, or fixed-step dispatch. A
+focused regression covers ordering, PCAR factory metadata, and malformed-span
+rejection.
+
 Before populating that object array, `0x420480` obtains the track-state record
 from `0x45C2C0` and passes it to `0x426000`. That helper switches on the DWORD
 at input offset `+0x18` (decompiler expression `param_1[6]`): selector 0

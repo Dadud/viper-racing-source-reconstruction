@@ -1572,6 +1572,7 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamSession> full_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
+    std::vector<viper::PhysicsTaskObjectInventoryEntry> physics_task_object_inventory;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
@@ -2928,6 +2929,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 decoded.consumed_bytes == stream.bytes.size() &&
                 decoded.records.size() == ordered_track_records.records.size() &&
                 decoded.final_cursor == stream.final_cursor;
+            if (stream_ok) {
+                const auto inventory = viper::inventory_physics_task_objects(
+                    decoded, stream.bytes);
+                stream_ok = inventory.status ==
+                    viper::PhysicsTaskObjectInventoryStatus::complete;
+                if (stream_ok)
+                    state.physics_task_object_inventory = inventory.entries;
+            }
             for (std::size_t index = 0U;
                  stream_ok && index < decoded.records.size(); ++index) {
                 const auto& ordered = ordered_track_records.records[index];
@@ -3001,6 +3010,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         } else {
             state.full_task_record_stream.reset();
             state.full_task_record_readback.reset();
+            state.physics_task_object_inventory.clear();
             state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }

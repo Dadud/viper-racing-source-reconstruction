@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace viper {
@@ -178,5 +179,41 @@ private:
 // values are signed in the native reader, so a negative DWORD terminates input.
 [[nodiscard]] PhysicsTaskRecordStreamRead read_physics_task_record_stream(
     std::span<const std::byte> bytes);
+
+// Session-owned inventory of records whose framing and order were validated
+// by read_physics_task_record_stream. This preserves task identity and the
+// exact record payload without implying native allocation or callback support.
+struct PhysicsTaskObjectInventoryEntry {
+    std::size_t stream_record_index{};
+    std::uint32_t record_tag{};
+    std::uint32_t stream_cursor{};
+    std::size_t record_bytes_offset{};
+    std::size_t record_size{};
+    std::optional<std::uint32_t> allocation_bytes;
+    std::optional<std::uint32_t> constructor_address;
+    bool native_object_materialized{};
+    bool fixed_step_callback_supported{};
+};
+
+enum class PhysicsTaskObjectInventoryStatus : std::uint8_t {
+    complete,
+    invalid_readback,
+    record_out_of_bounds,
+    unknown_factory_type,
+};
+
+struct PhysicsTaskObjectInventory {
+    PhysicsTaskObjectInventoryStatus status{
+        PhysicsTaskObjectInventoryStatus::invalid_readback};
+    std::vector<PhysicsTaskObjectInventoryEntry> entries;
+    std::optional<std::size_t> failed_record_index;
+};
+
+// Correlates each decoded record with the exact payload span and recovered
+// factory descriptor, rejecting malformed spans and unknown factory types.
+// No constructor is run by this inventory adapter.
+[[nodiscard]] PhysicsTaskObjectInventory inventory_physics_task_objects(
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    std::span<const std::byte> serialized_stream_bytes);
 
 } // namespace viper
