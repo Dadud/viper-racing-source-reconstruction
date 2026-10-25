@@ -25,11 +25,14 @@ product of row `+0` and record `+0x20` to setup word 1, passes row `+4` to
 car, and track bundles. When the selected player car is not Viper, it also
 opens and owns `viper.car` as a separate AI vehicle bundle and parses its CARF
 without player upgrade overlays. It resolves the selected track's `tracks.tab`
-row. At runtime startup, the setup planner is invoked for all eight AIDR
-profiles and both observed tuning modes, keyed by each AI entrant's modulo-7
-slot. The current profile/mode selector, native fallback block acquisition,
-and FDIV helper mode remain unresolved; generated candidates are not yet fed
-to opponent vehicle construction. The parser currently does not accept the legacy
+row. At runtime startup, the setup planner uses `GAME.opponent_strength` as the
+selected AIDR profile and each AI entrant's native modulo-7 slot. The tuning
+mode is 0 for the single-race path: both native single-race initializers zero
+their `0xCD4`-byte race state with `0x45C5B0`, then call `0x40A5D0`; that path
+does not write the mode byte at `+0xCD1` before `0x41A000` reads it. Native
+fallback block acquisition and FDIV helper mode remain unresolved; generated
+setups are not yet fed to opponent vehicle construction. The parser currently
+does not accept the legacy
 `0x660C`-byte version-2 payload that the native loader also recognizes and
 converts. Native `0x41B9B0` copies the legacy payload's first three groups and
 builds the remaining five groups from the first current runtime-manager record
@@ -42,6 +45,17 @@ records. Evidence: `0x41B9B0`
 `0x41BB30` `ev_f576fea3271bfdca92952c71c0fdb89423efd828a5f02ab99120fe532ffba015`,
 and `0x41BB50`
 `ev_88536434a4e9f02940f233812b02e911b5576593e57f294b8ee4fd05775efd03`.
+
+The single-race mode-0 path is supported by `0x45C5B0`
+`ev_0e695679750469c5a42eff7d5b5e8b7071961c4a85e551a2217e6f6e31c5eea8`,
+the two initializers `0x402AA0`
+`ev_749c1595510a9f81b76da5bf2e4f633182bd21c1f1589aacab6aea266fd57b9c` and
+`0x402BE0`
+`ev_041869a71d7adb78375a09de6452fbcd68ec4e8574bb399e22eb3499dbef3584`,
+the dispatch path `0x40A5D0`
+`ev_cc24790f321708d1f9ea5c4246a5f02757dd236c9ba0d2f4b956aec35e7156dc`, and
+the tuning-byte consumer `0x41A000`
+`ev_4e1034ff93f07927121e5fd1ebce8e3c9cf5fdf294c6f07f49101bab8632b5e1`.
 
 The Win32 single-race runtime reads `GAME.opponent_strength` as the selected
 profile index and resolves the corresponding localized display names from the

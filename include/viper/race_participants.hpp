@@ -245,8 +245,8 @@ struct SingleRaceAISetupObservation {
     const AIDriverResource* drivers{};
     AIDriverGroup driver_group{AIDriverGroup::easy};
     std::uint32_t track_index{};
-    // Native tuning mode is an explicit input; its relation to frontend flags
-    // has not yet been established.
+    // Native tuning mode is an explicit input. Single-race setup state uses
+    // mode 0; other race contexts may select another mode.
     std::uint8_t tuning_mode{};
     std::span<const std::byte> base_setup_payload;
     std::optional<bool> configuration_data_available;
@@ -266,9 +266,8 @@ struct SingleRaceAISetupPlan {
     std::vector<SingleRaceAISetupRecord> ai_setups;
 };
 
-// Selects the active AIDR profile slot by each AI entrant's native modulo-7
-// key and composes its setup. Profile and mode are explicit because their
-// runtime selector paths are not fully reconstructed yet.
+// Selects the requested AIDR profile slot by each AI entrant's native modulo-7
+// key and composes its setup. The caller supplies the race-context tuning mode.
 [[nodiscard]] SingleRaceAISetupPlan prepare_single_race_ai_setups(
     const SingleRaceAISetupObservation& observation);
 

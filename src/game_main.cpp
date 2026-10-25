@@ -3138,39 +3138,41 @@ int run_selected_race(const Options& options, const std::string_view track,
                 "single-race entrant has an unsupported physics car marker");
         }
     }
-    std::vector<viper::SingleRaceAISetupPlan> ai_setup_variants;
+    std::optional<viper::SingleRaceAISetupPlan> selected_ai_setups;
     if (entrants.participant_count > 1) {
         if (!assets.track_index())
             throw std::runtime_error("selected track has no matching tracks.tab row for AI setup");
-        ai_setup_variants.reserve(viper::ai_driver_group_count * 2U);
-        std::size_t complete_setup_records = 0;
-        for (std::size_t group = 0; group < viper::ai_driver_group_count; ++group) {
-            for (std::uint8_t mode = 0; mode <= 1U; ++mode) {
-                viper::SingleRaceAISetupObservation ai_observation{};
-                ai_observation.entrants = &entrants;
-                ai_observation.drivers = &assets.ai_drivers();
-                ai_observation.driver_group =
-                    static_cast<viper::AIDriverGroup>(group);
-                ai_observation.track_index = *assets.track_index();
-                ai_observation.tuning_mode = mode;
-                ai_observation.base_setup_payload = assets.ai_vehicle_setup();
-                ai_observation.configuration_data_available = true;
-                ai_observation.loaded_car_file = assets.ai_car().car_file;
-                ai_observation.compatibility_division_helper_enabled = false;
-                auto plan = viper::prepare_single_race_ai_setups(ai_observation);
-                complete_setup_records += static_cast<std::size_t>(std::count_if(
-                    plan.ai_setups.begin(), plan.ai_setups.end(),
+        if (opponent_strength < 0 || opponent_strength >=
+                static_cast<int>(viper::ai_driver_group_count)) {
+            std::cerr << "AI setup is unresolved: GAME.opponent_strength is outside "
+                         "the eight native AIDR profiles.\n";
+        } else {
+            // The single-race state is zeroed by 0x45C5B0. Both native
+            // single-race initializers call 0x40A5D0 without writing its
+            // tuning byte at +0xCD1; 0x41A000 consumes that byte as mode 0.
+            constexpr std::uint8_t single_race_tuning_mode = 0U;
+            viper::SingleRaceAISetupObservation ai_observation{};
+            ai_observation.entrants = &entrants;
+            ai_observation.drivers = &assets.ai_drivers();
+            ai_observation.driver_group =
+                static_cast<viper::AIDriverGroup>(opponent_strength);
+            ai_observation.track_index = *assets.track_index();
+            ai_observation.tuning_mode = single_race_tuning_mode;
+            ai_observation.base_setup_payload = assets.ai_vehicle_setup();
+            ai_observation.configuration_data_available = true;
+            ai_observation.loaded_car_file = assets.ai_car().car_file;
+            ai_observation.compatibility_division_helper_enabled = false;
+            selected_ai_setups = viper::prepare_single_race_ai_setups(ai_observation);
+            const auto complete_setup_records = static_cast<std::size_t>(
+                std::count_if(selected_ai_setups->ai_setups.begin(),
+                    selected_ai_setups->ai_setups.end(),
                     [](const auto& record) { return record.input_complete; }));
-                ai_setup_variants.push_back(std::move(plan));
-            }
+            std::cout << "Prepared " << selected_ai_setups->ai_setups.size()
+                      << " AI setup records for selected AIDR profile "
+                      << opponent_strength << " and native single-race tuning mode 0 ("
+                      << complete_setup_records
+                      << " numerically complete with the current FDIV model)\n";
         }
-        std::size_t prepared_records = 0;
-        for (const auto& variant : ai_setup_variants)
-            prepared_records += variant.ai_setups.size();
-        std::cout << "Prepared " << prepared_records
-                  << " AI setup variants across all AIDR profiles and tuning modes ("
-                  << complete_setup_records
-                  << " numerically complete with the current FDIV model)\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
         options.record_trace, playback_trace, hold_results_for_frontend,
