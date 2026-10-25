@@ -1184,8 +1184,10 @@ checks the scalar mapping with an explicit multiplier.
 ### PCAR constructor control settings
 
 The live session now parses the constructor's `CONTROL` options into persistent
-PCAR control state. The binary starts traction control, ABS, auto shifting,
-auto clutch, and yaw control at `1, 1, 1, 1, 0` before reading configuration.
+PCAR control state and materializes the observed constructor stores into the
+byte-backed player body/wheel objects. The binary starts traction control,
+ABS, auto shifting, auto clutch, and yaw control at `1, 1, 1, 1, 0` before
+reading configuration.
 `0x4381E0` forces auto clutch back on when auto shifting is enabled, then copies
 the final value to `+0x534`. It stores the game-mode helper result at `+0x4F4`
 as unresolved unless supplied. The traction/ABS setters `0x4330B0/0x4330D0`

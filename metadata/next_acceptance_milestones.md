@@ -112,9 +112,10 @@ The `0x4329C0` wheel-context copy reads mutable body `+0x50C`. Its constructor
 value is only initial state; `0x433570` can update it on the shared
 `0x431150` integrator path, while other callback writers have their own gates.
 The production session stores the shared body constructor's position, basis,
-dimensions, inertia matrices, velocity/accumulator clears, and derived PCAR
-constructor `+0x50C`/vtable in a persistent byte-backed object with an
-initialized-byte mask. It still does not dispatch native PCAR callback
+dimensions, inertia matrices, velocity/accumulator clears, derived PCAR
+constructor vtable/`+0x50C`, and settings-derived shift/clutch/yaw plus wheel
+traction/ABS fields in persistent byte-backed body/wheel objects with
+initialized-byte masks. It still does not dispatch native PCAR callback
 `0x4384D0` or execute shared integrator `0x431150`; it lacks their runtime
 body, timer, table, and callback transitions. Wheel `+0xE8`
 is interpolated from adjacent five-byte samples by `0x444240`, using records

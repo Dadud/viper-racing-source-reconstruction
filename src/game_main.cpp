@@ -1648,6 +1648,22 @@ struct WindowState {
             player_runtime_state = {};
             return false;
         }
+        const std::array<viper::NcarObjectFieldWrite, 4> pcar_control_writes{{
+            {0xec8U, 1U, static_cast<std::uint8_t>(
+                player_pcar_constructor_controls.auto_shifting)},
+            {0xec9U, 1U, static_cast<std::uint8_t>(
+                player_pcar_constructor_controls.auto_clutch)},
+            {0x534U, 1U, static_cast<std::uint8_t>(
+                player_pcar_constructor_controls.auto_clutch_0x534)},
+            {0x4f8U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_constructor_controls.yaw_control)},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, pcar_control_writes)) {
+            player_runtime_car_record.clear();
+            player_runtime_state = {};
+            return false;
+        }
         for (std::size_t wheel = 0;
              wheel < player_runtime_state.wheel_constructor_plans.size(); ++wheel) {
             const auto wheel_offset = static_cast<std::uint32_t>(
@@ -1673,6 +1689,21 @@ struct WindowState {
             }
             if (!viper::apply_ncar_wheel_core_initialization(
                     player_runtime_state.wheel_objects[wheel], wheel_offset, *core)) {
+                player_runtime_car_record.clear();
+                player_runtime_state = {};
+                return false;
+            }
+            const std::array<viper::NcarObjectFieldWrite, 2> pcar_wheel_control_writes{{
+                {wheel_offset + 0x15cU, 4U,
+                    player_pcar_constructor_controls.wheel_traction_0x6b0[wheel]},
+                {wheel_offset + 0x164U, 4U,
+                    player_pcar_constructor_controls.wheel_abs_0x6b8[wheel]},
+            }};
+            if (!viper::apply_ncar_wheel_object_writes(
+                    player_runtime_state.wheel_objects[wheel], wheel_offset,
+                    pcar_wheel_control_writes) ||
+                !viper::apply_ncar_body_object_writes(
+                    player_runtime_state.body_object, pcar_wheel_control_writes)) {
                 player_runtime_car_record.clear();
                 player_runtime_state = {};
                 return false;
