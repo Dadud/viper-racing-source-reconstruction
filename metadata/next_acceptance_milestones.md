@@ -453,11 +453,14 @@ inputs and callback ordering remain unresolved. The GCAR GhostBegin ring is
 separate and must not be used as a substitute for PCAR callback state. Only
 when the complete per-frame inputs and object mapping are sourced can the
 session connect the shared integrator and feed evidence-backed `+0x158` and
-`+0xE8` values into the wheel/body composition. In parallel, the polarity
-initializer still needs the actual common-startup timer backend and a single
-shared stream whose call order includes non-wheel
-consumers. Keep these as
-explicit dependencies; do not claim the existing models are live physics.
+`+0xE8` values into the wheel/body composition. In parallel, a process-shared
+diagnostic polarity stream now follows the observed QPC millisecond timer path
+(with the native `timeGetTime` fallback), and its modeled return is mapped to
+the native `-1/+1` surface adjustment in the player wheel trace. Live
+observations show calls from non-wheel sites, so the source stream still lacks
+complete callsite order and fixed-seed sequence parity. The adjustment result
+remains diagnostic; do not claim the existing models are live physics or feed
+this stream into forces.
 
 An expanded read-only displacement search found no additional PCAR wheel-field
 store among the queried common direct encodings: other matched `+0x158` stores
@@ -511,13 +514,14 @@ throttle/brake/steering globals, wheel state, body response, and tire force
 writer activity; the pair scales were `35039.3671875` in all 28 retained
 updates for that one active Viper session. The constructor source is resolved;
 applicability to other car records/modes still needs record-backed checks.
-Remaining live inputs include surface-code response mapping, response polarity,
-the native producer and timing for `+0x158`, and tire response inputs. Contact
-and history operands are recorded in the Windows physics tick trace, and
-constructor-backed suspension parameters feed a pure intermediate response
-calculation; the constructor terms themselves are not copied into each row.
-This does not resolve the downstream surface/finalization inputs or make the
-result live physics. Do not
+Surface adjustment and the `0 -> -1`, nonzero `-> +1` response mapping are now
+modeled as trace-only stages; fixed-seed stream parity and complete consumer
+ordering remain open. Other remaining live inputs include the native producer
+and timing for `+0x158`, and tire response inputs. Contact and history operands
+are recorded in the Windows physics tick trace, and constructor-backed
+suspension parameters feed pure intermediate response calculations; the
+constructor terms themselves are not copied into each row. These diagnostics
+do not resolve finalization, force accumulation, or body integration. Do not
 repeat a capture that only rereads the six pair operands. Capture the missing
 upstream inputs and timestamp-correlated wheel/accumulator/body samples for
 throttle, steering, braking, and coast. The captured `+0xF4` row is sampled
@@ -537,11 +541,11 @@ coast, throttle, steering, and braking windows; capture identity and static
 Evidence IDs are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 The trace now carries contact-gate status, raw and clamped depth, byte-backed
-prior `+0xE8` and pre-update `+0x158`, and the finite-checked base suspension
-response derived from initialized constructor terms. It remains diagnostic:
-surface adjustment, finalization, force accumulation, and body integration are
-still disconnected. This operand/result row is intended to support the next
-controlled original capture without substituting invented forces.
+prior `+0xE8` and pre-update `+0x158`, the finite-checked base suspension
+response, and the trace-only surface polarity/projection/adjustment stage.
+Finalization, force accumulation, and body integration remain disconnected.
+This operand/result row is intended to support the next controlled original
+capture without substituting invented forces.
 
 ### 3. Complete and compare the first original-compatible single-player race
 

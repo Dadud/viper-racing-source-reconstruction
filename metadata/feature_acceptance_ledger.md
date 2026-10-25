@@ -48,8 +48,10 @@ audio parity and modern multiplayer remain separate acceptance tracks.
 The native contact query is now statically traced through a coordinate
 quantizer, binary plane selector, plane equation, and signed-short surface code.
 The matching `track.bpp` TPPB v2 loader/parser and PCAR-based runtime query
-already exist. The immediate data gap is mapping surface codes to tire and
-suspension response and sourcing every remaining wheel input into the runtime
+already exist. The native wheel callback now has a trace-only model of its
+surface polarity draw and `0 -> -1`, nonzero `-> +1` adjustment. The immediate
+data gap is fixed-seed/shared-stream parity, mapping surface codes into tire
+and suspension response, and sourcing every remaining wheel input into runtime
 session. The immediate behavioral gap is a controlled per-wheel/body capture
 including `+0x24C/+0x258` accumulator deltas under coast, throttle, steering,
 and braking. The bounded original capture documents synthetic key reads, not

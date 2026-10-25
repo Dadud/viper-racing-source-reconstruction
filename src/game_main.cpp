@@ -43,6 +43,7 @@
 #include <iomanip>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <random>
 #include <stdexcept>
@@ -55,6 +56,67 @@
 namespace {
 
 using Microsoft::WRL::ComPtr;
+
+// The original process initializes one timer-seeded polarity stream and all
+// wheel updates draw from that shared state. Other native callsites are not
+// implemented yet, so this stream is diagnostic input only and must not drive
+// wheel forces until the rest of its callers are reconstructed.
+class NcarSurfacePolarityStream {
+public:
+    NcarSurfacePolarityStream() noexcept
+    {
+        LARGE_INTEGER frequency{};
+        LARGE_INTEGER origin{};
+        if (QueryPerformanceFrequency(&frequency) != FALSE &&
+            QueryPerformanceCounter(&origin) != FALSE) {
+            const auto ticks_per_millisecond = frequency.LowPart / 1000U;
+            if (ticks_per_millisecond != 0U) {
+                qpc_origin_ = origin.QuadPart;
+                qpc_ticks_per_millisecond_ = ticks_per_millisecond;
+                qpc_enabled_ = true;
+            }
+        }
+
+        const auto first = read_timer_low_dword();
+        const auto second = read_timer_low_dword();
+        const auto seeds = viper::make_ncar_surface_polarity_seed_pair_0x4193c0(
+            first, second);
+        viper::initialize_ncar_surface_polarity_state_0x419430(
+            state_, seeds.stack_argument_0_second_sample_remainder,
+            seeds.stack_argument_1_first_sample_remainder);
+    }
+
+    [[nodiscard]] std::optional<std::int64_t> next() noexcept
+    {
+        std::lock_guard lock(mutex_);
+        if (!state_.initialized) return std::nullopt;
+        // 0x442530 pushes the literal 2 before calling 0x4193F0.
+        return viper::advance_ncar_surface_polarity_value_0x4193f0(state_, 2);
+    }
+
+private:
+    [[nodiscard]] std::uint32_t read_timer_low_dword() const noexcept
+    {
+        if (qpc_enabled_) {
+            LARGE_INTEGER current{};
+            if (QueryPerformanceCounter(&current) != FALSE) {
+                const auto elapsed = current.QuadPart - qpc_origin_;
+                return static_cast<std::uint32_t>(
+                    elapsed / static_cast<std::int64_t>(
+                        qpc_ticks_per_millisecond_));
+            }
+        }
+        return static_cast<std::uint32_t>(timeGetTime());
+    }
+
+    viper::NcarSurfacePolarityState state_{};
+    std::mutex mutex_;
+    std::int64_t qpc_origin_{};
+    std::uint32_t qpc_ticks_per_millisecond_{};
+    bool qpc_enabled_{};
+};
+
+NcarSurfacePolarityStream g_ncar_surface_polarity_stream{};
 
 struct IdealLineVertex { float x; float y; };
 struct SurfaceVertex { float x; float y; float r; float g; float b; };
@@ -1968,6 +2030,12 @@ struct PlayerPhysicsTickContext {
     // fields and the current contact/history observations. Surface adjustment,
     // finalization, force accumulation, and body integration are not implied.
     std::array<std::optional<float>, 4> wheel_base_suspension_response_0x178{};
+    // Returns from the shared polarity stream and the following pure surface
+    // adjustment. The stream omits other native process callers and is not a
+    // force input in the current runtime.
+    std::array<std::optional<std::int64_t>, 4> wheel_surface_polarity_results{};
+    std::array<std::optional<float>, 4> wheel_surface_motion_projections{};
+    std::array<std::optional<float>, 4> wheel_surface_adjusted_responses{};
 };
 
 struct WindowState {
@@ -2019,6 +2087,8 @@ struct WindowState {
     std::array<viper::WheelContactState, 4> player_wheel_contact_states{};
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
+    std::array<std::optional<std::int64_t>, 4>
+        player_wheel_surface_polarity_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
     std::optional<std::array<float, 4>> player_simulated_pose;
     std::vector<std::optional<std::array<float, 4>>> opponent_simulated_poses;
@@ -2602,6 +2672,7 @@ struct WindowState {
         player_wheel_terrain_queries_succeeded.fill(false);
         player_wheel_contact_observations = {};
         player_wheel_contact_results = {};
+        player_wheel_surface_polarity_results = {};
         if (terrain == nullptr || !player_constructor_inputs_ready ||
             !player_wheel_core_initialization.has_value()) {
             for (auto& state : player_wheel_contact_states)
@@ -2690,6 +2761,8 @@ struct WindowState {
             player_wheel_contact_observations[wheel] = observation;
             player_wheel_contact_results[wheel] = viper::update_wheel_contact(
                 player_wheel_contact_states[wheel], observation);
+            player_wheel_surface_polarity_results[wheel] =
+                g_ncar_surface_polarity_stream.next();
 
             const auto wheel_object_offset = static_cast<std::uint32_t>(
                 0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
@@ -2720,6 +2793,33 @@ struct WindowState {
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
+        const auto read_body_float = [this](const std::uint32_t offset)
+            -> std::optional<float> {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, offset);
+            if (!bits) return std::nullopt;
+            return std::bit_cast<float>(*bits);
+        };
+        std::array<float, 12> body_transform{};
+        bool body_transform_ready = true;
+        for (std::size_t lane = 0U; lane < body_transform.size(); ++lane) {
+            const auto value = read_body_float(0x38U +
+                static_cast<std::uint32_t>(lane * sizeof(float)));
+            if (!value || !std::isfinite(*value)) {
+                body_transform_ready = false;
+                break;
+            }
+            body_transform[lane] = *value;
+        }
+        const auto body_center_x = read_body_float(0x5cU);
+        const auto body_center_y = read_body_float(0x60U);
+        const auto body_center_z = read_body_float(0x64U);
+        const auto body_velocity_x = read_body_float(0x234U);
+        const auto body_velocity_y = read_body_float(0x238U);
+        const auto body_velocity_z = read_body_float(0x23cU);
+        const auto body_angular_x = read_body_float(0x240U);
+        const auto body_angular_y = read_body_float(0x244U);
+        const auto body_angular_z = read_body_float(0x248U);
         const auto kinematics_diagnostic =
             viper::read_ncar_body_integration_kinematics_input_diagnostic(
                 player_runtime_state.body_object);
@@ -2773,6 +2873,8 @@ struct WindowState {
              ++wheel) {
             tick.wheel_contact_active_after_tick[wheel] =
                 player_wheel_contact_states[wheel].contact_active_0x168;
+            tick.wheel_surface_polarity_results[wheel] =
+                player_wheel_surface_polarity_results[wheel];
             tick.wheel_contact_gate_passed_after_tick[wheel] =
                 static_cast<std::uint8_t>(
                     player_wheel_contact_results[wheel].contact_gate_passed ? 1 : 0);
@@ -2835,9 +2937,65 @@ struct WindowState {
                         *tick.wheel_preupdate_value_0x158_after_tick[wheel],
                         *threshold_scale, *damage != 0U};
                     const auto base = viper::evaluate_wheel_suspension(input);
-                    if (std::isfinite(base.combined_response_0x178))
+                    if (std::isfinite(base.combined_response_0x178)) {
                         tick.wheel_base_suspension_response_0x178[wheel] =
                             base.combined_response_0x178;
+                        const auto coefficient_0x9c = read_wheel_float(0x9cU);
+                        const auto coefficient_0xa0 = read_wheel_float(0xa0U);
+                        const auto special_scaling_disabled =
+                            viper::read_ncar_wheel_object_u8(wheel_object, 0x1a0U);
+                        const auto& polarity =
+                            player_wheel_surface_polarity_results[wheel];
+                        if (coefficient_0x9c && coefficient_0xa0 &&
+                            special_scaling_disabled && polarity &&
+                            (*polarity == 0 || *polarity == 1) &&
+                            body_transform_ready && body_center_x && body_center_y &&
+                            body_center_z && body_velocity_x && body_velocity_y &&
+                            body_velocity_z && body_angular_x && body_angular_y &&
+                            body_angular_z &&
+                            std::isfinite(*coefficient_0x9c) &&
+                            std::isfinite(*coefficient_0xa0) &&
+                            std::isfinite(*body_center_x) &&
+                            std::isfinite(*body_center_y) &&
+                            std::isfinite(*body_center_z) &&
+                            std::isfinite(*body_velocity_x) &&
+                            std::isfinite(*body_velocity_y) &&
+                            std::isfinite(*body_velocity_z) &&
+                            std::isfinite(*body_angular_x) &&
+                            std::isfinite(*body_angular_y) &&
+                            std::isfinite(*body_angular_z)) {
+                            const viper::BodyPointVelocityInput point_velocity_input{
+                                {*body_center_x, *body_center_y, *body_center_z},
+                                player_wheel_contact_states[wheel].contact_point_0x130,
+                                {*body_velocity_x, *body_velocity_y, *body_velocity_z},
+                                {*body_angular_x, *body_angular_y, *body_angular_z}};
+                            const auto point_velocity =
+                                viper::derive_body_point_velocity_0x43e9b0(
+                                    point_velocity_input);
+                            const auto motion_projection =
+                                viper::project_body_point_velocity_0x442530(
+                                    point_velocity, body_transform);
+                            if (std::isfinite(motion_projection)) {
+                                tick.wheel_surface_motion_projections[wheel] =
+                                    motion_projection;
+                                const viper::WheelSuspensionSurfaceInput surface_input{
+                                    base.combined_response_0x178,
+                                    motion_projection,
+                                    *coefficient_0xa0,
+                                    *coefficient_0x9c,
+                                    *polarity == 0 ? -1.0F : 1.0F,
+                                    player_wheel_contact_states[wheel]
+                                        .contact_feature_0x19c,
+                                    *special_scaling_disabled != 0U};
+                                const auto surface =
+                                    viper::adjust_wheel_suspension_for_surface(
+                                        surface_input);
+                                if (std::isfinite(surface.adjusted_response))
+                                    tick.wheel_surface_adjusted_responses[wheel] =
+                                        surface.adjusted_response;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -4381,7 +4539,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_observed_value_0x158"
                 << ",wheel" << wheel << "_0x158_native_producer_owned"
                 << ",wheel" << wheel << "_previous_contact_depth_0xe8"
-                << ",wheel" << wheel << "_base_suspension_response_0x178";
+                << ",wheel" << wheel << "_base_suspension_response_0x178"
+                << ",wheel" << wheel << "_surface_polarity_result"
+                << ",wheel" << wheel << "_surface_motion_projection"
+                << ",wheel" << wheel << "_surface_adjusted_response_0x178";
         }
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
@@ -4669,6 +4830,21 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_base_suspension_response_0x178[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_base_suspension_response_0x178[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_surface_polarity_results[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_surface_polarity_results[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_surface_motion_projections[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_surface_motion_projections[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_surface_adjusted_responses[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_surface_adjusted_responses[wheel];
                         }
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';

@@ -254,7 +254,7 @@ if(WIN32)
         viper_language_resource viper_terrain_model
         viper_vehicle_model viper_frontend_model
         viper_scene_model viper_race_setup_model viper_wheel_body_coupling
-        viper_physics_scheduler d3d11 dxgi dsound dinput8 dxguid user32)
+        viper_physics_scheduler d3d11 dxgi dsound dinput8 dxguid user32 winmm)
 endif()
 
 include(CTest)

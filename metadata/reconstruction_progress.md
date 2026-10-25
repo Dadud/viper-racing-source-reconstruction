@@ -1,5 +1,16 @@
 # Reconstruction progress
 
+- **2026-10-25, surface polarity and response diagnostics:** Modeled the
+  process-shared polarity stream using the observed QPC millisecond timer path
+  and native fallback, then recorded each wheel's `0 -> -1`, nonzero `-> +1`
+  surface adjustment beside the existing base suspension diagnostics. The
+  mapped result is trace-only and does not feed wheel forces or body state.
+  A targeted, uncontrolled original-process probe recorded 7,968 helper calls,
+  including 21 calls from other sites; timing parity, full consumer ordering,
+  tire inputs, force accumulation, and body integration remain open. Release
+  build succeeded, all 65 CTest cases passed, and a three-frame WARP trace
+  confirmed the new columns align.
+
 - **2026-10-25, base suspension operands in live trace:** The player physics
   tick trace now distinguishes raw projected depth from clamped contact depth,
   records the contact gate, and evaluates the pure base suspension response

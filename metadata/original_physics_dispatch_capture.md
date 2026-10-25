@@ -1215,6 +1215,34 @@ code and tire/suspension parameter mapping, then supply the session-owned
 contact observations to a complete four-wheel body step and compare its
 outputs under controlled input.
 
+### Native surface-polarity stage and live stream observation (2026-10-25)
+
+Static analysis of `0x442530` resolves the wheel callback's call at
+`0x442EEE`: it pushes `2` to `0x4193F0`, then maps return `0` to `-1.0` and
+nonzero to `+1.0`. The helper advances the shared state through `0x419620`,
+multiplies by the supplied bound, and converts through `__ftol`; the source
+model uses `advance_ncar_surface_polarity_value_0x4193f0(state, 2)`. The
+original startup timer selects QPC when available, with a `timeGetTime`
+fallback. A live read of the original process observed timer globals
+`0x4EF310=10000` and `0x4EF320=0` (Evidence
+`ev_b1683c2a775344ceface7e09c69b128c6d47d94a209faf926ca3b7f03b372eae`).
+
+A targeted Frida observer on the session binary (SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`)
+recorded 7,968 calls to `0x4193F0` over four seconds. The four wheel objects
+were called in slot order at body-relative offsets `0x554`, `0x6F8`, `0x89C`,
+and `0xA40`, each 1,992 times; returns were 3,924 zero and 4,044 one. Wheel
+surface field `+0x19C` was zero in 7,719 samples and ten in 249. Twenty-one
+calls from other callsites were also observed (Evidence
+`ev_64fe3cd14e65769cbdee842c20a55e9ecbcf199bf8e84b4fa6dc228021ae2f14`).
+The observer ran against an uncontrolled live session and may perturb timing;
+it supplies no controlled-input parity claim or proof of the exact common
+stream order. The source now evaluates the modeled polarity and surface
+adjustment into diagnostic tick columns only. Fixed-seed sequence parity,
+non-wheel consumer order, upstream surface/tire input provenance, final
+response/force accumulation, and body integration remain open. Do not use this
+diagnostic stream to drive wheel forces.
+
 ### Controlled wheel, force, and pair-scale follow-up (2026-10-25)
 
 Bounded Frida key-read schedules were applied to the already-running original

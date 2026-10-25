@@ -285,9 +285,13 @@ the helper computes `(stack[+0x18] + 4.4444447) * stack[+0x10] * 1.25e-7`.
 The caller combines those outputs with constants `71.111115`, `-26.666666`,
 `711.1111`, and `5056.7905`, then multiplies by `-1.1865233e-5`. The resulting
 values are retained by raw offset only; this does not assign a physical meaning
-to them. The motion projection and global polarity input to the subsequent
-surface adjustment remain unresolved, so the live runtime still does not run
-the body and wheel update pipeline. Evidence: `0x441C10` dossier
+to them. The Windows runtime now records a body-motion projection and advances
+a process-shared, timer-seeded polarity stream for four wheel slots, then
+evaluates the recovered `0 -> -1`, nonzero `-> +1` surface adjustment in
+diagnostic tick columns. Fixed-seed native sequence parity and the order of
+non-wheel consumers remain open. These values are not connected to forces, so
+the live runtime still does not run the body and wheel update pipeline.
+Evidence: `0x441C10` dossier
 `ev_c5aa0c77b19958eb9c8ba45643b19d858c19899f5cfc958f00b97ab6df232f06`,
 `0x440560` pseudocode
 `ev_906c8fea850a24b83239803069e5c805da97ac274918d073c7ab9625a12ce57b`,
