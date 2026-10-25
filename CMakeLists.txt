@@ -24,6 +24,7 @@ add_library(viper_frontend_model
     src/replay_save.cpp
     src/replay_screen.cpp
     src/startup_command_line.cpp
+    src/setup_preferences.cpp
 )
 target_include_directories(viper_frontend_model PUBLIC include)
 target_compile_features(viper_frontend_model PUBLIC cxx_std_20)
@@ -256,6 +257,11 @@ if(BUILD_TESTING)
     add_executable(viper_game_options_regression tests/game_options_regression.cpp)
     target_link_libraries(viper_game_options_regression PRIVATE viper_frontend_model)
     add_test(NAME game_options_regression COMMAND viper_game_options_regression)
+    add_executable(viper_setup_preferences_regression
+        tests/setup_preferences_regression.cpp)
+    target_link_libraries(viper_setup_preferences_regression PRIVATE viper_frontend_model)
+    add_test(NAME setup_preferences_regression
+        COMMAND viper_setup_preferences_regression)
     add_executable(viper_career_file_store_regression
         tests/career_file_store_regression.cpp)
     target_link_libraries(viper_career_file_store_regression PRIVATE viper_frontend_model)

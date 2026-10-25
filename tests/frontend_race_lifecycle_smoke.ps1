@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_frontend_race_$([guid]::NewGuid().ToString('N'))"
 $capture = Join-Path $root 'capture.csv'
 $raceTrace = Join-Path $root 'viper-bemidji-one-lap.csv'
+$config = Join-Path $root 'Config'
 
 Add-Type @'
 using System;
@@ -102,7 +103,7 @@ try {
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --software --play-trace `"$raceTrace`""
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$config`" --software --play-trace `"$raceTrace`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)
@@ -136,7 +137,37 @@ try {
     if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after Escape from the returned setup window' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "viper_game exited with code $($process.ExitCode)" }
-    Write-Output 'Viper/Bemidji and Sports/Bemidji trace races reached results, returned to setup, and exited cleanly.'
+
+    $preferencePath = Join-Path $config 'viper-racing-setup.cfg'
+    if (-not (Test-Path -LiteralPath $preferencePath)) { throw 'Setup selection preference was not written' }
+    $preference = [System.IO.File]::ReadAllText($preferencePath)
+    if ($preference -notmatch '(?m)^track=bemidji$' -or
+        $preference -notmatch '(?m)^car=sports$') {
+        throw "Saved selection did not contain Bemidji/Sports: $preference"
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $GameExe
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$config`" --software --play-trace `"$raceTrace`""
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $process = [Diagnostics.Process]::Start($startInfo)
+    $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
+    Press-Key $setup 13
+    $restoredRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30
+    $restoredTitle = [System.Text.StringBuilder]::new(256)
+    for ($attempt = 0; $attempt -lt 20 -and $restoredTitle.Length -eq 0; ++$attempt) {
+        [void][ViperRaceFrontendWin32]::GetWindowText($restoredRace, $restoredTitle, $restoredTitle.Capacity)
+        if ($restoredTitle.Length -eq 0) { Start-Sleep -Milliseconds 50 }
+    }
+    if ($restoredTitle.ToString() -notmatch 'bemidji.*sports') {
+        throw "Relaunched setup did not restore Bemidji/Sports: $($restoredTitle.ToString())"
+    }
+    Press-Key $restoredRace 27
+    if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after the persisted-selection check' }
+    $process.Refresh()
+    if ($process.ExitCode -ne 0) { throw "relaunch exited with code $($process.ExitCode)" }
+    Write-Output 'Viper/Bemidji and Sports/Bemidji trace races reached results; Sports/Bemidji persisted across a clean relaunch.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

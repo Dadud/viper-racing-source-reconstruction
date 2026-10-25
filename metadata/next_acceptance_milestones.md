@@ -109,17 +109,22 @@ and physics-record paths can change it. Wheel `+0xE8` is interpolated from
 two adjacent five-byte samples in the separate `0x3C`-stride object ring,
 using a fraction derived from global tick and object timing fields. This ring
 is distinct from the timed NCAR sample pipeline's three-slot `0x3E` history.
-Neither the live body-integrator state nor the interpolation ring's bytes,
-capacity, timing lifecycle, producer ordering, and callback gates are currently
-owned by the race session. The sample pipeline explicitly consumes already
-updated body state; it cannot create that state from route motion.
+The `0x4278F0` GCAR constructor allocates `0x960` records at this stride, and
+the `0x427BF0` path can copy supplied records into it. The constructor's
+identity-helper loop does not initialize an empty buffer, and the evidence does
+not yet establish that this replay/sample buffer supplies the live race ring.
+Neither mutable body-integrator state nor live ring contents, timing lifecycle,
+producer ordering, and callback gates are currently owned by the race session.
+The timed sample pipeline explicitly consumes body state from its caller; it
+cannot create that state from route motion.
 
 Therefore the next implementation boundary is the state producer and its
 ownership, not a call to `advance_four_wheel_body_step`: reconstruct the
-mutable body state and callback write paths, identify the fixed-step/ring
-allocation and population source, and establish the tick/fraction and callback
-ordering. Only then can the session feed evidence-backed `+0x50C` and `+0xE8`
-values into the existing wheel/body composition. In parallel, the polarity
+mutable body state and callback write paths, resolve whether the GCAR source
+buffer feeds the live interpolation consumer or locate its live producer, and
+establish the tick/fraction and callback ordering. Only then can the session
+feed evidence-backed `+0x50C` and `+0xE8` values into the existing wheel/body
+composition. In parallel, the polarity
 initializer still needs the actual common-startup timer backend and a single
 shared stream whose call order includes non-wheel consumers. Keep these as
 explicit dependencies; do not claim the existing models are live physics.

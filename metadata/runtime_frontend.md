@@ -5,7 +5,11 @@ enumerates installed track names in the `common.res` `tracks.tab` table and
 keeps rows whose `.trk` bundle exists beside `common.res`; it enumerates
 top-level `.car` bundles in the same Win32 file-search order used by the saved
 `car_no` loader. `options.def` supplies the initial `GLOBAL.track_no` and
-`GLOBAL.car_no` selections. The UI does not write `options.def` yet.
+`GLOBAL.car_no` selections. On Enter, the runtime persists selected track/car
+resource stems in the separate, versioned `Config/viper-racing-setup.cfg`
+file. A saved stem is applied only if its bundle remains in the current
+inventory; a missing track or car independently falls back to its
+`options.def` selection. Original GameData and `options.def` are not modified.
 
 Use Up/Down to choose a track, Left/Right to choose a car, and Enter to load
 the assets and start the existing race session. On race results, Enter returns
@@ -32,9 +36,11 @@ Viper, plays the full trace, and waits for Enter to return from standings to
 setup. It then changes to Sports, launches the second full trace session, and
 exits from setup after its results. Replay exhaustion keeps the results window
 open only when playback was started through the interactive frontend; explicit
-CLI replay still closes when the trace ends. This verifies repeated
-setup/race/result resource lifecycles for the route prototype, not physical
-simulation or original-game parity.
+CLI replay still closes when the trace ends. The smoke then relaunches against
+the same Config directory and verifies the last selected Sports/Bemidji pair
+loads into the race. This verifies repeated setup/race/result resource
+lifecycles for the route prototype, not physical simulation or original-game
+parity.
 
 Race standings display localized AI driver names from the selected
 `GAME.opponent_strength` profile in `english.lng`, aligned through the

@@ -18,6 +18,7 @@
 #include "viper/world_track_objects.hpp"
 #include "viper/career_file_store.hpp"
 #include "viper/pcar_control_update.hpp"
+#include "viper/setup_preferences.hpp"
 
 #include <array>
 #include <algorithm>
@@ -2718,18 +2719,35 @@ int wmain(int argc, wchar_t** argv)
             !options.audio_smoke && !options.record_trace;
         auto selected_track = track;
         auto selected_car = car;
+        auto setup_config_directory = options.setup_config_directory
+            ? *options.setup_config_directory
+            : resolve_setup_config_directory(options.data_dir);
+        std::vector<std::string> setup_tracks;
+        std::vector<std::string> setup_cars;
+        if (interactive_frontend) {
+            setup_tracks = selectable_track_stems(options.data_dir);
+            setup_cars = selectable_car_stems(options.data_dir);
+            const auto saved = viper::load_setup_selection_preference(
+                setup_config_directory);
+            if (!saved.error.empty())
+                std::cerr << "Ignoring setup preference: " << saved.error << '\n';
+            const auto indices = viper::resolve_setup_selection_indices(
+                setup_tracks, setup_cars, saved.selection, selected_track, selected_car);
+            selected_track = setup_tracks[indices.track];
+            selected_car = setup_cars[indices.car];
+        }
         while (true) {
             if (interactive_frontend) {
-                const auto selection = show_setup_frontend(
-                    selectable_track_stems(options.data_dir),
-                    selectable_car_stems(options.data_dir),
-                    selected_track, selected_car,
-                    options.setup_config_directory
-                        ? *options.setup_config_directory
-                        : resolve_setup_config_directory(options.data_dir));
+                const auto selection = show_setup_frontend(setup_tracks, setup_cars,
+                    selected_track, selected_car, setup_config_directory);
                 if (!selection) return 0;
                 selected_track = selection->track;
                 selected_car = selection->car;
+                const auto saved = viper::save_setup_selection_preference(
+                    setup_config_directory, {selected_track, selected_car});
+                if (!saved.saved)
+                    std::cerr << "Could not persist setup selection: "
+                              << saved.error << '\n';
             }
             const auto result = run_selected_race(options, selected_track,
                 selected_car, playback_trace ? &*playback_trace : nullptr,
