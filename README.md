@@ -2,8 +2,11 @@
 
 ## Runtime implementation and acceptance
 
-The completion plan is tracked in [the feature ledger](metadata/completion_ledger.md)
-and [reference capture protocol](metadata/reference_capture_protocol.md).
+The goal's feature, evidence, and acceptance crosswalk is in
+[`metadata/feature_acceptance_ledger.md`](metadata/feature_acceptance_ledger.md).
+The detailed implementation history and gaps are in
+[`metadata/completion_ledger.md`](metadata/completion_ledger.md), alongside the
+[reference capture protocol](metadata/reference_capture_protocol.md).
 `viper_game` is the new Windows runtime foundation: it loads external assets,
 parses the selected track's terrain and ideal line plus the selected car's
 human setup, the track bundle's AI default setup, the selected car's level-0

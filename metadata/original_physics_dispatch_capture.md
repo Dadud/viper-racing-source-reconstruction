@@ -1125,3 +1125,32 @@ internal store in that integrator. Ghidra records a direct call to `0x431150`
 at `0x42AC98`, but does not assign that callsite to a containing procedure; a
 Frida fuzzy backtrace was inconclusive. Do not infer wheel-force or body-pose
 production from the nested same-value store.
+
+### Read-only wheel-response stage capture (2026-10-25)
+
+Attached the checked-in `tools/pcar_wheel_response_input_probe.js` to the
+already-running external `race.bin` process (PID 36860) after verifying the
+binary SHA-256 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`.
+The bounded probe observed eight selected PCAR integrator calls, 32 wheel
+updates, 128 force-writer rows, and 192 stage rows across suspension inputs,
+the three suspension-force vector components, tire-force callsites, and
+wheel-history/body-copy boundaries. It read the PCAR at `0x4dc20cc` and
+preserved stack snapshots at the instrumented stages. The probe's native-tick
+global read was unavailable in these rows.
+
+In each captured wheel call, wheel `+0x158` was unchanged across entry and
+return from `0x442530`; the `+0xe8` contact history changed on some calls.
+The capture therefore observes the wheel update and its later paired-history
+consumer boundary, but does not explain inputs that produced the sampled
+response vectors. It applied no synthetic controls and wrote no game-state
+fields. Frida hooks can perturb timing, so these samples are not an
+uninstrumented performance record, controlled input schedule, force-law
+derivation, or parity comparison.
+
+REA Evidence `ev_50b3347a3e526a5df184cc044800ca9ee8e8989f8aa04d813eba5e91f1c8fb4c`
+is included in the private exported bundle
+`../../analysis/reference_captures/goal_continuation_evidence_bundle_20261025.json`
+(87,385,342 bytes; SHA-256
+`2ec142bad9e1ff6f50c1ba96a0f18ea4f4fbc3355dc6587f178582d52fde0e5f`). The
+probe source SHA-256 was
+`26fb80a24250a536a4109d1635620c0be5de366e7593f7a9c25d2088f1cdc223`.

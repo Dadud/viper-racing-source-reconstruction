@@ -232,3 +232,10 @@ showed 17 MPH. Because the race had already been moving and the same run first
 performed a synthetic Space reset, this remains co-observation with coarse
 sampling, not isolated throttle causality. Paths and hashes are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#callback-entry-timestamped-resetthrottle-co-observation-2026-10-25).
+
+A later bounded read-only probe on the hash-matched original process captured
+eight PCAR integrator calls, 32 wheel updates, 128 force-writer rows, and 192
+suspension/tire/history stages. It applies no control schedule and is useful
+only as diagnostic state evidence; instrumentation can perturb timing. The
+evidence bundle path, identity, and limits are recorded in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#read-only-wheel-response-stage-capture-2026-10-25).

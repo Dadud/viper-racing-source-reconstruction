@@ -805,6 +805,55 @@ int main()
         require(!viper::make_ncar_integrator_wheel_pair_differential_input_from_updates(
                     invalid_pair_updates, 2.0F, 3.0F, {1U, 1U, 1U, 1U}),
             "paired +0x158 derivation must reject a non-finite updated wheel +0xE8");
+        viper::FourWheelBodyStepInput explicit_pair_step_input{};
+        explicit_pair_step_input.wheel_pair_differential_input.first_value_0x63c =
+            1.0F;
+        explicit_pair_step_input.wheel_pair_differential_input.first_reference_0x7e0 =
+            0.0F;
+        explicit_pair_step_input.wheel_pair_differential_input.first_scale_0xdd4 =
+            2.0F;
+        explicit_pair_step_input.wheel_pair_differential_input.second_value_0x984 =
+            1.0F;
+        explicit_pair_step_input.wheel_pair_differential_input.second_reference_0xb28 =
+            0.0F;
+        explicit_pair_step_input.wheel_pair_differential_input.second_scale_0xdd8 =
+            3.0F;
+        explicit_pair_step_input.wheel_pair_differential_input.contact_bytes =
+            {1U, 1U, 1U, 1U};
+        explicit_pair_step_input.mode_force_input.contact_bytes =
+            {1U, 1U, 1U, 1U};
+        explicit_pair_step_input.integrator_timer_state.record_time_0xe44 =
+            -100.0F;
+        const auto complete_explicit_pair_step =
+            viper::advance_four_wheel_body_step(explicit_pair_step_input);
+        require(complete_explicit_pair_step.input_complete &&
+                complete_explicit_pair_step.wheel_pair_differentials.value_0x850 ==
+                    -2.0F &&
+                complete_explicit_pair_step.wheel_pair_differentials.value_0xb98 ==
+                    -3.0F,
+            "four-wheel fallback must accept finite explicit history operands");
+        auto invalid_explicit_pair_scale = explicit_pair_step_input;
+        invalid_explicit_pair_scale.wheel_pair_differential_input.first_scale_0xdd4 =
+            std::numeric_limits<float>::quiet_NaN();
+        const auto invalid_explicit_pair_scale_step =
+            viper::advance_four_wheel_body_step(invalid_explicit_pair_scale);
+        require(!invalid_explicit_pair_scale_step.input_complete &&
+                invalid_explicit_pair_scale_step.wheel_pair_differentials.value_0x850 ==
+                    0.0F &&
+                invalid_explicit_pair_scale_step.wheel_pair_differentials.value_0xb98 ==
+                    0.0F,
+            "four-wheel fallback must reject non-finite scales without propagating them");
+        auto invalid_explicit_pair_history = explicit_pair_step_input;
+        invalid_explicit_pair_history.wheel_pair_differential_input.second_value_0x984 =
+            std::numeric_limits<float>::quiet_NaN();
+        const auto invalid_explicit_pair_history_step =
+            viper::advance_four_wheel_body_step(invalid_explicit_pair_history);
+        require(!invalid_explicit_pair_history_step.input_complete &&
+                invalid_explicit_pair_history_step.wheel_pair_differentials.value_0x850 ==
+                    0.0F &&
+                invalid_explicit_pair_history_step.wheel_pair_differentials.value_0xb98 ==
+                    0.0F,
+            "four-wheel fallback must reject non-finite histories without propagating them");
         viper::FourWheelBodyStepInput incomplete_timeout_body_step{};
         incomplete_timeout_body_step.post_body_state.timeout_pending_0x48c = 1U;
         incomplete_timeout_body_step.post_body_state.timeout_start_0x488 = 0.0F;

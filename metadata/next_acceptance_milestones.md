@@ -504,9 +504,14 @@ polarity, and tire response/query producers are not session-owned. Do not
 repeat a capture that only rereads the six pair operands. Capture the missing
 upstream inputs and timestamp-correlated wheel/accumulator/body samples for
 throttle, steering, braking, and coast. The captured `+0xF4` row is sampled
-after the current response calculation at the tire-force callsite, so it validates the
-projection output and does not reveal the locals/curves/velocity inputs that
-formed it. Capture identity and limits are in
+after the current response calculation at the tire-force callsite, so it
+validates the projection output and does not reveal the locals/curves/velocity
+inputs that formed it. A read-only follow-up captured eight integrators, 32
+wheel updates, 128 accumulator-writer rows, and 192 suspension/tire/history
+stage rows. It found wheel `+0x158` unchanged within each `0x442530` call and
+some `+0xE8` histories changing; the native tick read was unavailable and the
+capture had no input schedule. It does not close input provenance or acceptance.
+Capture identity and limits are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 
 ### 3. Complete and compare the first original-compatible single-player race
