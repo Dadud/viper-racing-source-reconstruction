@@ -673,6 +673,25 @@ pass; it has not run because the current original process is at the
 startup-abort dialog. Static scan Evidence ID:
 `ev_91884f19b8507dbff17b2371fb583d90bd02e1970601c25ad3c3093a39bfc374`.
 
+Follow-up caller audit confirms the reset path is constructor/setup-only in
+the resolved call graph: `0x4338C0` calls `0x441B90` for four wheel slots at
+`PCAR+0x554+i*0x1A4`, and its resolved callers are `0x433620` and
+`0x433AA0`. The per-frame consumer path is `0x431150` calling `0x442530` for
+those wheel pointers; `0x442530` reads the actual wheel `+0x158` in its
+suspension terms and has no store to that field. The `0x4329C0` `+0x158`
+store remains a different frame-row destination. This leaves the runtime
+writer unresolved; do not promote the constructor/reset zero to a live value.
+Evidence: `0x441B90` pseudocode/assembly and caller
+`ev_4a2b61d33988864abf28dc3967396235c19b9e10f8ab318f80f653761add6ab0`;
+`0x4338C0` four-slot loop `ev_1d0a877b86f4d1e3e7bf1b6462d39162f93655d67366159f45aa6d3491bc3d80`;
+its resolved caller list `ev_ee9562eb99d4284792369f305121d1da7a5e5371afbcb210f30a61b7eec994e2`;
+and the previously documented `0x442530` wheel consumer dossier
+`ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`.
+The current Stalker probe watches only inside `0x431150`; widening it to the
+upstream PCAR callback could observe an earlier same-thread writer, but should
+wait until the documented Frida-agent crash is diagnosed or a lower-overhead
+capture method is validated.
+
 ### Windows crash-event correlation (2026-10-25)
 
 The Windows Application log contains repeated Event 1000/1001 reports for
