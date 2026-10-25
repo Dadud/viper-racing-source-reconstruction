@@ -395,8 +395,8 @@ the `0x426000` physics-track service factory, so
 `CheckpointTrackLineObservation` carries the raw
 `track_state_selector_0x53b194` instead of a route-only boolean. Zero/nonzero
 controls this parser's branch, while values 0/1/3/5 select service classes in
-the factory. The shipped image initializes the field to zero, but runtime
-writes remain an observation. `plan_checkpoint_track_line` builds the verified
+the factory. The shipped image initializes the field to zero; ordinary task
+setup uses that value absent indirect/runtime mutation. `plan_checkpoint_track_line` builds the verified
 record and branch plan. `produce_checkpoint_task_record_from_line` now adapts a
 raw object line, obtains both heights through `terrain_height_or_zero`, and
 serializes the complete 0x20-byte CHKP record on the selector-zero route. It
@@ -429,6 +429,13 @@ the observed 0x20-byte records.
 ## Static box line and record
 
 The `static` directive reaches `0x45D6E0` only when `0x40D2F0` returns zero.
+The shipped disassembly shows that this gate returns one only when both
+`0x4D10FC` and `0x4ECC94` are nonzero. Ordinary initialization calls
+`0x40D110(1)`, which sets the first byte and invokes `0x40D150`; that routine
+clears the second byte. Thus ordinary startup allows static parsing, assuming
+no later write changes `0x4ECC94` before track parsing. This is
+instruction-level evidence from `disasm/engine_.text.asm`; focused REA evidence
+for the gate and setter has not yet been captured.
 That parser scans `obj static %s` followed by nine floats and requires ten total
 conversions. The only accepted type observed in the body is `box` at
 `0x4DC670`; unknown types call the fatal-error helper. The first three floats

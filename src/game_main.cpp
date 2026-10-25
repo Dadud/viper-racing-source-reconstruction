@@ -1569,6 +1569,7 @@ struct WindowState {
     std::vector<std::byte> player_runtime_car_record;
     std::vector<viper::ConfiguredCarTaskRecordInput> configured_car_task_records;
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
+    std::optional<viper::PhysicsTaskRecordStreamSession> full_task_record_stream;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
@@ -2757,6 +2758,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::CarFileResourcePayloads& player_car_resources,
                const std::array<std::byte, 0x8c>& player_car_setup,
                const std::array<viper::TireDefinition, 4>& wheel_tires,
+               const std::span<const viper::ResourceBundle* const> model_bundles,
                const bool force_default_placement,
                const viper::GameOptions& options)
 {
@@ -2852,23 +2854,63 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         state.player_runtime_car_record});
     const auto prepared_ai_record_count = state.prepare_ai_runtime_car_records(
         selected_ai_setups, ai_car_resources, configured_car_record_tags);
-    std::size_t resolved_manifest_car_records = 0U;
-    for (const auto& entry : state.physics_task_manifest->entries) {
-        if (!entry.configured_car_index.has_value()) continue;
-        const auto found = std::find_if(
-            state.configured_car_task_records.begin(),
-            state.configured_car_task_records.end(), [&](const auto& record) {
-                return record.configured_car_index == *entry.configured_car_index;
-            });
-        if (found != state.configured_car_task_records.end() &&
-            entry.record_tag == read_u32_le(found->record_bytes.data()))
-            ++resolved_manifest_car_records;
+    // Ordinary initialization sets the first gate byte and clears the second,
+    // so 0x40D2F0 returns false and the static parser is enabled. The selector
+    // region is zero-initialized in the shipped image; no indirect runtime
+    // mutation is currently modeled. The x64 host uses host division because
+    // the original x86 FDIV compatibility path is not implemented here.
+    const auto materialized_track_records =
+        viper::materialize_track_object_task_records(track_objects, terrain,
+            model_bundles, 0U, true, false);
+    const auto ordered_track_records = viper::plan_ordered_track_task_records(
+        materialized_track_records, *state.physics_task_manifest,
+        state.configured_car_task_records);
+    std::cout << "Materialized " << prepared_ai_record_count
+              << " selected AI ACAR runtime records and "
+              << materialized_track_records.rows.size()
+              << " track.obt rows; ordered manifest join is "
+              << (ordered_track_records.complete ? "complete" : "incomplete");
+    if (ordered_track_records.failed_manifest_entry.has_value())
+        std::cout << " at entry " << *ordered_track_records.failed_manifest_entry;
+    if (ordered_track_records.complete) {
+        state.full_task_record_stream.emplace(
+            state.physics_task_manifest->initial_cursor);
+        bool stream_ok = true;
+        for (const auto& record : ordered_track_records.records) {
+            const auto appended = state.full_task_record_stream->append_record(
+                record.record_bytes);
+            if (appended.status !=
+                viper::PhysicsTaskRecordSerializationStatus::complete) {
+                stream_ok = false;
+                break;
+            }
+        }
+        const auto stream = state.full_task_record_stream->snapshot();
+        stream_ok = stream_ok && stream.status ==
+            viper::PhysicsTaskRecordSerializationStatus::complete &&
+            stream.initial_cursor == state.physics_task_manifest->initial_cursor &&
+            state.physics_task_manifest->final_cursor.has_value() &&
+            stream.final_cursor == *state.physics_task_manifest->final_cursor &&
+            stream.records.size() == state.physics_task_manifest->entries.size();
+        for (std::size_t index = 0U;
+             stream_ok && index < ordered_track_records.records.size(); ++index) {
+            const auto& ordered = ordered_track_records.records[index];
+            const auto& serialized = stream.records[index];
+            stream_ok = serialized.record_tag == ordered.record_tag &&
+                serialized.cursor_offset == ordered.cursor_offset &&
+                serialized.record_size == ordered.record_bytes.size();
+        }
+        if (stream_ok) {
+            std::cout << "; serialized " << stream.records.size()
+                      << " ordered records from cursor 0x" << std::hex
+                      << stream.initial_cursor << " through 0x" << stream.final_cursor
+                      << std::dec;
+        } else {
+            state.full_task_record_stream.reset();
+            std::cout << "; full stream serialization validation failed";
+        }
     }
-    std::cout << "Materialized " << prepared_ai_record_count << " selected AI ACAR "
-              << "runtime records; " << resolved_manifest_car_records << " of "
-              << configured_car_record_tags.size()
-              << " configured car records now match manifest indices and tags. "
-              << "The full ordered world stream is still unresolved.\n";
+    std::cout << ".\n";
     if (playback_trace != nullptr) state.graphics.set_vsync(false);
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
@@ -3257,6 +3299,12 @@ int run_selected_race(const Options& options, const std::string_view track,
         assets.track_objects(),
         assets.bundle(std::string(assets.car_name()) + ".car"),
         assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
+        std::array<const viper::ResourceBundle*, 7>{
+            &assets.bundle(std::string(assets.track_name()) + ".trk"),
+            &assets.bundle(std::string(assets.car_name()) + ".car"),
+            &assets.bundle("viper.car"), &assets.bundle("common.res"),
+            &assets.bundle("race.res"), &assets.bundle("ui.res"),
+            &assets.bundle("drivers.res")},
         options.grid_mode, assets.options());
 }
 

@@ -159,28 +159,33 @@ timing fields. This particular `0x3C`-stride ring is owned by the
 live-player wheel-history producer. It is distinct from NCAR's timed three-slot
 `0x3E` sample history.
 
-Runtime startup now builds a complete tag/cursor manifest for the native
-world-load order: recognized `track.obt` object records first, then configured
-entrant rows not consumed by `obj car` directives. Each entrant's PCAR/ACAR
-tag comes from its observed setup marker. This fixes the player's constructor
-cursor when its configured row is appended after later track objects; the
-previous prefix-only cursor planner could not represent that case. The manifest
-does not contain world-record payload bytes and does not populate the native
-physics task object array. Any unsupported directive/class or incomplete line
-keeps the affected suffix unresolved. The physical race remains route-driven.
+Runtime startup builds a complete tag/cursor manifest for native world-load
+order: recognized `track.obt` object records first, then configured entrant
+rows not consumed by `obj car` directives. Each entrant's PCAR/ACAR tag comes
+from its observed setup marker. The live race path now materializes the
+track.obt CHKP/WOBL/STAT/OBST records, joins them with setup/placement-derived
+PCAR/ACAR bytes by manifest identity, and serializes the complete ordered
+framed stream. A one-frame WARP run confirms all entries and the final cursor
+for all eight shipped tracks with Viper, and all five shipped cars on Bemidji.
+The live stream remains separate from the constructor-only player stream.
 
-Therefore the next implementation boundary is completing the native
-world-load-to-task path, not calling `advance_four_wheel_body_step`: produce
-every full record in `0x45C630` order (object directives, then remaining
-`0x45CAB0` configured rows), connect the existing per-class record producers,
-and supply each entrant's effective setup/CARF, model-name, and placement
-inputs. The car task-record layout is already source-backed: `0x45CAE0` calls
-`0x45EC20`/`0x45E4B0` to produce the 0x1E4 record later copied by the same
-world serializer. `plan_ordered_track_task_records` now joins non-car bytes to
-the manifest and accepts validated car bytes by configured-car index, but the
-live session does not yet supply every entrant record or serialize that full
-ordered result. Feed the complete ordered byte stream through the observed
-task factory and retain the resulting physics objects for fixed-step dispatch.
+This is a byte-stream milestone, not native object construction. Current
+startup passes selector zero based on the shipped zero-initialized global and
+ordinary startup path; it assumes no indirect runtime mutation before track
+parsing. Static parsing is enabled based on `0x40D2F0` returning false after
+ordinary startup clears its second gate byte. On x64, terrain division uses
+host arithmetic; original x87/FDIV compatibility is not implemented. Obstacle
+model lookup currently uses an explicit active-track, active-car, Viper, then
+shared-bundle precedence which still needs comparison against the native
+resource-search order. The stream is not yet fed through the observed task
+factory, and no resulting physics-task objects are retained for fixed-step
+dispatch. Unsupported directives/classes, visual-only rows, invalid resources,
+or incomplete lines still block stream acceptance rather than being skipped.
+
+The next boundary is to compare the now-complete serialized bytes and object
+creation sequence against a controlled original run, establish exact runtime
+gate/global values and obstacle model lookup order, and feed the stream through
+the observed task factory while retaining its objects for fixed-step dispatch.
 Then reconstruct mutable
 PCAR callback/force state, locate the live player's wheel-history producer
 independently of the GCAR GhostBegin ring, and establish tick/fraction and
