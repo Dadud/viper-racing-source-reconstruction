@@ -336,3 +336,20 @@ installation, and `Config/options.cfg` remains at SHA-256
 `7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`.
 The reason the fresh launcher attempts ended without a race child remains
 unknown; these attempts are startup diagnostics only, not gameplay evidence.
+
+## Additional staged launcher attempt (2026-10-25)
+
+The official-hash launcher was started from the isolated
+`wheel_history_probe_20261025\GameRoot` copy with its primary thread suspended.
+Frida attached to launcher PID 33016 and installed the child bridge; both
+`CreateProcessA` and `CreateProcessW` hooks reported ready (script SHA-256
+`6f502cb837ec501c0308606f7da98c15f9244273be554d888455d07fc5de681d`, Evidence
+`ev_4fc7b4ebdce1fc8a433d912c83d61e93ed0b43372c0f53d7188d3a7b617b8060`). The
+launcher helper resumed the primary thread with previous suspend count 1, but
+the attached session detached before reporting a child-create event (Evidence
+`ev_247c57060253f783c8dc346dd24690be846bf5c4bdffc50df3da4e35bf1aa033`). No
+race child or simulation samples resulted. The 32 staged `Data` files remain
+identical to the verified manifest and staged `Config/options.cfg` remains at
+SHA-256 `7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`.
+PID 23908 was left untouched. This repeat does not explain the launcher exit
+and does not replace original gameplay evidence.
