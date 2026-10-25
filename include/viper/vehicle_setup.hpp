@@ -954,6 +954,15 @@ struct WheelCollisionImpulseResult {
 [[nodiscard]] WheelSuspensionPipelineResult evaluate_wheel_suspension_pipeline(
     const WheelSuspensionPipelineInput& input) noexcept;
 
+// Advances one suspension pass using the initialized wheel object's prior
+// +0xE8 depth, then persists the finalized next +0xE8 value. Returns
+// unavailable until the native wheel reset/constructor path has initialized
+// that history lane; all other suspension inputs remain explicit observations.
+[[nodiscard]] std::optional<WheelSuspensionPipelineResult>
+advance_ncar_wheel_suspension_with_history(
+    NcarWheelRuntimeObjectState& wheel,
+    const WheelSuspensionPipelineInput& input) noexcept;
+
 // Composes transformed contact, suspension finalization, and feature dispatch.
 [[nodiscard]] WheelUpdatePipelineResult advance_wheel_update_pipeline(
     WheelContactState& contact_state,

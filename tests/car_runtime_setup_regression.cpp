@@ -946,6 +946,61 @@ int main()
                     [](const std::uint8_t value) { return value != 0U; }),
             "unresolved compatibility fills must not partially materialize wheel state");
 
+        {
+            viper::NcarWheelRuntimeObjectState history_wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 1> reset_history{{
+                {0xe8U, 4U, std::bit_cast<std::uint32_t>(0.0F)}}};
+            require(viper::apply_ncar_wheel_object_writes(
+                        history_wheel, 0U, reset_history),
+                "the observed wheel reset must initialize its +0xE8 history lane");
+
+            viper::WheelSuspensionPipelineInput suspension_input{};
+            suspension_input.base.piecewise_terms = {1.0F, 2.0F, 1.0F, 2.0F};
+            suspension_input.base.contact_depth = 0.25F;
+            suspension_input.base.previous_contact_depth_0xe8 = -99.0F;
+            suspension_input.base.wheel_depth_limit_0x44 = 1.0F;
+            suspension_input.base.spring_scale_0x3c = 2.0F;
+            suspension_input.base.spring_base_0x40 = 0.1F;
+            suspension_input.base.suspension_base_0x158 = 0.3F;
+            suspension_input.base.suspension_threshold_0x4c = 0.2F;
+            suspension_input.contact_direction = {0.0F, 1.0F, 0.0F};
+            suspension_input.contact_active = true;
+            const auto first_pass = viper::advance_ncar_wheel_suspension_with_history(
+                history_wheel, suspension_input);
+            require(first_pass.has_value() &&
+                    std::fabs(first_pass->base.scaled_travel - 15.625F) < 1.0e-6F &&
+                    first_pass->finalized.next_contact_depth_0xe8 == 0.25F &&
+                    viper::read_ncar_wheel_object_u32(history_wheel, 0xe8U) ==
+                        std::bit_cast<std::uint32_t>(0.25F),
+                "suspension history adapter must read prior +0xE8 and persist the finalized depth");
+
+            suspension_input.base.contact_depth = 0.30F;
+            suspension_input.base.previous_contact_depth_0xe8 = 99.0F;
+            suspension_input.contact_active = false;
+            const auto second_pass = viper::advance_ncar_wheel_suspension_with_history(
+                history_wheel, suspension_input);
+            require(second_pass.has_value(),
+                "initialized suspension history must permit the next pass");
+            const auto scaled_spring =
+                second_pass->base.piecewise_response * 62.499996F;
+            const auto expected_relaxed_history =
+                (0.25F * scaled_spring - 0.3F) / (scaled_spring + 2.0F);
+            require(std::fabs(second_pass->base.scaled_travel - 3.125F) < 1.0e-5F &&
+                    std::fabs(second_pass->finalized.next_contact_depth_0xe8 -
+                        expected_relaxed_history) < 1.0e-6F &&
+                    viper::read_ncar_wheel_object_u32(history_wheel, 0xe8U) ==
+                        std::bit_cast<std::uint32_t>(expected_relaxed_history),
+                "inactive suspension pass must use the persisted prior depth for its observed relaxation recurrence");
+
+            viper::NcarWheelRuntimeObjectState unknown_history_wheel{};
+            require(!viper::advance_ncar_wheel_suspension_with_history(
+                        unknown_history_wheel, suspension_input).has_value() &&
+                    std::none_of(unknown_history_wheel.initialized_bytes.begin(),
+                        unknown_history_wheel.initialized_bytes.end(),
+                        [](const std::uint8_t value) { return value != 0U; }),
+                "suspension history adapter must fail closed before +0xE8 is initialized");
+        }
+
         setup.pop_back();
         const auto short_preparation =
             viper::prepare_car_file_runtime_mapping_from_setup_payload(

@@ -21,8 +21,10 @@ jobs:
       - name: Build game and regression executables
         run: cmake --build build --config Release --parallel
 
-      - name: Run portable regression suite
-        run: ctest --test-dir build -C Release --output-on-failure --output-junit build/ctest-results.xml
+      - name: Run complete configured regression suite
+        # CTest's default parallelism can overload the UI and localhost-network
+        # smoke tests on hosted Windows runners; keep execution deterministic.
+        run: ctest --test-dir build -C Release --no-tests=error --parallel 1 --output-on-failure --output-junit build/ctest-results.xml
 
       - name: Upload CTest report
         if: always()

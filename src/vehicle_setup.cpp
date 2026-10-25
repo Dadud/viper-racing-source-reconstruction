@@ -1006,6 +1006,25 @@ WheelSuspensionPipelineResult evaluate_wheel_suspension_pipeline(
     return result;
 }
 
+std::optional<WheelSuspensionPipelineResult>
+advance_ncar_wheel_suspension_with_history(
+    NcarWheelRuntimeObjectState& wheel,
+    const WheelSuspensionPipelineInput& input) noexcept
+{
+    const auto prior_depth_bits = read_ncar_wheel_object_u32(wheel, 0xe8U);
+    if (!prior_depth_bits.has_value()) return std::nullopt;
+
+    auto resolved_input = input;
+    resolved_input.base.previous_contact_depth_0xe8 =
+        std::bit_cast<float>(*prior_depth_bits);
+    const auto result = evaluate_wheel_suspension_pipeline(resolved_input);
+    const std::array<NcarObjectFieldWrite, 1> writes{{
+        {0xe8U, 4U,
+         std::bit_cast<std::uint32_t>(result.finalized.next_contact_depth_0xe8)}}};
+    if (!apply_ncar_wheel_object_writes(wheel, 0U, writes)) return std::nullopt;
+    return result;
+}
+
 WheelUpdatePipelineResult advance_wheel_update_pipeline(
     WheelContactState& contact_state,
     const WheelUpdatePipelineInput& input) noexcept

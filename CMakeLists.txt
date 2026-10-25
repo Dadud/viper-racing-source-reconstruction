@@ -6,7 +6,7 @@ project(viper_racing_reconstruction
     LANGUAGES CXX
 )
 
-add_library(viper_network_session src/network_session.cpp)
+add_library(viper_network_session src/network_session.cpp src/network_race_input.cpp)
 target_include_directories(viper_network_session PUBLIC include)
 target_compile_features(viper_network_session PUBLIC cxx_std_20)
 if(WIN32)
@@ -244,6 +244,7 @@ if(WIN32)
         target_compile_options(viper_game PRIVATE /W4 /permissive- /utf-8)
     endif()
     target_link_libraries(viper_game PRIVATE
+        viper_network_session
         viper_race_progression
         viper_race_loop_model
         viper_pcar_model
@@ -401,6 +402,11 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/frontend_race_lifecycle_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
+            add_test(NAME game_network_race_smoke
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${CMAKE_SOURCE_DIR}/tests/network_race_smoke.ps1"
+                    -GameExe "$<TARGET_FILE:viper_game>"
+                    -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
             add_test(NAME game_trace_replay_regression
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
@@ -410,6 +416,7 @@ if(BUILD_TESTING)
             set_tests_properties(game_frontend_launch_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_keyboard_binding_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_frontend_race_lifecycle_smoke PROPERTIES TIMEOUT 180)
+            set_tests_properties(game_network_race_smoke PROPERTIES TIMEOUT 60)
             set_tests_properties(game_asset_root_discovery PROPERTIES TIMEOUT 45)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)

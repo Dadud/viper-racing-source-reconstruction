@@ -26,6 +26,7 @@
 #include "viper/setup_preferences.hpp"
 #include "viper/track_selection.hpp"
 #include "viper/replay_file.hpp"
+#include "viper/network_race_input.hpp"
 #include "directinput_keyboard_service.h"
 
 #include <array>
@@ -123,6 +124,10 @@ struct Options {
     std::optional<std::filesystem::path> record_physics_tick_trace;
     std::optional<std::filesystem::path> play_trace;
     std::optional<std::filesystem::path> load_replay;
+    enum class NetworkMode { host, join };
+    std::optional<NetworkMode> network_mode;
+    std::string network_host;
+    std::uint16_t network_port{};
 };
 
 struct TraceInputFrame {
@@ -136,7 +141,8 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--load-replay PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--load-replay PATH] [--software] [--help]\n"
+        << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges provisional race controls.\n"
         << "  --load-replay PATH validates and retains a native replay container for the race session; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
@@ -222,6 +228,31 @@ Options parse_options(const int argc, wchar_t** argv)
         const std::wstring_view arg(argv[i]);
         if (arg == L"--help" || arg == L"-h") {
             options.help = true;
+        } else if (arg == L"--host" || arg == L"--join") {
+            const bool host_mode = arg == L"--host";
+            if (options.network_mode) throw std::runtime_error("choose only one network role");
+            if (host_mode) {
+                options.network_mode = Options::NetworkMode::host;
+                options.network_host.clear();
+            } else {
+                options.network_mode = Options::NetworkMode::join;
+                if (++i >= argc) throw std::runtime_error("--join requires a host name");
+                const std::wstring_view name(argv[i]);
+                for (const wchar_t ch : name) {
+                    if (ch > 0x7f || ch < 0x20) throw std::runtime_error("host name must be ASCII");
+                    options.network_host.push_back(static_cast<char>(ch));
+                }
+            }
+            if (++i >= argc) throw std::runtime_error(host_mode ? "--host requires a port" : "--join requires a port");
+            const std::wstring_view port_text(argv[i]);
+            unsigned port{};
+            for (const wchar_t ch : port_text) {
+                if (ch < L'0' || ch > L'9' || port > (65535U - static_cast<unsigned>(ch - L'0')) / 10U)
+                    throw std::runtime_error("network port must be an integer from 1 to 65535");
+                port = port * 10U + static_cast<unsigned>(ch - L'0');
+            }
+            if (port == 0U) throw std::runtime_error("network port must be an integer from 1 to 65535");
+            options.network_port = static_cast<std::uint16_t>(port);
         } else if (arg == L"--validate-assets") {
             options.validate_assets = true;
         } else if (arg == L"--software") {
@@ -1930,6 +1961,9 @@ struct WindowState {
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<viper::RouteOpponentAiState> opponent_ai_states;
     std::vector<viper::RouteOpponentAiDecision> last_opponent_ai_decisions;
+    viper::net::Session* network_session{};
+    std::optional<viper::net::RaceInput> remote_race_input;
+    std::uint32_t network_input_sequence{};
     std::vector<std::array<float, 4>> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
     // session. The complete ordered stream is validated and the recovered
@@ -2883,6 +2917,31 @@ struct WindowState {
             for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
                 if (car == player_car_index) continue;
                 auto& ai = opponent_motions[car];
+                const bool remote_controlled = network_session != nullptr &&
+                    remote_race_input.has_value() &&
+                    car == (player_car_index == 0U ? 1U : 0U);
+                if (remote_controlled) {
+                    auto candidate_remote = ai;
+                    const auto remote_result = viper::advance_route_motion(
+                        candidate_remote, route,
+                        remote_race_input->steering < -0.2F,
+                        remote_race_input->steering > 0.2F,
+                        remote_race_input->throttle, remote_race_input->brake,
+                        0.016F, target_laps);
+                    if (!remote_result.valid && !remote_result.finished) continue;
+                    if (remote_result.valid) {
+                        const auto remote_surface = viper::sample_terrain_resource(
+                            *terrain, {remote_result.x, 1000.0f, remote_result.z}, true);
+                        if (!remote_surface.query_succeeded ||
+                            !viper::commit_route_motion_after_terrain_query(
+                                ai, candidate_remote, remote_surface.query_succeeded))
+                            continue;
+                        opponent_simulated_poses[car] = std::array<float, 4>{
+                            remote_result.x, remote_surface.sampled_position[1],
+                            remote_result.z, remote_result.yaw};
+                    }
+                    continue;
+                }
                 const auto decision = viper::decide_route_opponent_action(
                     opponent_ai_states[car], route, route_participant_snapshot, car);
                 if (!decision.valid) continue;
@@ -3688,7 +3747,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::span<const viper::ResourceBundle* const> model_bundles,
                const bool force_default_placement,
                const viper::GameOptions& options,
-               const viper::ReplayFile* const loaded_replay)
+               const viper::ReplayFile* const loaded_replay,
+               viper::net::Session* const network_session)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -3702,6 +3762,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
+    state.network_session = network_session;
     if (loaded_replay) {
         state.loaded_replay = *loaded_replay;
         std::cout << "Retained validated native replay container: "
@@ -4368,6 +4429,32 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 return 1;
             }
             state.last_tick = now;
+            if (state.network_session != nullptr) {
+                try {
+                    const viper::net::RaceInput local_input{
+                        std::clamp(state.control_update_state.steering.value_0x509358,
+                            -1.0F, 1.0F),
+                        std::clamp(state.control_update_state.analog_0x5093f4.value,
+                            0.0F, 1.0F),
+                        std::clamp(state.control_update_state.analog_0x509320.value,
+                            0.0F, 1.0F)};
+                    const auto payload = viper::net::encode_race_input(local_input);
+                    state.network_session->send_state(state.network_input_sequence++,
+                        state.physics_step_count, payload);
+                    viper::net::StateSnapshot remote_snapshot;
+                    if (!state.network_session->receive_state(remote_snapshot))
+                        throw std::runtime_error("stale multiplayer race input snapshot");
+                    viper::net::RaceInput remote_input;
+                    if (!viper::net::decode_race_input(remote_snapshot.payload,
+                            remote_input))
+                        throw std::runtime_error("invalid multiplayer race input payload");
+                    state.remote_race_input = remote_input;
+                } catch (const std::exception& error) {
+                    std::cerr << "Multiplayer session failed: " << error.what() << '\n';
+                    DestroyWindow(hwnd);
+                    return 1;
+                }
+            }
             if (record_physics_tick_trace) {
                 for (const auto& tick : state.player_physics_ticks_this_update) {
                     const auto& controls = tick.controls.controls;
@@ -4827,6 +4914,19 @@ int run_selected_race(const Options& options, const std::string_view track,
                       << " numerically complete with the current FDIV model)\n";
         }
     }
+    std::optional<viper::net::Session> network_session;
+    if (options.network_mode) {
+        if (participant_names.size() < 2U)
+            throw std::runtime_error("multiplayer control exchange needs at least two race entrants");
+        std::cout << (*options.network_mode == Options::NetworkMode::host
+            ? "Waiting for reconstructed client on TCP port "
+            : "Connecting to reconstructed client at " + options.network_host + ":")
+                  << options.network_port << "...\n";
+        network_session.emplace(*options.network_mode == Options::NetworkMode::host
+            ? viper::net::Session::host(options.network_port)
+            : viper::net::Session::join(options.network_host, options.network_port));
+        std::cout << "Reconstructed client connected; exchanging provisional route controls.\n";
+    }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
         options.record_trace, options.record_physics_tick_trace,
         playback_trace, hold_results_for_frontend,
@@ -4848,7 +4948,8 @@ int run_selected_race(const Options& options, const std::string_view track,
             &assets.bundle("viper.car"), &assets.bundle("common.res"),
             &assets.bundle("race.res"), &assets.bundle("ui.res"),
             &assets.bundle("drivers.res")},
-        options.grid_mode, assets.options(), loaded_replay);
+        options.grid_mode, assets.options(), loaded_replay,
+        network_session ? &*network_session : nullptr);
 }
 
 } // namespace

@@ -683,6 +683,20 @@ flag at `+0x20` is set, the `+0x3C` product is reduced by 90 percent. The
 combined scalar corresponds to the wheel store at `+0x178`; field meanings
 remain raw offsets.
 
+`advance_ncar_wheel_suspension_with_history` joins this modeled pipeline to the
+byte-backed wheel owner. It reads prior depth only when all four bytes at
+`+0xE8` are initialized, overrides the caller's duplicate history value with
+that stored value, runs the existing scalar/surface/finalization sequence, and
+persists the finalized next depth back to `+0xE8`. An uninitialized lane fails
+closed without changing the wheel. This is a stateful model adapter only: the
+wheel reset at `0x441B90` explicitly clears `+0xE8`, and `0x442530` consumes
+the prior depth and later produces its next value, but the live race session
+does not call this adapter. Other suspension inputs remain explicit, including
+the unresolved source for wheel `+0x158`; the adapter does not provide that
+input or create live physical motion. Evidence: `0x441B90`
+`ev_4a2b61d33988864abf28dc3967396235c19b9e10`; `0x442530` dossier
+`ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`.
+
 The frame-context builder at `0x4329C0` copies body `+0x50C` into a separate
 context row at `+0x158`, then calls `0x444120` to populate that row. This does
 not establish a write to the actual wheel object's `+0x158`: PCAR integrator
