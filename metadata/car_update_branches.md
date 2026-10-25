@@ -1170,13 +1170,17 @@ The callback at `0x439200` obtains the physics object, calls `0x43E050` with a t
 
 The multiplier used by the initial `+0xDE0` store is now modeled at its
 producer, `0x40D270`, instead of remaining an unexplained float input. The
-function returns the float at `0x4C72E4` (observed bytes `00 00 80 3F`, 1.0)
-unless byte `0x4D10FC` is nonzero. With that gate set it calls `0x49BE40`,
-which returns whether DWORD `0x4E322C` is exactly one; selector one returns
-1.0, other values return the float at `0x4ECC60` (bytes `00 00 00 00`, 0.0).
-`PcarCallbackMultiplierObservation` keeps the mutable gate and selector
-explicit, and `advance_pcar_callback_control_prefix` now computes the
-multiplier before writing `+0xDE0`. Evidence: `0x40D270`
+function returns the float at `0x4C72E4` (1.0) unless byte `0x4D10FC` is
+nonzero. Startup calls `0x40D110(1)`, setting that gate. With the gate set it
+calls `0x49BE40`, which returns whether DWORD `0x4E322C` is exactly one;
+selector one returns 1.0, other values return `0x4ECC60`. Constructor
+`0x40D150` initializes `0x4ECC60` to 1.0 and registers it as `GAME
+throttle_boost`; the current `options.def` value is also 1.0. The human race
+setup stores an entrant-list pointer in `0x4E322C`, so its selector predicate
+is false. `PcarCallbackMultiplierObservation` accepts the configured boost and
+the selector predicate without fabricating a host pointer, and the live path
+now sources `GAME throttle_boost` instead of forcing the 1.0 branch. The trace
+records the computed multiplier. Evidence: `0x40D270`
 `ev_2d15c0a885891fcf248190882242031626ef2f733f06cce618aea2d0b5fdb382`,
 `0x49BE40` `ev_3880fbc859089f05482ecfc0c35f2c3f5d00a58b9d157278aff09a5f1b3123d2`,
 and constant/global reads `ev_ff88ee3fb2ab77d839288892cb88ff837277257f3d0a49dbc480f08a514bb6a5`,
@@ -1192,9 +1196,9 @@ brake, clutch-like, steering, and control-state outputs into the selected raw
 the beginning of `0x4384D0`: `+0xDE0 = 0x5093F4 * result(0x40D270)`,
 `+0xDE4 = 0x509320`, `+0xDE8 = 0x5093B8`, and `+0xDEC = clamp(1.1 -
 1.2*0x5093C8, 0, 1)`. The model names this a prefix because later callback
-branches can overwrite `+0xDE0/+0xDE4`. The runtime currently supplies 1.0
-for `result(0x40D270)`, matching the observed startup fallback; profile-driven
-settings remain unresolved. The four projected values are appended to race
+branches can overwrite `+0xDE0/+0xDE4`. The live session sources
+`GAME throttle_boost` from parsed options and computes `result(0x40D270)` for
+the human entrant-pointer branch. The four projected values are appended to race
 traces. `pcar_control_update_regression` checks the scalar mapping with an
 explicit multiplier.
 

@@ -133,8 +133,10 @@ PcarCallbackMultiplierResult evaluate_pcar_callback_multiplier(
     if (!observation.override_gate_0x4d10fc) {
         return {false, false, 1.0F};
     }
-    const bool selector_is_one = observation.selector_0x4e322c == 1U;
-    return {true, selector_is_one, selector_is_one ? 1.0F : 0.0F};
+    const bool selector_is_one = observation.selector_is_one_0x49be40
+        .value_or(observation.selector_0x4e322c == 1U);
+    return {true, selector_is_one, selector_is_one
+        ? 1.0F : observation.configured_multiplier_0x4ecc60};
 }
 
 void update_pcar_callback_scalar_prefix(

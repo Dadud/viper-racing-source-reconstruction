@@ -1538,6 +1538,7 @@ struct WindowState {
     float control_brake_speed{1.0F};
     bool control_game_pad{};
     bool control_squared_steering_gate_0x5093fc{};
+    float game_throttle_boost_0x4ecc60{1.0F};
     viper::RaceLoop43B290Plan last_control_update{};
     HWND window{};
     std::wstring title_base;
@@ -2205,7 +2206,12 @@ struct WindowState {
         };
         viper::PcarCallbackControlObservation callback_observation{};
         callback_observation.globals = pcar_callback_globals;
-        callback_observation.multiplier = {false, 0U};
+        callback_observation.multiplier.override_gate_0x4d10fc = true;
+        callback_observation.multiplier.configured_multiplier_0x4ecc60 =
+            game_throttle_boost_0x4ecc60;
+        // The human race setup stores an entrant-list pointer in this global;
+        // 0x49BE40 therefore returns false (the pointer is not integer one).
+        callback_observation.multiplier.selector_is_one_0x49be40 = false;
         for (std::size_t axis = 0; axis < 3U; ++axis) {
             const auto velocity = body_float(0x234U +
                 static_cast<std::uint32_t>(axis * 4U));
@@ -2491,6 +2497,8 @@ void load_keyboard_bindings(WindowState& state,
         options.real("CONTROL", "brake_speed").value_or(1.0F);
     state.control_game_pad =
         options.boolean("CONTROL", "game_pad").value_or(false);
+    state.game_throttle_boost_0x4ecc60 =
+        options.real("GAME", "throttle_boost").value_or(1.0F);
     state.control_squared_steering_gate_0x5093fc =
         options.boolean("CONTROL", "nonlinear_steering").value_or(false);
 
@@ -2768,7 +2776,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_body_0x500,pcar_body_0xdcc,pcar_body_0xbe4"
               << ",pcar_body_0x630,pcar_body_0x7d4"
               << ",pcar_body_0x978,pcar_body_0xb1c"
-              << ",pcar_gate_0x5093fc";
+              << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2904,6 +2912,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     else trace << ',';
                 }
                 trace << ',' << state.pcar_callback_globals.gate_0x5093fc;
+                trace << ',' << state.player_pcar_callback_result
+                    .callback_multiplier.value;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";

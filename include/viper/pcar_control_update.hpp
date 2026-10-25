@@ -126,6 +126,13 @@ void set_pcar_callback_globals_0x43b880(PcarCallbackGlobals& globals,
 struct PcarCallbackMultiplierObservation {
     bool override_gate_0x4d10fc{};
     std::uint32_t selector_0x4e322c{};
+    // GAME throttle_boost, loaded into global +0x4ECC60. Zero keeps the
+    // alternate path explicit for model-only callers that omit this input;
+    // live initialization supplies the game's 1.0 default or configured value.
+    float configured_multiplier_0x4ecc60{};
+    // Live callers may know the native selector branch without owning its raw
+    // pointer value (the human-race path stores an entrant pointer here).
+    std::optional<bool> selector_is_one_0x49be40;
 };
 
 struct PcarCallbackMultiplierResult {
@@ -135,7 +142,8 @@ struct PcarCallbackMultiplierResult {
 };
 
 // Models 0x40D270. When the override gate is clear it returns the observed
-// 1.0 constant; when set it returns 1.0 only for selector value exactly one.
+// 1.0 constant; when set it returns 1.0 for selector value one, otherwise the
+// configured +0x4ECC60 value.
 [[nodiscard]] PcarCallbackMultiplierResult evaluate_pcar_callback_multiplier(
     const PcarCallbackMultiplierObservation& observation) noexcept;
 

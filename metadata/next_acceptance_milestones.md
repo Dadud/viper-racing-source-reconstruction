@@ -134,8 +134,8 @@ and basis, runs the velocity projection, global scale, and `0x4330F0` smoother,
 and writes its accumulator, selected output pair, and
 `+0xDE0/+0xDE4/+0xDE8/+0xDEC` scalar stores into that same body owner. The
 constructor-backed smoother multiplier comes from the mapped runtime car
-record; the `0x40D270 = 1.0` startup fallback remains explicit. Gate
-`0x5093FC` now follows `CONTROL nonlinear_steering` and the recovered
+record; `0x40D270` now uses `GAME throttle_boost` and the human entrant-pointer
+selector predicate. Gate `0x5093FC` now follows `CONTROL nonlinear_steering` and the recovered
 `0x43BA30`/`0x446F90` binding-kind clearing rule. This
 does not execute the shared integrator or make these outputs authoritative for
 rendered pose. The runtime does

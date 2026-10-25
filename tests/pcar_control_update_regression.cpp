@@ -118,6 +118,20 @@ int main()
         std::cerr << "PCAR callback multiplier did not match selector value one.\n";
         return EXIT_FAILURE;
     }
+    auto configured_multiplier_observation = callback_observation;
+    configured_multiplier_observation.multiplier = {true, 0U, 1.25F, false};
+    viper::PcarCallbackControlState configured_multiplier_state{};
+    const auto configured_multiplier_result =
+        viper::advance_pcar_callback_control_prefix(
+            configured_multiplier_state, configured_multiplier_observation);
+    if (!configured_multiplier_result.callback_multiplier.selector_helper_called ||
+        configured_multiplier_result.callback_multiplier.selector_is_one ||
+        configured_multiplier_result.callback_multiplier.value != 1.25F ||
+        std::abs(configured_multiplier_state.scalar_prefix.value_0xde0 -
+            globals.value_0x5093f4 * 1.25F) > 1.0e-6F) {
+        std::cerr << "PCAR callback multiplier did not apply configured throttle boost.\n";
+        return EXIT_FAILURE;
+    }
 
     viper::PcarCallbackBranchFields branch_fields{};
     branch_fields.value_0xd64 = 7U;
