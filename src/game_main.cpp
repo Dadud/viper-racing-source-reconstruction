@@ -1525,6 +1525,7 @@ struct WindowState {
     viper::RaceLoop43B290State control_update_state{};
     viper::PcarCallbackGlobals pcar_callback_globals{};
     viper::PcarScalarFields player_pcar_control_prefix{};
+    viper::PcarCallbackControlResult player_pcar_callback_result{};
     viper::PcarConstructorControls player_pcar_constructor_controls{};
     float control_steering_smoothing{1.0F};
     float control_steering_range{1.0F};
@@ -2223,8 +2224,8 @@ struct WindowState {
         callback_state.scalar_prefix = player_pcar_control_prefix;
         // The 0x5093FC square-magnitude gate has no session source yet and
         // therefore remains at its zero-initialized startup observation.
-        viper::advance_pcar_callback_control_prefix(callback_state,
-            callback_observation);
+        player_pcar_callback_result = viper::advance_pcar_callback_control_prefix(
+            callback_state, callback_observation);
         player_pcar_control_prefix = callback_state.scalar_prefix;
         std::array<viper::NcarObjectFieldWrite, 7> pcar_callback_writes{{
             {0x500U, 4U, std::bit_cast<std::uint32_t>(
@@ -2749,7 +2750,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_traction_control,pcar_abs_braking"
               << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control"
               << ",pcar_body_0xde0,pcar_body_0xde4"
-              << ",pcar_body_0xde8,pcar_body_0xdec";
+              << ",pcar_body_0xde8,pcar_body_0xdec"
+              << ",pcar_velocity_projection,pcar_scaled_smoother_request"
+              << ",pcar_body_0x500,pcar_body_0xdcc,pcar_body_0xbe4"
+              << ",pcar_body_0x630,pcar_body_0x7d4"
+              << ",pcar_body_0x978,pcar_body_0xb1c";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2858,6 +2863,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.player_pcar_constructor_controls.auto_clutch_0x534
                       << ',' << state.player_pcar_constructor_controls.yaw_control;
                 for (const auto offset : {0xde0U, 0xde4U, 0xde8U, 0xdecU}) {
+                    const auto bits = viper::read_ncar_body_object_u32(
+                        state.player_runtime_state.body_object, offset);
+                    if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
+                    else trace << ',';
+                }
+                trace << ',' << state.player_pcar_callback_result
+                    .absolute_velocity_projection
+                      << ',' << state.player_pcar_callback_result
+                    .scaled_smoother_request;
+                for (const auto offset : {0x500U, 0xdccU}) {
+                    const auto bits = viper::read_ncar_body_object_u32(
+                        state.player_runtime_state.body_object, offset);
+                    if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
+                    else trace << ',';
+                }
+                const auto smoother_mode = viper::read_ncar_body_object_u8(
+                    state.player_runtime_state.body_object, 0xbe4U);
+                if (smoother_mode.has_value())
+                    trace << ',' << static_cast<unsigned>(*smoother_mode);
+                else trace << ',';
+                for (const auto offset : {0x630U, 0x7d4U, 0x978U, 0xb1cU}) {
                     const auto bits = viper::read_ncar_body_object_u32(
                         state.player_runtime_state.body_object, offset);
                     if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
