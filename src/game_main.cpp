@@ -1629,6 +1629,28 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
+        const auto callback_setup =
+            viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
+                player_runtime_car_record);
+        if (!callback_setup.has_value()) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
+        // 0x433AA0 initializes the smoother accumulator; 0x433C00 derives
+        // +0xDCC from the mapped runtime record; the PCAR constructor defaults
+        // +0xBE4 to zero. These are the inputs consumed by 0x4330F0.
+        const std::array<viper::NcarObjectFieldWrite, 3> callback_control_defaults{{
+            {0x500U, 4U, 0U},
+            {0xdccU, 4U, std::bit_cast<std::uint32_t>(callback_setup->angle_0xdcc)},
+            {0xbe4U, 1U, 0U},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, callback_control_defaults)) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
         // The derived ACAR constructor configures its embedded curve and
         // selector from the same mapped runtime car record. Persist the
         // numeric fields consumed by the recovered PCAR callback branch.
@@ -2162,23 +2184,6 @@ struct WindowState {
             control_update_state.controls.flag_0x5093f8 != 0U;
         pcar_callback_globals.gate_0x509420 =
             control_update_state.controls.flag_0x509420 != 0U;
-        viper::update_pcar_callback_scalar_prefix(
-            player_pcar_control_prefix, pcar_callback_globals, 1.0F);
-        const std::array<viper::NcarObjectFieldWrite, 4> pcar_callback_scalar_writes{{
-            {0xde0U, 4U, std::bit_cast<std::uint32_t>(
-                player_pcar_control_prefix.value_0xde0)},
-            {0xde4U, 4U, std::bit_cast<std::uint32_t>(
-                player_pcar_control_prefix.value_0xde4)},
-            {0xde8U, 4U, std::bit_cast<std::uint32_t>(
-                player_pcar_control_prefix.value_0xde8)},
-            {0xdecU, 4U, std::bit_cast<std::uint32_t>(
-                player_pcar_control_prefix.value_0xdec)},
-        }};
-        if (!viper::apply_ncar_body_object_writes(
-                player_runtime_state.body_object, pcar_callback_scalar_writes)) {
-            return false;
-        }
-
         const auto body_word = [&](const std::uint32_t offset) {
             return viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offset);
@@ -2189,6 +2194,66 @@ struct WindowState {
             if (!bits) return std::nullopt;
             return std::bit_cast<float>(*bits);
         };
+        const auto body_u8 = [&](const std::uint32_t offset)
+            -> std::optional<std::uint8_t> {
+            return viper::read_ncar_body_object_u8(
+                player_runtime_state.body_object, offset);
+        };
+        viper::PcarCallbackControlObservation callback_observation{};
+        callback_observation.globals = pcar_callback_globals;
+        callback_observation.multiplier = {false, 0U};
+        for (std::size_t axis = 0; axis < 3U; ++axis) {
+            const auto velocity = body_float(0x234U +
+                static_cast<std::uint32_t>(axis * 4U));
+            const auto basis = body_float(0x50U +
+                static_cast<std::uint32_t>(axis * 4U));
+            if (!velocity || !basis) return false;
+            callback_observation.body_velocity_0x234[axis] = *velocity;
+            callback_observation.body_basis_0x50[axis] = *basis;
+        }
+        const auto smoother_value = body_float(0x500U);
+        const auto smoother_multiplier = body_float(0xdccU);
+        const auto smoother_mode = body_u8(0xbe4U);
+        if (!smoother_value || !smoother_multiplier || !smoother_mode)
+            return false;
+        viper::PcarCallbackControlState callback_state{};
+        callback_state.smoother.value_0x500 = *smoother_value;
+        callback_state.smoother.multiplier_0xdcc = *smoother_multiplier;
+        callback_state.smoother.mode_0xbe4 = *smoother_mode != 0U;
+        callback_state.scalar_prefix = player_pcar_control_prefix;
+        // The 0x5093FC square-magnitude gate has no session source yet and
+        // therefore remains at its zero-initialized startup observation.
+        viper::advance_pcar_callback_control_prefix(callback_state,
+            callback_observation);
+        player_pcar_control_prefix = callback_state.scalar_prefix;
+        std::array<viper::NcarObjectFieldWrite, 7> pcar_callback_writes{{
+            {0x500U, 4U, std::bit_cast<std::uint32_t>(
+                callback_state.smoother.value_0x500)},
+            {0xde0U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xde0)},
+            {0xde4U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xde4)},
+            {0xde8U, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xde8)},
+            {0xdecU, 4U, std::bit_cast<std::uint32_t>(
+                player_pcar_control_prefix.value_0xdec)},
+        }};
+        if (callback_state.smoother.mode_0xbe4) {
+            pcar_callback_writes[5] = {0x978U, 4U,
+                std::bit_cast<std::uint32_t>(callback_state.smoother.output_0x978)};
+            pcar_callback_writes[6] = {0xb1cU, 4U,
+                std::bit_cast<std::uint32_t>(callback_state.smoother.output_0xb1c)};
+        } else {
+            pcar_callback_writes[5] = {0x630U, 4U,
+                std::bit_cast<std::uint32_t>(callback_state.smoother.output_0x630)};
+            pcar_callback_writes[6] = {0x7d4U, 4U,
+                std::bit_cast<std::uint32_t>(callback_state.smoother.output_0x7d4)};
+        }
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, pcar_callback_writes)) {
+            return false;
+        }
+
         const auto auto_shift = viper::read_ncar_body_object_u8(
             player_runtime_state.body_object, 0xec8U);
         const auto auto_clutch = viper::read_ncar_body_object_u8(
