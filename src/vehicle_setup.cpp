@@ -2031,11 +2031,14 @@ BodyIntegrationVirtualRecordCalls materialize_body_integration_virtual_record_ca
 BodyIntegrationForceCollectionResult prepare_body_integration_force_collection(
     BodyIntegrationTailState& tail_state,
     NcarPointImpulseAccumulator& impulse_state,
+    const float gravity_mass_0x7c,
     const BodyIntegrationForceCollectionInput& input)
 {
     BodyIntegrationForceCollectionResult result{};
+    // 0x43ECE0 performs this before embedded-record callbacks by adding
+    // body[+0x1f0] * the native gravity constant to the Y accumulator.
     tail_state.running_accumulators_0x93_to_0x98[1] +=
-        input.gravity_mass_0x7c * -9.81F;
+        gravity_mass_0x7c * -9.81F;
     for (std::size_t index = 0;
          index < tail_state.running_accumulators_0x93_to_0x98.size(); ++index) {
         tail_state.running_accumulators_0x93_to_0x98[index] +=
@@ -2117,13 +2120,14 @@ read_ncar_body_integration_kinematics_input(
     const auto linear_velocity = read_vector(0x234U);
     const auto accumulated_linear_force = read_vector(0x24cU);
     const auto inverse_mass = read_float(0x200U);
+    const auto gravity_mass = read_float(0x1f0U);
     const auto angular_velocity = read_vector(0x240U);
     const auto accumulated_angular_moment = read_vector(0x258U);
     const auto orientation = read_matrix(0x038U);
     const auto angular_transform = read_matrix(0x264U);
     const auto body_matrix = read_matrix(0x210U);
     if (!position || !linear_velocity || !accumulated_linear_force ||
-        !inverse_mass || !angular_velocity || !accumulated_angular_moment ||
+        !inverse_mass || !gravity_mass || !angular_velocity || !accumulated_angular_moment ||
         !orientation || !angular_transform || !body_matrix) {
         return std::nullopt;
     }
@@ -2133,6 +2137,7 @@ read_ncar_body_integration_kinematics_input(
     input.linear_velocity = *linear_velocity;
     input.accumulated_linear_force = *accumulated_linear_force;
     input.inverse_mass = *inverse_mass;
+    input.gravity_mass_0x7c = *gravity_mass;
     input.angular_velocity = *angular_velocity;
     input.accumulated_angular_moment = *accumulated_angular_moment;
     input.orientation_matrix_0x0e = *orientation;

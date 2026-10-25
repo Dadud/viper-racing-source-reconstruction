@@ -1383,8 +1383,18 @@ after the copy.
 
 The integrator kinematics boundary is now mapped onto the same byte owner.
 `read_ncar_body_integration_kinematics_input` requires initialized values for
-position `+0x5C`, inverse mass `+0x200`, matrices `+0x210/+0x264`, linear
-velocity/force `+0x234/+0x24C`, and angular velocity/moment `+0x240/+0x258`.
+position `+0x5C`, gravity mass `+0x1F0` (DWORD index `0x7C`), inverse mass
+`+0x200`, matrices `+0x210/+0x264`, linear velocity/force `+0x234/+0x24C`,
+and angular velocity/moment `+0x240/+0x258`. The four-wheel composition now
+gets the gravity mass from this byte-backed kinematics input rather than from
+an independent caller argument. Regression coverage verifies the exact value
+and rejects an unknown source byte.
+The shipped instruction sequence loads body `+0x1F0`, multiplies by the float
+at `0x4C85BC`, and adds the result to the Y accumulator before the counted
+embedded-record loop (`0x43ECE8..0x43ED06`, evidence
+`ev_682b48156e299295986e5cf8240512f653fa962628409e1f374b4143bb58ab79`).
+The constant's bytes are `C3 F5 1C C1` (`-9.81f`, read-bytes evidence
+`ev_bf78f6f0cae670b512fe7b3e52ae18aa37fa0b9ddeb87bc63bc89042eb967a32`).
 Its result writer persists the modeled position, velocities, orientation at
 `+0x38`, synchronized matrix at `+0x264`, accumulator clears, and 16-bit update
 counter at `+0x10`; it preserves `+0x210` and adjacent counter bytes. Regression

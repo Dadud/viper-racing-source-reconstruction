@@ -187,6 +187,7 @@ int main()
             11.0F, 12.0F, 13.0F, 14.0F, 15.0F, 16.0F, 17.0F, 18.0F, 19.0F};
         add_matrix(0x038U, orientation_input);
         add_vector(0x05cU, {21.0F, 22.0F, 23.0F});
+        add_float(0x1f0U, 8.0F);
         add_float(0x200U, 0.125F);
         add_matrix(0x210U, body_matrix_input);
         add_vector(0x234U, {31.0F, 32.0F, 33.0F});
@@ -206,6 +207,7 @@ int main()
                 kinematics_input->linear_velocity.z == 33.0F &&
                 kinematics_input->accumulated_linear_force.y == 52.0F &&
                 kinematics_input->inverse_mass == 0.125F &&
+                kinematics_input->gravity_mass_0x7c == 8.0F &&
                 kinematics_input->angular_velocity.x == 41.0F &&
                 kinematics_input->accumulated_angular_moment.z == 63.0F &&
                 kinematics_input->orientation_matrix_0x0e == orientation_input &&
@@ -217,6 +219,11 @@ int main()
         require(!viper::read_ncar_body_integration_kinematics_input(
                     incomplete_kinematics_body).has_value(),
             "kinematics input must stay unavailable when any consumed matrix byte is unknown");
+        auto missing_gravity_mass_body = kinematics_body;
+        missing_gravity_mass_body.initialized_bytes[0x1f0U] = 0U;
+        require(!viper::read_ncar_body_integration_kinematics_input(
+                    missing_gravity_mass_body).has_value(),
+            "kinematics input must stay unavailable when the constructor gravity-mass source is unknown");
 
         viper::BodyIntegrationKinematicsResult kinematics_result{};
         kinematics_result.linear.position = {101.0F, 102.0F, 103.0F};
@@ -493,6 +500,7 @@ int main()
         body_step_input.wheel_contact_pipeline_enabled = true;
         body_step_input.integrator_prefix_input.state_0x4fc = 1U;
         body_step_input.kinematics.linear_velocity = {1.0F, 2.0F, 3.0F};
+        body_step_input.kinematics.gravity_mass_0x7c = 8.0F;
         body_step_input.kinematics.angular_velocity = {0.0F, 0.0F, 2.0F};
         body_step_input.wheel_contact_states[0].contact_point_0x130 = {4.0F, 5.0F, 0.0F};
         auto& body_step_wheel = body_step_input.wheel_update_pipeline_inputs[0];
@@ -507,6 +515,9 @@ int main()
         require(body_step.wheel_contact_pipeline_results[0]
                     .suspension.surface.absolute_motion_projection == 20.0F,
             "four-wheel step must project point velocity through the body fields");
+        require(std::fabs(body_step.force_collection.accumulated_linear_force.y +
+                    78.48F) < 1.0e-4F,
+            "four-wheel composition must source its gravity term from the body kinematics input");
         const auto polarity_seeds =
             viper::make_ncar_surface_polarity_seed_pair_0x4193c0(
                 30001U, static_cast<std::uint32_t>(-29999));

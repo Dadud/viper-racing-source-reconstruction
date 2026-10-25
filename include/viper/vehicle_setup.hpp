@@ -1071,6 +1071,8 @@ struct BodyIntegrationKinematicsInput {
     PhysicsVector3 linear_velocity{};
     PhysicsVector3 accumulated_linear_force{};
     float inverse_mass{};
+    // Body +0x1f0 (DWORD index 0x7c), added as gravity before force integration.
+    float gravity_mass_0x7c{};
     PhysicsVector3 angular_velocity{};
     PhysicsVector3 accumulated_angular_moment{};
     std::array<float, 9> orientation_matrix_0x0e{};
@@ -1097,7 +1099,6 @@ struct BodyIntegrationVirtualRecordCalls {
 };
 
 struct BodyIntegrationForceCollectionInput {
-    float gravity_mass_0x7c{};
     // Aggregate writes made by the preceding embedded-record callbacks. Their
     // per-record virtual behavior remains caller supplied.
     std::array<float, 6> embedded_record_accumulator_delta{};
@@ -1195,13 +1196,14 @@ materialize_body_integration_virtual_record_calls(
     std::size_t record_count);
 
 // Composes the observable pre-kinematics accumulator phase of 0x43ECE0:
-// gravity, caller-projected embedded-record effects, point-impulse transfer,
-// then normalized +0x38 callback arguments. Clears the duration/count fields;
-// virtual callback effects are not applied here.
+// body +0x1f0 gravity, caller-projected embedded-record effects, point-impulse
+// transfer, then normalized +0x38 callback argument decoding. Clears the
+// duration/count fields; virtual callback effects are not applied here.
 [[nodiscard]] BodyIntegrationForceCollectionResult
 prepare_body_integration_force_collection(
     BodyIntegrationTailState& tail_state,
     NcarPointImpulseAccumulator& impulse_state,
+    float gravity_mass_0x7c,
     const BodyIntegrationForceCollectionInput& input);
 
 // Composes the ordered linear, angular, orientation, basis-sync, and tail

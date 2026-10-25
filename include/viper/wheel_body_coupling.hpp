@@ -784,7 +784,6 @@ struct FourWheelBodyStepInput {
     const TerrainSurfaceResourcePayload* terrain{};
     EmbeddedRecordUpdateInput embedded_record_body_input{};
     bool compatibility_division_enabled{};
-    float gravity_mass_0x7c{};
     std::span<const float> packed_virtual_records;
     BodyIntegrationKinematicsInput kinematics{};
     NcarPostBodyState post_body_state{};

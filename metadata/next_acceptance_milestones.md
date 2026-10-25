@@ -33,6 +33,12 @@ separate Release validation build passed a Viper/Bemidji software smoke against
 the external asset installation. This initializes body bytes from the observed
 constructor handoff; the body integrator still does not advance them and the
 route prototype still owns player motion/render pose.
+The body-kinematics reader now also requires gravity mass at `+0x1F0` (DWORD
+index `0x7C`), and the four-wheel composition takes its gravity input from that
+same byte-backed owner. The regression verifies exact extraction and rejects
+an uninitialized source byte. This closes input provenance for the native
+gravity term only; wheel forces, callback effects, and live body integration
+remain disconnected.
 The Win32 loop now uses the recovered `0.016` physics-task schedule and
 two-step catch-up cap to advance its current route/contact prototype, while
 sampling controls once per outer update and retaining the latest accepted

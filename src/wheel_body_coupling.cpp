@@ -2031,7 +2031,6 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     }
 
     BodyIntegrationForceCollectionInput force_collection_input{};
-    force_collection_input.gravity_mass_0x7c = input.gravity_mass_0x7c;
     force_collection_input.embedded_record_accumulator_delta = {
         result.force_moment_state.force_0x24c[0],
         result.force_moment_state.force_0x24c[1],
@@ -2043,6 +2042,7 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     result.force_collection = prepare_body_integration_force_collection(
         result.body_tail_state,
         result.point_impulse_state,
+        input.kinematics.gravity_mass_0x7c,
         force_collection_input);
     result.input_complete = result.input_complete &&
         result.force_collection.virtual_record_calls.truncated_records == 0U;
