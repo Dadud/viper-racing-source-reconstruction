@@ -249,6 +249,21 @@ It records the exact bounded source hash used for that run. The checked-in
 extends that capture with stack snapshots at the suspension and tire-force
 callsites; those added stage rows still require a fresh controlled run.
 
+The 32 force-writer rows also contain complete raw `0x1A4`-byte wheel-object
+snapshots. Decoding offsets `+0x158` and `+0xE8` gives these ranges across the
+eight sampled integrator calls (eight rows per wheel): wheel 0,
+`+0x158 = -43.073410`, `+0xE8 = 0.049957..0.049959`; wheel 1,
+`+0x158 = 43.073410`, `+0xE8 = 0.051187..0.051188`; wheel 2,
+`+0x158 = 38.253132..38.386795`, `+0xE8 = 0.053592..0.053595`; wheel 3,
+`+0x158 = -38.386795..-38.253132`, `+0xE8 = 0.052500..0.052501`. These are
+observed post-suspension values at the `0x43E6F0` writer, alongside
+`+0x178`; they do not expose the earlier body-to-wheel `+0x50C` copy or the
+prior-history value consumed to calculate the current `+0xE8`. The
+wheel-specific `+0x158` values must not be treated as the shared body
+`+0x50C` producer. This narrows the raw-field inventory but does not close
+either suspension input's source or justify feeding these snapshots back into
+the live runtime.
+
 This establishes the final force application inputs and the response scalar's
 handoff, but not the upstream derivation of the wheel direction, tire response
 vector, suspension/query state, or their live session producers. It does not
