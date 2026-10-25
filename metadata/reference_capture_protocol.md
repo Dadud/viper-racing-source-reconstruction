@@ -72,6 +72,22 @@ reset prompt; a later no-input frame at Lap Time 2:04.5 shows Position 8/8,
 motion attribution. This is a startup and no-input baseline only; it does not
 verify input delivery, race completion, audio, or reconstruction parity.
 
+### Isolated launcher handoff retry on 2026-10-25
+
+A fresh copy of the staged `GameRoot` (47 files, 70,536,575 bytes) was
+launched from its own copied `Data` directory. The copied launcher and data
+files matched the source capture copy by SHA-256. A Frida bridge was installed
+before resuming the launcher thread and watched `CreateProcessA/W` for a
+`race.bin` child with the exact staged working directory. The launcher process
+exited after resume without a matching child-creation event; no new engine
+process or gameplay capture was produced. The earlier preserved launcher and
+the reconstructed game remained running. Details are in the private manifest
+`../../analysis/reference_captures/wheel_history_probe_20261025_isolated_attempt1/isolated_launcher_handoff_20261025_attempt1.manifest.json`
+(SHA-256
+`0E3E5D5DB24833F67E50C3403E55BD1E68A00DFD99947924009523251BC08413`). This
+is a failed handoff attempt, not runtime gameplay evidence. Its launcher exit
+cause remains unresolved.
+
 ### Preserved launcher process check on 2026-10-26
 
 The older preserved launcher process (PID 14636, executable under
