@@ -53,8 +53,12 @@ update cannot yet replace the provisional playback path.
 exercises buffer creation/play calls. On the current Windows setup, this smoke
 initialized Viper with four buffers (idle plus three bands) and Exotic, Plane,
 Sedan, and Sports with three each (idle plus two bands); all five commands
-returned successfully. The smoke run does not capture speaker output or
-compare timing and pitch against the original. The separate top-level
+returned successfully. If a playback operation reports `DSERR_BUFFERLOST`, the
+runtime now restores the buffer's PCM, reapplies its last requested volume and
+frequency, and restarts looping playback. Pause/resume also reapplies those
+cached settings. This recovery path has build and general-suite coverage but
+does not yet have a simulated lost-buffer test. Existing smoke runs do not
+capture speaker output or compare timing and pitch against the original. The separate top-level
 `trk2.sfx` file's `MGI!` payload remains unparsed.
 
 ### Native vehicle values used by ESFX playback

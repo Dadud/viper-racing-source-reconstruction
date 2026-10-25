@@ -106,6 +106,41 @@ try {
     if (Test-Path -LiteralPath $careerPath) {
         throw 'Confirming career slot deletion left the selected file in place'
     }
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]78, [IntPtr]::Zero)) {
+        throw 'Could not create a career slot in the selected empty slot'
+    }
+    Start-Sleep -Milliseconds 250
+    if (-not (Test-Path -LiteralPath $careerPath)) {
+        throw 'Career slot creation did not write the selected native slot'
+    }
+    $createdBytes = [System.IO.File]::ReadAllBytes($careerPath)
+    if ($createdBytes.Length -ne 0x684) {
+        throw "Created career slot has an unexpected size: $($createdBytes.Length)"
+    }
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]78, [IntPtr]::Zero)) {
+        throw 'Could not check that creating a career refuses an occupied slot'
+    }
+    Start-Sleep -Milliseconds 150
+    $validBytesAfterCreateAttempt = [System.IO.File]::ReadAllBytes($careerPath)
+    if ([Convert]::ToBase64String($createdBytes) -ne
+        [Convert]::ToBase64String($validBytesAfterCreateAttempt)) {
+        throw 'Creating a career overwrote a valid existing slot'
+    }
+    $corruptBytes = [byte[]](0x01, 0x02, 0x03, 0x04)
+    [System.IO.File]::WriteAllBytes($careerPath, $corruptBytes)
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]78, [IntPtr]::Zero)) {
+        throw 'Could not check that creating a career preserves an invalid slot'
+    }
+    Start-Sleep -Milliseconds 150
+    $corruptBytesAfterCreateAttempt = [System.IO.File]::ReadAllBytes($careerPath)
+    if ([Convert]::ToBase64String($corruptBytes) -ne
+        [Convert]::ToBase64String($corruptBytesAfterCreateAttempt)) {
+        throw 'Creating a career overwrote an invalid existing slot'
+    }
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]13, [IntPtr]::Zero)) {
+        throw 'Could not validate the new career slot'
+    }
+    Start-Sleep -Milliseconds 200
     $process.Refresh()
     if ($process.HasExited) { throw 'Career slot screen closed the setup process unexpectedly' }
     if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]27, [IntPtr]::Zero)) {

@@ -672,7 +672,7 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
             SetTextColor(dc, RGB(255, 194, 112));
             write(L"DELETE THIS SLOT?  Y: DELETE   N / ESC: CANCEL", 100, 430, 30);
         } else {
-            write(L"UP / DOWN: SELECT   ENTER: VALIDATE   D: DELETE", 100, 430, 30);
+            write(L"UP / DOWN: SELECT   ENTER: VALIDATE   N: NEW SLOT   D: DELETE", 100, 430, 25);
             write(L"ESC: BACK", 100, 500, 30);
         }
         if (!state.career_message.empty())
@@ -792,6 +792,37 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                     } else {
                         state->career_rows[static_cast<std::size_t>(state->career_slot)] = "EMPTY OR INVALID";
                         state->career_message = "SLOT FAILED NATIVE VALIDATION";
+                    }
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam == 'N') {
+                    const auto selected = static_cast<std::size_t>(state->career_slot);
+                    const auto existing = viper::load_career_slot(
+                        state->config_directory, state->career_slot);
+                    std::error_code slot_status_error;
+                    const bool slot_file_exists = std::filesystem::exists(
+                        existing.path, slot_status_error);
+                    if (existing.file.returns_success || slot_file_exists) {
+                        state->career_message = existing.file.returns_success
+                            ? "SLOT IN USE - SELECT AN EMPTY SLOT"
+                            : "SLOT FILE INVALID - PRESERVED; SELECT AN EMPTY SLOT";
+                    } else if (slot_status_error) {
+                        state->career_message = "SLOT CHECK FAILED: " +
+                            slot_status_error.message();
+                    } else {
+                        constexpr std::array<std::uint8_t, 12> new_career_name{
+                            'N','e','w',' ','C','a','r','e','e','r',0,0};
+                        const auto created = viper::create_career_slot(
+                            state->config_directory, state->career_slot,
+                            std::span<const std::uint8_t>(new_career_name.data(), 11U),
+                            0U, 0U);
+                        if (created.saved) {
+                            state->career_rows[selected] = "AVAILABLE: New Career";
+                            state->career_message = "NEW SLOT CREATED - CAREER EVENTS PENDING";
+                        } else {
+                            state->career_message = "CREATE FAILED: " + created.error;
+                        }
                     }
                     InvalidateRect(hwnd, nullptr, FALSE);
                     return 0;
@@ -1605,12 +1636,14 @@ public:
         if (band_indices_.size() != declared_band_count_) return false;
 
         for (auto& sound : sounds_) {
+            sound.target_volume = DSBVOLUME_MIN;
             if (FAILED(sound.buffer->SetVolume(DSBVOLUME_MIN)) ||
                 FAILED(sound.buffer->SetCurrentPosition(0U)) ||
                 FAILED(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING))) {
                 return false;
             }
         }
+        sounds_[idle_index_].target_volume = -850;
         static_cast<void>(sounds_[idle_index_].buffer->SetVolume(-850));
         initialized_ = true;
         return true;
@@ -1643,17 +1676,16 @@ public:
         for (std::size_t index = 0; index < sounds_.size(); ++index) {
             const LONG volume = index == desired ? -850 : DSBVOLUME_MIN;
             auto& sound = sounds_[index];
+            sound.target_volume = volume;
             const auto volume_result = sound.buffer->SetVolume(volume);
-            if (volume_result == DSERR_BUFFERLOST && restore_buffer(sound)) {
-                static_cast<void>(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
-                static_cast<void>(sound.buffer->SetVolume(volume));
+            if (volume_result == DSERR_BUFFERLOST) {
+                static_cast<void>(restore_and_play(sound));
             }
             if (index == desired) {
+                sound.target_frequency = frequency;
                 const auto frequency_result = sound.buffer->SetFrequency(frequency);
-                if (frequency_result == DSERR_BUFFERLOST && restore_buffer(sound)) {
-                    static_cast<void>(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
-                    static_cast<void>(sound.buffer->SetFrequency(frequency));
-                    static_cast<void>(sound.buffer->SetVolume(volume));
+                if (frequency_result == DSERR_BUFFERLOST) {
+                    static_cast<void>(restore_and_play(sound));
                 }
             }
         }
@@ -1669,9 +1701,16 @@ public:
                 static_cast<void>(sound.buffer->Stop());
             } else {
                 auto result = sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING);
-                if (result == DSERR_BUFFERLOST && restore_buffer(sound))
-                    result = sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING);
-                static_cast<void>(result);
+                if (result == DSERR_BUFFERLOST) {
+                    static_cast<void>(restore_and_play(sound));
+                    continue;
+                }
+                if (SUCCEEDED(result)) {
+                    static_cast<void>(sound.buffer->SetVolume(sound.target_volume));
+                    if (sound.target_frequency != 0U)
+                        static_cast<void>(sound.buffer->SetFrequency(
+                            sound.target_frequency));
+                }
             }
         }
     }
@@ -1697,6 +1736,8 @@ private:
     struct Sound {
         ComPtr<IDirectSoundBuffer> buffer;
         DWORD sample_rate{};
+        DWORD target_frequency{};
+        LONG target_volume{DSBVOLUME_MIN};
         std::optional<std::array<float, 7>> engine_parameters;
         std::vector<std::byte> pcm_data;
     };
@@ -1724,6 +1765,17 @@ private:
     {
         if (!sound.buffer || FAILED(sound.buffer->Restore())) return false;
         return copy_pcm_to_buffer(sound);
+    }
+
+    static bool restore_and_play(Sound& sound) noexcept
+    {
+        if (!restore_buffer(sound) ||
+            FAILED(sound.buffer->SetVolume(sound.target_volume)) ||
+            (sound.target_frequency != 0U &&
+             FAILED(sound.buffer->SetFrequency(sound.target_frequency)))) {
+            return false;
+        }
+        return SUCCEEDED(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
     }
 
     bool load_sound(const viper::ResourceBundle& bundle,
