@@ -1212,6 +1212,19 @@ advance_body_integration_kinematics(
     BodyIntegrationTailState& tail_state,
     const BodyIntegrationKinematicsInput& input) noexcept;
 
+// Reads the exact body fields consumed by 0x43ECE0 from a byte-backed PCAR
+// object. Returns unavailable if any input byte has no observed initializer.
+[[nodiscard]] std::optional<BodyIntegrationKinematicsInput>
+read_ncar_body_integration_kinematics_input(
+    const NcarBodyRuntimeObjectState& body) noexcept;
+
+// Persists the observed 0x43ECE0 kinematics outputs into the same body object:
+// pose, velocities, synchronized angular matrix, cleared accumulators, and the
+// low 16-bit update counter. The body's +0x210 matrix is read-only here.
+[[nodiscard]] bool apply_ncar_body_integration_kinematics_result(
+    NcarBodyRuntimeObjectState& body,
+    const BodyIntegrationKinematicsResult& result) noexcept;
+
 // Decodes the fixed-size 120-byte payload copied by the original tire loader
 // at 0x435B50. Parameter semantics remain address-based and undocumented.
 [[nodiscard]] std::optional<TireDefinition> parse_tire_resource(

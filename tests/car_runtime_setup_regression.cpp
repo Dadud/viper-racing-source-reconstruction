@@ -159,6 +159,100 @@ int main()
         require(viper::read_ncar_body_object_u32(placed_body, 0x68U) ==
                     std::nullopt && placed_body.initialized_bytes[0x68U] == 0U,
             "placement copy must stop after the three body-position DWORDs");
+
+        viper::NcarBodyRuntimeObjectState kinematics_body{};
+        std::vector<viper::NcarObjectFieldWrite> kinematics_writes;
+        const auto add_float = [&kinematics_writes](
+            const std::uint32_t offset, const float value) {
+            kinematics_writes.push_back({offset, 4U,
+                std::bit_cast<std::uint32_t>(value)});
+        };
+        const auto add_vector = [&add_float](
+            const std::uint32_t offset, const std::array<float, 3>& values) {
+            for (std::size_t axis = 0; axis < values.size(); ++axis) {
+                add_float(offset + static_cast<std::uint32_t>(axis * 4U), values[axis]);
+            }
+        };
+        const auto add_matrix = [&add_float](
+            const std::uint32_t offset, const std::array<float, 9>& values) {
+            for (std::size_t index = 0; index < values.size(); ++index) {
+                add_float(offset + static_cast<std::uint32_t>(index * 4U), values[index]);
+            }
+        };
+        const std::array<float, 9> orientation_input{
+            1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F};
+        const std::array<float, 9> angular_matrix_input{
+            2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F, 9.0F, 10.0F};
+        const std::array<float, 9> body_matrix_input{
+            11.0F, 12.0F, 13.0F, 14.0F, 15.0F, 16.0F, 17.0F, 18.0F, 19.0F};
+        add_matrix(0x038U, orientation_input);
+        add_vector(0x05cU, {21.0F, 22.0F, 23.0F});
+        add_float(0x200U, 0.125F);
+        add_matrix(0x210U, body_matrix_input);
+        add_vector(0x234U, {31.0F, 32.0F, 33.0F});
+        add_vector(0x240U, {41.0F, 42.0F, 43.0F});
+        add_vector(0x24cU, {51.0F, 52.0F, 53.0F});
+        add_vector(0x258U, {61.0F, 62.0F, 63.0F});
+        add_matrix(0x264U, angular_matrix_input);
+        kinematics_writes.push_back({0x10U, 2U, 0x12ffU});
+        kinematics_writes.push_back({0x12U, 2U, 0xabcdU});
+        require(viper::apply_ncar_body_object_writes(
+                    kinematics_body, kinematics_writes),
+            "the test body must receive only explicitly initialized integrator fields");
+        const auto kinematics_input =
+            viper::read_ncar_body_integration_kinematics_input(kinematics_body);
+        require(kinematics_input.has_value() &&
+                kinematics_input->position.x == 21.0F &&
+                kinematics_input->linear_velocity.z == 33.0F &&
+                kinematics_input->accumulated_linear_force.y == 52.0F &&
+                kinematics_input->inverse_mass == 0.125F &&
+                kinematics_input->angular_velocity.x == 41.0F &&
+                kinematics_input->accumulated_angular_moment.z == 63.0F &&
+                kinematics_input->orientation_matrix_0x0e == orientation_input &&
+                kinematics_input->angular_transform_matrix_0x99 == angular_matrix_input &&
+                kinematics_input->body_matrix_0x210 == body_matrix_input,
+            "body kinematics adapter must read the exact 0x43ECE0 offsets");
+        auto incomplete_kinematics_body = kinematics_body;
+        incomplete_kinematics_body.initialized_bytes[0x210U + 8U * 4U] = 0U;
+        require(!viper::read_ncar_body_integration_kinematics_input(
+                    incomplete_kinematics_body).has_value(),
+            "kinematics input must stay unavailable when any consumed matrix byte is unknown");
+
+        viper::BodyIntegrationKinematicsResult kinematics_result{};
+        kinematics_result.linear.position = {101.0F, 102.0F, 103.0F};
+        kinematics_result.linear.velocity = {111.0F, 112.0F, 113.0F};
+        kinematics_result.angular.angular_velocity = {121.0F, 122.0F, 123.0F};
+        kinematics_result.orientation.orientation_matrix = {
+            1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F, 9.0F};
+        kinematics_result.basis.basis_matrix = {
+            9.0F, 8.0F, 7.0F, 6.0F, 5.0F, 4.0F, 3.0F, 2.0F, 1.0F};
+        require(viper::apply_ncar_body_integration_kinematics_result(
+                    kinematics_body, kinematics_result),
+            "body integration result must be writable to the persistent PCAR owner");
+        require(viper::read_ncar_body_object_u32(kinematics_body, 0x05cU) ==
+                    std::bit_cast<std::uint32_t>(101.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x234U + 8U) ==
+                    std::bit_cast<std::uint32_t>(113.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x240U + 4U) ==
+                    std::bit_cast<std::uint32_t>(122.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x264U) ==
+                    std::bit_cast<std::uint32_t>(9.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x210U) ==
+                    std::bit_cast<std::uint32_t>(11.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x24cU) ==
+                    std::bit_cast<std::uint32_t>(0.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x258U + 8U) ==
+                    std::bit_cast<std::uint32_t>(0.0F) &&
+                viper::read_ncar_body_object_u32(kinematics_body, 0x10U) ==
+                    0xabcd1300U,
+            "body kinematics apply must store pose, matrices, resets, and wrapped 16-bit counter");
+        auto missing_counter_body = kinematics_body;
+        missing_counter_body.initialized_bytes[0x11U] = 0U;
+        require(!viper::apply_ncar_body_integration_kinematics_result(
+                    missing_counter_body, kinematics_result) &&
+                viper::read_ncar_body_object_u32(missing_counter_body, 0x05cU) ==
+                    std::bit_cast<std::uint32_t>(101.0F),
+            "an unavailable native counter must reject result application atomically");
         const auto body_shift_write = std::find_if(
             preparation.mapping->writes.begin(), preparation.mapping->writes.end(),
             [](const viper::CarFileRuntimeFieldWrite& write) {

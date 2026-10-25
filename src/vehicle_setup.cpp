@@ -2080,6 +2080,116 @@ BodyIntegrationKinematicsResult advance_body_integration_kinematics(
     return result;
 }
 
+std::optional<BodyIntegrationKinematicsInput>
+read_ncar_body_integration_kinematics_input(
+    const NcarBodyRuntimeObjectState& body) noexcept
+{
+    const auto read_float = [&body](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits.has_value()) return std::nullopt;
+        return std::bit_cast<float>(*bits);
+    };
+    const auto read_vector = [&read_float](const std::uint32_t offset)
+        -> std::optional<PhysicsVector3> {
+        const auto x = read_float(offset);
+        const auto y = read_float(offset + 4U);
+        const auto z = read_float(offset + 8U);
+        if (!x || !y || !z) return std::nullopt;
+        return PhysicsVector3{*x, *y, *z};
+    };
+    const auto read_matrix = [&read_float](const std::uint32_t offset)
+        -> std::optional<std::array<float, 9>> {
+        std::array<float, 9> matrix{};
+        for (std::size_t index = 0; index < matrix.size(); ++index) {
+            const auto value = read_float(offset +
+                static_cast<std::uint32_t>(index * sizeof(std::uint32_t)));
+            if (!value) return std::nullopt;
+            matrix[index] = *value;
+        }
+        return matrix;
+    };
+
+    // These offsets follow the loads and stores in shipped 0x43ECE0. In
+    // particular, +0x38 is both the constructor's placement basis and the
+    // integrator orientation; +0x210 remains a separate basis matrix.
+    const auto position = read_vector(0x05cU);
+    const auto linear_velocity = read_vector(0x234U);
+    const auto accumulated_linear_force = read_vector(0x24cU);
+    const auto inverse_mass = read_float(0x200U);
+    const auto angular_velocity = read_vector(0x240U);
+    const auto accumulated_angular_moment = read_vector(0x258U);
+    const auto orientation = read_matrix(0x038U);
+    const auto angular_transform = read_matrix(0x264U);
+    const auto body_matrix = read_matrix(0x210U);
+    if (!position || !linear_velocity || !accumulated_linear_force ||
+        !inverse_mass || !angular_velocity || !accumulated_angular_moment ||
+        !orientation || !angular_transform || !body_matrix) {
+        return std::nullopt;
+    }
+
+    BodyIntegrationKinematicsInput input{};
+    input.position = *position;
+    input.linear_velocity = *linear_velocity;
+    input.accumulated_linear_force = *accumulated_linear_force;
+    input.inverse_mass = *inverse_mass;
+    input.angular_velocity = *angular_velocity;
+    input.accumulated_angular_moment = *accumulated_angular_moment;
+    input.orientation_matrix_0x0e = *orientation;
+    input.angular_transform_matrix_0x99 = *angular_transform;
+    input.body_matrix_0x210 = *body_matrix;
+    return input;
+}
+
+bool apply_ncar_body_integration_kinematics_result(
+    NcarBodyRuntimeObjectState& body,
+    const BodyIntegrationKinematicsResult& result) noexcept
+{
+    // 0x43ECE0 increments only the 16-bit counter at +0x10. Preserve its
+    // adjacent bytes exactly, and fail closed if either counter byte is unknown.
+    constexpr std::uint32_t counter_offset = 0x10U;
+    if (body.initialized_bytes[counter_offset] == 0U ||
+        body.initialized_bytes[counter_offset + 1U] == 0U) {
+        return false;
+    }
+    const auto counter = static_cast<std::uint16_t>(
+        std::to_integer<std::uint8_t>(body.bytes[counter_offset]) |
+        (static_cast<std::uint16_t>(std::to_integer<std::uint8_t>(
+            body.bytes[counter_offset + 1U])) << 8U));
+
+    std::array<NcarObjectFieldWrite, 34> writes{};
+    std::size_t write_index{};
+    const auto append_float = [&writes, &write_index](
+        const std::uint32_t offset, const float value) {
+        writes[write_index++] = {offset, 4U, std::bit_cast<std::uint32_t>(value)};
+    };
+    const auto append_vector = [&append_float](
+        const std::uint32_t offset, const PhysicsVector3& value) {
+        append_float(offset, value.x);
+        append_float(offset + 4U, value.y);
+        append_float(offset + 8U, value.z);
+    };
+    const auto append_matrix = [&append_float](
+        const std::uint32_t offset, const std::array<float, 9>& matrix) {
+        for (std::size_t index = 0; index < matrix.size(); ++index) {
+            append_float(offset + static_cast<std::uint32_t>(index * 4U),
+                matrix[index]);
+        }
+    };
+
+    append_vector(0x05cU, result.linear.position);
+    append_vector(0x234U, result.linear.velocity);
+    append_vector(0x240U, result.angular.angular_velocity);
+    append_matrix(0x038U, result.orientation.orientation_matrix);
+    append_matrix(0x264U, result.basis.basis_matrix);
+    append_vector(0x24cU, PhysicsVector3{});
+    append_vector(0x258U, PhysicsVector3{});
+    writes[write_index++] = {counter_offset, 2U,
+        static_cast<std::uint16_t>(counter + 1U)};
+    return write_index == writes.size() &&
+        apply_ncar_body_object_writes(body, writes);
+}
+
 float solve_normal_contact_impulse(
     const PhysicsVector3& body_center,
     const PhysicsVector3& contact_point,

@@ -1381,6 +1381,25 @@ the exact 12-DWORD source and destination loop. A regression now checks every
 float bit pattern, basis/position ordering, and the untouched byte immediately
 after the copy.
 
+The integrator kinematics boundary is now mapped onto the same byte owner.
+`read_ncar_body_integration_kinematics_input` requires initialized values for
+position `+0x5C`, inverse mass `+0x200`, matrices `+0x210/+0x264`, linear
+velocity/force `+0x234/+0x24C`, and angular velocity/moment `+0x240/+0x258`.
+Its result writer persists the modeled position, velocities, orientation at
+`+0x38`, synchronized matrix at `+0x264`, accumulator clears, and 16-bit update
+counter at `+0x10`; it preserves `+0x210` and adjacent counter bytes. Regression
+coverage also verifies that an unknown consumed byte rejects input construction
+and an unknown counter rejects result application before any writes. This is a
+byte-exact adapter around the existing `advance_body_integration_kinematics`
+model, not a live race call site: wheel/contact forces, callback side effects,
+and render-pose ownership still have to be connected before it can advance the
+player safely.
+
+Evidence: shipped `0x43ECE0` dossier
+`ev_eeac45221c20dabe425f430d776ba783e9648cae4d51a76551839c7db16aa05e`;
+the offsets above follow its loads/stores, including the linear update and
+matrix stores at `0x43EF04..0x43F0xx`.
+
 #### Second registration dispatch (`0x49C1F0`)
 
 Static Ghidra analysis shows `0x43DFB0` calls `0x49C1F0` during the derived
@@ -1439,9 +1458,10 @@ six-pair instrumentation attempt in this evidence bundle read orientation at
 excluded from this result.
 
 This directly establishes that the native integrator advances the live body
-state for the sampled PCAR. It is not an input-driven race baseline and does not
-identify how scene placement is first copied into the body orientation and
-position fields. The serialized `0x1E4` record goes through `0x463510` into the
+state for the sampled PCAR. It is not an input-driven race baseline. The
+constructor placement transfer is now separately resolved by `0x433C00` above;
+the session applies that same initial transform to its byte-backed body owner.
+The serialized `0x1E4` record goes through `0x463510` into the
 record reader `0x425720`, which reads the record and calls factory `0x422580`.
 The PCAR factory allocates `0xEF0` bytes and calls `0x4381E0`. After the
 constructor, the loader's virtual `+0x2C` gate may call `0x426F20`, which writes
@@ -1456,11 +1476,11 @@ instruction sequence associates the body pointer with its ordinal, calls
 pointer in the manager's indexed slot, allocates a separate `0x70`-byte record,
 sets body `+0x4FC = 0`, and clears the manager record through `0x43c950`; these
 effects do not copy the scene transform to body position/orientation. This
-narrows the remaining constructor gap: `0x43DFB0`'s second subsystem
-registration through `0x49c1f0` and later runtime synchronization still need
-inspection. Do not seed the live integrator from yaw-only route pose or assume
-the placement record is the body matrix until that transfer is traced. The
-attachment may perturb timing and represents only this running instance.
+narrows the remaining runtime gap: `0x43DFB0`'s second subsystem registration
+through `0x49c1f0` is multiplayer-context work, while later per-step integration
+and renderer consumption are not connected in the reconstruction. Do not seed
+the live integrator from yaw-only route pose. The attachment may perturb timing
+and represents only this running instance.
 
 The complete private evidence bundle is
 `../../analysis/reference_captures/viper_body_constructor_and_integrator_20261025.evidence.json`.
