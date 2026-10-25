@@ -101,6 +101,25 @@ still does not collect and pass the descriptor rows, so this standalone
 algorithm is not yet exercised against live native rows and the timer remains
 disconnected from production physics.
 
+The main update ordering fixes which snapshot `0x433570` consumes. In race
+state 20, `0x49BEC0` conditionally calls `0x420750` after its state callback
+and before the final service callback. `0x420750` first invokes the registered
+update objects, then a manager callback, resets the three frame counters via
+`0x423B40`, and only then calls `0x41AEB0` to copy registered body rows and
+rebuild/sort the ordinal pair table. Therefore a car integrator invoked by an
+object callback in update N reads the table produced after the callbacks in
+update N-1 (or the initialized table on the first update). A reconstruction
+must retain the completed registry snapshot across fixed steps and consume it
+before replacing it with the current step's participant states; collecting
+rows before each current callback would remove this one-update lag.
+
+Evidence: `0x49BEC0` (`ev_4d080a4a02a10fbbd2812a27daf9b3fd76450d3325841b30dd07d3a1a26b4cc8`),
+`0x420750` (`ev_704036ff5199b0a6ba38c7dd926ce76c64c27183acdfd0d7152afa56b9abdbb9`),
+`0x423B40` (`ev_1577fba3acb7c016eb2abed2d2a6acc620f06c91bd52ced5a2e5ad929f0fc8be`),
+and `0x41AEB0` (`ev_30b4f6568d84c15c70989f6ff082d1da7f54c0deffba7239a27cbccf5a06af6b`).
+This is static call-order evidence; it does not supply the missing live body
+rows or prove the exact first-update descriptor contents.
+
 #### Production row-source audit (2026-10-25)
 
 The existing Windows session cannot yet form valid rows for

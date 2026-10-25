@@ -193,9 +193,13 @@ exercised by the existing `capture_player_tick_physics_state` call, but it
 does not run or mutate the timer helper. Its ordinal-pair table at `0x4D45B0`
 and the shared-integrator call ordering remain unowned, so the `+0x50C` ramp
 must stay outside production suspension inputs until that source chain is
-connected. Regression verifies the timer gate independently from rigid-body
-kinematics: unavailable timer fields do not invalidate an otherwise complete
-`0x43ECE0` snapshot.
+connected. Static analysis now shows `0x420750` rebuilds/sorts the registered
+participant-pair table after its entity callbacks. Each `0x433570` call
+therefore reads the prior completed update's table, and the live session must
+preserve that one-update snapshot boundary. It still lacks current body-owned
+position/velocity rows for all registered participants. Regression verifies
+the timer gate independently from rigid-body kinematics: unavailable timer
+fields do not invalidate an otherwise complete `0x43ECE0` snapshot.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
