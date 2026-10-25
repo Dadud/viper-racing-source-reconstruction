@@ -15,13 +15,22 @@ const at = va => {
 const safe = fn => { try { return fn(); } catch (_) { return null; } };
 const readFloat = (pointer, offset = 0) => safe(() => pointer.add(offset).readFloat());
 const readU32 = (pointer, offset = 0) => safe(() => pointer.add(offset).readU32());
-const maxRows = 16;
+// Keep a bounded evidence set without ending the capture after the first few
+// simulation ticks. The branch under study is reached only after a 6.2-second
+// elapsed-time gate, so an early-call row limit would prevent observing it.
+const maxRows = 48;
 const captureMs = 120000;
+const initialRowsToKeep = 4;
+const gateWindowStart = 5.6;
+const gateWindowEnd = 6.8;
+const maxGateWindowRows = 16;
 // If the first callback is not the player PCAR, set this to the observed body
 // pointer before loading the script. Null selects the first readable PCAR.
 const targetOverride = null;
 let rows = [];
-let nextSerial = 0;
+let helperCalls = 0;
+let gateWindowRows = 0;
+let pairLookupRows = 0;
 let finished = false;
 let finishTimer = null;
 const active = new Map();
@@ -46,6 +55,9 @@ function finish(reason) {
     event: "pcar_timer_branch_probe_done",
     reason,
     target: target ? target.toString() : null,
+    helperCalls,
+    gateWindowRows,
+    pairLookupRows,
     rows
   });
 }
@@ -64,9 +76,9 @@ listeners.push(Interceptor.attach(at(0x4384d0), {
 listeners.push(Interceptor.attach(at(0x43358d), {
   onEnter() {
     const body = this.context.esi;
-    if (!target || !body.equals(target) || rows.length >= maxRows) return;
+    if (!target || !body.equals(target)) return;
     const row = {
-      call: ++nextSerial,
+      call: ++helperCalls,
       body: body.toString(),
       nativeTick: safe(() => readU32(at(0x508774))),
       rampTime_0xe44: readFloat(body, 0xe44),
@@ -80,7 +92,6 @@ listeners.push(Interceptor.attach(at(0x43358d), {
       pairComponent_0x8: null
     };
     active.set(threadId(), row);
-    rows.push(row);
   }
 }));
 
@@ -93,6 +104,7 @@ listeners.push(Interceptor.attach(at(0x4335e5), {
     const row = active.get(threadId());
     if (!row || !this.context.esi.equals(target)) return;
     row.pairLookupReached = true;
+    pairLookupRows++;
     const pair = this.context.eax;
     row.pairRecord = pair.isNull() ? "0x0" : pair.toString();
     if (pair.isNull() || !Process.findRangeByAddress(pair)) return;
@@ -110,7 +122,16 @@ listeners.push(Interceptor.attach(at(0x433570), {
     row.rampTimeAfter_0xe44 = readFloat(ptr(row.body), 0xe44);
     row.rampValueAfter_0x50c = readFloat(ptr(row.body), 0x50c);
     active.delete(threadId());
-    if (rows.length >= maxRows) finish("row_limit");
+    const elapsed = row.elapsedAtEspPlus4;
+    const inGateWindow = Number.isFinite(elapsed) &&
+      elapsed >= gateWindowStart && elapsed <= gateWindowEnd &&
+      gateWindowRows < maxGateWindowRows;
+    if (inGateWindow) gateWindowRows++;
+    if (rows.length < maxRows && (row.call <= initialRowsToKeep ||
+        row.pairLookupReached || inGateWindow)) {
+      rows.push(row);
+    }
+    if (rows.length >= maxRows) finish("sample_limit");
   }
 }));
 
@@ -120,6 +141,9 @@ send({
   base: engine.base.toString(),
   captureMs,
   maxRows,
+  initialRowsToKeep,
+  gateWindowSeconds: [gateWindowStart, gateWindowEnd],
+  maxGateWindowRows,
   targetOverride: targetOverride === null ? null : ptr(targetOverride).toString(),
   staticTarget: "race.bin SHA-256 f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56"
 });

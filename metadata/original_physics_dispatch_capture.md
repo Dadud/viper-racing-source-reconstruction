@@ -531,18 +531,24 @@ Added `tools/pcar_timer_branch_probe.js` to sample the computed elapsed value
 and x87 comparison status at `0x43358D`, then observe whether execution reaches
 the ordinal pair-row lookup at `0x4335E5`. It records the row pointer and the
 two consumed values only when the pointer is readable, along with body timer
-fields and the optional native tick global. It is bounded to 16 selected-PCAR
-calls or 120 seconds, checks instruction addresses against the loaded image,
-and performs no target writes. `node --check` passed. This is a capture tool,
-not gameplay code.
+fields and the optional native tick global. The initial 16-call bound would
+end before the documented 6.2-second gate, so the probe now remains attached
+for up to 120 seconds and retains a bounded set: the first four calls, up to
+16 calls in the 5.6–6.8 second window, and any call reaching the pair lookup,
+with a 48-row total cap. It checks instruction addresses against the loaded
+image and performs no target writes. This is a capture tool, not gameplay code.
 
 An initial inline attempt to hook these branch sites was loaded after the
 previous race had already accumulated a large number of fixed-step updates;
-the child Frida session detached before a completion row was returned. No
-branch-input values were recovered and the detach cause is unknown. The
-checked-in probe should be loaded before starting the next race and its session
-status verified while the child is still live. It still does not trace writes
-to each wheel object's `+0x158`.
+the child Frida session detached before a completion row was returned. A later
+suspended-child retry loaded the probe before resume, but its startup-memory
+override did not report a query and the child exited before recording a timer
+row. These failures do not overturn the separate successful Quick Race capture
+documented in [`graphics_startup.md`](graphics_startup.md): that capture used
+the proven first-query video-memory override. Reuse that verified startup
+intervention for the next timer-branch attempt. No branch-input values were
+recovered in these retries, and the probe still does not trace writes to each
+wheel object's `+0x158`.
 
 ### Fresh external-copy launcher retry (2026-10-25)
 
