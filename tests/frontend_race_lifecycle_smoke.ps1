@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_frontend_race_$([guid]::NewGuid().ToString('N'))"
 $capture = Join-Path $root 'capture.csv'
 $raceTrace = Join-Path $root 'two-lap-full-throttle.csv'
+$remapReloadTrace = Join-Path $root 'remap-reload.csv'
 $config = Join-Path $root 'Config'
 
 Add-Type @'
@@ -210,13 +211,47 @@ try {
     }
     if ($restoredTitle.ToString() -notmatch 'dundas.*sports' -or
         $restoredTitle.ToString() -notmatch 'Lap 1/2') {
-        throw "Relaunched setup did not restore Dundas/Sports with two laps: $($restoredTitle.ToString())"
+        throw "Relaunched race did not restore Dundas/Sports with two laps: $($restoredTitle.ToString())"
     }
     Press-Key $restoredRace 27
     if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after the persisted-selection check' }
     $process.Refresh()
+    if ($process.ExitCode -ne 0) { throw "selection-relaunch exited with code $($process.ExitCode)" }
+
+    # The controls-page throttle remap was saved by the first process. Prove
+    # the next process loaded it by driving with W and checking consumed
+    # input in a trace (the route uses Up by default).
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $GameExe
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$config`" --software --record-trace `"$remapReloadTrace`""
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $process = [Diagnostics.Process]::Start($startInfo)
+    $remapRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30
+    if (-not [ViperRaceFrontendWin32]::PostMessage($remapRace, 0x0100, [IntPtr]87, [IntPtr]::Zero)) {
+        throw 'Could not post the saved remapped throttle key-down after relaunch'
+    }
+    Start-Sleep -Milliseconds 500
+    if (-not [ViperRaceFrontendWin32]::PostMessage($remapRace, 0x0101, [IntPtr]87, [IntPtr]::Zero)) {
+        throw 'Could not post the saved remapped throttle key-up after relaunch'
+    }
+    Start-Sleep -Milliseconds 150
+    Press-Key $remapRace 27
+    if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after the persisted-selection check' }
+    $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "relaunch exited with code $($process.ExitCode)" }
-    Write-Output 'Viper/Bemidji, Sports/Bemidji, and Sports/Dundas trace races reached results; track, car, and lap count persisted across a clean relaunch.'
+    if (-not (Test-Path -LiteralPath $remapReloadTrace)) { throw 'Relaunched race did not create the remap verification trace' }
+    $remapRows = [System.IO.File]::ReadAllLines($remapReloadTrace)
+    if ($remapRows.Count -lt 3) { throw 'Relaunched remap trace did not capture enough frames' }
+    $remapHeader = $remapRows[0].Split(',')
+    $throttleColumn = [Array]::IndexOf($remapHeader, 'throttle')
+    if ($throttleColumn -lt 0) { throw 'Relaunched trace omitted the consumed throttle input field' }
+    $remappedThrottleObserved = $false
+    foreach ($row in $remapRows | Select-Object -Skip 1) {
+        if ($row.Split(',')[$throttleColumn] -eq '1') { $remappedThrottleObserved = $true; break }
+    }
+    if (-not $remappedThrottleObserved) { throw 'The saved W throttle binding was not active after relaunch' }
+    Write-Output 'Viper/Bemidji, Sports/Bemidji, and Sports/Dundas trace races reached results; track, car, and lap count reloaded, and the saved W throttle binding remained active after restart.'
 
     # Exercise setup-to-results lifecycle on every other shipped track. Seed
     # each isolated Config with the selected track so this does not depend on
