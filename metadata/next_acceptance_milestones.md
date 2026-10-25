@@ -154,14 +154,28 @@ timing fields. This particular `0x3C`-stride ring is owned by the
 live-player wheel-history producer. It is distinct from NCAR's timed three-slot
 `0x3E` sample history.
 
-Therefore the next implementation boundary is the local PCAR state producer
-and its ownership, not a call to `advance_four_wheel_body_step`: construct a
-persistent mutable PCAR body from the recovered setup/task initialization,
-reconstruct the callback and force-collection writes on `0x4384D0` and shared
-`0x431150`, locate the live player's wheel-history producer independently of
-the GCAR GhostBegin ring, and establish tick/fraction and callback ordering.
-Only then can the session feed evidence-backed per-frame `+0x50C` and `+0xE8`
-values into the existing wheel/body composition. In parallel, the polarity
+Runtime startup now builds a complete tag/cursor manifest for the native
+world-load order: recognized `track.obt` object records first, then configured
+entrant rows not consumed by `obj car` directives. Each entrant's PCAR/ACAR
+tag comes from its observed setup marker. This fixes the player's constructor
+cursor when its configured row is appended after later track objects; the
+previous prefix-only cursor planner could not represent that case. The manifest
+does not contain world-record payload bytes and does not populate the native
+physics task object array. Any unsupported directive/class or incomplete line
+keeps the affected suffix unresolved. The physical race remains route-driven.
+
+Therefore the next implementation boundary is completing the native
+world-load-to-task path, not calling `advance_four_wheel_body_step`: produce
+every full record in `0x45C630` order (object directives, then remaining
+`0x45CAB0` configured rows), connect the existing per-class record producers,
+and explicitly resolve any missing layouts or car configuration inputs. Feed
+that one ordered byte stream through the observed task factory and retain the
+resulting physics objects for fixed-step dispatch. Then reconstruct mutable
+PCAR callback/force state, locate the live player's wheel-history producer
+independently of the GCAR GhostBegin ring, and establish tick/fraction and
+callback ordering. Only when the full per-frame inputs are sourced can the
+session connect the shared integrator and feed evidence-backed `+0x50C` and
+`+0xE8` values into the wheel/body composition. In parallel, the polarity
 initializer still needs the actual common-startup timer backend and a single
 shared stream whose call order includes non-wheel consumers. Keep these as
 explicit dependencies; do not claim the existing models are live physics.

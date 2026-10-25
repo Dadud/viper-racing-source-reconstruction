@@ -122,6 +122,47 @@ struct TrackPhysicsCursorPlan {
     std::optional<std::size_t> unsupported_object_row;
 };
 
+enum class TrackPhysicsTaskManifestStatus {
+    complete,
+    track_data_incomplete,
+    unsupported_directive,
+    unsupported_object_type,
+    invalid_configured_car_tag,
+    cursor_overflow,
+};
+
+struct TrackPhysicsTaskManifestEntry {
+    // Present for records emitted while 0x45C630 walks track.obt. Configured
+    // cars emitted by the later 0x45CAB0 pass have no track row.
+    std::optional<std::size_t> track_object_row;
+    std::optional<std::size_t> configured_car_index;
+    std::uint32_t record_tag{};
+    std::uint32_t cursor_offset{};
+    std::uint32_t cursor_advance{};
+};
+
+struct TrackPhysicsTaskManifest {
+    TrackPhysicsTaskManifestStatus status{
+        TrackPhysicsTaskManifestStatus::complete};
+    std::uint32_t initial_cursor{};
+    std::optional<std::uint32_t> final_cursor;
+    // This is the ordered tag/cursor manifest, not a claim that record payload
+    // bytes or physics task objects have been produced.
+    std::vector<TrackPhysicsTaskManifestEntry> entries;
+    std::optional<std::size_t> player_entry_index;
+    std::optional<std::uint32_t> player_stream_offset;
+    std::optional<std::size_t> failed_track_object_row;
+};
+
+// Models 0x45C630's source order: object directives first, then any configured
+// car rows not consumed by an obj car directive via 0x45CAB0. The supplied car
+// tags come from the configured entrant rows (0x45CAE0 subtype markers).
+[[nodiscard]] TrackPhysicsTaskManifest plan_track_physics_task_manifest(
+    const TrackObjectTextTable& table,
+    std::span<const std::uint32_t> configured_car_record_tags,
+    std::size_t player_car_index,
+    std::uint32_t initial_cursor = 0U);
+
 // Derives the native physics-task stream cursor before a configured player car
 // from track.obt serialization order. It supports recovered car, static,
 // obstacle, wobble, checkpoint, and ball tags; unknown preceding scene-object

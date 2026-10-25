@@ -288,15 +288,21 @@ allocation sizes. Evidence:
 `0x425420`, `ev_ef89830f565cea2f11328cf87320e8939eb255ab7d432ab5de43786aadee533c`,
 and the native bytes at `0x4D4890`, observed by `read_bytes`.
 
-`TrackPhysicsCursorPlan` now retains the modeled prefix that produced its
-cursor: each preceding track-object row, its presumed task tag, cursor offset,
-advance, and car-directive ordinal where applicable. This exposes the planner's
-ordered inputs for verification instead of returning only the final cursor.
-For a single-player lineup it still classifies every prior `obj car` line as
-ACAR; exact coupling between directive processing, entrant construction, and
-native task-stream insertion order remains to be verified before these entries
-can be treated as a complete stream manifest. Constructor bytes remain
-unavailable for most entries.
+`plan_track_physics_task_manifest` now models the recovered two-phase record
+order. While walking `track.obt`, each `obj car` consumes the next configured
+entrant row and uses that row's PCAR/ACAR tag; recognized non-car object lines
+emit their mapped task tags in place. After the directive loop, any configured
+entrant rows not consumed by an `obj car` line are appended, matching
+`0x45CAB0`'s remaining-row loop. Entries retain their source row (when any),
+configured-car index (for cars), FourCC, cursor, and class advance. The runtime
+passes marker-derived entrant tags and uses the manifest's player offset;
+this also handles a player row appended after later world objects. The former
+`TrackPhysicsCursorPlan` remains a prefix-only model and is no longer the
+runtime's cursor source. This manifest covers tag order/cursors only: it does
+not claim that non-player record bytes, the shared buffer, or native physics
+objects have been produced. Unsupported classes leave the rest of the sequence
+unresolved. Regression covers directive-order cars, zero-advance STAT,
+non-car advances, appended entrant rows, end handling, and unsupported classes.
 
 `read_physics_task_record_stream` decodes the same framing with bounds checks:
 each entry is a signed cursor DWORD plus one complete record. It verifies that

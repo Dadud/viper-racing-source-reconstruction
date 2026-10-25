@@ -460,6 +460,146 @@ TrackPhysicsCursorPlan plan_track_player_physics_cursor(
     return result;
 }
 
+TrackPhysicsTaskManifest plan_track_physics_task_manifest(
+    const TrackObjectTextTable& table,
+    const std::span<const std::uint32_t> configured_car_record_tags,
+    const std::size_t player_car_index,
+    const std::uint32_t initial_cursor)
+{
+    TrackPhysicsTaskManifest result{};
+    result.initial_cursor = initial_cursor;
+    std::uint32_t cursor = initial_cursor;
+    std::size_t configured_car_index = 0U;
+    const auto is_car_tag = [](const std::uint32_t tag) noexcept {
+        return tag == 0x50434152U || tag == 0x41434152U ||
+            tag == 0x4E434152U || tag == 0x47434152U;
+    };
+    for (const auto tag : configured_car_record_tags) {
+        if (!is_car_tag(tag) || !physics_task_stream_advance_for_tag(tag)) {
+            result.status =
+                TrackPhysicsTaskManifestStatus::invalid_configured_car_tag;
+            return result;
+        }
+    }
+
+    const auto append = [&](const std::uint32_t tag,
+                            const std::optional<std::size_t> track_row,
+                            const std::optional<std::size_t> car_index) {
+        const auto advance = physics_task_stream_advance_for_tag(tag);
+        if (!advance.has_value()) {
+            result.status = TrackPhysicsTaskManifestStatus::unsupported_object_type;
+            result.failed_track_object_row = track_row;
+            return false;
+        }
+        if (*advance > std::numeric_limits<std::uint32_t>::max() - cursor) {
+            result.status = TrackPhysicsTaskManifestStatus::cursor_overflow;
+            result.failed_track_object_row = track_row;
+            return false;
+        }
+        const auto entry_index = result.entries.size();
+        result.entries.push_back({track_row, car_index, tag, cursor, *advance});
+        if (car_index == player_car_index) {
+            result.player_entry_index = entry_index;
+            result.player_stream_offset = cursor;
+        }
+        cursor += *advance;
+        return true;
+    };
+    const auto is_space = [](const char value) noexcept {
+        return value == ' ' || value == '\t' || value == '\r' ||
+            value == '\n' || value == '\f' || value == '\v';
+    };
+
+    bool directive_loop_complete = true;
+    for (std::size_t row = 1U; row < table.line_count; ++row) {
+        const auto line = track_object_text_line(table, row);
+        if (!line.has_value()) {
+            result.status = TrackPhysicsTaskManifestStatus::track_data_incomplete;
+            result.failed_track_object_row = row;
+            directive_loop_complete = false;
+            break;
+        }
+        const auto directive = classify_track_directive(*line);
+        if (directive.kind == TrackDirectiveKind::end) break;
+        if (directive.kind == TrackDirectiveKind::comment ||
+            directive.kind == TrackDirectiveKind::empty_or_unscannable ||
+            directive.kind == TrackDirectiveKind::map ||
+            directive.kind == TrackDirectiveKind::ai) {
+            continue;
+        }
+        if (directive.kind == TrackDirectiveKind::bad_token) {
+            result.status = TrackPhysicsTaskManifestStatus::unsupported_directive;
+            result.failed_track_object_row = row;
+            directive_loop_complete = false;
+            break;
+        }
+
+        auto object_line = directive.object_line;
+        while (!object_line.empty() && is_space(object_line.front()))
+            object_line.remove_prefix(1U);
+        if (object_line.size() < 3U ||
+            !equals_ascii_case_insensitive(object_line.substr(0U, 3U), "obj")) {
+            result.status = TrackPhysicsTaskManifestStatus::unsupported_object_type;
+            result.failed_track_object_row = row;
+            directive_loop_complete = false;
+            break;
+        }
+        object_line.remove_prefix(3U);
+        while (!object_line.empty() && is_space(object_line.front()))
+            object_line.remove_prefix(1U);
+        const auto type_end = std::find_if(
+            object_line.begin(), object_line.end(), is_space);
+        const std::string_view object_type(object_line.data(),
+            static_cast<std::size_t>(type_end - object_line.begin()));
+
+        if (equals_ascii_case_insensitive(object_type, "car")) {
+            // 0x45CAE0 consumes the next configured row only while its global
+            // car ordinal is below the configured count. Later obj car lines
+            // do not emit a record; 0x45CAB0 appends remaining configured rows.
+            if (configured_car_index < configured_car_record_tags.size()) {
+                const auto car_index = configured_car_index++;
+                if (!append(configured_car_record_tags[car_index], row, car_index)) {
+                    directive_loop_complete = false;
+                    break;
+                }
+            }
+            continue;
+        }
+
+        std::optional<std::uint32_t> tag;
+        if (equals_ascii_case_insensitive(object_type, "static")) {
+            tag = 0x53544154U;
+        } else if (equals_ascii_case_insensitive(object_type, "obstacle")) {
+            tag = 0x4F425354U;
+        } else if (equals_ascii_case_insensitive(object_type, "wobble")) {
+            tag = 0x4C424F57U;
+        } else if (equals_ascii_case_insensitive(object_type, "checkpoint")) {
+            tag = 0x43484B50U;
+        } else if (equals_ascii_case_insensitive(object_type, "ball")) {
+            tag = 0x42414C4CU;
+        }
+        if (!tag.has_value()) {
+            result.status = TrackPhysicsTaskManifestStatus::unsupported_object_type;
+            result.failed_track_object_row = row;
+            directive_loop_complete = false;
+            break;
+        }
+        if (!append(*tag, row, std::nullopt)) {
+            directive_loop_complete = false;
+            break;
+        }
+    }
+
+    if (!directive_loop_complete) return result;
+    while (configured_car_index < configured_car_record_tags.size()) {
+        const auto car_index = configured_car_index++;
+        if (!append(configured_car_record_tags[car_index], std::nullopt, car_index))
+            return result;
+    }
+    result.final_cursor = cursor;
+    return result;
+}
+
 TrackTransformPlan plan_track_transform_from_checkpoint(
     const std::span<const TrackTransformCheckpointCandidate> candidates,
     const bool centered_half_turn_enabled) noexcept

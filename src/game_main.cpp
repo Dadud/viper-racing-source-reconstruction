@@ -1510,6 +1510,7 @@ struct WindowState {
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
+    std::optional<viper::TrackPhysicsTaskManifest> physics_task_manifest;
     bool player_constructor_inputs_ready{};
     bool accelerate{};
     bool brake{};
@@ -2612,6 +2613,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool hold_results_for_frontend,
                const std::size_t player_car_index,
                const std::vector<std::string>& participant_names,
+               const std::span<const std::uint32_t> configured_car_record_tags,
                const std::uint32_t target_laps,
                const std::string_view track_name,
                const std::string_view car_name,
@@ -2641,40 +2643,28 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     WindowState state;
     state.terrain = &terrain;
     state.participant_names = participant_names;
-    const auto cursor_plan =
-        viper::plan_track_player_physics_cursor(track_objects, player_car_index);
-    const auto serialized_stream_offset = cursor_plan.serialized_object_stream_offset;
+    state.physics_task_manifest = viper::plan_track_physics_task_manifest(
+        track_objects, configured_car_record_tags, player_car_index);
+    const auto serialized_stream_offset =
+        state.physics_task_manifest->player_stream_offset;
     if (serialized_stream_offset.has_value()) {
-        std::cout << "Inherited constructor argument 2 uses track-derived physics "
-                  << "stream offset 0x" << std::hex << *serialized_stream_offset
-                  << std::dec << ". ";
-    } else if (cursor_plan.unsupported_object_row.has_value()) {
-        const auto row = *cursor_plan.unsupported_object_row;
-        const auto line = viper::track_object_text_line(track_objects, row);
-        std::cout << "Inherited constructor argument 2 is unresolved at track.obt row "
-                  << row << " (" << (line ? *line : std::string_view{})
-                  << "); its serialized class advance is not yet mapped. ";
-    } else if (cursor_plan.incomplete_row.has_value()) {
-        std::cout << "Inherited constructor argument 2 is unresolved because track.obt "
-                  << "row " << *cursor_plan.incomplete_row << " is incomplete. ";
-    } else {
-        switch (cursor_plan.status) {
-        case viper::TrackPhysicsCursorStatus::player_car_not_found:
-            std::cout << "Inherited constructor argument 2 is unresolved because player "
-                      << "car index " << player_car_index
-                      << " has no matching car directive in track.obt. ";
-            break;
-        case viper::TrackPhysicsCursorStatus::stream_plan_failed:
-            std::cout << "Inherited constructor argument 2 is unresolved because the "
-                      << "mapped physics-task cursor fold failed. ";
-            break;
-        case viper::TrackPhysicsCursorStatus::track_data_incomplete:
-        case viper::TrackPhysicsCursorStatus::unsupported_prior_object:
-        case viper::TrackPhysicsCursorStatus::complete:
-            std::cout << "Inherited constructor argument 2 is unresolved; track object "
-                      << "ordering did not produce a complete physics-task cursor. ";
-            break;
+        std::cout << "Inherited constructor argument 2 uses the ordered world-task "
+                  << "manifest offset 0x" << std::hex << *serialized_stream_offset
+                  << std::dec << " after " << *state.physics_task_manifest->player_entry_index
+                  << " preceding records";
+        if (state.physics_task_manifest->status !=
+            viper::TrackPhysicsTaskManifestStatus::complete) {
+            std::cout << " (later manifest entries remain unresolved)";
         }
+        std::cout << ". ";
+    } else {
+        std::cout << "Inherited constructor argument 2 is unresolved in the ordered "
+                  << "world-task manifest";
+        if (state.physics_task_manifest->failed_track_object_row.has_value()) {
+            std::cout << " at track.obt row "
+                      << *state.physics_task_manifest->failed_track_object_row;
+        }
+        std::cout << ". ";
     }
     std::cout
               << "Upgrade overlays are not requested in this race path.\n";
@@ -3019,9 +3009,19 @@ int run_selected_race(const Options& options, const std::string_view track,
               << (*entrants.player_record_index + 1U) << " of "
               << entrants.participant_count << " (fresh single-race driver order)\n";
     std::vector<std::string> participant_names;
+    std::vector<std::uint32_t> configured_car_record_tags;
     participant_names.reserve(entrants.records.size());
+    configured_car_record_tags.reserve(entrants.records.size());
     for (const auto& record : entrants.records) {
         participant_names.push_back(record.display_name.value_or(std::string{}));
+        if (record.marker_value == 0U) {
+            configured_car_record_tags.push_back(0x50434152U);
+        } else if (record.marker_value == 1U) {
+            configured_car_record_tags.push_back(0x41434152U);
+        } else {
+            throw std::runtime_error(
+                "single-race entrant has an unsupported physics car marker");
+        }
     }
     std::vector<viper::SingleRaceAISetupPlan> ai_setup_variants;
     if (entrants.participant_count > 1) {
@@ -3061,6 +3061,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         options.record_trace, playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,
         participant_names,
+        configured_car_record_tags,
         static_cast<std::uint32_t>(std::clamp(
             assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
         assets.track_name(), assets.car_name(), assets.terrain(),

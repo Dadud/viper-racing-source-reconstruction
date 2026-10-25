@@ -1,13 +1,16 @@
 #include "viper/world_track_objects.hpp"
 #include "viper/terrain_surface.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 
 namespace {
 
@@ -35,6 +38,24 @@ void set_byte(viper::IdealLineResourcePayload::Record& row,
               const std::size_t offset, const std::uint8_t value)
 {
     row[offset] = static_cast<std::byte>(value);
+}
+
+viper::TrackObjectTextTable make_track_text_table(
+    const std::span<const std::string_view> lines)
+{
+    viper::TrackObjectTextTable table{};
+    table.line_count = static_cast<std::uint32_t>(lines.size());
+    table.line_stride = 128U;
+    table.line_offsets.fill(0U);
+    table.raw_payload.resize(table.header_size + lines.size() * table.line_stride);
+    for (std::size_t index = 0U; index < lines.size(); ++index) {
+        const auto offset = table.header_size + index * table.line_stride;
+        const auto count = std::min<std::size_t>(
+            lines[index].size(), table.line_stride - 1U);
+        std::memcpy(table.raw_payload.data() + static_cast<std::ptrdiff_t>(offset),
+            lines[index].data(), count);
+    }
+    return table;
 }
 
 } // namespace
@@ -150,6 +171,45 @@ int main()
                     ai_car.subtype == viper::TrackCarSubtype::acar &&
                     ai_car.calls_acar_helper_0x41a2a0,
                 "AI participant marker must select the configured ACAR class");
+
+        const std::array<std::string_view, 7> ordered_task_lines{
+            "track", "obj static scenery", "obj car 1, 2",
+            "obj checkpoint finish 1,2 3,4", "end", "obj car 5, 6", ""};
+        const auto task_table = make_track_text_table(ordered_task_lines);
+        const std::array<std::uint32_t, 3> task_car_tags{
+            0x41434152U, 0x50434152U, 0x41434152U};
+        const auto task_manifest = viper::plan_track_physics_task_manifest(
+            task_table, task_car_tags, 1U);
+        require(task_manifest.status ==
+                    viper::TrackPhysicsTaskManifestStatus::complete &&
+                    task_manifest.entries.size() == 5U &&
+                    task_manifest.final_cursor == 0x4d8U,
+                "world task manifest did not preserve directive then configured-car order");
+        require(task_manifest.entries[0].record_tag == 0x53544154U &&
+                    task_manifest.entries[0].cursor_offset == 0U &&
+                    task_manifest.entries[0].cursor_advance == 0U &&
+                    task_manifest.entries[1].track_object_row == 2U &&
+                    task_manifest.entries[1].configured_car_index == 0U &&
+                    task_manifest.entries[1].cursor_offset == 0U &&
+                    task_manifest.entries[2].record_tag == 0x43484B50U &&
+                    task_manifest.entries[2].cursor_offset == 0x18cU &&
+                    task_manifest.player_entry_index == 3U &&
+                    task_manifest.player_stream_offset == 0x1c0U &&
+                    task_manifest.entries[3].configured_car_index == 1U &&
+                    !task_manifest.entries[3].track_object_row.has_value() &&
+                    task_manifest.entries[4].record_tag == 0x41434152U,
+                "world task manifest lost record ownership or cursor offsets");
+
+        const std::array<std::string_view, 3> unsupported_lines{
+            "track", "obj unknown thing", "obj car 1, 2"};
+        const auto unsupported_table = make_track_text_table(unsupported_lines);
+        const auto unsupported_manifest = viper::plan_track_physics_task_manifest(
+            unsupported_table, task_car_tags, 0U);
+        require(unsupported_manifest.status ==
+                    viper::TrackPhysicsTaskManifestStatus::unsupported_object_type &&
+                    unsupported_manifest.failed_track_object_row == 1U &&
+                    !unsupported_manifest.player_stream_offset.has_value(),
+                "unsupported prior world object did not stop cursor ownership");
 
         std::cout << "world track objects regression passed\n";
         return 0;
