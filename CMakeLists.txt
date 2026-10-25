@@ -215,7 +215,9 @@ target_link_libraries(viper_reconstruction PRIVATE
 )
 target_compile_features(viper_reconstruction PRIVATE cxx_std_20)
 
-add_library(viper_race_progression src/race_progression.cpp)
+add_library(viper_race_progression
+    src/race_progression.cpp
+    src/route_opponent_ai.cpp)
 target_include_directories(viper_race_progression PUBLIC include)
 target_compile_features(viper_race_progression PUBLIC cxx_std_20)
 target_link_libraries(viper_race_progression PUBLIC viper_race_loop_model)
@@ -269,6 +271,13 @@ if(BUILD_TESTING)
         viper_race_progression)
     add_test(NAME race_progression_regression
         COMMAND viper_race_progression_regression)
+
+    add_executable(viper_route_opponent_ai_regression
+        tests/route_opponent_ai_regression.cpp)
+    target_link_libraries(viper_route_opponent_ai_regression PRIVATE
+        viper_race_progression)
+    add_test(NAME route_opponent_ai_regression
+        COMMAND viper_route_opponent_ai_regression)
     add_executable(viper_race_loop_control_actions_regression
         tests/race_loop_control_actions_regression.cpp)
     target_link_libraries(viper_race_loop_control_actions_regression PRIVATE

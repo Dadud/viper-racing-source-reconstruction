@@ -12,6 +12,7 @@
 #include "viper/race_participants.hpp"
 #include "viper/race_loop_callbacks.hpp"
 #include "viper/race_progression.hpp"
+#include "viper/route_opponent_ai.hpp"
 #include "viper/sound_resource.hpp"
 #include "viper/engine_sound_setup.hpp"
 #include "viper/wheel_body_coupling.hpp"
@@ -1695,6 +1696,8 @@ struct WindowState {
     std::vector<std::string> participant_names;
     viper::RouteMotionState motion{};
     std::vector<viper::RouteMotionState> opponent_motions;
+    std::vector<viper::RouteOpponentAiState> opponent_ai_states;
+    std::vector<viper::RouteOpponentAiDecision> last_opponent_ai_decisions;
     std::vector<std::array<float, 4>> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
     // session. The complete ordered stream is validated and the recovered
@@ -2446,6 +2449,8 @@ struct WindowState {
         playback_clock_milliseconds = 0U;
         player_simulated_pose.reset();
         opponent_motions.resize(graphics.car_count());
+        opponent_ai_states.assign(graphics.car_count(), {});
+        last_opponent_ai_decisions.assign(graphics.car_count(), {});
         opponent_simulated_poses.resize(graphics.car_count());
         std::fill(opponent_simulated_poses.begin(), opponent_simulated_poses.end(),
             std::nullopt);
@@ -2474,7 +2479,10 @@ struct WindowState {
                 }
             }
             if (!std::isfinite(nearest)) return false;
-            ai.speed = 8.0F + static_cast<float>(car % 5U) * 1.5F;
+            // AI starts from the same stationary grid assumption as the
+            // player. The route policy supplies runtime-owned throttle/brake
+            // decisions instead of an entrant-index speed seed.
+            ai.speed = 0.0F;
             viper::initialize_race_progression(ai.race, ai.route_segment);
         }
         return true;
@@ -2541,9 +2549,14 @@ struct WindowState {
             physics_step_accumulator, scheduler_input);
         last_physics_step_schedule = schedule;
         player_physics_ticks_this_update.clear();
+        last_opponent_ai_decisions.assign(opponent_motions.size(), {});
         const auto outer_update_index = player_outer_update_count++;
         bool lap_completed = false;
         for (std::int32_t step = 0; step < schedule.steps; ++step) {
+            // Every opponent in this fixed step decides from the same traffic
+            // snapshot. The player occupies its rendered entrant slot.
+            auto route_participant_snapshot = opponent_motions;
+            route_participant_snapshot[player_car_index] = motion;
             PlayerPhysicsTickContext tick_context{};
             tick_context.input_provenance = playback_active
                 ? PhysicsTickInputProvenance::logical_trace_actions
@@ -2591,15 +2604,21 @@ struct WindowState {
             for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
                 if (car == player_car_index) continue;
                 auto& ai = opponent_motions[car];
+                const auto decision = viper::decide_route_opponent_action(
+                    opponent_ai_states[car], route, route_participant_snapshot, car);
+                if (!decision.valid) continue;
                 auto candidate_ai = ai;
                 const auto ai_result = viper::advance_route_motion(candidate_ai, route,
-                    false, false, true, false, 0.016F, target_laps);
+                    decision.steer_left, decision.steer_right,
+                    decision.throttle, decision.brake, 0.016F, target_laps);
                 if (!ai_result.valid) continue;
                 const auto ai_surface = viper::sample_terrain_resource(
                     *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
                 if (!ai_surface.query_succeeded ||
                     !viper::commit_route_motion_after_terrain_query(
                         ai, candidate_ai, ai_surface.query_succeeded)) continue;
+                opponent_ai_states[car] = decision.next_state;
+                last_opponent_ai_decisions[car] = decision;
                 opponent_simulated_poses[car] = std::array<float, 4>{ai_result.x,
                     ai_surface.sampled_position[1], ai_result.z, ai_result.yaw};
             }
@@ -3756,6 +3775,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",physics_tick_index,physics_tick_scheduled_step_index"
               << ",physics_tick_scheduled_step_count,physics_tick_simulation_time"
               << ",physics_tick_steering,physics_tick_throttle,physics_tick_brake";
+        for (std::size_t car = 0U; car < state.opponent_motions.size(); ++car) {
+            if (car == player_car_index) continue;
+            trace << ",car" << car << "_ai_valid,car" << car
+                  << "_ai_throttle,car" << car << "_ai_brake,car" << car
+                  << "_ai_target_speed,car" << car << "_ai_leader,car" << car
+                  << "_ai_gap";
+        }
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -4048,6 +4074,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                           << ',' << tick.controls.analog_0x509320.value;
                 } else {
                     trace << ",,,,,,,,";
+                }
+                for (std::size_t car = 0U; car < state.opponent_motions.size(); ++car) {
+                    if (car == player_car_index) continue;
+                    const auto& decision = state.last_opponent_ai_decisions[car];
+                    trace << ',' << decision.valid << ',' << decision.throttle << ','
+                        << decision.brake << ',' << decision.target_speed << ',';
+                    if (decision.leader_index !=
+                        std::numeric_limits<std::size_t>::max())
+                        trace << decision.leader_index;
+                    trace << ',' << decision.distance_to_leader;
                 }
                 trace << '\n';
                 if (!trace) {

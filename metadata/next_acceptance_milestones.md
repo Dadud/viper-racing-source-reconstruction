@@ -10,7 +10,7 @@ requirements and final gates remain in [`completion_ledger.md`](completion_ledge
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
-placeholders, standings, and a return-to-setup path. The trace-driven frontend
+safe-follow policy, standings, and a return-to-setup path. The trace-driven frontend
 lifecycle now reaches results on all eight tracks through the route prototype;
 Viper/Bemidji, Sports/Bemidji, and Sports/Dundas additionally exercise selector
 changes and saved-selection reload. `src/game_main.cpp`
@@ -49,6 +49,12 @@ up axis. `trace_replay_regression.ps1` confirms the supported terrain query
 samples remain valid through a deterministic full Viper/Bemidji race. This
 does not advance body pose, run the native collision query, produce native
 forces, or transfer pose authority from the route prototype.
+The opponents now use a deterministic route-gap controller with staged
+braking hysteresis rather than unconditional full throttle; the trace records
+each decision and repeated playback checks it. This authored policy improves
+the current route prototype only. Native ACAR decisions, physical opponent
+state, and original comparison remain open
+([`route_opponent_ai.md`](route_opponent_ai.md)).
 The player now owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
 and persistent contact outputs. This closes object-state materialization only;

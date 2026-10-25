@@ -229,7 +229,32 @@ try {
     }
     $observedThrottle = $false
     $observedSteering = $false
+    $observedAiDecision = $false
     $header = $replayedLines[0].Split(',')
+    $aiValidColumns = @()
+    for ($column = 0; $column -lt $header.Count; ++$column) {
+        if ($header[$column] -match '^car\d+_ai_valid$') {
+            $aiValidColumns += $column
+        }
+    }
+    if ($aiValidColumns.Count -ne 7) {
+        throw "Expected seven per-opponent AI action columns, found $($aiValidColumns.Count)"
+    }
+    $aiActionColumns = @()
+    foreach ($validColumn in $aiValidColumns) {
+        $carPrefix = $header[$validColumn] -replace '_ai_valid$', ''
+        $columns = @(
+            $validColumn,
+            [Array]::IndexOf($header, "${carPrefix}_ai_throttle"),
+            [Array]::IndexOf($header, "${carPrefix}_ai_brake"),
+            [Array]::IndexOf($header, "${carPrefix}_ai_target_speed"),
+            [Array]::IndexOf($header, "${carPrefix}_ai_leader"),
+            [Array]::IndexOf($header, "${carPrefix}_ai_gap"))
+        if (@($columns | Where-Object { $_ -lt 0 }).Count -gt 0) {
+            throw "Trace is missing action fields for $carPrefix"
+        }
+        $aiActionColumns += ,$columns
+    }
     $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
     $pcarBodyStart = [Array]::IndexOf($header, 'pcar_body_0xde0')
     $pcarMultiplierIndex = [Array]::IndexOf($header, 'pcar_0x40d270_multiplier')
@@ -269,6 +294,30 @@ try {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
         }
         $fields = $replayedLines[$index].Split(',')
+        foreach ($columns in $aiActionColumns) {
+            if ($fields[$columns[0]] -notin @('0', '1')) {
+                throw "AI action validity is malformed at frame $($index - 1)"
+            }
+            if ($fields[$columns[0]] -eq '1') {
+                foreach ($actionColumn in @($columns[1], $columns[2], $columns[3], $columns[5])) {
+                    $actionValue = [single]::Parse(
+                        $fields[$actionColumn], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($actionValue) -or [single]::IsInfinity($actionValue)) {
+                        throw "AI action contains a non-finite value at frame $($index - 1)"
+                    }
+                }
+                $throttleValue = [single]::Parse(
+                    $fields[$columns[1]], [cultureinfo]::InvariantCulture)
+                $brakeValue = [single]::Parse(
+                    $fields[$columns[2]], [cultureinfo]::InvariantCulture)
+                if ($throttleValue -lt 0.0 -or $throttleValue -gt 1.0 -or
+                    $brakeValue -lt 0.0 -or $brakeValue -gt 1.0 -or
+                    ($throttleValue -gt 0.0 -and $brakeValue -gt 0.0)) {
+                    throw "AI throttle/brake decision is outside the policy range at frame $($index - 1)"
+                }
+                $observedAiDecision = $true
+            }
+        }
         $sharedFloatSource = [single]::Parse(
             $fields[$sharedFloatSourceIndex], [cultureinfo]::InvariantCulture)
         $sharedFloatCache = [single]::Parse(
@@ -365,6 +414,7 @@ try {
     }
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }
+    if (-not $observedAiDecision) { throw 'Replay trace did not record any live opponent AI decisions' }
     Write-Output "Trace playback reproduced $($replayedLines.Count - 1) frames exactly across two runs."
 
     $raceLines = [System.Collections.Generic.List[string]]::new()
