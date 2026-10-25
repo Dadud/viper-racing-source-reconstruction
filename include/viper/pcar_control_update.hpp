@@ -172,22 +172,22 @@ struct PcarCallbackControlResult {
     const PcarCallbackControlObservation& observation) noexcept;
 
 // State and helper-result observations for the 0x4384D0 branch at 0x438552.
-// Optional copied values represent the unresolved effects of 0x4331E0/0x433210.
+// Optional raw DWORD copies represent unresolved 0x4331E0/0x433210 effects.
 struct PcarCallbackBranchFields {
     PcarScalarFields scalars{};
     float value_0x54{};
     std::uint8_t value_0xec8{};
     std::uint8_t value_0xec9{};
     float value_0xc7c{};
-    float value_0xd64{};
+    std::uint32_t value_0xd64{};
     float value_0xc34{};
     std::uint32_t value_0x4{};
 };
 
 struct PcarCallbackBranchObservation {
     PcarCallbackGlobals globals{};
-    std::optional<float> copied_value_0xd64_from_0x4331e0;
-    std::optional<float> copied_value_0xd64_from_0x433210;
+    std::optional<std::uint32_t> copied_value_0xd64_from_0x4331e0;
+    std::optional<std::uint32_t> copied_value_0xd64_from_0x433210;
 };
 
 struct PcarCallbackBranchResult {
@@ -197,7 +197,8 @@ struct PcarCallbackBranchResult {
     bool wrote_0x5093bc{};
     bool called_0x433250{};
     std::uint32_t status_flags{};
-    std::optional<float> output_0x5093bc;
+    std::optional<std::uint32_t> output_0x5093bc;
+    std::optional<std::int32_t> argument_0x4331e0;
 };
 
 // Reconstructs the branch routing and direct stores only. Returns incomplete

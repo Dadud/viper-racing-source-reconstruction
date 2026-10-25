@@ -189,6 +189,9 @@ PcarCallbackBranchResult advance_pcar_callback_branch(
     if (call_4331e0) {
         fields.value_0xd64 = *observation.copied_value_0xd64_from_0x4331e0;
         result.called_0x4331e0 = true;
+        result.argument_0x4331e0 = globals.gate_0x5093f0
+            ? -1
+            : std::bit_cast<std::int32_t>(globals.value_0x5093bc);
         if (globals.gate_0x5093f0) {
             constexpr float constant_0x4c814c =
                 std::bit_cast<float>(std::uint32_t{0x3e99999aU});

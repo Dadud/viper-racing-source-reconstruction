@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 int main()
 {
@@ -119,7 +120,7 @@ int main()
     }
 
     viper::PcarCallbackBranchFields branch_fields{};
-    branch_fields.value_0xd64 = 7.0F;
+    branch_fields.value_0xd64 = 7U;
     branch_fields.scalars.value_0xde0 = 0.1F;
     branch_fields.scalars.value_0xde4 = 0.3F;
     branch_fields.value_0xc34 = 0.9F;
@@ -127,20 +128,20 @@ int main()
     branch_observation.globals.gate_0x5093f0 = true;
     branch_observation.globals.value_0x5093f4 = 0.2F;
     branch_observation.globals.value_0x5093c8 = 0.5F;
-    branch_observation.copied_value_0xd64_from_0x4331e0 = 8.0F;
+    branch_observation.copied_value_0xd64_from_0x4331e0 = 8U;
     const auto gate_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
     if (!gate_branch.complete || !gate_branch.called_0x4331e0 ||
-        gate_branch.called_0x433210 || branch_fields.value_0xd64 != 8.0F ||
+        gate_branch.called_0x433210 || branch_fields.value_0xd64 != 8U ||
         std::abs(branch_fields.value_0x54 - 0.3F) > 1.0e-6F ||
-        branch_fields.value_0x4 != 3U) {
+        branch_fields.value_0x4 != 3U || gate_branch.argument_0x4331e0 != -1) {
         std::cerr << "PCAR branch gate did not preserve precedence, helper result, max, and flags.\n";
         return EXIT_FAILURE;
     }
     branch_fields = {};
     branch_fields.value_0x54 = 0.6F;
     branch_observation.globals.value_0x5093f4 = 0.7F;
-    branch_observation.copied_value_0xd64_from_0x4331e0 = 1.0F;
+    branch_observation.copied_value_0xd64_from_0x4331e0 = 1U;
     const auto max_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
     if (!max_branch.complete || branch_fields.value_0x54 != 0.7F) {
@@ -148,51 +149,52 @@ int main()
         return EXIT_FAILURE;
     }
     branch_fields = {};
-    branch_fields.value_0xd64 = 4.0F;
+    branch_fields.value_0xd64 = 4U;
     branch_fields.value_0xec8 = 1U;
     branch_observation = {};
     const auto missing_helper = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
-    if (missing_helper.complete || branch_fields.value_0xd64 != 4.0F ||
+    if (missing_helper.complete || branch_fields.value_0xd64 != 4U ||
         branch_fields.value_0x4 != 0U) {
         std::cerr << "PCAR branch partially mutated state without a helper observation.\n";
         return EXIT_FAILURE;
     }
     branch_fields = {};
-    branch_fields.value_0xd64 = 11.0F;
+    branch_fields.value_0xd64 = 11U;
     branch_fields.value_0xec8 = 1U;
     branch_observation = {};
-    branch_observation.copied_value_0xd64_from_0x433210 = 12.0F;
+    branch_observation.copied_value_0xd64_from_0x433210 = 12U;
     const auto ec8_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
     if (!ec8_branch.complete || !ec8_branch.called_0x433210 ||
-        ec8_branch.called_0x4331e0 || branch_fields.value_0xd64 != 12.0F) {
+        ec8_branch.called_0x4331e0 || branch_fields.value_0xd64 != 12U) {
         std::cerr << "PCAR +0xEC8 branch did not route through 0x433210.\n";
         return EXIT_FAILURE;
     }
     branch_fields = {};
-    branch_fields.value_0xd64 = 13.0F;
+    branch_fields.value_0xd64 = 13U;
     branch_fields.value_0xec9 = 1U;
     branch_fields.value_0xc7c = 0.9F;
     branch_observation = {};
-    branch_observation.globals.value_0x5093bc = 0x3f800000U;
-    branch_observation.copied_value_0xd64_from_0x4331e0 = 13.0F;
+    branch_observation.globals.value_0x5093bc = 0x80000000U;
+    branch_observation.copied_value_0xd64_from_0x4331e0 = 13U;
     const auto ec9_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
     if (!ec9_branch.complete || !ec9_branch.called_0x4331e0 ||
-        branch_fields.value_0xd64 != 13.0F || !ec9_branch.output_0x5093bc ||
-        *ec9_branch.output_0x5093bc != 13.0F) {
+        branch_fields.value_0xd64 != 13U || !ec9_branch.output_0x5093bc ||
+        *ec9_branch.output_0x5093bc != 13U ||
+        ec9_branch.argument_0x4331e0 != std::numeric_limits<std::int32_t>::min()) {
         std::cerr << "PCAR +0xEC9 branch or global +0x5093BC copy was incorrect.\n";
         return EXIT_FAILURE;
     }
     branch_fields = {};
-    branch_fields.value_0xd64 = 14.0F;
+    branch_fields.value_0xd64 = 14U;
     branch_fields.value_0xc7c = std::bit_cast<float>(std::uint32_t{0x3f666666U});
     branch_observation = {};
     const auto threshold_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
     if (!threshold_branch.complete || threshold_branch.called_0x4331e0 ||
-        threshold_branch.output_0x5093bc != 14.0F) {
+        threshold_branch.output_0x5093bc != 14U) {
         std::cerr << "PCAR +0xC7C threshold must be strictly less than 0x3F666666.\n";
         return EXIT_FAILURE;
     }

@@ -190,14 +190,17 @@ Both paths join at `0x43B950`/`0x4331C0`. If `0x43B9F0` returns true,
 `advance_pcar_callback_branch` now projects this split and its direct stores.
 The constant at `0x4C814C` is verified from the executable bytes as
 `9A 99 99 3E` (`0x3E99999A`, 0.3f), used for the `max` written to `+0x54`.
-The wrapper effects of `0x4331E0` and `0x433210` remain explicit optional
-observations: if a selected call lacks its copied `+0xD64` result, the model
-returns incomplete without mutation. The non-`+0xEC8` arm reports the
-post-helper `+0xD64` to global `0x5093BC` copy. Regression covers gate precedence,
+The wrapper effects of `0x4331E0` and `0x433210` remain explicit optional raw
+DWORD observations: if a selected call lacks its copied `+0xD64` result, the
+model returns incomplete without mutation. The non-`+0xEC8` arm reports the
+post-helper `+0xD64` to global `0x5093BC` copy and the exact `0x4331E0`
+argument bits. Regression covers gate precedence,
 `+0xEC8`, `+0xEC9`, the strict signed `+0xC7C` threshold, the observed helper
 copy, the `+0x54` floor, and status bits. This remains a standalone model;
 runtime callback dispatch and the embedded selector helper internals are not
 implemented.
+The floor constant bytes were read from the shipped `race.bin` at `0x4C814C`
+(`ev_c1a1c96bc554d4b7efe42229fd89168076d2116e4f6cb2b020456143cbca6054`).
 
 `0x43B9D0` returns the global byte at `0x509360` and gates a timestamp
 operation on `+0xECC`. On its true path, a zero value triggers a backend
