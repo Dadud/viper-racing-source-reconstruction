@@ -74,9 +74,13 @@ All currently modeled `0x441C10` outputs are now materialized at their wheel
 offsets. The composed `advance_four_wheel_body_step` now derives the surface
 motion projection from the prior contact point and step-start body kinematics,
 before the current contact query can replace that point. This composition is
-still not called by the production race session. The next unresolved wheel
-inputs are per-frame `+0x158` from body `+0x50C`, initialized-history `+0xE8`,
-and the random-seeded table/call lifecycle for environment polarity. Static
+still not called by the production race session. The live `+0xE8` producer is
+now identified: `0x442530` derives it from the wheel's native contact depth and
+stores that depth after the suspension calculation. The session has the
+constructor's initial `+0xE8` value, but its route-pose contact observation is
+not the native fixed-step body/query state, so this store is not yet wired.
+Remaining unresolved wheel inputs include per-step `+0x158` from mutable body
+`+0x50C` and the random-seeded table/call lifecycle for environment polarity. Static
 analysis now establishes common-startup initialization and the shared locked
 stream: each car update consumes four sequential wheel draws, and at least 16
 other resolved direct callers also advance it. The repo now models the seed
@@ -92,8 +96,9 @@ state that mutates it is connected.
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
 checks the physics object's virtual `+0x2C` gate and calls virtual `+8`, which
-resolves through PCAR vtable `0x4C8188` to callback `0x4384D0`. That callback
-conditionally calls shared wheel/body integrator `0x431150`; NCAR callback
+resolves through PCAR vtable `0x4C8188` to callback `0x4384D0`. Once that
+virtual dispatch gate passes, all observed PCAR callback branches join before
+its call to shared wheel/body integrator `0x431150`; NCAR callback
 `0x439200` is a separate sample/queue/interpolation path and must not be used
 as the player callback. The live session now persists the numeric ACAR-derived
 curve and selector configuration and runs the modeled PCAR embedded-selection

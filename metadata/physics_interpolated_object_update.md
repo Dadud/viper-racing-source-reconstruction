@@ -86,6 +86,29 @@ ghost playback only. The live-player `+0x50C` writer, per-frame wheel-history
 source, and body-force route must be traced through the player/NCAR callback
 path independently.
 
+### Live player wheel `+0xE8` producer
+
+The player wheel's per-step `+0xE8` value is written by the ordinary wheel
+integrator `0x442530`, not by the ghost interpolation routine `0x444240`.
+In `0x442530`, the terrain-contact path derives `local_f0` (zero when contact
+is rejected; otherwise the projected depth after its native clamp), computes
+the spring travel delta from the prior wheel `+0xE8`, then stores `local_f0`
+back to `+0xE8` at `0x4430A7`. The four wheel calls are made by `0x431150`;
+the PCAR callback reaches that integrator at `0x43872F` after its earlier
+branches join. The outer `0x421050` fixed-step dispatcher only invokes the
+virtual `+8` callback when the object's virtual `+0x2C` gate returns nonzero.
+Evidence: `0x442530` `ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`,
+`0x431150` `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`,
+the exact `0x43872F` call instruction `ev_22df0327cec5115cc94b5918b4dd75f923de929c6867677dc3b8341d547aade2`,
+and dispatcher `0x421050` `ev_aefa6a2d466f478adf238aafc416bc8b2096abc5d5a58260a34dffb29dd767a`.
+The `0x444240` writer is reached through `0x427630`'s `0x3C`-stride
+interpolation selection for the GhostBegin/ghost-playback ring described
+above; it is not the missing live-player producer. The live runtime has a
+known constructor/reset value for `+0xE8` when the compatibility fill path is
+disabled, but its route-pose contact projection is not the native per-step
+body basis/query state. Do not update the session's wheel history from that
+observation until the PCAR callback's actual fixed-step path is integrated.
+
 The direct subset is exposed as `update_ncar_interpolated_object`. It models
 the record ushort at `0x1E` into object `+0xD70` (`value*14000/32768 - 2000`),
 the byte at `0x20` into `+0x500` (scaled by `256*0.00007324219`, then `-1.2`),
