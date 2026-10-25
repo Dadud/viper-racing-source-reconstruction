@@ -214,6 +214,35 @@ void check_car_record_deferral_is_ordered_and_explicit()
             completed.records[1].cursor_offset == manifest.entries[1].cursor_offset &&
             completed.records[3].cursor_offset == manifest.entries[3].cursor_offset,
         "complete car inputs must fill their track and appended positions");
+
+    std::vector<viper::PhysicsTaskRecordInput> stream_inputs;
+    stream_inputs.reserve(completed.records.size());
+    for (const auto& record : completed.records)
+        stream_inputs.push_back({record.record_bytes});
+    const auto serialized = viper::serialize_physics_task_records(
+        stream_inputs, manifest.initial_cursor);
+    const auto decoded = viper::read_physics_task_record_stream(serialized.bytes);
+    const auto bindings = viper::bind_configured_car_task_records_to_stream(
+        completed, decoded, serialized.bytes);
+    require(bindings.status ==
+                viper::ConfiguredCarTaskStreamBindingStatus::complete &&
+            bindings.bindings.size() == 2U &&
+            bindings.bindings[0].configured_car_index == 0U &&
+            bindings.bindings[0].stream_record_index == 1U &&
+            bindings.bindings[0].record_tag == 0x50434152U &&
+            bindings.bindings[1].configured_car_index == 1U &&
+            bindings.bindings[1].stream_record_index == 3U &&
+            bindings.bindings[1].record_tag == 0x41434152U,
+        "configured PCAR and ACAR records must bind to exact ordered stream identities");
+    auto mismatched_order = completed;
+    mismatched_order.records[3].record_bytes[8] ^= std::byte{1U};
+    const auto rejected_binding = viper::bind_configured_car_task_records_to_stream(
+        mismatched_order, decoded, serialized.bytes);
+    require(rejected_binding.status ==
+                viper::ConfiguredCarTaskStreamBindingStatus::record_bytes_mismatch &&
+            rejected_binding.failed_record_index == 3U &&
+            rejected_binding.bindings.empty(),
+        "configured car binding must fail atomically if ordered bytes differ from the decoded stream");
 }
 
 void check_explicit_unresolved_routes()

@@ -1573,6 +1573,7 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamSession> full_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
     std::vector<viper::PhysicsTaskObjectInventoryEntry> physics_task_object_inventory;
+    std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
@@ -2937,6 +2938,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 if (stream_ok)
                     state.physics_task_object_inventory = inventory.entries;
             }
+            if (stream_ok) {
+                const auto bindings = viper::bind_configured_car_task_records_to_stream(
+                    ordered_track_records, decoded, stream.bytes);
+                stream_ok = bindings.status ==
+                    viper::ConfiguredCarTaskStreamBindingStatus::complete;
+                if (stream_ok)
+                    state.configured_car_stream_bindings = bindings.bindings;
+            }
             for (std::size_t index = 0U;
                  stream_ok && index < decoded.records.size(); ++index) {
                 const auto& ordered = ordered_track_records.records[index];
@@ -3011,6 +3020,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.full_task_record_stream.reset();
             state.full_task_record_readback.reset();
             state.physics_task_object_inventory.clear();
+            state.configured_car_stream_bindings.clear();
             state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }

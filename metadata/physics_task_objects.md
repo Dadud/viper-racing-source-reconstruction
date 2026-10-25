@@ -29,6 +29,14 @@ not native allocation, constructor execution, or fixed-step dispatch. A
 focused regression covers ordering, PCAR factory metadata, malformed-span
 rejection, and a same-size buffer with a mismatched cursor prefix.
 
+The configured car records now also have a session binding from configured
+entrant index to the exact ordered stream record index, task tag, logical
+cursor, and payload span. The binding validates the complete ordered-plan and
+decoded-stream identities plus byte equality, and rejects gaps or duplicate
+configured-car identities. This lets the runtime associate each selected AI
+ACAR record with its stream entry, but ACAR objects and their callback state
+are still not constructed; opponent motion remains on the route prototype.
+
 Before populating that object array, `0x420480` obtains the track-state record
 from `0x45C2C0` and passes it to `0x426000`. That helper switches on the DWORD
 at input offset `+0x18` (decompiler expression `param_1[6]`): selector 0

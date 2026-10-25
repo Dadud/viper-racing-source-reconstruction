@@ -506,4 +506,84 @@ OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
     return result;
 }
 
+ConfiguredCarTaskStreamBindingResult bind_configured_car_task_records_to_stream(
+    const OrderedTrackTaskRecordPlan& ordered_plan,
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    const std::span<const std::byte> serialized_stream_bytes)
+{
+    ConfiguredCarTaskStreamBindingResult result{};
+    if (!ordered_plan.complete) {
+        result.status = ConfiguredCarTaskStreamBindingStatus::incomplete_ordered_plan;
+        return result;
+    }
+    if (decoded_stream.status != PhysicsTaskRecordStreamReadStatus::complete ||
+        decoded_stream.consumed_bytes != serialized_stream_bytes.size()) {
+        result.status = ConfiguredCarTaskStreamBindingStatus::invalid_stream;
+        return result;
+    }
+    if (ordered_plan.records.size() != decoded_stream.records.size()) {
+        result.status = ConfiguredCarTaskStreamBindingStatus::record_count_mismatch;
+        return result;
+    }
+
+    std::vector<std::size_t> seen_configured_cars;
+    result.bindings.reserve(ordered_plan.records.size());
+    for (std::size_t index = 0U; index < ordered_plan.records.size(); ++index) {
+        const auto& planned = ordered_plan.records[index];
+        const auto& decoded = decoded_stream.records[index];
+        if (planned.manifest_entry_index != index ||
+            planned.record_tag != decoded.record_tag ||
+            planned.cursor_offset != decoded.cursor_offset ||
+            planned.record_bytes.size() != decoded.record_size) {
+            result.status = ConfiguredCarTaskStreamBindingStatus::ordered_identity_mismatch;
+            result.failed_record_index = index;
+            result.bindings.clear();
+            return result;
+        }
+        if (decoded.record_bytes_offset > serialized_stream_bytes.size() ||
+            decoded.record_size > serialized_stream_bytes.size() -
+                decoded.record_bytes_offset ||
+            !std::equal(planned.record_bytes.begin(), planned.record_bytes.end(),
+                serialized_stream_bytes.begin() + static_cast<std::ptrdiff_t>(
+                    decoded.record_bytes_offset))) {
+            result.status = ConfiguredCarTaskStreamBindingStatus::record_bytes_mismatch;
+            result.failed_record_index = index;
+            result.bindings.clear();
+            return result;
+        }
+        if (!planned.configured_car_index.has_value()) continue;
+        if (planned.record_tag != 0x50434152U && planned.record_tag != 0x41434152U) {
+            result.status = ConfiguredCarTaskStreamBindingStatus::ordered_identity_mismatch;
+            result.failed_record_index = index;
+            result.bindings.clear();
+            return result;
+        }
+        const auto configured_car_index = *planned.configured_car_index;
+        if (std::find(seen_configured_cars.begin(), seen_configured_cars.end(),
+                configured_car_index) != seen_configured_cars.end()) {
+            result.status = ConfiguredCarTaskStreamBindingStatus::duplicate_configured_car;
+            result.failed_record_index = index;
+            result.bindings.clear();
+            return result;
+        }
+        seen_configured_cars.push_back(configured_car_index);
+        result.bindings.push_back({configured_car_index, index, planned.record_tag,
+            planned.cursor_offset, decoded.record_bytes_offset, decoded.record_size});
+    }
+    std::sort(result.bindings.begin(), result.bindings.end(),
+        [](const auto& left, const auto& right) {
+            return left.configured_car_index < right.configured_car_index;
+        });
+    for (std::size_t index = 0U; index < result.bindings.size(); ++index) {
+        if (result.bindings[index].configured_car_index != index) {
+            result.status = ConfiguredCarTaskStreamBindingStatus::missing_configured_car;
+            result.failed_record_index = index;
+            result.bindings.clear();
+            return result;
+        }
+    }
+    result.status = ConfiguredCarTaskStreamBindingStatus::complete;
+    return result;
+}
+
 } // namespace viper
