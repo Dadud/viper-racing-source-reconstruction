@@ -684,6 +684,16 @@ timer helper `0x436EB0`: `ev_79004fd497de281d1e0b97eabded5bc795dcc3133ce0e8baa7e
 geometry helper `0x4372C0`:
 `ev_29b5f991b46ddd11e833ac2abe53b20dcc50e00ef7e78739f4990b1c2a8fb142`.
 
+The ordered runtime collection now retains OBST constructor inputs and the
+cached yaw basis/position from each valid 0x38-byte stream record. Selector 2
+also retains sphere scale and all six known geometry records, preserving the
+native per-record word mask including the unwritten twelfth DWORD. Other shape
+selectors retain only the shared cached pose. The record does not provide the
+constructor timer or child allocation result, so those remain explicitly
+unknown; no native object allocation or callback dispatch is claimed. The
+projection retains the model's x87 approximation limit and is not yet consumed
+by collision.
+
 ## ACAR task constructor projection
 
 `plan_physics_acar_task_constructor` projects the derived constructor at

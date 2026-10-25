@@ -578,10 +578,13 @@ int main()
                     runtime_tasks.entries[2].record_tag == 0x4f425354U &&
                     runtime_tasks.entries[2].status ==
                         viper::PhysicsTaskRuntimeEntryStatus::
-                            active_callback_unavailable &&
+                            obstacle_cached_pose_retained &&
+                    runtime_tasks.entries[2].callback_behavior_unavailable &&
+                    runtime_tasks.entries[2].obstacle.has_value() &&
+                    runtime_tasks.entries[2].obstacle->geometry_records.empty() &&
                     !runtime_tasks.entries[2].checkpoint.has_value() &&
                     !runtime_tasks.entries[2].stat.has_value(),
-                "semantic task runtime did not preserve order and unsupported active gates");
+                "semantic task runtime did not preserve OBST pose and unavailable callback status");
 
         // Synthetic fixture for the captured factory order: seven ACAR cars,
         // the player PCAR, then three CHKP objects. This verifies serialized
@@ -693,6 +696,135 @@ int main()
                 }
             }
         }
+
+        auto selector_two_obstacle = make_physics_record(0x4f425354U, 0x38U);
+        const auto write_obstacle_word = [&selector_two_obstacle](
+            const std::size_t offset, const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte) {
+                selector_two_obstacle[offset + byte] = static_cast<std::byte>(
+                    (value >> (byte * 8U)) & 0xffU);
+            }
+        };
+        const auto write_obstacle_float = [&write_obstacle_word](
+            const std::size_t offset, const float value) {
+            write_obstacle_word(offset, std::bit_cast<std::uint32_t>(value));
+        };
+        write_obstacle_float(0x08U, 1.5F);
+        write_obstacle_float(0x18U, 12.0F);
+        write_obstacle_float(0x1cU, 3.0F);
+        write_obstacle_float(0x20U, -7.0F);
+        write_obstacle_float(0x24U, 90.0F);
+        write_obstacle_float(0x28U, 2.0F);
+        write_obstacle_float(0x2cU, 4.0F);
+        write_obstacle_float(0x30U, 6.0F);
+        write_obstacle_word(0x34U, 2U);
+        const std::array<viper::PhysicsTaskRecordInput, 1> obstacle_input{{
+            {selector_two_obstacle}}};
+        const auto obstacle_stream = viper::serialize_physics_task_records(
+            obstacle_input);
+        const auto obstacle_decoded = viper::read_physics_task_record_stream(
+            obstacle_stream.bytes);
+        const auto obstacle_runtime =
+            viper::materialize_physics_task_runtime_collection(
+                obstacle_decoded, obstacle_stream.bytes, false);
+        require(obstacle_stream.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::complete &&
+                    obstacle_decoded.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::complete &&
+                    obstacle_runtime.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::complete &&
+                    obstacle_runtime.entries.size() == 1U,
+                "selector-2 OBST record did not reach ordered runtime materialization");
+        const auto& selector_two_runtime_entry = obstacle_runtime.entries.front();
+        require(selector_two_runtime_entry.status == viper::PhysicsTaskRuntimeEntryStatus::
+                    obstacle_shape_geometry_retained &&
+                    selector_two_runtime_entry.callback_behavior_unavailable &&
+                    selector_two_runtime_entry.obstacle.has_value() &&
+                    selector_two_runtime_entry.obstacle->shape_selector_0x34 == 2U &&
+                    selector_two_runtime_entry.obstacle->geometry_records.size() == 6U &&
+                    selector_two_runtime_entry.obstacle->cached_position_words ==
+                        std::array<std::uint32_t, 3>{
+                            std::bit_cast<std::uint32_t>(12.0F),
+                            std::bit_cast<std::uint32_t>(3.0F),
+                            std::bit_cast<std::uint32_t>(-7.0F)} &&
+                    std::abs(selector_two_runtime_entry.obstacle->sphere_scale - 24.525F) <
+                        1.0e-4F &&
+                    !selector_two_runtime_entry.obstacle->timer_value_known &&
+                    !selector_two_runtime_entry.obstacle->native_object_allocation_known,
+                "selector-2 OBST state must retain sourced geometry and expose unknown timer/allocation");
+        const auto& first_obstacle_geometry =
+            selector_two_runtime_entry.obstacle->geometry_records.front();
+        require(first_obstacle_geometry.object_offset == 0x6cU &&
+                    first_obstacle_geometry.known_word_mask == 0x07ffU &&
+                    std::bit_cast<float>(first_obstacle_geometry.words[0]) == 1.0F &&
+                    std::bit_cast<float>(first_obstacle_geometry.words[1]) == -2.0F &&
+                    std::bit_cast<float>(first_obstacle_geometry.words[2]) == -3.0F &&
+                    first_obstacle_geometry.words[6] ==
+                        std::bit_cast<std::uint32_t>(24.525F),
+                "OBST box geometry projection must preserve native offsets, known mask, and dimensions");
+
+        auto other_selector_obstacle = selector_two_obstacle;
+        for (std::size_t byte = 0U; byte < 4U; ++byte) {
+            other_selector_obstacle[0x34U + byte] = std::byte{0};
+        }
+        const std::array<viper::PhysicsTaskRecordInput, 1> other_selector_input{{
+            {other_selector_obstacle}}};
+        const auto other_selector_stream = viper::serialize_physics_task_records(
+            other_selector_input);
+        const auto other_selector_decoded = viper::read_physics_task_record_stream(
+            other_selector_stream.bytes);
+        const auto other_selector_runtime =
+            viper::materialize_physics_task_runtime_collection(
+                other_selector_decoded, other_selector_stream.bytes, false);
+        require(other_selector_runtime.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::complete &&
+                    other_selector_runtime.entries.front().status ==
+                        viper::PhysicsTaskRuntimeEntryStatus::
+                            obstacle_cached_pose_retained &&
+                    other_selector_runtime.entries.front().obstacle.has_value() &&
+                    other_selector_runtime.entries.front().obstacle->geometry_records.empty() &&
+                    other_selector_runtime.entries.front().obstacle->cached_position_words ==
+                        selector_two_runtime_entry.obstacle->cached_position_words,
+                "non-box OBST selectors must retain only their shared cached pose");
+
+        auto invalid_obstacle = selector_two_obstacle;
+        const auto invalid_yaw = std::bit_cast<std::uint32_t>(
+            std::numeric_limits<float>::infinity());
+        for (std::size_t byte = 0U; byte < 4U; ++byte) {
+            invalid_obstacle[0x24U + byte] = static_cast<std::byte>(
+                (invalid_yaw >> (byte * 8U)) & 0xffU);
+        }
+        const std::array<viper::PhysicsTaskRecordInput, 1> invalid_obstacle_input{{
+            {invalid_obstacle}}};
+        const auto invalid_obstacle_stream = viper::serialize_physics_task_records(
+            invalid_obstacle_input);
+        const auto invalid_obstacle_decoded = viper::read_physics_task_record_stream(
+            invalid_obstacle_stream.bytes);
+        const auto invalid_obstacle_runtime =
+            viper::materialize_physics_task_runtime_collection(
+                invalid_obstacle_decoded, invalid_obstacle_stream.bytes, false);
+        require(invalid_obstacle_runtime.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::
+                        entry_materialization_failed &&
+                    invalid_obstacle_runtime.failed_record_index == 0U &&
+                    invalid_obstacle_runtime.entries.empty(),
+                "selector-2 OBST runtime must reject non-finite constructor inputs");
+
+        const auto truncated_obstacle = make_physics_record(0x4f425354U, 0x34U);
+        const std::array<viper::PhysicsTaskRecordInput, 1> truncated_obstacle_input{{
+            {truncated_obstacle}}};
+        const auto truncated_obstacle_stream = viper::serialize_physics_task_records(
+            truncated_obstacle_input);
+        const auto truncated_obstacle_decoded = viper::read_physics_task_record_stream(
+            truncated_obstacle_stream.bytes);
+        const auto truncated_obstacle_runtime =
+            viper::materialize_physics_task_runtime_collection(
+                truncated_obstacle_decoded, truncated_obstacle_stream.bytes, false);
+        require(truncated_obstacle_runtime.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::
+                        entry_materialization_failed &&
+                    truncated_obstacle_runtime.failed_record_index == 0U,
+                "OBST runtime must reject a record too short for its selector and constructor inputs");
 
         auto invalid_runtime_bytes = runtime_serialized.bytes;
         const auto write_nan_word = [&invalid_runtime_bytes](

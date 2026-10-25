@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <limits>
 #include <utility>
 
@@ -336,6 +337,17 @@ PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
         const auto& identity = inventory.entries[index];
         const auto record_bytes = serialized_stream_bytes.subspan(
             identity.record_bytes_offset, identity.record_size);
+        const auto read_record_u32 = [record_bytes](
+            const std::size_t offset) noexcept {
+            return std::to_integer<std::uint32_t>(record_bytes[offset])
+                | (std::to_integer<std::uint32_t>(record_bytes[offset + 1U]) << 8U)
+                | (std::to_integer<std::uint32_t>(record_bytes[offset + 2U]) << 16U)
+                | (std::to_integer<std::uint32_t>(record_bytes[offset + 3U]) << 24U);
+        };
+        const auto read_record_f32 = [&read_record_u32](
+            const std::size_t offset) noexcept {
+            return std::bit_cast<float>(read_record_u32(offset));
+        };
         PhysicsTaskRuntimeEntry entry{};
         entry.stream_record_index = identity.stream_record_index;
         entry.record_tag = identity.record_tag;
@@ -354,6 +366,7 @@ PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
                 collection.failed_record_index = index;
                 return collection;
             }
+            entry.callback_behavior_unavailable = false;
             entry.status = PhysicsTaskRuntimeEntryStatus::inert_checkpoint_retained;
             entry.checkpoint = *checkpoint.state;
         } else if (record.record_tag == 0x53544154U) { // STAT
@@ -362,6 +375,7 @@ PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
             if (stat.status ==
                     PhysicsStatTaskRuntimeMaterializationStatus::complete &&
                 stat.state.has_value()) {
+                entry.callback_behavior_unavailable = false;
                 entry.status = PhysicsTaskRuntimeEntryStatus::inactive_stat_retained;
                 entry.stat = *stat.state;
             } else if (stat.status ==
@@ -375,9 +389,80 @@ PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
                 collection.failed_record_index = index;
                 return collection;
             }
+        } else if (record.record_tag == 0x4f425354U) { // OBST constructor record
+            if (record_bytes.size() < 0x38U) {
+                collection.entries.clear();
+                collection.status =
+                    PhysicsTaskRuntimeCollectionStatus::entry_materialization_failed;
+                collection.failed_record_index = index;
+                return collection;
+            }
+            PhysicsObstacleTaskConstructorObservation observation{};
+            observation.record_scale_word_0x08 = read_record_u32(0x08U);
+            for (std::size_t axis = 0U; axis < 3U; ++axis) {
+                observation.position_words_0x18[axis] =
+                    read_record_u32(0x18U + axis * 4U);
+            }
+            observation.yaw_degrees_0x24 = read_record_f32(0x24U);
+            observation.dimension_x_0x28 = read_record_f32(0x28U);
+            observation.dimension_y_0x2c = read_record_f32(0x2cU);
+            observation.dimension_z_0x30 = read_record_f32(0x30U);
+            observation.shape_selector_0x34 = read_record_u32(0x34U);
+
+            const auto finite_word = [](const std::uint32_t word) noexcept {
+                return std::isfinite(std::bit_cast<float>(word));
+            };
+            const bool finite_inputs =
+                finite_word(observation.record_scale_word_0x08) &&
+                std::all_of(observation.position_words_0x18.begin(),
+                    observation.position_words_0x18.end(), finite_word) &&
+                std::isfinite(observation.yaw_degrees_0x24) &&
+                std::isfinite(observation.dimension_x_0x28) &&
+                std::isfinite(observation.dimension_y_0x2c) &&
+                std::isfinite(observation.dimension_z_0x30);
+            if (!finite_inputs) {
+                collection.entries.clear();
+                collection.status =
+                    PhysicsTaskRuntimeCollectionStatus::entry_materialization_failed;
+                collection.failed_record_index = index;
+                return collection;
+            }
+
+            const auto constructor =
+                plan_physics_obstacle_task_constructor(observation);
+            const bool selector_two = observation.shape_selector_0x34 == 2U;
+            if ((selector_two && constructor.geometry_records.size() != 6U) ||
+                (!selector_two && !constructor.geometry_records.empty())) {
+                collection.entries.clear();
+                collection.status =
+                    PhysicsTaskRuntimeCollectionStatus::entry_materialization_failed;
+                collection.failed_record_index = index;
+                return collection;
+            }
+            PhysicsObstacleTaskRuntimeState obstacle{};
+            obstacle.record_scale_word_0x08 =
+                observation.record_scale_word_0x08;
+            obstacle.position_words_0x18 = observation.position_words_0x18;
+            obstacle.yaw_degrees_0x24 = observation.yaw_degrees_0x24;
+            obstacle.dimensions_0x28 = {observation.dimension_x_0x28,
+                observation.dimension_y_0x2c, observation.dimension_z_0x30};
+            obstacle.shape_selector_0x34 = observation.shape_selector_0x34;
+            obstacle.cached_basis = constructor.rotated_basis;
+            obstacle.cached_position_words = observation.position_words_0x18;
+            obstacle.sphere_scale = constructor.sphere_scale;
+            if (selector_two) {
+                obstacle.geometry_records = constructor.geometry_records;
+                entry.status = PhysicsTaskRuntimeEntryStatus::
+                    obstacle_shape_geometry_retained;
+            } else {
+                entry.status = PhysicsTaskRuntimeEntryStatus::
+                    obstacle_cached_pose_retained;
+            }
+            entry.obstacle = std::move(obstacle);
         } else {
             // Preserve order and identity while refusing to invent active
-            // callback state for PCAR/ACAR/OBST/WOBL and other known classes.
+            // callback state for PCAR/ACAR, truncated OBST, WOBL, and other
+            // known classes.
             entry.status = PhysicsTaskRuntimeEntryStatus::active_callback_unavailable;
         }
         collection.entries.push_back(std::move(entry));

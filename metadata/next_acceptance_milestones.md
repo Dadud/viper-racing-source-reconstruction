@@ -275,7 +275,11 @@ framed stream. A one-frame WARP run confirms all entries and the final cursor
 for all eight shipped tracks with Viper, and all five shipped cars on Bemidji.
 The live stream remains separate from the constructor-only player stream.
 
-This is a byte-stream milestone, not native object construction. Current
+This is a byte-stream milestone, not native object construction. The stream
+readback is correlated with its factory inventory and a session-owned semantic
+collection; the collection retains inert CHKP, supported inactive STAT, and
+the cached pose for valid OBST records, with selector-2 geometry retained as
+well. This still does not allocate native objects or dispatch active callbacks. Current
 startup passes selector zero based on the shipped zero-initialized global and
 ordinary startup path; it assumes no indirect runtime mutation before track
 parsing. Static parsing is enabled based on `0x40D2F0` returning false after
@@ -283,8 +287,8 @@ ordinary startup clears its second gate byte. On x64, terrain division uses
 host arithmetic; original x87/FDIV compatibility is not implemented. Obstacle
 model lookup currently uses an explicit active-track, active-car, Viper, then
 shared-bundle precedence which still needs comparison against the native
-resource-search order. The stream is not yet fed through the observed task
-factory, and no resulting physics-task objects are retained for fixed-step
+resource-search order. The stream is not yet fed through the observed native
+constructors, and no allocated physics-task objects are retained for fixed-step
 dispatch. Unsupported directives/classes, visual-only rows, invalid resources,
 or incomplete lines still block stream acceptance rather than being skipped.
 

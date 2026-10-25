@@ -223,12 +223,31 @@ enum class PhysicsTaskRuntimeEntryStatus : std::uint8_t {
     inert_checkpoint_retained,
     inactive_stat_retained,
     unsupported_stat_variant,
+    obstacle_cached_pose_retained,
+    obstacle_shape_geometry_retained,
     active_callback_unavailable,
 };
 
+struct PhysicsObstacleTaskRuntimeState {
+    std::uint32_t record_scale_word_0x08{};
+    std::array<std::uint32_t, 3> position_words_0x18{};
+    float yaw_degrees_0x24{};
+    std::array<float, 3> dimensions_0x28{};
+    std::uint32_t shape_selector_0x34{};
+    std::array<float, 9> cached_basis{};
+    std::array<std::uint32_t, 3> cached_position_words{};
+    float sphere_scale{};
+    std::vector<PhysicsObstacleGeometryRecord> geometry_records;
+    bool x87_intermediate_approximated{true};
+    // Constructor timer and allocation outcomes are not present in the stream.
+    bool timer_value_known{};
+    bool native_object_allocation_known{};
+};
+
 // Ordered semantic runtime state for validated records. This is explicitly
-// separate from native allocation and fixed-step dispatch: currently only
-// CHKP geometry and the inactive STAT class have retained state.
+// separate from native allocation and fixed-step dispatch: it retains CHKP
+// geometry, supported inactive STAT state, and recovered OBST constructor
+// pose/shape data.
 struct PhysicsTaskRuntimeEntry {
     std::size_t stream_record_index{};
     std::uint32_t record_tag{};
@@ -237,10 +256,14 @@ struct PhysicsTaskRuntimeEntry {
     // ordered entry. It does not imply that the rest of the native callback
     // or the task object's native allocation is implemented.
     std::uint32_t known_callback_projection_steps{};
+    // Independent of retained constructor state; OBST cached data does not
+    // imply that its active fixed-step callback is reconstructed.
+    bool callback_behavior_unavailable{true};
     PhysicsTaskRuntimeEntryStatus status{
         PhysicsTaskRuntimeEntryStatus::active_callback_unavailable};
     std::optional<PhysicsCheckpointTaskRuntimeState> checkpoint;
     std::optional<PhysicsStatTaskRuntimeState> stat;
+    std::optional<PhysicsObstacleTaskRuntimeState> obstacle;
 };
 
 enum class PhysicsTaskRuntimeCollectionStatus : std::uint8_t {

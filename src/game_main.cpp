@@ -3426,6 +3426,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         }
         std::size_t retained_checkpoint_count = 0U;
         std::size_t retained_inactive_stat_count = 0U;
+        std::size_t retained_obstacle_pose_count = 0U;
+        std::size_t retained_obstacle_geometry_count = 0U;
         std::size_t unsupported_stat_variant_count = 0U;
         std::size_t unavailable_active_callback_count = 0U;
         if (stream_ok && state.physics_task_runtime_collection.has_value()) {
@@ -3444,10 +3446,30 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 case viper::PhysicsTaskRuntimeEntryStatus::unsupported_stat_variant:
                     ++unsupported_stat_variant_count;
                     break;
+                case viper::PhysicsTaskRuntimeEntryStatus::
+                        obstacle_cached_pose_retained:
+                    if (!entry.obstacle.has_value() ||
+                        !entry.obstacle->geometry_records.empty()) {
+                        stream_ok = false;
+                        break;
+                    }
+                    ++retained_obstacle_pose_count;
+                    break;
+                case viper::PhysicsTaskRuntimeEntryStatus::
+                        obstacle_shape_geometry_retained:
+                    if (!entry.obstacle.has_value() ||
+                        entry.obstacle->geometry_records.size() != 6U) {
+                        stream_ok = false;
+                        break;
+                    }
+                    ++retained_obstacle_pose_count;
+                    ++retained_obstacle_geometry_count;
+                    break;
                 case viper::PhysicsTaskRuntimeEntryStatus::active_callback_unavailable:
-                    ++unavailable_active_callback_count;
                     break;
                 }
+                if (entry.callback_behavior_unavailable)
+                    ++unavailable_active_callback_count;
             }
         } else {
             stream_ok = false;
@@ -3471,7 +3493,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << retained_checkpoint_count
                       << " inert CHKP records and "
                       << retained_inactive_stat_count
-                      << " inactive STAT task states; "
+                      << " inactive STAT task states and "
+                      << retained_obstacle_pose_count
+                      << " OBST cached poses (including "
+                      << retained_obstacle_geometry_count
+                      << " with selector-2 geometry); "
                       << unsupported_stat_variant_count
                       << " unsupported STAT variants and "
                       << unavailable_active_callback_count
