@@ -111,14 +111,19 @@ installed hooks before resuming the suspended launcher-created child. The
 same DirectDraw calls again returned success, the enumeration callback
 reported return value 1 for 640x480, and SetDisplayMode succeeded at
 640x480x16. No CreateSurface or surface-vtable call occurred before the child
-exited with code 5 and the generic dialog appeared. Static analysis of
-`0x44EEB0` establishes that exit code 5 is taken when byte `0x509C52` (the
-640x480-supported flag within `0x509C50`) is still zero after enumeration.
-Therefore callback return value 1 does not establish that the engine's
-required-mode flag was set; the current trace has not captured that global or
-the callback's raw mode fields. The failure is localized to the internal
-640x480 acceptance gate after enumeration and before surface creation, but
-the reason the flag remains unset is unresolved. A bounded follow-up should
-record callback input fields and the flag before/after the callback. The
-capture confirms cleanup, unchanged launcher/engine/ISO hashes, and matching
-hashes for all 31 GameData files.
+exited with code 5 and the generic dialog appeared. This capture established
+that no surface setup occurs before termination, but did not identify the
+termination path.
+
+The callback-level private capture
+`../../analysis/reference_captures/callback_flags_20261025T025906Z.json`
+hooked the engine callback at `0x44EE00`. It ran 23 times; the first
+640x480x16 callback returned 1 and changed byte `0x509C52` from zero to one.
+The 640x480 flag remained set after enumeration and the `0x44EEB0` wrapper,
+yet the child still exited with code 5. This contradicts the initial
+hypothesis that the observed exit came from `0x44EEB0`'s missing-640x480
+branch, assuming the captured flag state matches the branch check. The exact
+termination caller and branch are unresolved; a final probe is tracing
+`ExitProcess` arguments and call sites. Across the surface and callback
+captures, cleanup is verified and hashes of the launcher, engine, ISO, and
+all 31 GameData files match their baselines.
