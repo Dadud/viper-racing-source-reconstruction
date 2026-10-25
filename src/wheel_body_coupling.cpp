@@ -11,6 +11,192 @@
 
 namespace viper {
 
+namespace {
+
+using OrdinalPairPointer = std::optional<std::size_t>;
+
+int compare_ordinal_pair_records(
+    const OrdinalPairPointer& first,
+    const OrdinalPairPointer& second,
+    const std::span<const NcarOrdinalPairRecord> records) noexcept
+{
+    // The callback's null path compares the first pointer with 1, placing the
+    // single diagonal null after every non-null pair pointer.
+    if (!first) return 1;
+    if (!second) return -1;
+
+    const auto& a = records[*first];
+    const auto& b = records[*second];
+    // The x87 callback stores the difference to a float stack temporary
+    // before its comparisons. Preserve the native subtraction/addition order;
+    // double intermediates retain exact products of finite float inputs.
+    const auto ax = static_cast<double>(a.position_delta_x_0x04);
+    const auto az = static_cast<double>(a.position_delta_z_0x08);
+    const auto bx = static_cast<double>(b.position_delta_x_0x04);
+    const auto bz = static_cast<double>(b.position_delta_z_0x08);
+    const auto difference = static_cast<float>(
+        ((ax * ax - bx * bx) - bz * bz) + az * az);
+    constexpr auto tolerance = std::bit_cast<float>(0x3DCCCCCDU);
+    if (std::isnan(difference)) return 0;
+    if (difference >= tolerance) return 1;
+    if (std::fabs(difference) < tolerance) return 0;
+    return -1;
+}
+
+void shortsort_ordinal_pair_pointers(
+    std::vector<OrdinalPairPointer>& values,
+    std::size_t first,
+    std::size_t last,
+    const std::span<const NcarOrdinalPairRecord> records)
+{
+    while (first < last) {
+        auto maximum = first;
+        for (auto scan = first + 1U; scan <= last; ++scan) {
+            if (compare_ordinal_pair_records(
+                    values[scan], values[maximum], records) > 0) {
+                maximum = scan;
+            }
+        }
+        std::swap(values[maximum], values[last]);
+        --last;
+    }
+}
+
+void quicksort_ordinal_pair_pointers(
+    std::vector<OrdinalPairPointer>& values,
+    const std::span<const NcarOrdinalPairRecord> records)
+{
+    if (values.size() < 2U) return;
+    struct Range { std::size_t first; std::size_t last; };
+    std::vector<Range> pending;
+    std::size_t first = 0U;
+    std::size_t last = values.size() - 1U;
+    for (;;) {
+        const auto count = last - first + 1U;
+        if (count > 8U) {
+            std::swap(values[first + (count >> 1U)], values[first]);
+            auto scan_left = first;
+            auto scan_right = last + 1U;
+            for (;;) {
+                do {
+                    ++scan_left;
+                    if (scan_left > last) break;
+                } while (compare_ordinal_pair_records(
+                             values[scan_left], values[first], records) < 1);
+
+                do {
+                    --scan_right;
+                    if (scan_right <= first) break;
+                } while (compare_ordinal_pair_records(
+                             values[scan_right], values[first], records) >= 0);
+
+                if (scan_left <= scan_right) {
+                    std::swap(values[scan_left], values[scan_right]);
+                    continue;
+                }
+                break;
+            }
+
+            std::swap(values[first], values[scan_right]);
+            const auto left_measure =
+                static_cast<std::ptrdiff_t>(scan_right) - 1 -
+                static_cast<std::ptrdiff_t>(first);
+            const auto right_measure =
+                static_cast<std::ptrdiff_t>(last) -
+                static_cast<std::ptrdiff_t>(scan_left);
+            if (left_measure < right_measure) {
+                if (scan_left < last) pending.push_back({scan_left, last});
+                if (first + 1U < scan_right) {
+                    last = scan_right - 1U;
+                    continue;
+                }
+            } else {
+                if (first + 1U < scan_right) {
+                    pending.push_back({first, scan_right - 1U});
+                }
+                first = scan_left;
+                if (scan_left < last) continue;
+            }
+        } else {
+            shortsort_ordinal_pair_pointers(values, first, last, records);
+        }
+
+        if (pending.empty()) return;
+        const auto next = pending.back();
+        pending.pop_back();
+        first = next.first;
+        last = next.last;
+    }
+}
+
+} // namespace
+
+NcarOrdinalPairLookupResult resolve_ncar_ordinal_pair_lookup(
+    const std::span<const NcarOrdinalPairRowInput> rows,
+    const std::uint32_t ordinal)
+{
+    NcarOrdinalPairLookupResult result{};
+    result.row_ordinal = ordinal;
+    if (rows.empty() || ordinal >= rows.size() ||
+        rows.size() > static_cast<std::size_t>(
+            std::numeric_limits<std::int16_t>::max())) {
+        return result;
+    }
+
+    const auto row_values = [rows](const std::size_t index) {
+        const auto& row = rows[index];
+        if (!row.registered) return NcarOrdinalPairRowInput{};
+        return row;
+    };
+    std::vector<NcarOrdinalPairRecord> records;
+    records.reserve(rows.size() * (rows.size() - 1U) / 2U);
+    std::vector<std::vector<OrdinalPairPointer>> middle_lists(
+        rows.size(), std::vector<OrdinalPairPointer>(rows.size()));
+    for (std::size_t endpoint_a = 0U; endpoint_a < rows.size(); ++endpoint_a) {
+        for (std::size_t endpoint_b = endpoint_a + 1U;
+             endpoint_b < rows.size(); ++endpoint_b) {
+            const auto a = row_values(endpoint_a);
+            const auto b = row_values(endpoint_b);
+            const auto record_index = records.size();
+            records.push_back({
+                static_cast<std::int16_t>(endpoint_a),
+                static_cast<std::int16_t>(endpoint_b),
+                b.position_x_0x5c - a.position_x_0x5c,
+                b.position_z_0x64 - a.position_z_0x64,
+                b.velocity_x_0x234 - a.velocity_x_0x234,
+                b.velocity_z_0x23c - a.velocity_z_0x23c});
+            middle_lists[endpoint_a][endpoint_b] = record_index;
+            middle_lists[endpoint_b][endpoint_a] = record_index;
+        }
+    }
+
+    const auto record_span = std::span<const NcarOrdinalPairRecord>(records);
+    for (auto& row : middle_lists) {
+        quicksort_ordinal_pair_pointers(row, record_span);
+    }
+
+    const auto selected_row = static_cast<std::size_t>(ordinal);
+    const auto& selected_list = middle_lists[selected_row];
+    result.sorted_partner_ordinals.reserve(selected_list.size());
+    for (const auto& pointer : selected_list) {
+        if (!pointer) {
+            result.sorted_partner_ordinals.emplace_back(std::nullopt);
+            continue;
+        }
+        const auto& record = records[*pointer];
+        const auto partner = record.endpoint_a_ordinal_0x00 == ordinal
+            ? record.endpoint_b_ordinal_0x02
+            : record.endpoint_a_ordinal_0x00;
+        result.sorted_partner_ordinals.emplace_back(
+            static_cast<std::uint32_t>(partner));
+    }
+    if (ordinal < selected_list.size() && selected_list[ordinal].has_value()) {
+        result.record = records[*selected_list[ordinal]];
+    }
+    result.input_complete = true;
+    return result;
+}
+
 NcarIntegratorPrefixResult apply_ncar_integrator_prefix(
     BodyIntegrationKinematicsInput& kinematics,
     NcarForceMomentAccumulator& accumulator,
@@ -90,16 +276,34 @@ NcarIntegratorTimerResult advance_ncar_integrator_timer(
     }
 
     result.ordinal_record_lookup_reached = true;
-    if (!input.record_lookup_resolved) {
+    auto lookup_resolved = input.record_lookup_resolved;
+    auto record_nonnull = input.record_nonnull;
+    auto record_x = input.record_x_0x04;
+    auto record_y = input.record_y_0x08;
+    if (input.ordinal_rows_resolved) {
+        const auto lookup = resolve_ncar_ordinal_pair_lookup(
+            input.ordinal_rows, input.vehicle_ordinal_0x510);
+        if (!lookup.input_complete) {
+            result.input_complete = false;
+            return result;
+        }
+        lookup_resolved = true;
+        record_nonnull = lookup.record.has_value();
+        if (lookup.record) {
+            record_x = lookup.record->position_delta_x_0x04;
+            record_y = lookup.record->position_delta_z_0x08;
+        }
+    }
+    if (!lookup_resolved) {
         result.input_complete = false;
         return result;
     }
-    if (!input.record_nonnull) {
+    if (!record_nonnull) {
         return result;
     }
     const auto record_distance_squared =
-        static_cast<long double>(input.record_x_0x04) * input.record_x_0x04 +
-        static_cast<long double>(input.record_y_0x08) * input.record_y_0x08;
+        static_cast<long double>(record_x) * record_x +
+        static_cast<long double>(record_y) * record_y;
     if (record_distance_squared >=
             static_cast<long double>(record_radius_squared) &&
         !std::isnan(record_distance_squared)) {

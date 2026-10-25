@@ -90,11 +90,16 @@ returning equality within its observed 0.1f tolerance; the second callback
 sorts the separate last array using the row's second two-dimensional values.
 This resolves the storage class and index semantics, but not the exact live
 record selected without the runtime descriptor dimension and participant
-position rows. The helper `0x4BD250` is the Visual Studio 1998 release
-quicksort, with `_shortsort` for partitions of at most eight elements; its
-ordering can be reproduced from the complete input rows and comparator, but
-the current runtime does not yet build this table or supply those rows to the
-timer. It therefore continues to require a resolved lookup input.
+position rows. The portable reconstruction now exposes
+`resolve_ncar_ordinal_pair_lookup`, which builds the triangular records and
+middle row from ordinal-ordered row inputs and runs the recovered VS1998
+quicksort/`_shortsort` algorithm. The timer projection can consume those rows
+directly, superseding a manually resolved record when the caller has the
+complete row span. Regression covers both the <=8 shortsort path and a 10-row
+quicksort path, including the null diagonal and ordinal selection. Production
+still does not collect and pass the descriptor rows, so this standalone
+algorithm is not yet exercised against live native rows and the timer remains
+disconnected from production physics.
 
 The next original-client capture can use the passive one-shot Frida probe at
 [`../../analysis/reference_captures/ordinal_pair_lookup_probe.js`](../../analysis/reference_captures/ordinal_pair_lookup_probe.js).

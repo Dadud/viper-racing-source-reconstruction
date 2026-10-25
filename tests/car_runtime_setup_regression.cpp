@@ -34,6 +34,62 @@ void write_u32_le(std::vector<std::byte>& bytes, const std::size_t offset,
 int main()
 {
     try {
+        {
+            std::array<viper::NcarOrdinalPairRowInput, 4> rows{{
+                {true, 0.0F, 0.0F, 0.0F, 0.0F},
+                {true, 2.0F, 0.0F, 5.0F, 0.0F},
+                {true, 10.0F, 0.0F, 8.0F, 0.0F},
+                {true, 3.0F, 0.0F, 9.0F, 0.0F}}};
+            const auto lookup = viper::resolve_ncar_ordinal_pair_lookup(rows, 1U);
+            require(lookup.input_complete && lookup.record.has_value() &&
+                    lookup.sorted_partner_ordinals.size() == rows.size() &&
+                    lookup.sorted_partner_ordinals[0] == 3U &&
+                    lookup.sorted_partner_ordinals[1] == 0U &&
+                    lookup.sorted_partner_ordinals[2] == 2U &&
+                    !lookup.sorted_partner_ordinals[3].has_value() &&
+                    lookup.record->endpoint_a_ordinal_0x00 == 0 &&
+                    lookup.record->endpoint_b_ordinal_0x02 == 1 &&
+                    lookup.record->position_delta_x_0x04 == 2.0F &&
+                    lookup.record->velocity_delta_x_0x0c == 5.0F,
+                "0x433570 lookup must select the native ordinal-ranked middle-list pair");
+
+            viper::NcarIntegratorTimerState timer_state{1.0F, 0.0F};
+            viper::NcarIntegratorTimerInput timer_input{};
+            timer_input.vehicle_ordinal_0x510 = 1U;
+            timer_input.ordinal_rows_resolved = true;
+            timer_input.ordinal_rows = rows;
+            const auto timer = viper::advance_ncar_integrator_timer(
+                timer_state, timer_input);
+            require(timer.input_complete && timer.ordinal_record_lookup_reached &&
+                    timer.record_radius_gate_passed && timer.record_time_advanced &&
+                    std::fabs(timer_state.record_time_0xe44 - 0.016F) < 1.0e-7F,
+                "0x433570 timer must derive its pair distance from participant rows");
+
+            const auto terminal_ordinal =
+                viper::resolve_ncar_ordinal_pair_lookup(rows, 3U);
+            require(terminal_ordinal.input_complete && !terminal_ordinal.record.has_value() &&
+                    !terminal_ordinal.sorted_partner_ordinals.back().has_value(),
+                "native sorted row must retain its single null diagonal entry at the end");
+
+            std::array<viper::NcarOrdinalPairRowInput, 10> larger_rows{};
+            for (std::size_t index = 0; index < larger_rows.size(); ++index) {
+                larger_rows[index] = {
+                    true, static_cast<float>(index), 0.0F,
+                    static_cast<float>(index * 2U), 0.0F};
+            }
+            const auto larger_lookup =
+                viper::resolve_ncar_ordinal_pair_lookup(larger_rows, 0U);
+            require(larger_lookup.input_complete &&
+                    larger_lookup.sorted_partner_ordinals.size() == larger_rows.size(),
+                "native qsort path must produce a complete larger ordinal list");
+            for (std::size_t index = 0; index + 1U < larger_rows.size(); ++index) {
+                require(larger_lookup.sorted_partner_ordinals[index] == index + 1U,
+                    "native qsort path must preserve increasing distance order");
+            }
+            require(!larger_lookup.sorted_partner_ordinals.back().has_value(),
+                "native qsort path must place the null diagonal after every pair");
+        }
+
         constexpr std::size_t setup_size =
             viper::CarFileRuntimeMappingObservation::configuration_word_count *
             sizeof(std::uint32_t);

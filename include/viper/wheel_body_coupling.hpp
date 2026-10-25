@@ -2,8 +2,10 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
+#include <vector>
 
 #include "viper/model_resource.hpp"
 #include "viper/ncar_state.hpp"
@@ -430,6 +432,40 @@ struct NcarIntegratorTimerState {
     float record_time_0xe44{};
 };
 
+// Values copied by 0x419E80 into one ordinal row before the shared pair pass.
+// Unregistered slots retain the matrix allocator's zero-filled values.
+struct NcarOrdinalPairRowInput {
+    bool registered{};
+    float position_x_0x5c{};
+    float position_z_0x64{};
+    float velocity_x_0x234{};
+    float velocity_z_0x23c{};
+};
+
+struct NcarOrdinalPairRecord {
+    std::int16_t endpoint_a_ordinal_0x00{};
+    std::int16_t endpoint_b_ordinal_0x02{};
+    float position_delta_x_0x04{};
+    float position_delta_z_0x08{};
+    float velocity_delta_x_0x0c{};
+    float velocity_delta_z_0x10{};
+};
+
+struct NcarOrdinalPairLookupResult {
+    bool input_complete{};
+    std::uint32_t row_ordinal{};
+    std::vector<std::optional<std::uint32_t>> sorted_partner_ordinals;
+    std::optional<NcarOrdinalPairRecord> record;
+};
+
+// Rebuilds the middle n-entry row pointer list initialized by 0x41EAB0,
+// populated by 0x41EC40, sorted by the 0x41EE90 comparator and indexed by
+// 0x433570. Input rows are in descriptor ordinal order; null registration
+// entries retain the native zero-filled position/velocity values.
+[[nodiscard]] NcarOrdinalPairLookupResult resolve_ncar_ordinal_pair_lookup(
+    std::span<const NcarOrdinalPairRowInput> rows,
+    std::uint32_t ordinal);
+
 struct NcarIntegratorTimerInput {
     // Raw global counter consumed by 0x425790, scaled by the binary's 0.016f.
     std::uint32_t timer_ticks_0x508774{};
@@ -439,6 +475,11 @@ struct NcarIntegratorTimerInput {
     bool record_nonnull{};
     float record_x_0x04{};
     float record_y_0x08{};
+    // When available, this supersedes the explicit record observation above
+    // and reconstructs the descriptor's selected pair record from native row
+    // inputs. The span length is the descriptor dimension.
+    bool ordinal_rows_resolved{};
+    std::span<const NcarOrdinalPairRowInput> ordinal_rows;
 };
 
 struct NcarIntegratorTimerResult {
