@@ -1465,6 +1465,10 @@ private:
 // The source placement is row-major 3x3 plus translation at [9..11].
 struct MaterializedNcarRuntimeState {
     std::array<float, 12> placement_transform{};
+    // Shared 0x43E490 constructor bytes are persistent session-owned state.
+    // The byte mask distinguishes native constructor writes from untouched
+    // fields; it is not yet advanced by the fixed-step physics callback.
+    viper::NcarBodyRuntimeObjectState body_object{};
     std::array<std::array<float, 3>, 4> initial_wheel_world_positions{};
     // The derived 0x42FF90 constructor writes 1.0 here after the base body
     // constructor. Keep it as constructor state; the later callback/ring that
@@ -1610,6 +1614,12 @@ struct WindowState {
         }
         player_body_constructor_plan =
             viper::plan_ncar_body_constructor(*body_observation);
+        if (!viper::materialize_ncar_body_constructor(
+                player_runtime_state.body_object, *player_body_constructor_plan)) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
         player_body_inverse_mass_0x200 =
             player_body_constructor_plan->reciprocal_dimensions_0x200_to_0x20c[0];
         player_wheel_core_initialization =
@@ -1628,6 +1638,16 @@ struct WindowState {
         // 0x4419A0. Retain those exact constructor projections in the player
         // session without treating them as a live force/integration state.
         player_runtime_state.constructor_field_0x50c = 1.0F;
+        const std::array<viper::NcarObjectFieldWrite, 2> derived_body_writes{{
+            {0x50cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+            {0x000U, 4U, 0x004c8188U},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, derived_body_writes)) {
+            player_runtime_car_record.clear();
+            player_runtime_state = {};
+            return false;
+        }
         for (std::size_t wheel = 0;
              wheel < player_runtime_state.wheel_constructor_plans.size(); ++wheel) {
             const auto wheel_offset = static_cast<std::uint32_t>(

@@ -2298,6 +2298,70 @@ NcarBodyConstructorPlan plan_ncar_body_constructor(
     return result;
 }
 
+bool apply_ncar_body_object_writes(
+    NcarBodyRuntimeObjectState& destination,
+    const std::span<const NcarObjectFieldWrite> writes) noexcept
+{
+    auto materialized = destination;
+    for (const auto& write : writes) {
+        if ((write.width_bytes != 1U && write.width_bytes != 2U &&
+                write.width_bytes != 4U) ||
+            static_cast<std::uint64_t>(write.offset) + write.width_bytes >
+                ncar_body_runtime_object_bytes) {
+            return false;
+        }
+        const auto offset = static_cast<std::size_t>(write.offset);
+        for (std::size_t byte = 0; byte < write.width_bytes; ++byte) {
+            materialized.bytes[offset + byte] = static_cast<std::byte>(
+                (write.value_bits >> (byte * 8U)) & 0xffU);
+            materialized.initialized_bytes[offset + byte] = 1U;
+        }
+    }
+    destination = materialized;
+    return true;
+}
+
+bool materialize_ncar_body_constructor(
+    NcarBodyRuntimeObjectState& destination,
+    const NcarBodyConstructorPlan& plan) noexcept
+{
+    if (!plan.helper_0x4375c0_called || !plan.helper_0x43e650_called ||
+        plan.fdiv_compatibility_fill_unknown) {
+        return false;
+    }
+    for (const auto& value : plan.matrix_0x210) {
+        if (!value.has_value()) return false;
+    }
+    for (const auto& value : plan.copied_matrix_0x264) {
+        if (!value.has_value()) return false;
+    }
+
+    std::vector<NcarObjectFieldWrite> writes;
+    writes.reserve(plan.inherited_base_writes_0x4375c0.size() +
+        plan.subobject_writes_0x43f460.size() +
+        plan.finalizer_writes_0x43e650.size() + 4U + 4U + 18U + 3U);
+    writes.insert(writes.end(), plan.inherited_base_writes_0x4375c0.begin(),
+        plan.inherited_base_writes_0x4375c0.end());
+    writes.insert(writes.end(), plan.subobject_writes_0x43f460.begin(),
+        plan.subobject_writes_0x43f460.end());
+    writes.push_back({0x00U, 4U, plan.vtable_address});
+    writes.push_back({0x1ecU, 4U, plan.cleared_dword_0x1ec});
+    writes.push_back({0x474U, 1U, plan.cleared_byte_0x474});
+    for (std::size_t index = 0; index < plan.scaled_dimensions_0x1f0_to_0x1fc.size(); ++index) {
+        writes.push_back({static_cast<std::uint32_t>(0x1f0U + index * 4U), 4U,
+            std::bit_cast<std::uint32_t>(plan.scaled_dimensions_0x1f0_to_0x1fc[index])});
+        writes.push_back({static_cast<std::uint32_t>(0x200U + index * 4U), 4U,
+            std::bit_cast<std::uint32_t>(plan.reciprocal_dimensions_0x200_to_0x20c[index])});
+        writes.push_back({static_cast<std::uint32_t>(0x210U + index * 4U), 4U,
+            std::bit_cast<std::uint32_t>(*plan.matrix_0x210[index])});
+        writes.push_back({static_cast<std::uint32_t>(0x264U + index * 4U), 4U,
+            std::bit_cast<std::uint32_t>(*plan.copied_matrix_0x264[index])});
+    }
+    writes.insert(writes.end(), plan.finalizer_writes_0x43e650.begin(),
+        plan.finalizer_writes_0x43e650.end());
+    return apply_ncar_body_object_writes(destination, writes);
+}
+
 NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
     const std::optional<std::uint32_t> source_record_word_0x65)
 {

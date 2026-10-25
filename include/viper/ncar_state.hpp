@@ -267,6 +267,28 @@ struct NcarBodyConstructorPlan {
     bool fdiv_compatibility_fill_unknown{};
 };
 
+inline constexpr std::size_t ncar_body_runtime_object_bytes = 0x0ef0U;
+
+// Persistent raw object storage for the fields proven initialized by the
+// shared body constructor. The byte mask keeps untouched native storage
+// distinct from zero and allows later callback models to update this owner.
+struct NcarBodyRuntimeObjectState {
+    std::array<std::byte, ncar_body_runtime_object_bytes> bytes{};
+    std::array<std::uint8_t, ncar_body_runtime_object_bytes> initialized_bytes{};
+};
+
+[[nodiscard]] bool apply_ncar_body_object_writes(
+    NcarBodyRuntimeObjectState& destination,
+    std::span<const NcarObjectFieldWrite> writes) noexcept;
+
+// Materializes the shared 0x43E490 body constructor's known direct writes,
+// derived dimensions/matrices, subobject initialization and finalizer stores.
+// It does not apply a derived PCAR/NCAR constructor or initialize unknown
+// compatibility-fill values.
+[[nodiscard]] bool materialize_ncar_body_constructor(
+    NcarBodyRuntimeObjectState& destination,
+    const NcarBodyConstructorPlan& plan) noexcept;
+
 // Projects the direct fields and fixed subobject loops in body initializer 0x43E490.
 [[nodiscard]] NcarBodyConstructorPlan plan_ncar_body_constructor(
     const NcarBodyConstructorObservation& observation);

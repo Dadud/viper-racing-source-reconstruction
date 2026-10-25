@@ -662,9 +662,11 @@ the PCAR callback `0x4384D0`; the PCAR derived constructor `0x42FF90` sets
 contains a ramp/reset writer at `0x433570`; NCAR callback `0x439200` has
 additional gated decrement/assignment paths. The record-driven `0x432420`
 writer belongs to the separate GCAR GhostBegin playback ring and is not the
-player's live ring. These per-frame effects are modeled, but the runtime does
-not yet own the mutable PCAR body, callback inputs, and live wheel-history
-producer needed to drive them. Consequently, wheel `+0x158` remains
+player's live ring. These per-frame effects are modeled, and the runtime now
+stores the known shared-constructor body bytes plus the PCAR vtable and initial
+`+0x50C` in a persistent byte-backed object. It still does not dispatch the
+PCAR callback or own its mutable frame transitions, callback inputs, and live
+wheel-history producer. Consequently, wheel `+0x158` remains
 unavailable to live suspension and must not be guessed from constructor state.
 Evidence: `0x4329C0` dossier
 `ev_ec495a0523b6b3e8a6e16deb0b941496b12fb9879319d848e6ea55c41bb6ad6e`,

@@ -96,8 +96,9 @@ resolves through PCAR vtable `0x4C8188` to callback `0x4384D0`. That callback
 conditionally calls shared wheel/body integrator `0x431150`; NCAR callback
 `0x439200` is a separate sample/queue/interpolation path and must not be used
 as the player callback. The PCAR callback's modeled control prefix still
-requires body velocity and basis, and the production session does not own the
-mutable PCAR body state or call its integrator. The 3-slot NCAR `0x3E` sample
+requires body velocity and basis. The production session now owns the known
+base-constructor bytes for one PCAR body, but does not dispatch the native
+callback or advance that state through its integrator. The 3-slot NCAR `0x3E` sample
 history is distinct from the `0x960`-record GCAR `0x3C` wheel-history ring;
 the latter is tied to GhostBegin playback and is not a live-player ring.
 See `metadata/physics_task_objects.md`, `metadata/car_update_branches.md`, and
@@ -110,9 +111,12 @@ the PCAR constructor's `+0x50C = 1.0` as substitutes for native frame state.
 The `0x4329C0` wheel-context copy reads mutable body `+0x50C`. Its constructor
 value is only initial state; `0x433570` can update it on the shared
 `0x431150` integrator path, while other callback writers have their own gates.
-The production session does not dispatch native PCAR callback `0x4384D0` or
-execute shared integrator `0x431150`; it lacks their mutable body, timer,
-table, and callback state. Wheel `+0xE8`
+The production session stores the shared body constructor's position, basis,
+dimensions, inertia matrices, velocity/accumulator clears, and derived PCAR
+constructor `+0x50C`/vtable in a persistent byte-backed object with an
+initialized-byte mask. It still does not dispatch native PCAR callback
+`0x4384D0` or execute shared integrator `0x431150`; it lacks their runtime
+body, timer, table, and callback transitions. Wheel `+0xE8`
 is interpolated from adjacent five-byte samples by `0x444240`, using records
 selected through `0x427630` and a fraction derived from global tick and object
 timing fields. This particular `0x3C`-stride ring is owned by the

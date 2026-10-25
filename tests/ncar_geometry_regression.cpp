@@ -57,6 +57,57 @@ int main()
                 near(positions[11][2], 1.77F),
             "constructor sphere positions must consume the precomputed bounds");
 
+        viper::NcarBodyConstructorObservation body_constructor_observation{};
+        body_constructor_observation.source_values_0x08_to_0x14 =
+            {4.0F, 0.5F, 0.5F, 0.5F};
+        body_constructor_observation.source_record_word_0x00 = 0x50434152U;
+        body_constructor_observation.serialized_object_stream_offset = 0xAD4U;
+        const auto body_constructor_plan =
+            viper::plan_ncar_body_constructor(body_constructor_observation);
+        viper::NcarBodyRuntimeObjectState body_runtime_state{};
+        require(viper::materialize_ncar_body_constructor(
+                    body_runtime_state, body_constructor_plan),
+            "shared body constructor writes must materialize into persistent byte state");
+        const auto read_body_dword = [&](const std::size_t offset) {
+            std::uint32_t value{};
+            for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+                value |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+                    body_runtime_state.bytes[offset + byte])) << (byte * 8U);
+            }
+            return value;
+        };
+        require(read_body_dword(0x00U) == 0x004c85e0U &&
+                read_body_dword(0x08U) == 0xAD4U &&
+                read_body_dword(0x0cU) == 0x50434152U &&
+                read_body_dword(0x38U) == std::bit_cast<std::uint32_t>(1.0F) &&
+                read_body_dword(0x58U) == std::bit_cast<std::uint32_t>(1.0F) &&
+                read_body_dword(0x5cU) == 0U && read_body_dword(0x234U) == 0U &&
+                near(std::bit_cast<float>(read_body_dword(0x1f0U)), 1.818F) &&
+                body_runtime_state.initialized_bytes[0x234U] != 0U &&
+                body_runtime_state.initialized_bytes[0x50cU] == 0U,
+            "body constructor state must preserve initialized pose/velocity while leaving runtime-only fields unknown");
+        const std::array<viper::NcarObjectFieldWrite, 2> pcar_derived_writes{{
+            {0x50cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+            {0x00U, 4U, 0x004c8188U},
+        }};
+        require(viper::apply_ncar_body_object_writes(
+                    body_runtime_state, pcar_derived_writes) &&
+                read_body_dword(0x00U) == 0x004c8188U &&
+                read_body_dword(0x50cU) == std::bit_cast<std::uint32_t>(1.0F) &&
+                body_runtime_state.initialized_bytes[0x50cU] != 0U,
+            "derived PCAR constructor stores must update the same persistent object");
+        const auto prior_body_bytes = body_runtime_state.bytes;
+        const auto prior_body_mask = body_runtime_state.initialized_bytes;
+        const std::array<viper::NcarObjectFieldWrite, 1> invalid_body_write{{
+            {static_cast<std::uint32_t>(viper::ncar_body_runtime_object_bytes),
+                4U, 0U},
+        }};
+        require(!viper::apply_ncar_body_object_writes(
+                    body_runtime_state, invalid_body_write) &&
+                body_runtime_state.bytes == prior_body_bytes &&
+                body_runtime_state.initialized_bytes == prior_body_mask,
+            "invalid body writes must be rejected without partially mutating persistent state");
+
         std::array<float, 12> identity{};
         identity[0] = identity[4] = identity[8] = 1.0F;
         viper::NcarResetBackendGroupObservation group{};
