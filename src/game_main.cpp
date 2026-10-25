@@ -1860,6 +1860,10 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
     std::array<std::optional<float>, 4> wheel_preupdate_value_0x158_after_tick{};
+    // The sampled wheel +0x158 currently comes only from constructor/reset
+    // initialization. Keep the field visible for diagnostics, but do not let
+    // its presence imply that a per-frame suspension producer is connected.
+    std::array<bool, 4> wheel_0x158_native_producer_owned{};
     std::array<std::optional<float>, 4> wheel_previous_contact_depth_0xe8_after_tick{};
 };
 
@@ -2651,6 +2655,7 @@ struct WindowState {
                 tick.wheel_preupdate_value_0x158_after_tick[wheel] =
                     std::bit_cast<float>(*bits);
             }
+            tick.wheel_0x158_native_producer_owned[wheel] = false;
             if (const auto bits = viper::read_ncar_wheel_object_u32(
                     wheel_object, 0xe8U)) {
                 tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
@@ -4154,7 +4159,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_projected_depth"
-                << ",wheel" << wheel << "_preupdate_value_0x158"
+                << ",wheel" << wheel << "_observed_value_0x158"
+                << ",wheel" << wheel << "_0x158_native_producer_owned"
                 << ",wheel" << wheel << "_previous_contact_depth_0xe8";
         }
         physics_tick_trace << '\n';
@@ -4388,6 +4394,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace <<
                                 *tick.wheel_preupdate_value_0x158_after_tick[wheel];
                         }
+                        physics_tick_trace << ',';
+                        physics_tick_trace << (tick.wheel_0x158_native_producer_owned[wheel]
+                            ? 1 : 0);
                         physics_tick_trace << ',';
                         if (tick.wheel_previous_contact_depth_0xe8_after_tick[wheel]) {
                             physics_tick_trace <<

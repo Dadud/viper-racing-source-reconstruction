@@ -113,6 +113,7 @@ try {
     $wheelActiveColumns = [int[]]::new(4)
     $wheelDepthColumns = [int[]]::new(4)
     $wheelPreupdateColumns = [int[]]::new(4)
+    $wheelProducerOwnedColumns = [int[]]::new(4)
     $wheelPriorDepthColumns = [int[]]::new(4)
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         $wheelActiveColumns[$wheel] = [Array]::IndexOf(
@@ -120,7 +121,9 @@ try {
         $wheelDepthColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_projected_depth")
         $wheelPreupdateColumns[$wheel] = [Array]::IndexOf(
-            $tickHeader, "wheel${wheel}_preupdate_value_0x158")
+            $tickHeader, "wheel${wheel}_observed_value_0x158")
+        $wheelProducerOwnedColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_0x158_native_producer_owned")
         $wheelPriorDepthColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_previous_contact_depth_0xe8")
     }
@@ -144,6 +147,7 @@ try {
         @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelPreupdateColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelProducerOwnedColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing body or wheel state fields'
     }
@@ -205,9 +209,10 @@ try {
                 throw 'First tick does not expose the initialized PCAR +0x50C/+0x510 constructor state'
             }
             for ($wheel = 0; $wheel -lt 4; ++$wheel) {
-                if ($fields[$wheelPreupdateColumns[$wheel]] -ne '0' -or
+                if ($fields[$wheelProducerOwnedColumns[$wheel]] -ne '0' -or
+                    $fields[$wheelPreupdateColumns[$wheel]] -ne '0' -or
                     $fields[$wheelPriorDepthColumns[$wheel]] -ne '0') {
-                    throw "Wheel $wheel first-tick +0x158/+0xE8 constructor state differs"
+                    throw "Wheel $wheel first-tick +0x158 ownership/value or +0xE8 constructor state differs"
                 }
             }
         }
@@ -247,6 +252,12 @@ try {
             }
         }
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
+            if ($fields[$wheelProducerOwnedColumns[$wheel]] -notin @('0', '1')) {
+                throw "Wheel $wheel +0x158 producer-ownership flag is invalid"
+            }
+            if ($fields[$wheelProducerOwnedColumns[$wheel]] -ne '0') {
+                throw "Wheel $wheel +0x158 is reported native-owned without an integrated producer"
+            }
             $active = $fields[$wheelActiveColumns[$wheel]]
             if (-not [string]::IsNullOrWhiteSpace($active) -and $active -notin @('0', '1')) {
                 throw "Wheel $wheel contact-active value is invalid at line $($index + 1)"
