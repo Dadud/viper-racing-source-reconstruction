@@ -1012,9 +1012,71 @@ transition is supported.
 
 A bounded six-second Frida hardware-watch probe armed write watchpoints on the four aligned wheel fields for the selected PCAR during callback `0x4384D0`. It stopped on a `single-step` exception with PC `0x4319BC`, immediately after the x86 store `FSTP [ESI+0x850]` at `0x4319B6`. The watched wheel-1 field at `PCAR+0x850` matched wheel subobject `PCAR+0x6F8` plus `+0x158`. Its bits were unchanged (`0x40239AFE` before and after), so this is a same-value write, not evidence of a changed suspension response. The watchpoint capture is `ev_56ff29dc0e25c8269a4850dd0d08e549f230ed529e923e302475e97451f97f27`.
 
-Static disassembly of the same `0x431150` body identifies all four stores: `0x4319D5` writes `PCAR+0x6AC`, `0x4319B6` writes `+0x850`, `0x431A10` writes `+0x9F4`, and `0x431A02` writes `+0xB98`. These are wheel subobject `+0x158` at bases `+0x554`, `+0x6F8`, `+0x89C`, and `+0xA40`. The already implemented `apply_ncar_integrator_wheel_pair_differentials` models the opposite-sign front/rear pair equations and contact gates. The Windows player callback now feeds it the six byte-backed body operands (`+0x63C`, `+0x7E0`, `+0xDD4`, `+0x984`, `+0xB28`, `+0xDD8`) and four initialized contact bytes, then stages and commits all four wheel writes together. Per-tick trace ownership is true only after that commit; absent or non-finite inputs leave existing bytes untouched. Supporting static evidence: disassembly `ev_2534fc83d0f6e0f4cea9397149195b61a7e7383fec5e886f81c33c3d9bc331f2`, pseudocode `ev_7a9e71a13e0b73abe7ddb371739a299361079bfb2ac0f0922555068ca2abdc3b`, and exact function resolution `ev_9b5a3813b67ec3075c3f43d23ae2eeac05178bc6ee1d6a62ec90a43a55009ad4`.
+Static disassembly of the same `0x431150` body identifies all four stores: `0x4319D5` writes `PCAR+0x6AC`, `0x4319B6` writes `+0x850`, `0x431A10` writes `+0x9F4`, and `0x431A02` writes `+0xB98`. These are wheel subobject `+0x158` at bases `+0x554`, `+0x6F8`, `+0x89C`, and `+0xA40`. The existing `apply_ncar_integrator_wheel_pair_differentials` models their opposite-sign pair equations and contact gates. It is a standalone model only: the Windows callback does not claim native producer ownership because the operands are consumed after earlier work inside `0x431150`. Supporting static evidence: disassembly `ev_2534fc83d0f6e0f4cea9397149195b61a7e7383fec5e886f81c33c3d9bc331f2`, pseudocode `ev_7a9e71a13e0b73abe7ddb371739a299361079bfb2ac0f0922555068ca2abdc3b`, and exact function resolution `ev_9b5a3813b67ec3075c3f43d23ae2eeac05178bc6ee1d6a62ec90a43a55009ad4`.
 
 This resolves the direct `+0x158` producer. It does not supply freshness for the six upstream body values, prove a changed-value native comparison, or connect suspension/tire forces to PCAR accumulators and body integration. The route-motion model therefore remains authoritative for rendered motion.
+
+### Callback callsite and internal source timing (2026-10-25)
+
+Same-object Frida entry/return hooks show callback `0x4384D0` directly invokes
+the shared integrator at `0x43872F`; the integrator returns to `0x438734`,
+followed by call `0x422890`. The observed PCAR object was `0x04DC20CC`, and
+the integrator ran while the callback frame was active. Evidence:
+`ev_7c92a931581624cd44336e19169e1b32d28825859f7acbfbc40a8087ab9ddd6f` and
+callback-tail disassembly `ev_3ec41c82085852157f24b4f4193781591fade66700b22660dd49b4d2c0a23dfc`.
+
+The complete `0x431150` disassembly shows the first pair sources are consumed
+at `0x43197C` (`+0x63C`), `0x431982` (`+0x7E0`), and `0x43198F` (`+0xDD4`),
+and the second pair at `0x4319BC` (`+0x984`), `0x4319C2` (`+0xB28`), and
+`0x4319CF` (`+0xDD8`). Before those reads, this function updates velocity,
+orientation, and other state; it does not directly store to these six source
+offsets in the entry-to-consumption range. The paired result writes follow at
+`0x4319B6`, `0x4319D5`, `0x431A02`, and `0x431A10`. Static evidence:
+`ev_fb7a9b21717cfb6308ed0b4ff5c8e3f5b185399be225d0fbbfbde36ee68b1217`.
+
+This narrows the freshness question but does not resolve it. An earlier,
+error-prone entry/return capture showed different field values at those two
+function boundaries, but did not locate when they changed. The callback
+projection placed immediately before the integrator call therefore does not
+reproduce native read timing. Runtime ownership remains false; do not claim
+native-equivalent per-tick output until the consumed values are sourced at the
+internal read boundary or the intervening updates are implemented. The live
+entry/return capture
+`ev_cc32c28b9a2e328c88c27b73bf5e3262112138054553edadebc26feb896b4881` had
+per-row instrumentation errors; only successful rows are exploratory evidence,
+not a clean controlled comparison.
+
+### Paired operands at internal read sites (2026-10-25)
+
+A low-overhead, read-only Frida session attached to the already-running
+`race.bin` PID 36860 and sampled the selected player PCAR (`ESI=0x04DC20CC`)
+at `0x43197C`, before the first pair reads, and `0x4319BC`, before the second
+pair reads. Five consecutive callback pairs were captured without input or
+memory writes; session script `eb8ac0bf-ba6f-4f84-b41b-c990d00d1f1d` first
+confirmed address filtering, and the player-only script was
+`025081bf-c91e-4077-aea6-76c333ae1594`. Evidence:
+`ev_d644ad3c50329e7ea8fce2fd4a653a847b450caefe293bd95e47ef757f744259`
+(session status and payloads) and
+`ev_e5c8bb0c8a4250fb9b69a8e0dd00a160224e6899ecc1e29dbf80de4307c1ad7d`
+(script load identity).
+
+In each of the five callback pairs, all six float operands matched between the
+two read sites. Across those callbacks, `+0x63C`, `+0x7E0`, `+0x984`, and
+`+0xB28` varied; `+0xDD4` and `+0xDD8` stayed fixed in this short sample. All
+four contact gates read as active byte value 1. The output fields changed in
+the pattern implied by the static pair equations. The broader first pass also
+sampled the same read sites across several PCAR-like objects and likewise saw
+the selected player's sources change across callback iterations. This is
+stronger timing evidence than the earlier entry/return probe, but it remains a
+short, idle/control-unspecified observation: it does not identify which prior
+native operation refreshes the varying operands, prove behavior under a
+controlled input schedule, or provide original-vs-reconstruction parity.
+Because those values change between callbacks and are consumed only after
+earlier work inside `0x431150`, the runtime must keep the writer disconnected
+until that work or an evidence-backed equivalent is implemented. Session
+closure was requested after collection; the Frida provider returned slowly,
+and the subsequent status showed the scripts unloaded while the original
+target remained running.
 
 ### Callback-nesting and ordering re-audit (2026-10-25)
 
@@ -1026,13 +1088,10 @@ observed callback. The six source operands and four contact bytes were readable
 at the trap, but the written value again matched its prior bits. Evidence:
 `ev_ec4413f88ebc060e0e478f2127be4b3cf9c21ad9323c83848467b38a1f6d515c`.
 
-This nesting observation does not prove that the runtime's current placement
-before its timestamp projection matches the native instruction order, nor that
-the six byte-backed operands are refreshed before each callback. Static
-analysis confirms `0x431150` is a 4,049-byte body and the writer is an internal
-store in that integrator. Ghidra records a direct call to `0x431150` at
-`0x42AC98`, but does not assign that callsite to a containing procedure; a
-Frida fuzzy backtrace was inconclusive. Keep the runtime projection explicitly
-provisional until callback-stage order and operand freshness are established.
-Do not infer wheel-force or body-pose production from this nested same-value
-store.
+This nesting observation establishes callback lifetime only. It does not
+identify the varying operand producers or supply a controlled input comparison.
+Static analysis confirms `0x431150` is a 4,049-byte body and the writer is an
+internal store in that integrator. Ghidra records a direct call to `0x431150`
+at `0x42AC98`, but does not assign that callsite to a containing procedure; a
+Frida fuzzy backtrace was inconclusive. Do not infer wheel-force or body-pose
+production from the nested same-value store.

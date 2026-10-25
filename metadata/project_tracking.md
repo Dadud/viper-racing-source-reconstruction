@@ -34,13 +34,12 @@ The full acceptance criteria and exact supporting evidence remain in the
 [completion ledger](completion_ledger.md). A successful launcher-owned capture
 on 2026-10-25 applied a bounded synthetic DIK_UP pulse and observed the
 original PCAR throttle/body response alongside eight throttle-gated integrators
-and 32 wheel updates. A later hardware watch identified the live paired
-differential writer for wheel `+0x158`, and the existing equation is now
-connected to byte-backed runtime state. A follow-up capture shows that writer
-runs within the observed PCAR callback lifetime, but does not establish that
-the current reconstruction insertion point matches native instruction order.
-The same-value hit also does not establish changed-value parity or freshness of
-its six upstream fields. Tire-response/query
+and 32 wheel updates. A hardware watch identified the live paired differential
+writer for wheel `+0x158`, and static analysis resolved its operands and stores.
+The callback calls the shared integrator directly, but that integrator performs
+earlier state updates before consuming the six differential operands. The
+runtime therefore leaves this writer disconnected until the consumed values can
+be staged at the internal read boundary. Tire-response/query
 inputs and a paired reconstruction baseline remain open. Separate Frida Stalker attempts
 crashed in `frida-agent.dll`; the new low-overhead capture did not use Stalker
 and does not diagnose those crashes. Details and limits are documented in
@@ -52,10 +51,10 @@ Treat one Viper/Bemidji single-player race as the release gate. Work in this
 order, and keep later systems out of the gate until this race is reliable:
 
 1. **Close the remaining upstream wheel-input evidence gaps.** The direct
-   wheel `+0x158` writer is identified and provisionally projected into the
-   runtime; a bounded capture shows it executes during the PCAR callback
-   lifetime, but the current insertion point is not yet ordered against the
-   native integrator call. Freshness of its six body operands is also unproven.
+   wheel `+0x158` writer is identified but disconnected from the runtime. A
+   bounded capture places it inside the shared integrator, and static analysis
+   shows the six body operands are consumed only after earlier integrator
+   updates. Their exact values at that internal point remain unresolved.
    Use the successful launcher-owned staged flow
    and low-overhead hooks to identify pre-projection tire response/query
    producers, then capture timestamped per-wheel rows with `+0x24C/+0x258`

@@ -211,8 +211,9 @@ now identified: `0x442530` derives it from the wheel's native contact depth and
 stores that depth after the suspension calculation. The session has the
 constructor's initial `+0xE8` value, but its route-pose contact observation is
 not the native fixed-step body/query state, so this store is not yet wired.
-Remaining unresolved wheel inputs include the live producer of the actual
-wheel object's per-step `+0x158` and the random-seeded table/call lifecycle
+The live producer of the actual wheel object's per-step `+0x158` is identified
+inside the integrator but remains disconnected until its inputs can be staged
+at the internal read point. The random-seeded table/call lifecycle
 for environment polarity. A separate frame-context row receives body
 `+0x50C` at `+0x158`, but that is not the actual wheel object's same-offset
 field. Static analysis establishes common-startup initialization and the
@@ -436,8 +437,9 @@ PCAR callback/force state and establish tick/fraction and callback ordering.
 `0x4329C0` is a separate context-row producer: its row `+0x158` receives body
 `+0x50C`, but the routine calls `0x444120` to populate that row. The PCAR
 integrator's four car-owned wheel objects are passed directly to `0x442530`;
-the actual wheel-object `+0x158` writer and any relationship to the context
-row remain unknown. The gated `0x433570` branch is a candidate body timer
+the actual wheel-object `+0x158` writer is the paired differential block in
+`0x431150`, distinct from this context row, but its runtime integration remains
+blocked on internal operand timing. The gated `0x433570` branch is a candidate body timer
 producer, but the capture did not observe its ramp advancing, so its live
 inputs and callback ordering remain unresolved. The GCAR GhostBegin ring is
 separate and must not be used as a substitute for PCAR callback state. Only
@@ -485,8 +487,10 @@ visible in the ledger.
 **Current dependency:** The throttle-aligned original capture supplies eight
 selected PCAR updates and 32 ordered wheel observations, including downstream
 suspension and tire projection fields. The direct wheel `+0x158` producer is
-now identified and connected to the byte-backed runtime; freshness of its six
-upstream body operands still needs evidence. The upstream tire response/query
+identified but disconnected from the byte-backed runtime: its six operands are
+read only after earlier state updates inside `0x431150`. Capture their values
+at the internal read point before considering a runtime connection. The
+upstream tire response/query
 producers remain unresolved. The captured `+0xF4` row is sampled after the
 current response calculation at the tire-force callsite, so it validates the
 projection output and does not reveal the locals/curves/velocity inputs that
