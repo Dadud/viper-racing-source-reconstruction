@@ -33,11 +33,15 @@ This is a provenance boundary feeding the existing projections; it does not
 make their route-driven movement or terrain/contact samples physics-owned.
 The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
-per-tick controls/timing. The trace replay regression checks contiguous tick
-ordering, pre-increment timer values, logical-input provenance, input snapshot
-size, and byte-identical repeated playback. This is input/timing evidence, not
-physics acceptance; next wire a complete observed body update and preserve
-per-tick physical state in paired original/reconstruction captures.
+per-tick controls/timing plus post-callback byte-backed body position,
+velocities, force/moment accumulators, and wheel contact-active/projected-depth
+state. Unknown body fields and unsuccessful wheel depths remain blank. The
+trace replay regression checks contiguous tick ordering, pre-increment timer
+values, logical-input provenance, input snapshot size, finite body/contact
+samples, and byte-identical repeated playback. The body values currently expose
+the static constructor state; this is instrumentation, not physics acceptance.
+Next wire a complete observed body update and preserve paired per-tick physical
+state captures against the original.
 Four wheel contact projections now transform constructor wheel anchors through
 the initialized byte-backed PCAR body basis and position and project along its
 up axis. `trace_replay_regression.ps1` confirms the supported terrain query

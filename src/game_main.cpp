@@ -1603,6 +1603,12 @@ struct PlayerPhysicsTickContext {
     std::uint32_t scheduled_step_count{};
     std::uint64_t outer_update_index{};
     float simulation_time_seconds{};
+    // Post-callback byte-backed body fields in this order: position, linear
+    // velocity, angular velocity, accumulated force, accumulated moment.
+    // Unknown native bytes remain empty rather than becoming zeroes.
+    std::array<std::optional<float>, 15> body_state_after_tick{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
+    std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
 };
 
 struct WindowState {
@@ -1636,9 +1642,9 @@ struct WindowState {
     MaterializedNcarRuntimeState player_runtime_state{};
     std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
-    // Per-wheel observations use the current renderer's route pose and the
-    // constructor's wheel-anchor points. They are exposed in race traces while
-    // route motion remains the current pose authority.
+    // Per-wheel terrain observations transform constructor wheel anchors by
+    // the initialized PCAR body pose. The body remains static in this runtime;
+    // route motion still supplies the rendered pose.
     std::array<viper::WheelContactState, 4> player_wheel_contact_states{};
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
@@ -2218,9 +2224,9 @@ struct WindowState {
             }
 
             // The selected vertex is subtracted by native 0x441C10 when it
-            // stores +0x04..+0x0C, then added back by 0x437BA0. This is the
-            // equivalent local point before the current renderer's yaw-only
-            // pose transform.
+            // stores +0x04..+0x0C, then added back by 0x437BA0. Combine those
+            // terms to recover the local anchor before applying the initialized
+            // body basis and position.
             const viper::PhysicsVector3 local_anchor{
                 core->position_relative_to_selected_vertex[0] +
                     core->selected_model_vertex[0],
@@ -2284,6 +2290,29 @@ struct WindowState {
                         write_count))) {
                 player_constructor_inputs_ready = false;
                 return;
+            }
+        }
+    }
+
+    void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
+    {
+        constexpr std::array<std::uint32_t, 15> offsets{
+            0x5cU, 0x60U, 0x64U, 0x50U, 0x54U, 0x58U,
+            0x68U, 0x6cU, 0x70U, 0x24cU, 0x250U, 0x254U,
+            0x258U, 0x25cU, 0x260U};
+        for (std::size_t index = 0U; index < offsets.size(); ++index) {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, offsets[index]);
+            if (bits.has_value())
+                tick.body_state_after_tick[index] = std::bit_cast<float>(*bits);
+        }
+        for (std::size_t wheel = 0U; wheel < player_wheel_contact_states.size();
+             ++wheel) {
+            tick.wheel_contact_active_after_tick[wheel] =
+                player_wheel_contact_states[wheel].contact_active_0x168;
+            if (player_wheel_terrain_queries_succeeded[wheel]) {
+                tick.wheel_contact_depth_after_tick[wheel] =
+                    player_wheel_contact_results[wheel].projected_depth;
             }
         }
     }
@@ -2417,6 +2446,8 @@ struct WindowState {
             player_physics_ticks_this_update.push_back(tick_context);
             update_player_wheel_contacts_from_body();
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
+            capture_player_tick_physics_state(
+                player_physics_ticks_this_update.back());
             auto candidate_motion = motion;
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
                 tick_context.controls.steering.value_0x509358 < -0.2F,
@@ -3494,7 +3525,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",control_value_5093c8,control_flag_5093cc,control_flag_5093f8"
             ",control_flag_509360,control_difference_509344,control_flag_509420"
             ",control_difference_509340,control_shift_latch_509354"
-            ",control_counter_5093bc,keyboard_snapshot_hex\n";
+            ",control_counter_5093bc,keyboard_snapshot_hex"
+            ",body_pos_x,body_pos_y,body_pos_z,body_vel_x,body_vel_y,body_vel_z"
+            ",body_ang_x,body_ang_y,body_ang_z,body_force_x,body_force_y,body_force_z"
+            ",body_moment_x,body_moment_y,body_moment_z";
+        for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
+            physics_tick_trace << ",wheel" << wheel << "_contact_active"
+                << ",wheel" << wheel << "_projected_depth";
+        }
+        physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
         if (!physics_tick_trace) {
             std::cerr << "Could not write physics tick trace header.\n";
@@ -3659,6 +3698,22 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << std::hex << std::setw(2)
                             << std::setfill('0')
                             << static_cast<unsigned>(key_state);
+                    }
+                    for (const auto& value : tick.body_state_after_tick) {
+                        physics_tick_trace << ',';
+                        if (value.has_value()) physics_tick_trace << *value;
+                    }
+                    for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
+                        physics_tick_trace << ',';
+                        if (tick.wheel_contact_active_after_tick[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_contact_active_after_tick[wheel]);
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_contact_depth_after_tick[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_contact_depth_after_tick[wheel];
+                        }
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {

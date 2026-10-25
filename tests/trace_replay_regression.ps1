@@ -61,14 +61,46 @@ try {
     $tickTimeColumn = [Array]::IndexOf($tickHeader, 'simulation_time')
     $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
     $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
+    $bodyPositionColumns = @(
+        [Array]::IndexOf($tickHeader, 'body_pos_x'),
+        [Array]::IndexOf($tickHeader, 'body_pos_y'),
+        [Array]::IndexOf($tickHeader, 'body_pos_z'))
+    $bodyMotionColumns = @(
+        [Array]::IndexOf($tickHeader, 'body_vel_x'),
+        [Array]::IndexOf($tickHeader, 'body_vel_y'),
+        [Array]::IndexOf($tickHeader, 'body_vel_z'),
+        [Array]::IndexOf($tickHeader, 'body_ang_x'),
+        [Array]::IndexOf($tickHeader, 'body_ang_y'),
+        [Array]::IndexOf($tickHeader, 'body_ang_z'),
+        [Array]::IndexOf($tickHeader, 'body_force_x'),
+        [Array]::IndexOf($tickHeader, 'body_force_y'),
+        [Array]::IndexOf($tickHeader, 'body_force_z'),
+        [Array]::IndexOf($tickHeader, 'body_moment_x'),
+        [Array]::IndexOf($tickHeader, 'body_moment_y'),
+        [Array]::IndexOf($tickHeader, 'body_moment_z'))
+    $wheelActiveColumns = [int[]]::new(4)
+    $wheelDepthColumns = [int[]]::new(4)
+    for ($wheel = 0; $wheel -lt 4; ++$wheel) {
+        $wheelActiveColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_contact_active")
+        $wheelDepthColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_projected_depth")
+    }
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
         $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
+    if (@($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($bodyMotionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
+        throw 'Fixed-step trace header is missing body or wheel state fields'
+    }
     $expectedTick = 0
     $previousOuterUpdate = -1L
     $expectedStepIndex = 0
+    $wheelDepthObserved = [bool[]]::new(4)
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
             throw "Repeated fixed-step trace differs at CSV line $($index + 1)"
@@ -97,7 +129,37 @@ try {
             $fields[$tickInputColumn].Length -ne 512) {
             throw "Fixed-step input/timing snapshot is invalid at line $($index + 1)"
         }
+        foreach ($column in $bodyPositionColumns) {
+            $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($value) -or [single]::IsInfinity($value)) {
+                throw "Body position snapshot is non-finite at line $($index + 1)"
+            }
+        }
+        foreach ($column in $bodyMotionColumns) {
+            if ([string]::IsNullOrWhiteSpace($fields[$column])) { continue }
+            $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($value) -or [single]::IsInfinity($value)) {
+                throw "Body motion/force snapshot is non-finite at line $($index + 1)"
+            }
+        }
+        for ($wheel = 0; $wheel -lt 4; ++$wheel) {
+            $active = $fields[$wheelActiveColumns[$wheel]]
+            if (-not [string]::IsNullOrWhiteSpace($active) -and $active -notin @('0', '1')) {
+                throw "Wheel $wheel contact-active value is invalid at line $($index + 1)"
+            }
+            $depth = $fields[$wheelDepthColumns[$wheel]]
+            if (-not [string]::IsNullOrWhiteSpace($depth)) {
+                $depthValue = [single]::Parse($depth, [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($depthValue) -or [single]::IsInfinity($depthValue)) {
+                    throw "Wheel $wheel projected depth is non-finite at line $($index + 1)"
+                }
+                $wheelDepthObserved[$wheel] = $true
+            }
+        }
         ++$expectedTick
+    }
+    if ($wheelDepthObserved -contains $false) {
+        throw 'Fixed-step trace did not capture projected depth for all four wheels'
     }
     $observedThrottle = $false
     $observedSteering = $false
