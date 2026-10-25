@@ -131,6 +131,71 @@ void check_complete_world_rows()
             read_u32(checkpoint, 8U) == std::bit_cast<std::uint32_t>(0.0F) &&
             read_u32(checkpoint, 20U) == std::bit_cast<std::uint32_t>(1.0F),
         "CHKP bytes must include terrain-sampled XYZ endpoints");
+
+    const auto manifest = viper::plan_track_physics_task_manifest(
+        table, {}, 0U);
+    const auto ordered = viper::plan_ordered_track_task_records(
+        materialized, manifest);
+    require(ordered.complete && ordered.records.size() == expected_tags.size(),
+        "fully materialized world records must join the native tag/cursor order");
+    for (std::size_t index = 0; index < ordered.records.size(); ++index) {
+        require(ordered.records[index].record_tag == expected_tags[index] &&
+                ordered.records[index].record_bytes ==
+                    materialized.rows[index].record_bytes,
+            "ordered record join must preserve source bytes in manifest order");
+    }
+
+    auto malformed = materialized;
+    write_u32(malformed.rows[0].record_bytes, 0U, 0x12345678U);
+    const auto rejected = viper::plan_ordered_track_task_records(
+        malformed, manifest);
+    require(!rejected.complete && rejected.failed_manifest_entry == 0U,
+        "ordered join must reject a record whose embedded tag disagrees with the manifest");
+}
+
+void check_car_record_deferral_is_ordered_and_explicit()
+{
+    const std::array lines{
+        std::string_view{"out\\track.txt"},
+        std::string_view{"obj wobble pole 42"},
+        std::string_view{"obj car 10, 20"},
+        std::string_view{"obj static box 1 2 3 0 0 0 4 5 6"},
+        std::string_view{"end"},
+    };
+    const auto table = make_table(lines);
+    const viper::TerrainSurfaceResourcePayload terrain{};
+    const std::span<const viper::ResourceBundle* const> no_bundles{};
+    const auto materialized = viper::materialize_track_object_task_records(
+        table, terrain, no_bundles, 0U, true, false);
+    const std::array<std::uint32_t, 2> car_tags{0x50434152U, 0x41434152U};
+    const auto manifest = viper::plan_track_physics_task_manifest(
+        table, car_tags, 0U);
+    const auto ordered = viper::plan_ordered_track_task_records(
+        materialized, manifest);
+
+    require(!ordered.complete && ordered.records.size() == 4U &&
+            ordered.failed_manifest_entry == 1U,
+        "unproduced car bytes must keep the ordered stream incomplete");
+    require(ordered.records[0].source_row == 1U &&
+            ordered.records[0].record_tag == 0x574F424CU &&
+            ordered.records[0].record_bytes.size() == 0x20U,
+        "records before a deferred car must retain their source position and bytes");
+    require(ordered.records[1].source_row == 2U &&
+            ordered.records[1].configured_car_index == 0U &&
+            ordered.records[1].record_tag == 0x50434152U &&
+            ordered.records[1].source_status ==
+                viper::TrackObjectTaskRecordStatus::car_record_deferred &&
+            ordered.records[1].record_bytes.empty(),
+        "obj car must join its configured entry without inventing record bytes");
+    require(ordered.records[2].source_row == 3U &&
+            ordered.records[2].record_tag == 0x53544154U &&
+            ordered.records[2].record_bytes.size() == 0x48U,
+        "records following a deferred car must retain native ordering metadata");
+    require(!ordered.records[3].source_row.has_value() &&
+            ordered.records[3].configured_car_index == 1U &&
+            ordered.records[3].source_status ==
+                viper::TrackObjectTaskRecordStatus::car_record_deferred,
+        "configured cars appended after track directives must remain explicit");
 }
 
 void check_explicit_unresolved_routes()
@@ -185,6 +250,7 @@ int main()
 {
     try {
         check_complete_world_rows();
+        check_car_record_deferral_is_ordered_and_explicit();
         check_explicit_unresolved_routes();
         std::cout << "track object task record materialization checks passed\n";
         return 0;

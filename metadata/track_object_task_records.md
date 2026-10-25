@@ -8,6 +8,16 @@ produced order, to `serialize_physics_task_records` or merged with records from
 the configured-car producer. The function deliberately does not decide that
 merged order, assign stream cursors, or append configured entrants.
 
+`plan_ordered_track_task_records` now joins those results with the separately
+recovered `TrackPhysicsTaskManifest`. Every output row carries its manifest
+index, cursor, tag, and either the source-row bytes or the configured-car
+identity. It reports the first manifest entry without a complete matching
+record and is complete only when the materialization and manifest are both
+complete, every record header agrees with its bytes, and all manifest entries
+are covered. This is an ordering/validation layer, not a serializer or native
+task-array loader. Deferred car entries remain empty and keep the plan
+incomplete; the `0x1E4` runtime car mapping is intentionally not substituted.
+
 The materializer uses the existing line/record models for:
 
 | Class | Producer path | Bytes |
@@ -43,4 +53,5 @@ factory, or establish player/task-array correspondence. STAT matrix arithmetic
 and checkpoint/terrain calculations retain the existing host floating-point
 approximations; structural completeness does not guarantee x87/FDIV bitwise
 identity. The corresponding regression uses synthetic resources to validate
-byte layout, source order, route gates, and explicit unresolved outcomes.
+byte layout, source order, route gates, explicit unresolved car entries, and
+the join between complete non-car bytes and the independent manifest.

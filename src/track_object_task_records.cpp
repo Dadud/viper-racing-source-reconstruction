@@ -2,6 +2,7 @@
 
 #include "viper/model_resource.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstdio>
@@ -357,6 +358,72 @@ TrackObjectTaskRecordMaterialization materialize_track_object_task_records(
         result.complete = false;
         break;
     }
+    return result;
+}
+
+OrderedTrackTaskRecordPlan plan_ordered_track_task_records(
+    const TrackObjectTaskRecordMaterialization& materialization,
+    const TrackPhysicsTaskManifest& manifest)
+{
+    OrderedTrackTaskRecordPlan result;
+    result.complete = materialization.complete &&
+        manifest.status == TrackPhysicsTaskManifestStatus::complete &&
+        manifest.final_cursor.has_value();
+    result.records.reserve(manifest.entries.size());
+
+    const auto read_u32_le = [](const std::span<const std::byte> bytes,
+                                const std::size_t offset) {
+        return std::to_integer<std::uint32_t>(bytes[offset]) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 1U]) << 8U) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 2U]) << 16U) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 3U]) << 24U);
+    };
+
+    for (std::size_t index = 0; index < manifest.entries.size(); ++index) {
+        const auto& entry = manifest.entries[index];
+        OrderedTrackTaskRecord record{};
+        record.manifest_entry_index = index;
+        record.source_row = entry.track_object_row;
+        record.configured_car_index = entry.configured_car_index;
+        record.record_tag = entry.record_tag;
+        record.cursor_offset = entry.cursor_offset;
+
+        if (entry.track_object_row.has_value()) {
+            const auto source = std::find_if(materialization.rows.begin(),
+                materialization.rows.end(), [&](const auto& row) {
+                    return row.source_row == *entry.track_object_row;
+                });
+            if (source != materialization.rows.end()) {
+                record.source_status = source->status;
+                record.record_bytes = source->record_bytes;
+                const bool complete_bytes =
+                    source->status == TrackObjectTaskRecordStatus::complete_record &&
+                    source->record_tag == entry.record_tag &&
+                    source->record_bytes.size() >= 8U &&
+                    read_u32_le(source->record_bytes, 0U) == entry.record_tag &&
+                    read_u32_le(source->record_bytes, 4U) == source->record_bytes.size();
+                if (!complete_bytes) {
+                    result.complete = false;
+                    if (!result.failed_manifest_entry.has_value())
+                        result.failed_manifest_entry = index;
+                }
+            } else {
+                record.source_status = TrackObjectTaskRecordStatus::incomplete_track_data;
+                result.complete = false;
+                if (!result.failed_manifest_entry.has_value())
+                    result.failed_manifest_entry = index;
+            }
+        } else {
+            // The native post-directive configured-car pass has an identity
+            // and cursor but no track.obt line from which to materialize bytes.
+            record.source_status = TrackObjectTaskRecordStatus::car_record_deferred;
+            result.complete = false;
+            if (!result.failed_manifest_entry.has_value())
+                result.failed_manifest_entry = index;
+        }
+        result.records.push_back(std::move(record));
+    }
+
     return result;
 }
 
