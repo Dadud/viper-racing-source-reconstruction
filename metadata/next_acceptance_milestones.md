@@ -501,9 +501,13 @@ leave the paired outputs at their default values. This closes model
 correctness gaps only. The native TPPB v2 `track.bpp` plane/tree is parsed and
 the runtime queries it from byte-backed PCAR pose and wheel constructor
 geometry; those contact observations are not yet fed into the composed wheel
-force/body step. Its other live inputs remain incomplete: surface-code response
-mapping, response polarity, prior `+0x158` state, pair scales, suspension
-parameters, and tire response inputs. Do not
+force/body step. A controlled original-process schedule now co-observes
+throttle/brake/steering globals, wheel state, body response, and tire force
+writer activity; the pair scales were `35039.3671875` in all 28 retained
+updates for that one active Viper session. This is a session observation, not
+the scale producer or a portable default. Remaining live inputs include
+surface-code response mapping, response polarity, prior `+0x158` state,
+suspension parameters, and tire response inputs. Do not
 repeat a capture that only rereads the six pair operands. Capture the missing
 upstream inputs and timestamp-correlated wheel/accumulator/body samples for
 throttle, steering, braking, and coast. The captured `+0xF4` row is sampled

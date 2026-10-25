@@ -1214,3 +1214,35 @@ next implementation target is therefore downstream: establish the surface
 code and tire/suspension parameter mapping, then supply the session-owned
 contact observations to a complete four-wheel body step and compare its
 outputs under controlled input.
+
+### Controlled wheel, force, and pair-scale follow-up (2026-10-25)
+
+Bounded Frida key-read schedules were applied to the already-running original
+`race.bin` process. These probes record controlled input-aligned observations;
+they are not clean-start parity captures. Across the retained windows, the
+throttle global at `0x5093F4` reached 1, steering at `0x509358` reached -1,
+and brake at `0x509320` reached 1. Body velocity responded to throttle/coast,
+steering, and braking; observed speed fell to about 0.35 during the brake
+window. The `0x43E6F0` force writer ran 54,364 times across object types, with
+selected PCAR calls and accumulators retained. A separate wheel sample kept 29
+before/after body and wheel rows from 439 player integrator calls, including
+wheel `+0xE8`, `+0x158`, active/contact flags, tire projection `+0xF4`, and
+control globals. A pair-scale sample retained 28 rows from 282 integrator
+calls; `+0xDD4` and `+0xDD8` were both `35039.3671875` in every row. These
+observations support the known pair equation and show live control-correlated
+wheel/body response for this active Viper session. They do not establish a
+clean initial condition, identify the scale constructor/configuration
+producer, generalize the value to other cars/modes, or validate a reconstructed
+force law.
+
+Evidence IDs: controlled body/input and force-writer capture
+`ev_fdbb99472a90683e5903479bcd142a289fdb406bbaf525e0ac3e63c7a094d318`;
+wheel/input capture
+`ev_22cb99a4c8e9c3e1518a523e4adcf585883283d5b9a157772ccec2c386850bf7`;
+pair-scale capture
+`ev_29bbd154a34bbb917107333c3625f0af58d69e3e6d909c0e942dd08204dd6625`.
+Their script hashes, schedules, and the private export path are recorded in
+`../../analysis/reference_captures/controlled_player_physics_20261025.json`.
+The next trace should find the `+0xDD4/+0xDD8` write/initialization site and
+trace live suspension/tire inputs at `0x442530` back to their producers, then
+correlate those inputs with per-wheel `+0xF4` and PCAR force/moment deltas.
