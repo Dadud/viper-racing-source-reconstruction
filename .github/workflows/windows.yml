@@ -1,0 +1,25 @@
+name: Windows build and regressions
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure x64 Release build
+        run: cmake -S . -B build -A x64
+
+      - name: Build game and regression executables
+        run: cmake --build build --config Release --parallel
+
+      - name: Run portable regression suite
+        run: ctest --test-dir build -C Release --output-on-failure
