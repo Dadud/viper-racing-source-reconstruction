@@ -141,12 +141,12 @@ does not execute the shared integrator or make these outputs authoritative for
 rendered pose. The runtime does
 not yet dispatch complete native PCAR callback `0x4384D0` or shared integrator
 `0x431150`; it lacks their runtime body, timer, table, force-collection, and
-callback transitions. Two constructor inputs also
-remain unresolved: `+0x4F4` copies global `0x508794`, set from the physics
-session's incoming mode word, and `+0xD74` stores the result of a helper that
-samples gated control state at global `0x509328`. The mapping of session modes
-and that control state to reconstruction-owned inputs must be established
-before those bytes are materialized. Wheel `+0xE8`
+callback transitions. The PCAR `+0x4F4` constructor input is now sourced from
+the configured entrant count: native setup copies the setup-block DWORD at
+`+0xCA8` into global `0x508794`, and the race owner consumes that same field as
+the participant-count loop bound. `+0xD74` remains unresolved; it stores the
+result of a helper that samples gated control state at global `0x509328`, and
+that state is not yet mapped to a configured binding. Wheel `+0xE8`
 is interpolated from adjacent five-byte samples by `0x444240`, using records
 selected through `0x427630` and a fraction derived from global tick and object
 timing fields. This particular `0x3C`-stride ring is owned by the

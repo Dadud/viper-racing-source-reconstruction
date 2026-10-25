@@ -1758,13 +1758,19 @@ struct WindowState {
             player_runtime_state = {};
             return false;
         }
-        const std::array<viper::NcarObjectFieldWrite, 4> pcar_control_writes{{
+        if (!player_pcar_constructor_controls.game_mode_0x4f4.has_value()) {
+            player_runtime_car_record.clear();
+            player_runtime_state = {};
+            return false;
+        }
+        const std::array<viper::NcarObjectFieldWrite, 5> pcar_control_writes{{
             {0xec8U, 1U, static_cast<std::uint8_t>(
                 player_pcar_constructor_controls.auto_shifting)},
             {0xec9U, 1U, static_cast<std::uint8_t>(
                 player_pcar_constructor_controls.auto_clutch)},
             {0x534U, 1U, static_cast<std::uint8_t>(
                 player_pcar_constructor_controls.auto_clutch_0x534)},
+            {0x4f4U, 4U, *player_pcar_constructor_controls.game_mode_0x4f4},
             {0x4f8U, 4U, std::bit_cast<std::uint32_t>(
                 player_pcar_constructor_controls.yaw_control)},
         }};
@@ -2470,13 +2476,18 @@ std::optional<std::uint8_t> directinput_key_selector(const UINT virtual_key)
 void load_keyboard_bindings(WindowState& state,
                             const viper::GameOptions& options)
 {
+    if (state.participant_names.size() >
+            std::numeric_limits<std::uint32_t>::max()) {
+        throw std::runtime_error("participant count exceeds the native session field");
+    }
     state.player_pcar_constructor_controls =
         viper::initialize_pcar_constructor_controls(
             options.boolean("CONTROL", "traction_control"),
             options.boolean("CONTROL", "abs_braking"),
             options.boolean("CONTROL", "auto_shifting"),
             options.boolean("CONTROL", "auto_clutch"),
-            options.integer("CONTROL", "yaw_control"), std::nullopt);
+            options.integer("CONTROL", "yaw_control"),
+            static_cast<std::uint32_t>(state.participant_names.size()));
     // 0x43B030 resets these CONTROL values to 1.0, then reads saved overrides.
     state.control_steering_smoothing =
         options.real("CONTROL", "steer_sensitivity").value_or(1.0F);
@@ -2760,6 +2771,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_prefix_0xde8,pcar_prefix_0xdec"
               << ",pcar_traction_control,pcar_abs_braking"
               << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control"
+              << ",pcar_body_0x4f4_entrant_count"
               << ",pcar_body_0xde0,pcar_body_0xde4"
               << ",pcar_body_0xde8,pcar_body_0xdec"
               << ",pcar_velocity_projection,pcar_scaled_smoother_request"
@@ -2874,6 +2886,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.player_pcar_constructor_controls.auto_shifting
                       << ',' << state.player_pcar_constructor_controls.auto_clutch_0x534
                       << ',' << state.player_pcar_constructor_controls.yaw_control;
+                if (state.player_pcar_constructor_controls.game_mode_0x4f4.has_value())
+                    trace << ',' << *state.player_pcar_constructor_controls.game_mode_0x4f4;
+                else
+                    trace << ',';
                 for (const auto offset : {0xde0U, 0xde4U, 0xde8U, 0xdecU}) {
                     const auto bits = viper::read_ncar_body_object_u32(
                         state.player_runtime_state.body_object, offset);

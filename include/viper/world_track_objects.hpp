@@ -165,7 +165,7 @@ struct TrackPhysicsTaskManifest {
 
 // Derives the native physics-task stream cursor before a configured player car
 // from track.obt serialization order. It supports recovered car, static,
-// obstacle, wobble, checkpoint, and ball tags; unknown preceding scene-object
+// obstacle, wobble, and checkpoint tags; unknown preceding scene-object
 // classes leave the cursor unresolved instead of assigning a guessed advance.
 [[nodiscard]] TrackPhysicsCursorPlan plan_track_player_physics_cursor(
     const TrackObjectTextTable& table,

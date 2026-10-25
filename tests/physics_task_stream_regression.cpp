@@ -84,7 +84,7 @@ int main()
             {0x4E434152U, 0x18CU}, // NCAR
             {0x53544154U, 0U},     // STAT
             {0x4F425354U, 0x34U},  // OBST
-            {0x4C424F57U, 0x34U},  // WOBL
+            {0x574F424CU, 0x34U},  // WOBL
             {0x43484B50U, 0x34U},  // CHKP
             {0x42414C4CU, 0x34U},  // BALL
         }};
@@ -325,7 +325,7 @@ int main()
                     mapped_cursor.preceding_records.size() == 3U &&
                     mapped_cursor.preceding_records[0].object_row == 0U &&
                     !mapped_cursor.preceding_records[0].car_directive_index.has_value() &&
-                    mapped_cursor.preceding_records[0].record_tag == 0x4C424F57U &&
+                    mapped_cursor.preceding_records[0].record_tag == 0x574F424CU &&
                     mapped_cursor.preceding_records[0].cursor_offset == 0U &&
                     mapped_cursor.preceding_records[0].cursor_advance == 0x34U &&
                     mapped_cursor.preceding_records[1].object_row == 1U &&
@@ -341,21 +341,30 @@ int main()
 
         const auto known_scene_objects = make_track_object_table({
             "obj obstacle wall", "obj wobble pole 0", "obj checkpoint finish",
-            "obj ball ball", "obj static flag", "obj car 1, 1"});
+            "obj static flag", "obj car 1, 1"});
         const auto known_scene_cursor =
             viper::plan_track_player_physics_cursor(known_scene_objects, 0U);
         require(known_scene_cursor.status ==
                     viper::TrackPhysicsCursorStatus::complete &&
-                    known_scene_cursor.serialized_object_stream_offset == 0xD0U &&
-                    known_scene_cursor.preceding_records.size() == 5U &&
+                    known_scene_cursor.serialized_object_stream_offset == 0x9cU &&
+                    known_scene_cursor.preceding_records.size() == 4U &&
                     known_scene_cursor.preceding_records[0].record_tag == 0x4F425354U &&
-                    known_scene_cursor.preceding_records[1].record_tag == 0x4C424F57U &&
+                    known_scene_cursor.preceding_records[1].record_tag == 0x574F424CU &&
                     known_scene_cursor.preceding_records[2].record_tag == 0x43484B50U &&
-                    known_scene_cursor.preceding_records[3].record_tag == 0x42414C4CU &&
-                    known_scene_cursor.preceding_records[4].record_tag == 0x53544154U &&
-                    known_scene_cursor.preceding_records[4].cursor_offset == 0xD0U &&
-                    known_scene_cursor.preceding_records[4].cursor_advance == 0U,
-                "known obstacle, wobble, checkpoint, ball, and static prefixes must fold safely");
+                    known_scene_cursor.preceding_records[3].record_tag == 0x53544154U &&
+                    known_scene_cursor.preceding_records[3].cursor_offset == 0x9cU &&
+                    known_scene_cursor.preceding_records[3].cursor_advance == 0U,
+                "known obstacle, wobble, checkpoint, and static prefixes must fold safely");
+
+        const auto unknown_ball_directive = make_track_object_table({
+            "obj ball ball", "obj car 1, 1"});
+        const auto unknown_ball_cursor =
+            viper::plan_track_player_physics_cursor(unknown_ball_directive, 0U);
+        require(unknown_ball_cursor.status ==
+                    viper::TrackPhysicsCursorStatus::unsupported_prior_object &&
+                    unknown_ball_cursor.unsupported_object_row == 0U &&
+                    !unknown_ball_cursor.serialized_object_stream_offset.has_value(),
+                "configured BALL effect must not be accepted as an obj directive");
 
         const auto short_car_table = make_track_object_table({
             "obj car 1, 1", "obj car 2, 2"});

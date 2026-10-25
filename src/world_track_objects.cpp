@@ -441,11 +441,9 @@ TrackPhysicsCursorPlan plan_track_player_physics_cursor(
         } else if (equals_ascii_case_insensitive(object_type, "obstacle")) {
             record_tag = 0x4F425354U; // OBST
         } else if (equals_ascii_case_insensitive(object_type, "wobble")) {
-            record_tag = 0x4C424F57U; // WOBL
+            record_tag = 0x574F424CU; // WOBL
         } else if (equals_ascii_case_insensitive(object_type, "checkpoint")) {
             record_tag = 0x43484B50U; // CHKP
-        } else if (equals_ascii_case_insensitive(object_type, "ball")) {
-            record_tag = 0x42414C4CU; // BALL
         }
         if (!record_tag.has_value()) {
             result.status = TrackPhysicsCursorStatus::unsupported_prior_object;
@@ -572,11 +570,9 @@ TrackPhysicsTaskManifest plan_track_physics_task_manifest(
         } else if (equals_ascii_case_insensitive(object_type, "obstacle")) {
             tag = 0x4F425354U;
         } else if (equals_ascii_case_insensitive(object_type, "wobble")) {
-            tag = 0x4C424F57U;
+            tag = 0x574F424CU;
         } else if (equals_ascii_case_insensitive(object_type, "checkpoint")) {
             tag = 0x43484B50U;
-        } else if (equals_ascii_case_insensitive(object_type, "ball")) {
-            tag = 0x42414C4CU;
         }
         if (!tag.has_value()) {
             result.status = TrackPhysicsTaskManifestStatus::unsupported_object_type;

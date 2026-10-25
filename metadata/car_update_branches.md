@@ -1254,8 +1254,17 @@ and game-mode accessor `0x425860`
 `ev_1c3a9bf935b6573c5a7c6279f49730c305e395a1f150383e8dc332cb85662528`.
 The first `0x43BA90` helper result is also stored as a byte at PCAR `+0xD74`.
 The accessor `0x425860` returns global `0x508794`; physics-session initializer
-`0x425420` copies its incoming session word into that global. The mapping from
-the reconstruction's selected mode to this native session word is unresolved.
+`0x425420` copies its incoming session word into that global. The normal race
+setup at `0x45B6B0` passes the DWORD at setup-block `+0xCA8` as that word.
+Race-loop owner `0x401EA0` consumes the same `+0xCA8` DWORD as its participant
+count, using it to bound enumeration of the configured entrants. The live
+session therefore supplies its exact configured participant count to PCAR
+`+0x4F4` and persists that value in the player's byte-backed body. This is a
+field-use-derived interpretation of the native input; it is no longer an
+unresolved selected-mode value. Evidence: `0x425420`
+`ev_0c5ca75a39ac6b15a40b00d86be2b955b101b06c42c52c7e135dff0c69a2d767`,
+`0x45B6B0` `ev_7f5111ab5f3e72ba4f690fb4ec50b70f5e1de9255f5349ba386db51f29e7d78a`,
+and `0x401EA0` `ev_91167368d5f946d8c4d6403b32fa6e846847a3f686bd0fe7f7d8992776bd1f20`.
 `0x43BA90` samples control state through global `0x509328` when gate
 `0x5093A0` is clear, but that state is not yet mapped to a configured binding.
 The model now retains that raw byte only when an observation is supplied;

@@ -20,7 +20,7 @@ std::optional<std::uint32_t> physics_task_stream_advance_for_tag(
     case 0x53544154U: // STAT: scene record has no physics-task cursor advance
         return 0U;
     case 0x4F425354U: // OBST
-    case 0x4C424F57U: // WOBL
+    case 0x574F424CU: // WOBL, immediate stored by 0x45D5D0
     case 0x43484B50U: // CHKP
     case 0x42414C4CU: // BALL
         return 0x34U;

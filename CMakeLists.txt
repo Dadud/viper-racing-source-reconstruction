@@ -89,11 +89,12 @@ add_library(viper_scene_model
     src/scene_car_update.cpp
     src/scene_renderer_dispatch.cpp
     src/scene_overlay.cpp
+    src/track_object_task_records.cpp
     src/world_track_objects.cpp
 )
 target_include_directories(viper_scene_model PUBLIC include)
 target_compile_features(viper_scene_model PUBLIC cxx_std_20)
-target_link_libraries(viper_scene_model PUBLIC viper_terrain_model)
+target_link_libraries(viper_scene_model PUBLIC viper_terrain_model viper_model_resource)
 
 add_library(viper_race_scene_flow src/race_scene_render_flow.cpp)
 target_include_directories(viper_race_scene_flow PUBLIC include)
@@ -289,6 +290,12 @@ if(BUILD_TESTING)
         viper_scene_model viper_resource_bundle)
     add_test(NAME world_track_objects_regression
         COMMAND viper_world_track_objects_regression)
+    add_executable(viper_track_object_task_records_regression
+        tests/track_object_task_records_regression.cpp)
+    target_link_libraries(viper_track_object_task_records_regression PRIVATE
+        viper_scene_model viper_resource_bundle viper_model_resource)
+    add_test(NAME track_object_task_records_regression
+        COMMAND viper_track_object_task_records_regression)
     add_test(NAME inspection_help COMMAND viper_reconstruction --help)
     if(WIN32)
         add_test(NAME game_help COMMAND viper_game --help)

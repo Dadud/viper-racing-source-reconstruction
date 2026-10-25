@@ -211,6 +211,19 @@ int main()
                     !unsupported_manifest.player_stream_offset.has_value(),
                 "unsupported prior world object did not stop cursor ownership");
 
+        const std::array<std::string_view, 3> unsupported_ball_lines{
+            "track", "obj ball ball", "obj car 1, 2"};
+        const auto unsupported_ball_table =
+            make_track_text_table(unsupported_ball_lines);
+        const auto unsupported_ball_manifest =
+            viper::plan_track_physics_task_manifest(
+                unsupported_ball_table, task_car_tags, 0U);
+        require(unsupported_ball_manifest.status ==
+                    viper::TrackPhysicsTaskManifestStatus::unsupported_object_type &&
+                    unsupported_ball_manifest.failed_track_object_row == 1U &&
+                    !unsupported_ball_manifest.player_stream_offset.has_value(),
+                "configured BALL effect was incorrectly treated as an obj directive");
+
         std::cout << "world track objects regression passed\n";
         return 0;
     } catch (const std::exception& error) {
