@@ -72,6 +72,22 @@ reset prompt; a later no-input frame at Lap Time 2:04.5 shows Position 8/8,
 motion attribution. This is a startup and no-input baseline only; it does not
 verify input delivery, race completion, audio, or reconstruction parity.
 
+### Preserved launcher process check on 2026-10-26
+
+The older preserved launcher process (PID 14636, executable under
+`analysis/reference_captures/wheel_history_probe_20261025/GameRoot`, window
+title `Our Apologies`) was inspected without changing its state. A read-only
+Frida module enumeration found only `Viper Racing.exe` at `0x400000`; it did
+not find the original `race.bin` engine module. Therefore this process cannot
+provide per-frame gameplay evidence and must not be treated as the engine
+capture target. The observation is retained outside Git in
+`../../analysis/reference_captures/current_original_module_probe_20261026.evidence.json`
+(SHA-256
+`C35D6725D1F7FB831BD24D5072337DC5000DA86302EDDEAC5DFCE8B1A1A346CA`, Frida
+Evidence `ev_feb945405f7bed8969dda6e8d55e41a1cd647e90e05679ed9121cdff968a77a4`).
+This is a module-presence observation only; a new controlled launcher-to-game
+handoff is required for additional physics captures.
+
 ## Pairing a scenario
 
 Run the original and reconstruction separately on the same Windows machine and
