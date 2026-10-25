@@ -181,8 +181,10 @@ PcarCallbackBranchResult advance_pcar_callback_branch(
          (fields.value_0xec9 != 0U ||
           std::bit_cast<std::int32_t>(fields.value_0xc7c) < 0x3f666666));
     const bool call_433210 = !globals.gate_0x5093f0 && fields.value_0xec8 != 0U;
+    const bool call_43b9a0 = !globals.gate_0x5093f0 && fields.value_0xec8 == 0U;
     if ((call_4331e0 && !observation.copied_value_0xd64_from_0x4331e0) ||
-        (call_433210 && !observation.copied_value_0xd64_from_0x433210)) {
+        (call_433210 && !observation.copied_value_0xd64_from_0x433210) ||
+        (call_43b9a0 && !observation.value_from_0x43b9a0)) {
         return result;
     }
 
@@ -204,8 +206,16 @@ PcarCallbackBranchResult advance_pcar_callback_branch(
         fields.value_0xd64 = *observation.copied_value_0xd64_from_0x433210;
         result.called_0x433210 = true;
     }
-    if (!globals.gate_0x5093f0 && fields.value_0xec8 == 0U) {
-        // The helper-free arm copies the current object +0xD64 to global 0x5093BC.
+    if (call_43b9a0) {
+        const bool call_4331e0_after_value = fields.value_0xec9 != 0U ||
+            std::bit_cast<std::int32_t>(fields.value_0xc7c) < 0x3f666666;
+        if (call_4331e0_after_value) {
+            result.argument_0x4331e0 = std::bit_cast<std::int32_t>(
+                *observation.value_from_0x43b9a0);
+        }
+    }
+    if (call_43b9a0) {
+        // After optional 0x4331E0, native code reloads +0xD64 for 0x43B9B0.
         result.wrote_0x5093bc = true;
         result.output_0x5093bc = fields.value_0xd64;
     }

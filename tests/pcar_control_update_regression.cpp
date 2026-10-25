@@ -141,6 +141,7 @@ int main()
     branch_fields = {};
     branch_fields.value_0x54 = 0.6F;
     branch_observation.globals.value_0x5093f4 = 0.7F;
+    branch_observation.value_from_0x43b9a0 = 1U;
     branch_observation.copied_value_0xd64_from_0x4331e0 = 1U;
     const auto max_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
@@ -160,6 +161,19 @@ int main()
         return EXIT_FAILURE;
     }
     branch_fields = {};
+    branch_fields.value_0xd64 = 6U;
+    branch_fields.value_0xec9 = 1U;
+    branch_fields.value_0xc7c = 0.9F;
+    branch_observation = {};
+    branch_observation.copied_value_0xd64_from_0x4331e0 = 9U;
+    const auto missing_43b9a0 = viper::advance_pcar_callback_branch(
+        branch_fields, branch_observation);
+    if (missing_43b9a0.complete || branch_fields.value_0xd64 != 6U ||
+        branch_fields.value_0x4 != 0U) {
+        std::cerr << "PCAR branch mutated without the 0x43B9A0 return.\n";
+        return EXIT_FAILURE;
+    }
+    branch_fields = {};
     branch_fields.value_0xd64 = 11U;
     branch_fields.value_0xec8 = 1U;
     branch_observation = {};
@@ -172,11 +186,12 @@ int main()
         return EXIT_FAILURE;
     }
     branch_fields = {};
-    branch_fields.value_0xd64 = 13U;
+    branch_fields.value_0xd64 = 5U;
     branch_fields.value_0xec9 = 1U;
     branch_fields.value_0xc7c = 0.9F;
     branch_observation = {};
-    branch_observation.globals.value_0x5093bc = 0x80000000U;
+    branch_observation.globals.value_0x5093bc = 0x12345678U;
+    branch_observation.value_from_0x43b9a0 = 0x80000000U;
     branch_observation.copied_value_0xd64_from_0x4331e0 = 13U;
     const auto ec9_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
@@ -191,6 +206,8 @@ int main()
     branch_fields.value_0xd64 = 14U;
     branch_fields.value_0xc7c = std::bit_cast<float>(std::uint32_t{0x3f666666U});
     branch_observation = {};
+    branch_observation.value_from_0x43b9a0 = 14U;
+    branch_observation.copied_value_0xd64_from_0x4331e0 = 14U;
     const auto threshold_branch = viper::advance_pcar_callback_branch(
         branch_fields, branch_observation);
     if (!threshold_branch.complete || threshold_branch.called_0x4331e0 ||

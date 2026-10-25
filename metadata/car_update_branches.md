@@ -192,9 +192,12 @@ The constant at `0x4C814C` is verified from the executable bytes as
 `9A 99 99 3E` (`0x3E99999A`, 0.3f), used for the `max` written to `+0x54`.
 The wrapper effects of `0x4331E0` and `0x433210` remain explicit optional raw
 DWORD observations: if a selected call lacks its copied `+0xD64` result, the
-model returns incomplete without mutation. The non-`+0xEC8` arm reports the
-post-helper `+0xD64` to global `0x5093BC` copy and the exact `0x4331E0`
-argument bits. Regression covers gate precedence,
+model returns incomplete without mutation. In the false-gate, clear-`+0xEC8`
+arm, `0x43B9A0`'s EAX result is also an explicit input: native code passes it
+to `0x4331E0` when the `+0xEC9`/`+0xC7C` condition is true. After that optional
+helper, native code reloads object `+0xD64` and passes that final DWORD to
+`0x43B9B0`; it does not store the helper argument or a global value directly.
+Regression covers gate precedence,
 `+0xEC8`, `+0xEC9`, the strict signed `+0xC7C` threshold, the observed helper
 copy, the `+0x54` floor, and status bits. This remains a standalone model;
 runtime callback dispatch and the embedded selector helper internals are not

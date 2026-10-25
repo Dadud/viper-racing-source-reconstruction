@@ -186,6 +186,8 @@ struct PcarCallbackBranchFields {
 
 struct PcarCallbackBranchObservation {
     PcarCallbackGlobals globals{};
+    // Raw EAX returned by 0x43B9A0 in the false-gate, +0xEC8-clear arm.
+    std::optional<std::uint32_t> value_from_0x43b9a0;
     std::optional<std::uint32_t> copied_value_0xd64_from_0x4331e0;
     std::optional<std::uint32_t> copied_value_0xd64_from_0x433210;
 };
@@ -201,8 +203,8 @@ struct PcarCallbackBranchResult {
     std::optional<std::int32_t> argument_0x4331e0;
 };
 
-// Reconstructs the branch routing and direct stores only. Returns incomplete
-// without mutation if a selected unresolved helper's copied +0xD64 is unknown.
+// Reconstructs the branch routing and direct stores. Returns incomplete
+// without mutation if a selected unresolved helper result is unknown.
 [[nodiscard]] PcarCallbackBranchResult advance_pcar_callback_branch(
     PcarCallbackBranchFields& fields,
     const PcarCallbackBranchObservation& observation) noexcept;
