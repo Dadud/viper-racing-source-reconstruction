@@ -2605,6 +2605,54 @@ struct WindowState {
             }
         }
 
+        // These stores are the observed late PCAR callback tail. Timestamp
+        // handling and shared-global cache calls that precede it are not yet
+        // connected to the live session, so only apply the independently
+        // modeled offset writes with the currently observed body inputs.
+        const auto tail_c3c = body_u8(0xc3cU);
+        const auto tail_c3d = body_u8(0xc3dU);
+        const auto tail_c7c = body_float(0xc7cU);
+        const auto tail_mode = body_word(0x4fcU);
+        const auto tail_de0 = body_float(0xde0U);
+        const auto tail_de4 = body_float(0xde4U);
+        const auto tail_be4 = body_u8(0xbe4U);
+        const auto tail_508 = body_float(0x508U);
+        if (!tail_c3c || !tail_c3d || !tail_c7c || !tail_mode || !tail_de0 ||
+            !tail_de4 || !tail_be4 || !tail_508) return false;
+        viper::PcarCallbackTailFields tail{};
+        tail.value_0xc3c = *tail_c3c;
+        tail.gate_0xc3d = *tail_c3d;
+        tail.curve_gate_0x41 = *tail_c3d;
+        tail.value_0xc7c = *tail_c7c;
+        tail.mode_0x4fc = *tail_mode;
+        tail.value_0xde0 = *tail_de0;
+        tail.value_0xde4 = *tail_de4;
+        tail.mode_0xbe4 = *tail_be4 != 0U;
+        tail.value_0x508 = *tail_508;
+        const auto tail_result = viper::advance_pcar_callback_tail(
+            tail, pcar_callback_globals.value_0x509340);
+        std::array<viper::NcarObjectFieldWrite, 4> tail_writes{};
+        std::size_t tail_write_count = 0U;
+        if (tail_result.set_byte_0xc3c) {
+            tail_writes[tail_write_count++] = {0xc3cU, 1U, tail.value_0xc3c};
+        }
+        if (tail_result.reset_0xde0) {
+            tail_writes[tail_write_count++] = {0xde0U, 4U,
+                std::bit_cast<std::uint32_t>(tail.value_0xde0)};
+        }
+        if (tail_result.floored_0xde4) {
+            tail_writes[tail_write_count++] = {0xde4U, 4U,
+                std::bit_cast<std::uint32_t>(tail.value_0xde4)};
+        }
+        if (tail_result.called_value_helper_0x434b20) {
+            tail_writes[tail_write_count++] = {0x508U, 4U,
+                std::bit_cast<std::uint32_t>(tail.value_0x508)};
+        }
+        if (tail_write_count != 0U && !viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                std::span<const viper::NcarObjectFieldWrite>(
+                    tail_writes.data(), tail_write_count))) return false;
+
         // The current route motion model accepts digital inputs. Preserve the
         // recovered analog values in session state and trace; this threshold
         // is only the adapter into that provisional route API.

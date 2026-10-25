@@ -27,12 +27,13 @@ the live loop still does not consume those bytes as suspension inputs.
 The Win32 loop now uses the recovered `0.016` physics-task schedule and
 two-step catch-up cap to advance its current route/contact prototype, while
 sampling controls once per outer update and retaining the latest accepted
-simulation pose for rendering. The modeled PCAR control prefix and selector
-branch now run once per scheduled fixed step; trace rows expose the callback
-step count and the replay regression checks it against the physics tick count.
-The native task factory, interpolation ring, remaining PCAR callback stages,
-and shared body-step integrator are not connected, and route kinematics still
-own player and opponent motion.
+simulation pose for rendering. The modeled PCAR control prefix, selector branch,
+and gated late callback-tail stores now run once per scheduled fixed step; trace
+rows expose the callback step count and the replay regression checks it against
+the physics tick count. Timestamp handling and shared-global cache updates
+before the tail, the native task factory, interpolation ring, post-integrator
+callback work, and shared body-step integrator are not connected. Route
+kinematics still own player and opponent motion.
 The session now also retains one ordered semantic task collection from the
 validated serialized stream: finite CHKP geometry and supported inactive STAT
 state are materialized, while other records remain explicit as unavailable
@@ -158,10 +159,13 @@ record; `0x40D270` now uses `GAME throttle_boost` and the human entrant-pointer
 selector predicate. Gate `0x5093FC` now follows `CONTROL nonlinear_steering` and the recovered
 `0x43BA30`/`0x446F90` binding-kind clearing rule. This
 does not execute the shared integrator or make these outputs authoritative for
-rendered pose. The runtime does
-not yet dispatch complete native PCAR callback `0x4384D0` or shared integrator
-`0x431150`; it lacks their runtime body, timer, table, force-collection, and
-callback transitions. The PCAR `+0x4F4` constructor input is now sourced from
+rendered pose. The gated late tail stores at `+0xC3C`, `+0xDE0`, `+0xDE4`, and
+`+0x508` now use the existing offset model per fixed step; the value passed to
+the `+0x508` helper is still the current `+0x509340` projection, before the
+missing timestamp/cache stages. The runtime does not yet reproduce complete
+PCAR callback `0x4384D0` or shared integrator `0x431150`; it lacks runtime
+timer/cache state, native wheel/force collection, and post-integrator
+record/event transitions. The PCAR `+0x4F4` constructor input is now sourced from
 the configured entrant count: native setup copies the setup-block DWORD at
 `+0xCA8` into global `0x508794`, and the race owner consumes that same field as
 the participant-count loop bound. `+0xD74` remains unresolved; it stores the

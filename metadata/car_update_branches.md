@@ -202,9 +202,13 @@ copies, `+0xEC8`, `+0xEC9`, the strict signed `+0xC7C` threshold, the
 now runs this branch with the modeled PCAR control prefix once per scheduled
 fixed step, using selector and curve state projected into its persistent body
 object. `pcar_callback_step_count` is checked against `physics_step_count` by
-`game_trace_replay_regression`. Timestamp handling, shared global caches,
-callback tail effects, post-integrator record/event handling, and the shared
-`0x431150` integration are still outside the live callback path.
+`game_trace_replay_regression`. The late callback tail now applies its observed
+`+0xC3C`, `+0xDE0`, `+0xDE4`, and `+0x508` stores at the same fixed-step
+boundary when the recovered gates request them. Its `0x43BA10` input is the
+current modeled global `+0x509340`; timestamp handling and shared global cache
+calls that precede the tail are still absent, so that value is not yet updated
+through the complete native callback sequence. Post-integrator record/event
+handling and shared `0x431150` integration are still outside the live path.
 The floor constant bytes were read from the shipped `race.bin` at `0x4C814C`
 (`ev_c1a1c96bc554d4b7efe42229fd89168076d2116e4f6cb2b020456143cbca6054`).
 
