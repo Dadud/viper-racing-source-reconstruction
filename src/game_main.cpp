@@ -1615,6 +1615,7 @@ struct WindowState {
     viper::PhysicsStepSchedule last_physics_step_schedule{};
     bool physics_step_clock_initialized{};
     std::uint32_t physics_step_count{};
+    std::uint32_t pcar_callback_step_count{};
     std::uint32_t playback_clock_milliseconds{};
     // The native binding evaluator consumes a post-poll device snapshot. The
     // DirectInput service supplies the original 256-byte keyboard snapshot;
@@ -2208,6 +2209,7 @@ struct WindowState {
         last_physics_step_schedule = {};
         physics_step_clock_initialized = false;
         physics_step_count = 0U;
+        pcar_callback_step_count = 0U;
         playback_clock_milliseconds = 0U;
         player_simulated_pose.reset();
         opponent_motions.resize(graphics.car_count());
@@ -2281,6 +2283,8 @@ struct WindowState {
         last_physics_step_schedule = schedule;
         bool lap_completed = false;
         for (std::int32_t step = 0; step < schedule.steps; ++step) {
+            if (!update_player_pcar_callback()) return false;
+            ++pcar_callback_step_count;
             auto candidate_motion = motion;
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
                 left, right, accelerate, brake, 0.016F, target_laps,
@@ -2426,6 +2430,11 @@ struct WindowState {
             control_update_state.controls.flag_0x509420 != 0U;
         pcar_callback_globals.gate_0x5093fc =
             control_squared_steering_gate_0x5093fc;
+        return true;
+    }
+
+    bool update_player_pcar_callback()
+    {
         const auto body_word = [&](const std::uint32_t offset) {
             return viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offset);
@@ -3232,6 +3241,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_body_0x978,pcar_body_0xb1c"
               << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier"
               << ",physics_steps_scheduled,physics_step_count"
+              << ",pcar_callback_step_count"
               << ",physics_simulation_time,physics_catchup_limited";
         trace << ",directinput_keyboard_state_read,directinput_up_pressed";
         trace << '\n' << std::setprecision(9);
@@ -3401,6 +3411,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     .callback_multiplier.value;
                 trace << ',' << state.last_physics_step_schedule.steps
                       << ',' << state.physics_step_count
+                      << ',' << state.pcar_callback_step_count
                       << ',' << static_cast<float>(state.physics_step_count) * 0.016F
                       << ',' << state.last_physics_step_schedule.catchup_limited
                       << ',' << state.directinput_keyboard_state_read

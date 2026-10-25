@@ -50,10 +50,12 @@ try {
     $pcarMultiplierIndex = [Array]::IndexOf($header, 'pcar_0x40d270_multiplier')
     $physicsStepsIndex = [Array]::IndexOf($header, 'physics_steps_scheduled')
     $physicsTickIndex = [Array]::IndexOf($header, 'physics_step_count')
+    $pcarCallbackTickIndex = [Array]::IndexOf($header, 'pcar_callback_step_count')
     $physicsTimeIndex = [Array]::IndexOf($header, 'physics_simulation_time')
     if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0 -or
         $pcarMultiplierIndex -lt 0 -or $physicsStepsIndex -lt 0 -or
-        $physicsTickIndex -lt 0 -or $physicsTimeIndex -lt 0) {
+        $physicsTickIndex -lt 0 -or $pcarCallbackTickIndex -lt 0 -or
+        $physicsTimeIndex -lt 0) {
         throw 'Trace is missing PCAR or fixed-step scheduler fields'
     }
     $observedPcarBodyState = $false
@@ -82,12 +84,15 @@ try {
             [cultureinfo]::InvariantCulture)
         $physicsTick = [int]::Parse($fields[$physicsTickIndex],
             [cultureinfo]::InvariantCulture)
+        $pcarCallbackTick = [int]::Parse($fields[$pcarCallbackTickIndex],
+            [cultureinfo]::InvariantCulture)
         $physicsTime = [single]::Parse($fields[$physicsTimeIndex],
             [cultureinfo]::InvariantCulture)
         if ($scheduledSteps -lt 0 -or $scheduledSteps -gt 2 -or
             $physicsTick -lt $previousPhysicsTick -or
+            $pcarCallbackTick -ne $physicsTick -or
             [Math]::Abs($physicsTime - ($physicsTick * 0.016)) -gt 0.0001) {
-            throw "Fixed-step clock trace is inconsistent at frame $($index - 1)"
+            throw "Fixed-step clock or PCAR callback cadence is inconsistent at frame $($index - 1)"
         }
         if ($physicsTick -gt 0) { $observedPhysicsStep = $true }
         $previousPhysicsTick = $physicsTick

@@ -198,9 +198,13 @@ The branch model now performs the `0x4331E0` selector setter and `+0xCBC` to
 false-gate, clear-`+0xEC8` arm then reports the post-helper `+0xD64` value
 passed to `0x43B9B0`. Regression covers gate precedence, the direct wrapper
 copies, `+0xEC8`, `+0xEC9`, the strict signed `+0xC7C` threshold, the
-`+0x54` floor, missing-input atomicity, and status bits. This remains a
-standalone model; runtime callback dispatch and live selector/curve snapshots
-are not yet connected.
+`+0x54` floor, missing-input atomicity, and status bits. The Windows session
+now runs this branch with the modeled PCAR control prefix once per scheduled
+fixed step, using selector and curve state projected into its persistent body
+object. `pcar_callback_step_count` is checked against `physics_step_count` by
+`game_trace_replay_regression`. Timestamp handling, shared global caches,
+callback tail effects, post-integrator record/event handling, and the shared
+`0x431150` integration are still outside the live callback path.
 The floor constant bytes were read from the shipped `race.bin` at `0x4C814C`
 (`ev_c1a1c96bc554d4b7efe42229fd89168076d2116e4f6cb2b020456143cbca6054`).
 

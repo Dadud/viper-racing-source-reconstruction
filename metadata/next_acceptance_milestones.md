@@ -26,11 +26,13 @@ and persistent contact outputs. This closes object-state materialization only;
 the live loop still does not consume those bytes as suspension inputs.
 The Win32 loop now uses the recovered `0.016` physics-task schedule and
 two-step catch-up cap to advance its current route/contact prototype, while
-sampling controls once per frame and retaining the latest accepted simulation
-pose for rendering. Trace rows include scheduled steps, task tick count, and
-derived task time. This improves timing ownership only: the native task factory,
-interpolation ring, PCAR callback, and body-step integrator are not connected,
-and route kinematics still own player and opponent motion.
+sampling controls once per outer update and retaining the latest accepted
+simulation pose for rendering. The modeled PCAR control prefix and selector
+branch now run once per scheduled fixed step; trace rows expose the callback
+step count and the replay regression checks it against the physics tick count.
+The native task factory, interpolation ring, remaining PCAR callback stages,
+and shared body-step integrator are not connected, and route kinematics still
+own player and opponent motion.
 The session now also retains one ordered semantic task collection from the
 validated serialized stream: finite CHKP geometry and supported inactive STAT
 state are materialized, while other records remain explicit as unavailable
