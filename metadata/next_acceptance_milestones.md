@@ -207,10 +207,13 @@ now identified: `0x442530` derives it from the wheel's native contact depth and
 stores that depth after the suspension calculation. The session has the
 constructor's initial `+0xE8` value, but its route-pose contact observation is
 not the native fixed-step body/query state, so this store is not yet wired.
-Remaining unresolved wheel inputs include per-step `+0x158` from mutable body
-`+0x50C` and the random-seeded table/call lifecycle for environment polarity. Static
-analysis now establishes common-startup initialization and the shared locked
-stream: each car update consumes four sequential wheel draws, and at least 16
+Remaining unresolved wheel inputs include the live producer of the actual
+wheel object's per-step `+0x158` and the random-seeded table/call lifecycle
+for environment polarity. A separate frame-context row receives body
+`+0x50C` at `+0x158`, but that is not the actual wheel object's same-offset
+field. Static analysis establishes common-startup initialization and the
+shared locked stream: each car update consumes four sequential wheel draws,
+and at least 16
 other resolved direct callers also advance it. The repo now models the seed
 wrapper's low-EAX signed remainder modulo 30,000 and native push order, and
 the recovered 97-entry table recurrence and associated initializer constants.
@@ -220,6 +223,18 @@ and the shared stream are not implemented or connected. See
 Do not promote the initial
 constructor value of `+0x50C` to a per-frame value until the callback/sample
 state that mutates it is connected.
+
+Before connecting the modeled PCAR timer, the session must own participant
+bodies and native ordinals and retain the descriptor's completed row snapshot
+across updates. Native update ordering runs entity callbacks before rebuilding
+the descriptor, so a timer callback in update N consumes the prior completed
+snapshot. Rows must come from persistent body `+0x5C/+0x64/+0x234/+0x23C` state
+with explicit zeroes for unregistered slots; route poses, constructor seeds,
+and this update's not-yet-completed states are not valid substitutes. The
+existing ordinal-pair resolver and timer model are ready to consume such a
+snapshot but remain standalone. Capture selection at `0x4335E5` with the
+descriptor dimension, row bytes, selected record pointer, timer gates, and
+before/after `+0x50C/+0xE44` before session wiring.
 
 The production per-tick body diagnostic now separately reports ownership of
 the three body fields read by `0x433570` (`+0x50C`, `+0xE44`, and `+0x510`),
