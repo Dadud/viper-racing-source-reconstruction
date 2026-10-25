@@ -16,8 +16,12 @@ they do not establish a particular runtime's clock samples or thread schedule.
 - `0x419380` registers/gets the named `"random"` critical-section slot via
   `0x4150C0`, stores it in `0x4F0A9C`, then calls `0x4193C0`. The lock registry
   is not a random-number generator. Evidence: `ev_bed9b066666fffb4d298ccd5da2ce834f37e9c5d7580c80056e44a6c75e41928`.
-- `0x4193C0` calls `0x413BD0` twice; each signed return is divided by 30,000
-  and the signed remainder is passed to `0x419430`. The table initializer
+- `0x4193C0` calls `0x413BD0` twice. After each call, `CDQ` sign-extends
+  `EAX`, replacing the helper's `EDX` high word; `IDIV 0x7530` therefore takes
+  the signed low-32-bit timer value modulo 30,000. The first sample is pushed
+  before the second, so initializer stack argument 0 is the second remainder.
+  This exact reduction and push ordering are modeled by
+  `make_ncar_surface_polarity_seed_pair_0x4193c0`. The table initializer
   writes 97 float entries at `0x4F0910..0x4F0A90`, then initializes phase
   `0x4F0908`, increment `0x4F0A94`, wrap value `0x4F0A98`, indices
   `0x4F0AA4/0x4F0AA8` to `0x60/0x20`, and initialized byte `0x4D3C58`.
@@ -66,10 +70,11 @@ the shared call order. Evidence:
 
 ## Implementation boundary
 
-The repository currently models the per-call `0x419620` transition and
-`0x4193F0` conversion, but the live session does not own initialization,
-clock-derived seed sampling, or the shared process-wide stream. Next exact
-steps are: finish the initializer's x87 recurrence; add signed seed-pair
-fixtures; model the timer source behind an injectable clock service; and route
-all reconstructed consumers through one locked session-level stream while
-recording unresolved call-order differences.
+The repository models the per-call `0x419620` transition, `0x4193F0`
+conversion, and the wrapper's signed low-dword seed reduction/order. The live
+session still does not own the clock source, table initializer, or shared
+process-wide stream. Next exact steps are to finish the x87-compatible table
+generator, capture native tables for fixed seed pairs when the original disc
+can be mounted through its intended path, model the timer source behind an
+injectable clock service, and route reconstructed consumers through one
+locked session-level stream while recording unresolved call-order differences.

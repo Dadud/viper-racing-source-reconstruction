@@ -799,6 +799,20 @@ struct NcarSurfacePolarityState {
     bool initialized{};
 };
 
+// The 0x4193C0 wrapper narrows each 0x413BD0 return to EAX, sign-extends it
+// with CDQ, and takes a signed remainder modulo 30,000. Because it pushes the
+// first sample before obtaining the second, the initializer's stack argument
+// order is second-sample remainder then first-sample remainder.
+struct NcarSurfacePolaritySeedPair {
+    std::int32_t stack_argument_0_second_sample_remainder{};
+    std::int32_t stack_argument_1_first_sample_remainder{};
+};
+
+[[nodiscard]] NcarSurfacePolaritySeedPair
+make_ncar_surface_polarity_seed_pair_0x4193c0(
+    std::uint32_t first_timer_low_dword,
+    std::uint32_t second_timer_low_dword) noexcept;
+
 // Advances one 0x419620 table/phase step. Callers must serialize access as the
 // native helper does under its process lock. Returns the value before scaling.
 // Malformed or uninitialized state fails without changing the supplied state.

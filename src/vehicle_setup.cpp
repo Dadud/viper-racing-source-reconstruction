@@ -855,6 +855,18 @@ WheelSuspensionResult evaluate_wheel_suspension(
     return result;
 }
 
+NcarSurfacePolaritySeedPair make_ncar_surface_polarity_seed_pair_0x4193c0(
+    const std::uint32_t first_timer_low_dword,
+    const std::uint32_t second_timer_low_dword) noexcept
+{
+    constexpr std::int32_t divisor = 30000;
+    const auto first_signed = std::bit_cast<std::int32_t>(first_timer_low_dword);
+    const auto second_signed = std::bit_cast<std::int32_t>(second_timer_low_dword);
+    return {
+        second_signed % divisor,
+        first_signed % divisor};
+}
+
 std::optional<float> advance_ncar_surface_polarity_phase_0x419620(
     NcarSurfacePolarityState& state) noexcept
 {

@@ -393,6 +393,18 @@ int main()
         require(body_step.wheel_contact_pipeline_results[0]
                     .suspension.surface.absolute_motion_projection == 20.0F,
             "four-wheel step must project point velocity through the body fields");
+        const auto polarity_seeds =
+            viper::make_ncar_surface_polarity_seed_pair_0x4193c0(
+                30001U, static_cast<std::uint32_t>(-29999));
+        require(polarity_seeds.stack_argument_0_second_sample_remainder == -29999 &&
+                polarity_seeds.stack_argument_1_first_sample_remainder == 1,
+            "polarity seed wrapper must use signed low-dword remainders and native push order");
+        const auto minimum_timer_seed =
+            viper::make_ncar_surface_polarity_seed_pair_0x4193c0(
+                0x80000000U, 0xffffffffU);
+        require(minimum_timer_seed.stack_argument_1_first_sample_remainder == -23648 &&
+                minimum_timer_seed.stack_argument_0_second_sample_remainder == -1,
+            "polarity seed wrapper must sign-interpret low dwords and preserve IDIV remainder sign");
         viper::NcarSurfacePolarityState polarity_state{};
         polarity_state.initialized = true;
         polarity_state.index_a_0x4f0aa4 = 0x60U;
