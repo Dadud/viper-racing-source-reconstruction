@@ -256,10 +256,17 @@ for eight consecutive selected-PCAR integrator calls. It records body
 `+0x50C/+0xE44/+0x510` alongside each wheel's `+0x158/+0xE8` before and after
 the update. The values remain distinct and `+0xE8` responds during some wheel
 updates. Static analysis identifies the `0x433570` timer helper, and a live
-read-only follow-up observed 16 calls without changes to `+0x50C/+0xE44/+0x510`.
-The wheel `+0x158` producer remains unknown, and the unchanged timer sample does
-not establish why the helper's update branch is inactive. This narrows the
-instrumentation gap without changing the production gate above. Repair and
+read-only follow-up selected PCAR vtable `0x4C8188` and observed three
+consecutive calls with `+0x50C/+0xE44/+0x510 == 1/-100/7`. The task timer was
+1107.120–1107.152 seconds, so `now - +0xE44` was 1207.120–1207.152 seconds and
+the strict `< 6.2` gate skipped the pair-table lookup. This explains the
+unchanged timer fields for that ordinary-race capture; it does not reveal the
+in-window lookup or which gameplay event replaces the constructor sentinel.
+The PCAR vtable's `+0x40` slot dispatches through `0x4384B0` and `0x43E030` to
+`0x433620`, which stores current time at `+0xE44` while rebuilding the body
+pose and zeroing velocity. Capture that virtual call and its following timer
+callbacks, then capture descriptor rows and selected record during the active
+window. The wheel `+0x158` producer remains unknown. Repair and
 capture provenance are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 A bounded checked-in Frida probe now samples the native `elapsed < 6.2` branch,
@@ -273,8 +280,9 @@ original-client launch path is already established with the documented
 first-query video-memory override. Resolve the staged-copy startup divergence
 before repeating that capture. `0x4329C0` copies body `+0x50C` into a separate
 frame-context row at `+0x158`; this does not identify the writer of the actual
-wheel object's `+0x158`. The live body `+0x50C` timer value and callback order
-remain unresolved.
+wheel object's `+0x158`. The constructor and ordinary-race timer values are
+now known, but the gameplay event that replaces `+0xE44 = -100` and the
+in-window `+0x50C` ramp/participant-row behavior remain unresolved.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`

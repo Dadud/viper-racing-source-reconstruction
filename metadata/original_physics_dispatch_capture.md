@@ -533,6 +533,27 @@ values. The hook recorded no native global clock or participant-pair inputs,
 so it does not establish why the update branch did not change state. REA
 Evidence ID: `ev_770c662bc5d1d3b75035846b3be9a34eea2585864a13854a5affa545800ad678`.
 
+### Live PCAR timer-gate explanation (2026-10-25)
+
+A follow-up attached read-only to the same hash-verified staged client and
+filtered `0x433570` entries to the PCAR vtable `0x4C8188`. Three consecutive
+calls selected the same body pointer `0x4C520CC`, ordinal 7. The task ticks
+69195–69197 produced `now = 1107.120–1107.152` seconds, with body
+`+0x50C/+0xE44 == 1/-100` before and after. The elapsed value was therefore
+1207.120–1207.152 seconds, so the strict `< 6.2` gate skipped the row lookup at
+`0x4335E5`. The `selected_record` field is null because that hook did not run;
+it is not an observed null pair entry. REA Evidence ID:
+`ev_d22019b61d5529b067f4da008a0c97fa50319434e65b46d0314a11435f4f7fcf`.
+
+The separate static dossier for `0x433620` shows a current-time store to
+`+0xE44` at `0x433870` inside a body-pose rebuild that clears velocities. The
+runtime event that invokes this path was not captured. When that transition is
+observed, correlate it with subsequent `0x433570` calls and run the descriptor
+probe only while the 6.2-second gate is active. The exported REA bundle is
+`../../analysis/reference_captures/wheel_history_probe_20261025/timer_ordinal_live_reason_20261025.evidence.json`,
+SHA-256 `3A43F68AEFD0409BCAD6A6C1520BB9D7B0D4D051C7961FCFDBB40BE185FF1035`;
+it remains outside the source repository.
+
 ### Bounded timer-branch input probe prepared (2026-10-25)
 
 Added `tools/pcar_timer_branch_probe.js` to sample the computed elapsed value

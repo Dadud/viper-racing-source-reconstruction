@@ -49,6 +49,47 @@ and `ev_946ec3efe850470f7eea21d3d08dc427a46c9a686b71d929dbd583ebeab36ae6`
 (`0x433570` constants). The retained records are in
 [`ncar_integrator_timer.evidence.json`](ncar_integrator_timer.evidence.json).
 
+#### Controlled live timer-gate sample (2026-10-25)
+
+A bounded read-only Frida attach to the hash-verified staged original client
+sampled the PCAR vtable `0x4C8188` at `0x433570` for three consecutive task
+ticks. The same body (`0x4C520CC`, ordinal 7) had `+0x50C = 1.0` and
+`+0xE44 = -100.0` before and after each call. The pre-increment task ticks
+69195–69197 correspond to `now = 1107.120–1107.152`; therefore the helper's
+`now - +0xE44` value was `1207.120–1207.152`, outside its strict `< 6.2`
+branch. The probe confirmed that execution did not reach the ordinal-table
+lookup at `0x4335E5`; `selected_record = null` means the hook was not reached,
+not that a null row was consumed. This explains the unchanged timer values in
+this captured ordinary-race state, but does not observe the table, the
+in-window path, or what event changes the `-100.0` constructor sentinel.
+
+The original image SHA-256 is
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`.
+Frida Evidence ID: `ev_d22019b61d5529b067f4da008a0c97fa50319434e65b46d0314a11435f4f7fcf`.
+The exported evidence bundle is external to Git at
+`../../analysis/reference_captures/wheel_history_probe_20261025/timer_ordinal_live_reason_20261025.evidence.json`.
+Bundle SHA-256: `3A43F68AEFD0409BCAD6A6C1520BB9D7B0D4D051C7961FCFDBB40BE185FF1035`.
+
+Direct store matches in the checked engine disassembly also bound the known
+`+0xE44` write sites: constructor `0x433AA0` installs the `-100.0` sentinel,
+the timer helper `0x433570` advances it by `0.016` only after its time and
+pair-distance gates, and `0x433620` stores the current task time at
+`0x433870` while rebuilding body pose and clearing linear/angular velocity.
+The captured race did not enter that pose-rebuild path, and the evidence does
+not establish which gameplay event invokes it. The PCAR vtable slot `+0x40`
+points at wrapper `0x4384B0` (`0x4C81C8`), which calls `0x43E030`; that wrapper
+calls `0x433620`, sets byte `+0xEC0`, and the vtable adapter then calls
+`0x43B9B0(0)`. This recovers the PCAR virtual entry path, but not the event
+that dispatches it. The next runtime probe should correlate this slot's
+invocation and current-time store with the following `0x433570` window and
+lookup; ordinary-race samples with the `-100.0` sentinel cannot reveal the
+selected pair record. `0x433620` evidence:
+`ev_4e20ce0d4acd4d4639db7448c6fb997dd001d622a1c425c488e0481e7c0f8c26`; its
+observed direct wrapper `0x43E030` is
+`ev_3e84cb4b38ce10f1ca4aa6b6990cef2d15ebdeef7e13dcb460eb09ed3944604d`;
+the adapter-to-vtable reference is
+`ev_beedcc0174691abe90ba09b094eefd878b7e864ff1f6d8d53aca94d1c8460a82`.
+
 ### Runtime descriptor lifecycle behind the ordinal lookup
 
 Static evidence now connects the `0x4D45B0` lookup's descriptor to its
@@ -170,9 +211,11 @@ The next original-client capture can use the passive one-shot Frida probe at
 It hooks `0x4335E5` after the lookup load and records the live descriptor,
 ordinal, middle row, all row entries and pair bytes, plus the actual EAX record
 pointer consumed by the gate. It emits one row per observed ordinal and does
-not modify game state. The original client is currently not in a race process,
-so this probe has only passed JavaScript syntax validation; it has not produced
-a runtime capture.
+not modify game state. This full descriptor probe has only passed JavaScript
+syntax validation; it has not produced a runtime capture. A separate live
+PCAR timer-window sample later showed the helper skipping this lookup because
+the elapsed-time gate was inactive. Run the descriptor probe only after a
+captured runtime transition places the helper inside its 6.2-second window.
 
 Evidence: `0x41EAB0` `ev_af5da57252f41fcd0aa04bb6653499d28865bacdb9057d9ecb6f8436ce4f6c71`,
 `0x41EC40` `ev_240938eecb93f46cc2581792cf643ca862b6427ce48841acbc367ee45c29d819`,
