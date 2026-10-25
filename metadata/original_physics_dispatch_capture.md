@@ -364,3 +364,25 @@ matched the capture manifest, and staged `options.cfg` retained the recorded
 baseline hash. No new gameplay samples resulted. Using the installed launcher
 instead of the staged executable therefore did not resolve the no-child
 startup; the cause remains unknown.
+
+## Current process and static dispatch recheck (2026-10-25)
+
+A read-only Frida module inventory of the still-open PID 23908 confirmed that
+it contains `Viper Racing.exe` from the isolated `wheel_history_probe_20261025`
+stage and system modules, but no `race.bin`. Evidence
+`ev_bb6ffff3f318d18f59c87165df86b22c2f09d20ecabbe55b2162c7cc70326d55` is an
+external-service observation with no executable identity or reported platform
+metadata; it establishes only that this particular launcher process cannot
+provide live physics samples at capture time. It does not explain the earlier
+launcher exits and is not a gameplay capture.
+
+A fresh shipped-binary function analysis of `0x431150` confirms its wheel loop
+calls `0x442530` four times in `0x1A4`-byte strides, then continues into
+per-body bookkeeping and `0x43ECE0` force collection. Evidence
+`ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5` is
+static Ghidra pseudocode, not runtime behavior. It does not reveal a writer
+for PCAR's live five-byte wheel-history records. The GCAR GhostBegin ring and
+NCAR three-slot sample queue therefore remain invalid substitutes. The next
+physics capture must first attach to a verified `race.bin` child, then trace
+writes and cadence for the five-byte records while pairing them with the
+selected PCAR's wheel update and input/body state.
