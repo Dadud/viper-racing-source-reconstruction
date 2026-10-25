@@ -1,5 +1,6 @@
 #include "viper/physics_task_stream.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <limits>
 
@@ -249,6 +250,59 @@ PhysicsTaskRecordStreamRead read_physics_task_record_stream(
         ? PhysicsTaskRecordStreamReadStatus::end_of_stream
         : PhysicsTaskRecordStreamReadStatus::complete;
     result.consumed_bytes = input_offset;
+    return result;
+}
+
+PlayerPcarTaskBindingResult bind_player_pcar_task_record(
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    const std::span<const std::byte> serialized_stream_bytes,
+    const std::span<const std::byte> expected_player_record,
+    const std::uint32_t expected_cursor)
+{
+    PlayerPcarTaskBindingResult result{};
+    if (decoded_stream.status != PhysicsTaskRecordStreamReadStatus::complete ||
+        decoded_stream.consumed_bytes != serialized_stream_bytes.size() ||
+        expected_player_record.size() != 0x1e4U) {
+        result.status = PlayerPcarTaskBindingStatus::invalid_stream;
+        return result;
+    }
+
+    std::optional<std::size_t> player_record_index;
+    for (std::size_t index = 0U; index < decoded_stream.records.size(); ++index) {
+        if (decoded_stream.records[index].record_tag != 0x50434152U) continue;
+        if (player_record_index.has_value()) {
+            result.status = PlayerPcarTaskBindingStatus::duplicate_player_records;
+            return result;
+        }
+        player_record_index = index;
+    }
+    if (!player_record_index.has_value()) {
+        result.status = PlayerPcarTaskBindingStatus::missing_player_record;
+        return result;
+    }
+
+    const auto& record = decoded_stream.records[*player_record_index];
+    if (record.cursor_offset != expected_cursor) {
+        result.status = PlayerPcarTaskBindingStatus::cursor_mismatch;
+        return result;
+    }
+    if (record.record_size != expected_player_record.size()) {
+        result.status = PlayerPcarTaskBindingStatus::record_size_mismatch;
+        return result;
+    }
+    if (record.record_bytes_offset > serialized_stream_bytes.size() ||
+        record.record_size > serialized_stream_bytes.size() - record.record_bytes_offset ||
+        !std::equal(expected_player_record.begin(), expected_player_record.end(),
+            serialized_stream_bytes.begin() + static_cast<std::ptrdiff_t>(
+                record.record_bytes_offset))) {
+        result.status = PlayerPcarTaskBindingStatus::record_bytes_mismatch;
+        return result;
+    }
+
+    result.status = PlayerPcarTaskBindingStatus::complete;
+    result.binding = PlayerPcarTaskBinding{
+        *player_record_index, record.cursor_offset,
+        record.record_bytes_offset, record.record_size};
     return result;
 }
 

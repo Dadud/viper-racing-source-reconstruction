@@ -139,6 +139,18 @@ record-copy and single-child semantic state for valid STAT records, keeps the
 stream cursor for identity, and represents the known inactive/no-op gates. It
 does not claim the omitted common-base bytes or native pointer layout.
 
+The player race session now binds exactly one decoded `PCAR` entry back to
+the setup/placement-derived player record. The binding requires a complete
+readback, the expected logical cursor, a `0x1E4`-byte record, and exact byte
+equality; it retains stream index, cursor, and byte range alongside the
+session. This catches a record-order or setup/stream mismatch, but the player
+body and wheel constructor projections are still prepared before the full
+stream is assembled. The binding is not an independent native PCAR allocation,
+does not establish the native `+0x34` registration cursor, and does not run
+PCAR/NCAR callbacks. Regression covers exact identity plus cursor, byte, and
+duplicate-record rejection. The next integration step is to make the full
+stream loader the source of the player constructor call.
+
 `plan_physics_wobl_task_constructor` models the WOBL record's shared-resource
 link. It first records the record `+0x1C` value at object `+0x4AC`, then
 performs the `0x420970` resource-ID search between the observed lock helpers.

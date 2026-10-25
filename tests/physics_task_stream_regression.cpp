@@ -183,6 +183,37 @@ int main()
                     decoded.records[1].cursor_offset == 0x28CU &&
                     decoded.records[2].cursor_offset == 0x28CU,
                 "reader must recover serialized records and native cursor positions");
+        const auto pcar_binding = viper::bind_player_pcar_task_record(
+            decoded, serialized.bytes, car_record, 0x100U);
+        require(pcar_binding.status ==
+                    viper::PlayerPcarTaskBindingStatus::complete &&
+                    pcar_binding.binding.has_value() &&
+                    pcar_binding.binding->stream_record_index == 0U &&
+                    pcar_binding.binding->serialized_stream_cursor == 0x100U &&
+                    pcar_binding.binding->record_bytes_offset == 4U &&
+                    pcar_binding.binding->record_size == 0x1e4U,
+                "player PCAR binding must retain its exact decoded stream identity");
+        require(viper::bind_player_pcar_task_record(
+                    decoded, serialized.bytes, car_record, 0x101U).status ==
+                    viper::PlayerPcarTaskBindingStatus::cursor_mismatch,
+                "player PCAR binding must reject a different logical cursor");
+        auto altered_player_record = car_record;
+        altered_player_record.back() ^= std::byte{1U};
+        require(viper::bind_player_pcar_task_record(
+                    decoded, serialized.bytes, altered_player_record, 0x100U).status ==
+                    viper::PlayerPcarTaskBindingStatus::record_bytes_mismatch,
+                "player PCAR binding must reject setup/stream byte disagreement");
+        const std::array<viper::PhysicsTaskRecordInput, 2> duplicate_pcar_inputs{{
+            {car_record}, {car_record}}};
+        const auto duplicate_pcar_stream = viper::serialize_physics_task_records(
+            duplicate_pcar_inputs, 0x100U);
+        const auto duplicate_pcar_read = viper::read_physics_task_record_stream(
+            duplicate_pcar_stream.bytes);
+        require(viper::bind_player_pcar_task_record(
+                    duplicate_pcar_read, duplicate_pcar_stream.bytes,
+                    car_record, 0x100U).status ==
+                    viper::PlayerPcarTaskBindingStatus::duplicate_player_records,
+                "player PCAR binding must reject ambiguous duplicate PCAR entries");
         require(viper::read_physics_task_record_stream({}).status ==
                     viper::PhysicsTaskRecordStreamReadStatus::end_of_stream,
                 "empty byte span must be an empty stream");

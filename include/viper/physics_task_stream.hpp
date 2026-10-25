@@ -104,6 +104,41 @@ struct PhysicsTaskRecordStreamRead {
     std::optional<std::size_t> failed_record_index;
 };
 
+enum class PlayerPcarTaskBindingStatus : std::uint8_t {
+    complete,
+    invalid_stream,
+    missing_player_record,
+    duplicate_player_records,
+    cursor_mismatch,
+    record_size_mismatch,
+    record_bytes_mismatch,
+};
+
+// Identifies the one serialized player PCAR entry corresponding byte-for-byte
+// to the setup-derived record already used to initialize the player state.
+// This binds record identity; it does not claim to instantiate the native
+// PCAR object or run its callbacks.
+struct PlayerPcarTaskBinding {
+    std::size_t stream_record_index{};
+    std::uint32_t serialized_stream_cursor{};
+    std::size_t record_bytes_offset{};
+    std::size_t record_size{};
+};
+
+struct PlayerPcarTaskBindingResult {
+    PlayerPcarTaskBindingStatus status{
+        PlayerPcarTaskBindingStatus::invalid_stream};
+    std::optional<PlayerPcarTaskBinding> binding;
+};
+
+// Finds and validates exactly one player PCAR record in a decoded stream.
+// The expected bytes and cursor must match the retained setup/placement record.
+[[nodiscard]] PlayerPcarTaskBindingResult bind_player_pcar_task_record(
+    const PhysicsTaskRecordStreamRead& decoded_stream,
+    std::span<const std::byte> serialized_stream_bytes,
+    std::span<const std::byte> expected_player_record,
+    std::uint32_t expected_cursor);
+
 // Serializes complete, already reconstructed records using the native stream
 // framing. Invalid or unknown records stop the walk without appending them.
 [[nodiscard]] PhysicsTaskRecordSerialization serialize_physics_task_records(

@@ -1572,6 +1572,7 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamSession> full_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
+    std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
@@ -2920,6 +2921,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     readback.cursor_offset == ordered.cursor_offset &&
                     readback.record_size == ordered.record_bytes.size();
             }
+            if (stream_ok && serialized_stream_offset.has_value()) {
+                const auto binding = viper::bind_player_pcar_task_record(
+                    decoded, stream.bytes, state.player_runtime_car_record,
+                    *serialized_stream_offset);
+                stream_ok = binding.status ==
+                        viper::PlayerPcarTaskBindingStatus::complete &&
+                    binding.binding.has_value();
+                if (stream_ok) state.player_pcar_task_binding = *binding.binding;
+            } else {
+                stream_ok = false;
+            }
         }
         std::size_t materialized_inactive_stat_count = 0U;
         std::size_t unresolved_stat_count = 0U;
@@ -2945,6 +2957,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             std::cout << "; serialized " << stream.records.size()
                       << " ordered records and decoded readback from cursor 0x" << std::hex
                       << stream.initial_cursor << " through 0x" << stream.final_cursor
+                      << std::dec << "; bound player PCAR record index "
+                      << state.player_pcar_task_binding->stream_record_index
+                      << " bound at cursor 0x" << std::hex
+                      << state.player_pcar_task_binding->serialized_stream_cursor
                       << std::dec << "; materialized "
                       << materialized_inactive_stat_count
                       << " inactive STAT task states";
@@ -2954,6 +2970,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         } else {
             state.full_task_record_stream.reset();
             state.full_task_record_readback.reset();
+            state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }
     }
