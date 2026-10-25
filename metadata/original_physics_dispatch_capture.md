@@ -399,3 +399,41 @@ The same child's PCAR input hook recorded throttle rising from `0.3696` at callb
 This is a controlled original-client input-to-PCAR response observation. It confirms that the targeted key-state result reaches the original PCAR throttle scalar path and accompanies increasing body speed, then that speed decreases during coast. It does not establish physical keyboard delivery on this host, the complete throttle transfer function, steering or braking behavior, tire/wheel forces, native field meanings, or parity of the reconstruction's current motion model. The bounded data also does not supply the missing per-wheel history/context rows required to connect production wheel dynamics. No original executable, asset, configuration, or raw memory dump was added to the repository.
 
 After the capture, the race child exited and its launcher displayed `Viper Racing has aborted (-1073740791). Let's check out the log.` A process inventory no longer found `race.bin`; the launcher remained on this dialog. The exit cause was not established and is not attributed to the synthetic input or later UI actions. A subsequent attempt to load the wheel-history probe failed because the Frida connection had closed, so this run adds no wheel-history evidence.
+
+## Additional staged wheel-history capture attempts (2026-10-25)
+
+The staged launcher and `race.bin` were rechecked before another read-only
+history capture. The official launcher SHA-256 remained
+`D75B38228D4B68B2C5EF39252B95E43A9DE16976005C26FAB4491D05CE3D32D4`, the
+staged ISO engine SHA-256 remained
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`, all 32
+staged `Data` files matched the installed set, and staged `Config/options.cfg`
+remained at SHA-256
+`7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`.
+
+An initial suspended launch used the installed launcher with the staged
+directory requested as its working directory. The launcher reset the child
+working directory to the installed `GameRoot\Data`; the bridge detected that
+mismatch and did not suspend or instrument that child. That launcher was closed
+without changing the staged options file. A subsequent launch used the
+hash-matched staged launcher and correctly created a suspended child in the
+staged `GameRoot\Data` directory (PID 41092). The launcher-owned bridge later
+reported resume from suspend count 1, and the bounded first-query
+`GetAvailableVidMem` override applied. The child reached Quick Race setup, but
+its Frida connection had closed before the longer wheel-history probe could be
+loaded. No paired wheel-history rows resulted; the launcher displayed its
+abort dialog and the exit cause remains unknown.
+
+A further staged-launcher retry created child PID 22208 in the expected
+directory and accepted the one-query override hook, but the process connection
+closed before the history probe loaded. The bridge history contained no
+`race_child_resumed` event for that child. This retry also produced no
+simulation samples and does not identify the exit cause.
+
+The capture-only probe copy used a 120-second observation window, passed
+`node --check`, and has SHA-256
+`4DD2D518507212E15D77804C995ED1F90FE9FE9F99230EB043B77C121137029C`. It is
+retained outside the source repository with the other capture artifacts. These
+retries provide launch-path diagnostics only; the runtime `+0x50C` producer,
+wheel `+0x158` pre-copy value, prior `+0xE8`, and their cadence remain
+unobserved.
