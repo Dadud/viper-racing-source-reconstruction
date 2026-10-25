@@ -1603,10 +1603,10 @@ struct PlayerPhysicsTickContext {
     std::uint32_t scheduled_step_count{};
     std::uint64_t outer_update_index{};
     float simulation_time_seconds{};
-    // Post-callback byte-backed body fields in this order: position, linear
-    // velocity, angular velocity, accumulated force, accumulated moment.
-    // Unknown native bytes remain empty rather than becoming zeroes.
-    std::array<std::optional<float>, 15> body_state_after_tick{};
+    // Post-callback byte-backed body fields in this order: orientation basis,
+    // position, linear/angular velocity, accumulated force, accumulated
+    // moment. Unknown native bytes remain empty rather than becoming zeroes.
+    std::array<std::optional<float>, 24> body_state_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
 };
@@ -2296,10 +2296,11 @@ struct WindowState {
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
-        constexpr std::array<std::uint32_t, 15> offsets{
-            0x5cU, 0x60U, 0x64U, 0x50U, 0x54U, 0x58U,
-            0x68U, 0x6cU, 0x70U, 0x24cU, 0x250U, 0x254U,
-            0x258U, 0x25cU, 0x260U};
+        constexpr std::array<std::uint32_t, 24> offsets{
+            0x38U, 0x3cU, 0x40U, 0x44U, 0x48U, 0x4cU,
+            0x50U, 0x54U, 0x58U, 0x5cU, 0x60U, 0x64U,
+            0x234U, 0x238U, 0x23cU, 0x240U, 0x244U, 0x248U,
+            0x24cU, 0x250U, 0x254U, 0x258U, 0x25cU, 0x260U};
         for (std::size_t index = 0U; index < offsets.size(); ++index) {
             const auto bits = viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offsets[index]);
@@ -3526,6 +3527,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",control_flag_509360,control_difference_509344,control_flag_509420"
             ",control_difference_509340,control_shift_latch_509354"
             ",control_counter_5093bc,keyboard_snapshot_hex"
+            ",body_basis_0,body_basis_1,body_basis_2,body_basis_3,body_basis_4"
+            ",body_basis_5,body_basis_6,body_basis_7,body_basis_8"
             ",body_pos_x,body_pos_y,body_pos_z,body_vel_x,body_vel_y,body_vel_z"
             ",body_ang_x,body_ang_y,body_ang_z,body_force_x,body_force_y,body_force_z"
             ",body_moment_x,body_moment_y,body_moment_z";

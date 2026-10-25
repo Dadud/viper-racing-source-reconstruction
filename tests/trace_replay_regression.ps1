@@ -61,6 +61,11 @@ try {
     $tickTimeColumn = [Array]::IndexOf($tickHeader, 'simulation_time')
     $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
     $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
+    $bodyBasisColumns = [int[]]::new(9)
+    for ($basis = 0; $basis -lt 9; ++$basis) {
+        $bodyBasisColumns[$basis] = [Array]::IndexOf(
+            $tickHeader, "body_basis_$basis")
+    }
     $bodyPositionColumns = @(
         [Array]::IndexOf($tickHeader, 'body_pos_x'),
         [Array]::IndexOf($tickHeader, 'body_pos_y'),
@@ -91,7 +96,8 @@ try {
         $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
-    if (@($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+    if (@($bodyBasisColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($bodyMotionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
@@ -129,7 +135,7 @@ try {
             $fields[$tickInputColumn].Length -ne 512) {
             throw "Fixed-step input/timing snapshot is invalid at line $($index + 1)"
         }
-        foreach ($column in $bodyPositionColumns) {
+        foreach ($column in $bodyBasisColumns + $bodyPositionColumns) {
             $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)
             if ([single]::IsNaN($value) -or [single]::IsInfinity($value)) {
                 throw "Body position snapshot is non-finite at line $($index + 1)"

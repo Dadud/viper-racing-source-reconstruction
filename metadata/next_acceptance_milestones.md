@@ -33,9 +33,10 @@ This is a provenance boundary feeding the existing projections; it does not
 make their route-driven movement or terrain/contact samples physics-owned.
 The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
-per-tick controls/timing plus post-callback byte-backed body position,
-velocities, force/moment accumulators, and wheel contact-active/projected-depth
-state. Unknown body fields and unsuccessful wheel depths remain blank. The
+per-tick controls/timing plus post-callback byte-backed body orientation basis,
+position, native linear/angular velocity (`+0x234/+0x240`), force/moment
+accumulators, and wheel contact-active/projected-depth state. Unknown body
+fields and unsuccessful wheel depths remain blank. The
 trace replay regression checks contiguous tick ordering, pre-increment timer
 values, logical-input provenance, input snapshot size, finite body/contact
 samples, and byte-identical repeated playback. The body values currently expose
