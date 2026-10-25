@@ -63,3 +63,18 @@ temporary links and mount were removed. The prior `-no3dfx` launch argument is
 not recognized by the recovered command-line parser and should not be treated
 as a valid bypass test. A 32-bit API trace is required to identify the failing
 DirectDraw boundary before another workaround is selected.
+
+### Direct-spawn Frida trace
+
+The follow-up private capture
+`../../analysis/reference_captures/original_ddraw_frida_20261025T022949Z.json`
+attached Frida to `race.bin` as an IA-32 process and installed hooks on both
+the raw DirectDraw exports and the `apphelp.dll`-forwarded export addresses
+before resuming it. The process remained responsive with the window title
+`MGI`, but neither export was called and no graphics dialog appeared. This
+direct-spawn path therefore stalled before the observed DirectDraw boundary;
+it did not produce an HRESULT and is not equivalent to launching through the
+original launcher. The launcher handoff is still untraced. Cleanup was
+verified: the process, temporary `Data` junction, staging directory, and ISO
+mount were removed, and hashes of the original launcher, engine, and ISO
+remained unchanged.
