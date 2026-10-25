@@ -117,7 +117,12 @@ constructor vtable/`+0x50C`, and settings-derived shift/clutch/yaw plus wheel
 traction/ABS fields in persistent byte-backed body/wheel objects with
 initialized-byte masks. It still does not dispatch native PCAR callback
 `0x4384D0` or execute shared integrator `0x431150`; it lacks their runtime
-body, timer, table, and callback transitions. Wheel `+0xE8`
+body, timer, table, and callback transitions. Two constructor inputs also
+remain unresolved: `+0x4F4` copies global `0x508794`, set from the physics
+session's incoming mode word, and `+0xD74` stores the result of a helper that
+samples gated control state at global `0x509328`. The mapping of session modes
+and that control state to reconstruction-owned inputs must be established
+before those bytes are materialized. Wheel `+0xE8`
 is interpolated from adjacent five-byte samples by `0x444240`, using records
 selected through `0x427630` and a fraction derived from global tick and object
 timing fields. This particular `0x3C`-stride ring is owned by the

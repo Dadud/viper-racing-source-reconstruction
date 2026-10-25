@@ -1202,6 +1202,11 @@ native update paths before they affect motion. Evidence: `0x4381E0`
 and game-mode accessor `0x425860`
 `ev_1c3a9bf935b6573c5a7c6279f49730c305e395a1f150383e8dc332cb85662528`.
 The first `0x43BA90` helper result is also stored as a byte at PCAR `+0xD74`.
+The accessor `0x425860` returns global `0x508794`; physics-session initializer
+`0x425420` copies its incoming session word into that global. The mapping from
+the reconstruction's selected mode to this native session word is unresolved.
+`0x43BA90` samples control state through global `0x509328` when gate
+`0x5093A0` is clear, but that state is not yet mapped to a configured binding.
 The model now retains that raw byte only when an observation is supplied;
 helper polarity/state and the second helper result's live source are not
 reconstructed, so runtime leaves `+0xD74` unknown. Evidence:
