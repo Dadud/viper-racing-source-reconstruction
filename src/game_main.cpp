@@ -3061,8 +3061,28 @@ struct WindowState {
                         &timestamp_write, 1U))) return false;
         }
 
-        // 0x43869C calls 0x43B880 after timestamp handling. The separate
-        // linked-target 0x434A80 effect is still unresolved here.
+        // The 0x43867F linked callback always refreshes body +0xE28 from
+        // gate global +0x5093F8. Target mutation is disabled in this model
+        // until the native enable globals and ordinal target lookup are
+        // session-owned; its unconditional cache store is still exact.
+        auto linked_target_fields = viper::NcarLinkedTargetFields{};
+        std::uint8_t linked_gate_cache{};
+        const std::array<std::uint32_t, 12> unused_linked_state{};
+        const std::array<float, 3> unused_linked_vector{};
+        const auto linked_callback = viper::run_ncar_linked_callback(
+            linked_target_fields, linked_gate_cache,
+            static_cast<std::uint8_t>(pcar_callback_globals.gate_0x5093f8),
+            false, 0, false, unused_linked_state, unused_linked_vector,
+            unused_linked_state, tick_context.simulation_time_seconds, false);
+        if (linked_callback.called_target_update) return false;
+        const viper::NcarObjectFieldWrite linked_gate_write{
+            0xe28U, 1U, linked_gate_cache};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                std::span<const viper::NcarObjectFieldWrite>(
+                    &linked_gate_write, 1U))) return false;
+
+        // 0x43869C calls 0x43B880 after the linked callback.
         // Its pushes map object +0xEB0, +0xEA8, +0xEAC to globals
         // +0x509384, +0x509388, +0x5093A4 respectively. Preserve the raw
         // DWORDs and only advance this global snapshot when every source byte
@@ -3079,8 +3099,7 @@ struct WindowState {
 
         // Preserve the native shared-global getter stores that precede the
         // late callback tail: 0x43BA00 -> +0x4F0 (float), then 0x43BA20
-        // -> +0x4EC (byte). The linked-target 0x434A80 effect remains
-        // unresolved; the raw 0x43B880 global stores are applied above.
+        // -> +0x4EC (byte). The raw 0x43B880 global stores are applied above.
         const std::array<viper::NcarObjectFieldWrite, 2> callback_cache_writes{{
             {0x4f0U, 4U, std::bit_cast<std::uint32_t>(
                 pcar_callback_globals.value_0x509344)},
@@ -3093,8 +3112,8 @@ struct WindowState {
         }
 
         // These stores are the observed late PCAR callback tail. The
-        // 0x434A80 linked-target call before the cache stores is not yet
-        // connected, so apply the modeled tail only with observed inputs.
+        // 0x434A80 target mutation remains disabled because its enable and
+        // lookup inputs are not observed in the live session.
         const auto tail_c3c = body_u8(0xc3cU);
         const auto tail_c3d = body_u8(0xc3dU);
         const auto tail_c7c = body_float(0xc7cU);

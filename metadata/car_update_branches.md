@@ -362,9 +362,10 @@ initialized in the session owner. Unknown tail inputs skip that projection;
 they no longer abort the race update. The exact `0x43B880` three-DWORD global
 store now runs after the timestamp path when body `+0xEB0/+0xEA8/+0xEAC` are
 initialized, mapped in native push order to globals `+0x509384`, `+0x509388`,
-and `+0x5093A4`; otherwise the session retains its prior shared-global values. The
-preceding linked-target `0x434A80` call and its target lookup remain outside
-the production path. The preceding `0x43BA00` and
+and `+0x5093A4`; otherwise the session retains its prior shared-global values.
+The preceding `0x434A80` call now applies its unconditional body `+0xE28`
+cache-byte refresh from gate global `+0x5093F8`; its target lookup and target
+mutation remain outside the production path. The preceding `0x43BA00` and
 `0x43BA20` getter outputs now store the current modeled `+0x509344` float at
 `+0x4F0` and `+0x509420` byte at `+0x4EC`, in the observed order. The earlier
 linked-target `0x434A80` effect remains absent. The `0x43BA10` input to the tail
@@ -997,8 +998,10 @@ dwords at `0x5081A8` and a zero vector; otherwise it passes the instance data
 at `+0x38` and `+0x234`. Both cases pass current time as the sample parameter,
 so the age gate in `0x43AD70` sees zero elapsed time. The wrapper stores the
 new `+0xE28` byte on every call, including calls that do not update a target.
-`run_ncar_linked_callback` models this dispatch and cache write. The global
-enable bytes and target lookup are explicit inputs rather than hidden globals.
+`run_ncar_linked_callback` models this dispatch and cache write. Production
+calls it with target updates disabled, preserving the unconditional cache-byte
+store without mutating an unobserved linked target. The global enable bytes and
+target lookup remain explicit inputs rather than hidden globals.
 
 ### NCAR timed interpolation callback
 

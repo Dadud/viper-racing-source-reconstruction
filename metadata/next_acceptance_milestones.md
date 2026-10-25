@@ -92,7 +92,8 @@ branch still requires an initialized timestamp. A controlled original capture
 observed the false gate and zero value at the callback join; the enabled
 backend path remains unavailable. The direct `0x43B880` global stores now run
 when their three byte-backed PCAR source DWORDs are initialized; the
-`0x434A80` linked-target update remains unavailable. The native task factory,
+`0x434A80` unconditional `+0xE28` cache-byte refresh is connected, while its
+linked-target update remains unavailable. The native task factory,
 interpolation ring, post-integrator callback work, and shared body-step
 integrator are not connected. Route kinematics still own player and opponent
 motion.
@@ -289,7 +290,8 @@ rendered pose. The gated late tail stores at `+0xC3C`, `+0xDE0`, `+0xDE4`, and
 preceding cache getters store `+0x509344` as a float at `+0x4F0` and
 `+0x509420` as a byte at `+0x4EC`. The value passed to the `+0x508` helper is
 still the current `+0x509340` projection because the earlier timestamp,
-`0x434A80`, and other callback effects remain incomplete; `0x43B880` is
+`0x434A80` target mutation, and other callback effects remain incomplete;
+`0x43B880` is
 applied conditionally from initialized object fields. The runtime does not yet
 reproduce complete PCAR callback `0x4384D0` or shared integrator `0x431150`; it
 lacks the runtime timer and earlier shared-cache callback producers, native
