@@ -115,7 +115,11 @@ The production session stores the shared body constructor's position, basis,
 dimensions, inertia matrices, velocity/accumulator clears, derived PCAR
 constructor vtable/`+0x50C`, and settings-derived shift/clutch/yaw plus wheel
 traction/ABS fields in persistent byte-backed body/wheel objects with
-initialized-byte masks. On each race update, the modeled callback's opening
+initialized-byte masks. The session now also applies the constructor's known
+embedded curve/selector defaults at `+0xBFC` and `+0xC98` to that same byte
+owner. Runtime selector table entries and PCAR curve/profile producers remain
+unavailable, so the embedded update helpers are not yet dispatched. On each
+race update, the modeled callback's opening
 `+0xDE0/+0xDE4/+0xDE8/+0xDEC` scalar stores are now written into that same
 body owner and traced alongside their modeled values; the current multiplier
 remains the explicit `0x40D270 = 1.0` startup fallback. This does not execute

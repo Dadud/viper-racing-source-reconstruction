@@ -89,6 +89,17 @@ int main()
         require(viper::read_ncar_body_object_u32(body_runtime_state, 0x234U) == 0U &&
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0x50cU),
             "body reads must expose initialized velocity but keep unwritten derived state unknown");
+        const auto constructor_subobjects =
+            viper::plan_ncar_constructor_subobject_defaults();
+        require(constructor_subobjects.constructor_tail_source_unknown &&
+                !constructor_subobjects.embedded_curve_selector_writes.empty() &&
+                viper::apply_ncar_body_object_writes(body_runtime_state,
+                    constructor_subobjects.embedded_curve_selector_writes) &&
+                read_body_dword(0xbfcU) == 0x004c8780U &&
+                read_body_dword(0xc98U) == 0x004c8778U &&
+                read_body_dword(0xcb0U) == 0U &&
+                !viper::read_ncar_body_object_u32(body_runtime_state, 0xcc4U),
+            "known curve/selector constructor defaults must persist without fabricating its table");
         const std::array<viper::NcarObjectFieldWrite, 2> pcar_derived_writes{{
             {0x50cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
             {0x00U, 4U, 0x004c8188U},

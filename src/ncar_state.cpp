@@ -2390,7 +2390,12 @@ NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
     const auto write = [&](const std::uint32_t offset,
                            const std::uint8_t width,
                            const std::uint32_t bits) {
-        result.writes.push_back({offset, width, bits});
+        const NcarObjectFieldWrite field{offset, width, bits};
+        result.writes.push_back(field);
+        if ((offset >= 0x0bfcU && offset < 0x0c98U) ||
+            (offset >= 0x0c98U && offset < 0x0d04U)) {
+            result.embedded_curve_selector_writes.push_back(field);
+        }
     };
 
     // 0x440100 at parent +0xBFC. Its inherited 0x43F8F0 base is followed

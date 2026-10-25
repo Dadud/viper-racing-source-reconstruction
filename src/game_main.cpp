@@ -1620,6 +1620,15 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
+        const auto constructor_subobjects =
+            viper::plan_ncar_constructor_subobject_defaults();
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                constructor_subobjects.embedded_curve_selector_writes)) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
         player_body_inverse_mass_0x200 =
             player_body_constructor_plan->reciprocal_dimensions_0x200_to_0x20c[0];
         player_wheel_core_initialization =

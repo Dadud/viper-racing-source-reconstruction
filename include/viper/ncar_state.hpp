@@ -301,6 +301,9 @@ struct NcarBodyRuntimeObjectState {
 
 struct NcarConstructorSubobjectDefaultsPlan {
     std::vector<NcarObjectFieldWrite> writes;
+    // Known embedded curve/selector defaults only; excludes unresolved source
+    // record tail values and runtime-populated selector table entries.
+    std::vector<NcarObjectFieldWrite> embedded_curve_selector_writes;
     std::size_t update_curve_subobjects_initialized{};
     std::size_t selector_subobjects_initialized{};
     std::size_t linked_state_subobjects_initialized{};
