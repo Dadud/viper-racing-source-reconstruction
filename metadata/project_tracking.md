@@ -31,25 +31,28 @@ original-matched game.
 | Original comparison | Original launcher has been made to reach its main menu, quick-race setup, grid and 3D scene using a process-local VRAM workaround; bounded input and state captures exist. | No controlled complete original race has been compared with the reconstruction. |
 
 The full acceptance criteria and exact supporting evidence remain in the
-[completion ledger](completion_ledger.md). A bounded original-client probe
-attempt on 2026-10-25 suspended `race.bin` and installed read-only hooks, but
-the instrumentation provider could not resume the launcher-owned thread. The
-child was recovered and resumed; this attempt produced no simulation samples
-and is explicitly not counted as implementation or parity progress.
+[completion ledger](completion_ledger.md). A successful launcher-owned capture
+on 2026-10-25 applied a bounded synthetic DIK_UP pulse and observed the
+original PCAR throttle and speed response. This establishes input-to-motion
+evidence for that intervention, but does not capture wheel-force producers or
+provide a paired reconstruction baseline. Separate Frida Stalker attempts
+crashed in `frida-agent.dll`; their failure is documented in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md)
+and must not be conflated with the successful throttle capture.
 
 ## Fastest correct path to the first accepted race
 
 Treat one Viper/Bemidji single-player race as the release gate. Work in this
 order, and keep later systems out of the gate until this race is reliable:
 
-1. **Close the input-to-motion evidence loop.** Resume the original client
-   through a capture flow that keeps the launcher-created child suspended,
-   installs hooks, and resumes that same child thread. Timestamp the synthetic
-   DIK_UP intervention together with throttle, force/moment accumulator,
-   body position, velocity and integrator entry/return. Repeat with steering,
-   brake and reset. Preserve the existing data working directory and compare
-   hashes before/after. Use this to decide which existing physics models have
-   complete inputs; keep unknown stores fail-closed.
+1. **Complete the input-to-force evidence loop.** Reuse the verified
+   launcher-owned child flow and the existing bounded DIK_UP throttle capture.
+   The remaining capture must correlate the same intervention with per-wheel
+   force contributors, `+0x24C/+0x258` accumulators, and body position and
+   velocity at `0x431150` entry/return. The current Stalker probe is unsafe in
+   this setup because Windows crash reports identify `frida-agent.dll` as the
+   faulting module. Use a native debugger or validate a lower-overhead capture
+   method before expanding instrumentation; keep unresolved stores fail-closed.
 2. **Implement the smallest complete physical player step.** Connect contact
    observations, per-wheel force contributors and accumulator collection to
    the byte-backed PCAR state only when every consumed field and callback
@@ -76,14 +79,14 @@ order, and keep later systems out of the gate until this race is reliable:
 
 ### Immediate next task
 
-Make the suspended-child capture deterministic and resumable with REA. The
-last attempt has a known failure: `resume_frida_session` only resumes a spawn
-owned by that session, whereas the original launcher created the child. The
-capture script should let the launcher-owned delayed `ResumeThread` fire after
-the child hooks are installed, or invoke `ResumeThread` from the launcher
-session itself, and must verify the suspend count reaches zero before waiting
-for samples. Then use the capture to populate the remaining per-wheel force
-inputs before touching live physics integration.
+Resolve the Frida-agent crash boundary before another wheel-producer capture.
+The verified original launcher flow already supports suspending `race.bin`,
+installing bounded hooks, resuming the child, and capturing the synthetic
+throttle response. Do not repeat the earlier resume-flow investigation. First
+validate an available native debugger or a lower-overhead probe on a bounded
+run; then capture the per-wheel contributor inputs alongside
+`+0x24C/+0x258` and body kinematics. Until those producers are identified and
+session-owned, leave live body integration disconnected.
 
 ## Completion rule
 
