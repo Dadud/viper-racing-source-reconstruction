@@ -1357,3 +1357,98 @@ The model now retains that raw byte only when an observation is supplied;
 helper polarity/state and the second helper result's live source are not
 reconstructed, so runtime leaves `+0xD74` unknown. Evidence:
 `0x4381E0` `ev_365b74f41f3ffe8a5d0ca349ed3801a7069ccd56fe16be69203abbe524a123f4`.
+
+### Controlled PCAR shared-integrator state sample
+
+#### Second registration dispatch (`0x49C1F0`)
+
+Static Ghidra analysis shows `0x43DFB0` calls `0x49C1F0` during the derived
+PCAR constructor. `0x49C1F0` first checks `0x49BE40`; when that readiness gate
+is true, it initializes the subsystem through `0x49C7A0`, dispatches the two
+constructor arguments through `DAT_004E322C`'s interface vtable slot `+0x78`,
+then calls `0x49C8E0` for teardown/finalization. This is a plausible placement
+handoff boundary, but static call shape does not establish the virtual target
+or prove that it writes body pose.
+
+A bounded read-only Frida attempt against the already-running PID 25904 found
+`DAT_004E322C` null at the sampled process state, so the interface and slot
+could not be resolved. No pointer was dereferenced beyond the null global and
+the attachment ended automatically. The readiness gate's false state in this
+snapshot does not establish what happens during race loading; the pose handoff
+remains unresolved. Static evidence is in
+`../../analysis/reference_captures/viper_second_registration_static_20261025.evidence.json`
+(Ghidra records `ev_92e0c3de48b60c960b4714e3e69da17731567770d25769ad98be4e99d579679d`
+and `ev_0e4cae09590de2e6eea747d730b5f1d08ec6ed7dc1f7dfba0e5cfdc573624561`);
+the bounded runtime observation is `ev_11d8079166884f2e56e1a82e5e6bf1cc916edbf9e4446e7a4f1ca202db3912fe`.
+
+Next probe: capture the global and vtable when the constructor actually enters
+`0x49C1F0` during race loading, then inspect the exact `+0x78` target and its
+body/side effects before implementing any pose transfer.
+
+A bounded Frida attachment to the already-running original `race.bin` (PID
+25904; SHA-256 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`)
+hooked shared integrator `0x431150` at entry and return for the same PCAR
+object `0x4ca20cc`. Three corrected paired calls were captured without input
+intervention. All four wheel contact bytes were `1`, and PCAR timestamp `+0xECC`
+was `0` throughout. Position, linear velocity, angular velocity, and the body
+matrix at `+0x38` were read at entry and return. The first pair moved position
+from `(228.7533722, 0.5111573, -100.1115265)` to
+`(228.7533417, 0.5111573, -100.1115265)` and changed linear velocity from
+`(-0.00168662, 0.00000593, 0.00024277)` to
+`(-0.00187095, -0.00000163, -0.00014990)`. Its orientation began
+`(-0.9999033, 0.00006466, 0.0139052, 0.00005858, 1, -0.00043765, ...)` and
+was unchanged by the end of that call at single-precision resolution. A prior
+six-pair instrumentation attempt in this evidence bundle read orientation at
+`+0x0E`, which is not the body-matrix address; its orientation values are
+excluded from this result.
+
+This directly establishes that the native integrator advances the live body
+state for the sampled PCAR. It is not an input-driven race baseline and does not
+identify how scene placement is first copied into the body orientation and
+position fields. The serialized `0x1E4` record goes through `0x463510` into the
+record reader `0x425720`, which reads the record and calls factory `0x422580`.
+The PCAR factory allocates `0xEF0` bytes and calls `0x4381E0`. After the
+constructor, the loader's virtual `+0x2C` gate may call `0x426F20`, which writes
+the native ordinal at object `+0x34` and advances a global counter; it does not
+copy the placement matrix. The shared base constructor path `0x43E490` calls
+`0x4375C0`, which initializes body position `+0x5C..+0x64` to zero and basis
+`+0x50..+0x58` to `(0, 0, 1)`. In the same running process, a read-only Frida
+snapshot resolved the global interface used by `0x43DFB0`'s virtual `+0x2C`
+call to vtable `0x4c84d8`, slot target `0x43ca90`. The target's observed
+instruction sequence associates the body pointer with its ordinal, calls
+`0x43ca00`, and initializes manager-side flags. `0x43ca00` records the body
+pointer in the manager's indexed slot, allocates a separate `0x70`-byte record,
+sets body `+0x4FC = 0`, and clears the manager record through `0x43c950`; these
+effects do not copy the scene transform to body position/orientation. This
+narrows the remaining constructor gap: `0x43DFB0`'s second subsystem
+registration through `0x49c1f0` and later runtime synchronization still need
+inspection. Do not seed the live integrator from yaw-only route pose or assume
+the placement record is the body matrix until that transfer is traced. The
+attachment may perturb timing and represents only this running instance.
+
+The complete private evidence bundle is
+`../../analysis/reference_captures/viper_body_constructor_and_integrator_20261025.evidence.json`.
+The corrected entry/return samples are in capture record
+`ev_56eb274701328c226a16081c4230fa4d62fa84712048c94f6c59ce6473f9117b`,
+script `4d998d04-e832-4ed0-a76b-4dc850b0d7bc`. Constructor and delegation dossiers are
+`ev_4b3c767956ed2838f5f97ea880abf3b1fdec0624bf9ffb41d9b54ba1891c7889`
+(`0x4381E0`), `ev_feefea8447a3a65f61cb349cdc59190de6a96f6d2c0652ff468fb93d826a7864`
+(`0x43DFB0`), `ev_188f23266930a8dddb21b4d48cc3f890b1c8ef3c31663ffc607bcccc229a5f96`
+(`0x42FF90`), `ev_cddb7e08b5efadc854ea2056b1e8341b4c14e1a23d6199e65d179aba2bac06e0`
+(`0x43E490`), and `ev_92e0c3de48b60c960b4714e3e69da17731567770d25769ad98be4e99d579679d`
+(`0x49C1F0`). The record-to-object path is bounded by `0x463510`
+`ev_f45cb1f8639c9e29051bf2e3dd86492c5c5785095fae94a8f70e72f0007cf359`,
+`0x425720` `ev_ba7c2afe0cea1b8ac035b877fcb66094822ac8ab525d2a70a8e196e787dde737`,
+factory `0x422580` `ev_16e9359e1fff260aa38cf33c56d1c882043ea11712c8fa31761a929ff9f41f37`,
+loader tail `0x4224D0` `ev_a400cb5ab86f7098dfd08c8099bbb812751892d0e3b03cc4de1165538324a68f`,
+and ordinal initializer `0x426F20`
+`ev_679ba033cbc016893b07a56810d23e21cb9712c49fc0d662992f9d535db8e3f7`.
+The base constructor's direct-zero/identity writes are in `0x4375C0`
+`ev_9e4c9ac64a512fb9fd594e3f39306aec6bcd9dff7a1ad97eda6e4521dc349f68`.
+The runtime-resolved vtable slot comes from the read-only Frida record
+`ev_d584076f241de5f417eb0d3e93b12d38286329fc88995874d2c9feba870d1e9f`;
+the first target instruction and its vtable data reference are
+`ev_5ec78751a4e3ffabd52b260faa75ace405a74bd43caebb6d4aeb706590a299b6`.
+The registrar bodies are `0x43CA00`
+`ev_86206c193a2ee0b15855fe49958b44f8478ff027ac1ab72fa6daf037161ab819` and
+`0x43C950` `ev_3c2fcc04e3969be87660adc7c9c740282ccc2a76f9479a60ba26f4e338493a49`.

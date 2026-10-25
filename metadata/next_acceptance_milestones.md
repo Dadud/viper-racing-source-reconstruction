@@ -46,6 +46,17 @@ backend path remains unavailable. The earlier `0x434A80` /
 `0x43B880` callback effects, the native task factory, interpolation ring,
 post-integrator callback work, and shared body-step integrator are not
 connected. Route kinematics still own player and opponent motion.
+Three paired Frida snapshots at the original PCAR integrator entry/return prove
+that `0x431150` changes position and linear/angular velocity for a grounded
+near-stationary object (`metadata/car_update_branches.md`). The PCAR constructor
+receives the serialized record through the `0x463510` → `0x425720` → `0x422580`
+loader/factory path. Its base constructor initializes position to zero and a
+separate basis to `(0,0,1)`; the post-constructor loader only assigns the native
+ordinal. A runtime-resolved manager slot points to `0x43CA90`; its registrar
+stores the body pointer by ordinal and initializes sidecar state but does not
+copy placement into body pose. The second registration subsystem and later
+runtime synchronization remain unresolved. This is evidence that native body
+state evolves, not a runtime integration or an input-driven baseline.
 The session now also retains one ordered semantic task collection from the
 validated serialized stream: finite CHKP geometry and supported inactive STAT
 state are materialized, while other records remain explicit as unavailable
