@@ -540,6 +540,14 @@ callback with its `+0xF4` result and PCAR `+0x24C/+0x258` deltas under separate
 coast, throttle, steering, and braking windows; capture identity and static
 Evidence IDs are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+An additional filtered, read-only original sample retained eight consecutive
+PCAR wheel rows in two four-wheel groups. It confirms the four callback slots
+change body force/moment accumulators while body position and velocity remain
+constant within each wheel callback; wheel `+0x158` was stable within the call
+while `+0xE8` and response fields changed. All sampled controls were zero, so
+this is only an uncontrolled coast ordering observation. Capture the body
+after the full integrator and repeat the bounded four-control schedule before
+using these rows to wire or validate the production body step.
 The trace now carries contact-gate status, raw and clamped depth, byte-backed
 prior `+0xE8` and pre-update `+0x158`, the finite-checked base suspension
 response, and the trace-only surface polarity/projection/adjustment stage.

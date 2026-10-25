@@ -1277,3 +1277,37 @@ Their script hashes, schedules, and the private export path are recorded in
 The next capture should trace remaining live suspension/tire inputs at
 `0x442530` back to their producers, then correlate those inputs with per-wheel
 `+0xF4` and PCAR force/moment deltas.
+
+### Filtered live PCAR wheel callback sample (2026-10-25)
+
+A second read-only Frida sample attached to PID 36860 and hooked the entry and
+return of `0x442530`, retaining only the body whose vtable was `0x4C8188`
+(PCAR). Over 900 ms, the hook observed 1,824 total calls to the function; 228
+had the PCAR vtable. Eight PCAR wheel rows were retained, two consecutive
+four-wheel groups at body-relative offsets `0x554`, `0x6F8`, `0x89C`, and
+`0xA40`. All retained input globals were zero (coast). The byte-sized active
+field `+0x168` was 1 for all eight rows; `+0x19C` was 10 only on the fourth
+wheel in the first group and zero in the other retained rows.
+
+Across each of the eight callback boundaries, wheel `+0x158` stayed unchanged
+while `+0xE8` and response/projection fields changed. Body position and linear
+velocity stayed unchanged within each wheel callback, while body accumulators
+`+0x24C..+0x260` changed after every wheel. For example, the first retained
+wheel callback changed linear force from `(0,0,0)` to approximately
+`(51.6773, 4030.5847, 407.8233)` and moment from `(0,0,0)` to approximately
+`(2470.4641, 502.4400, -5276.0566)`. This gives a useful ordered writer/result
+boundary for the PCAR, but it is one uncontrolled coast sample from an
+already-running, instrumented session. It is not clean-start or controlled
+input parity, and no complete force law can be inferred from eight rows. The
+probe reported no artifact digest or process architecture; the PID/path
+association is to the previously identified live `race.bin` session, whose
+SHA-256 was `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`.
+Evidence `ev_8deb7ade5c628b257b2de9d08da626b79bba0c43afaa64327c77797e20304a3c`.
+
+The next controlled sample should keep this PCAR-only vtable filter, capture
+all four ordered wheel calls plus the body state immediately after the full
+integrator, and record `+0xE8`, pre-update `+0x158`, `+0xF4`, and `+0x24C..+0x260`
+before/after each stage. Repeat the bounded throttle, steering, braking, and
+coast schedule with input globals in the same row. The current sample only
+establishes coast-call ordering and accumulator writes; it does not source the
+remaining tire inputs or validate reconstruction output.

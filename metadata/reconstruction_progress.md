@@ -1,5 +1,16 @@
 # Reconstruction progress
 
+- **2026-10-25, filtered live PCAR wheel/accumulator sample:** A read-only
+  Frida hook retained eight `0x442530` rows for the original PCAR vtable,
+  covering two ordered four-wheel calls. In this uncontrolled coast window,
+  all sampled controls were zero; all active bytes were one; wheel `+0x158`
+  stayed stable within each call, `+0xE8` changed, and body force/moment
+  accumulators changed after every wheel while body position/velocity remained
+  constant within the call. This sharpens the next controlled capture around
+  post-integrator state and input-to-accumulator deltas, but provides no
+  controlled parity or complete force law. Evidence and limits are recorded
+  in [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+
 - **2026-10-25, surface polarity and response diagnostics:** Modeled the
   process-shared polarity stream using the observed QPC millisecond timer path
   and native fallback, then recorded each wheel's `0 -> -1`, nonzero `-> +1`
