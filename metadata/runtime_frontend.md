@@ -19,14 +19,14 @@ to 99; its initial value comes from `GAME.laps`. Original GameData and
 Use Up/Down to choose a track, Left/Right to choose a car, `[`/`]` to choose
 one of the eight Easy, Intermediate, Hard, and Career 1–5 opponent profiles,
 and Enter to load the assets and start the existing race session. Press `K`
-for the keyboard controls page. Select steering left/right, throttle, or brake
-with keys 1–4, press the desired supported key to bind it, or Backspace to
+for the keyboard controls page. Use Up/Down to select any of the thirteen
+named actions from `options.def`, Enter to capture a key, or Backspace to
 unbind it. Press `R` to restore the binding values from the installed
-`options.def`; Escape returns to race setup. The four effective bindings are
-saved in version-4 `Config/viper-racing-setup.cfg` alongside selection
-preferences, while versions 1–3 remain readable and `options.def` is never
-modified. Only these four bindings currently affect the live route-motion
-prototype. During a
+`options.def`; Escape returns to race setup. All thirteen remaps are saved in
+version-5 `Config/viper-racing-setup.cfg` alongside selection preferences;
+versions 1–4 remain readable, including their previously saved actions, and
+`options.def` is never modified. Only actions already consumed by the live
+runtime affect current gameplay. During a
 race, press P to
 pause or resume. Pause clears held gameplay controls, freezes player/opponent
 simulation and race time, and stops the looping engine buffers. Resume resets

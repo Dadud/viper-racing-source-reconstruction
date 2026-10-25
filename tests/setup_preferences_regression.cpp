@@ -31,8 +31,9 @@ int main()
     check(missing.file_missing && !missing.selection && missing.error.empty(),
         "missing preference is a safe first-run state");
 
-    const std::array<std::optional<std::string>, 4> bindings{
-        "Key_A", "Key_D", "Key_W", std::string{}};
+    const std::array<std::optional<std::string>, 13> bindings{
+        "Key_A", "Key_D", "Key_W", std::string{}, "Key_S", "Key_R",
+        "Key_C", "Key_L", "Key_Q", "Key_E", "Key_B", "Key_Z", "Key_X"};
     const auto first_save = viper::save_setup_selection_preference(root,
         {"Bemidji", "Sports", 3U, std::nullopt, bindings});
     check(first_save.saved && first_save.path == root / "viper-racing-setup.cfg",
@@ -44,8 +45,23 @@ int main()
         loaded.selection->control_bindings[0] == "Key_A" &&
         loaded.selection->control_bindings[1] == "Key_D" &&
         loaded.selection->control_bindings[2] == "Key_W" &&
-        loaded.selection->control_bindings[3] == "",
-        "round-trips selector settings, keyboard overrides, and explicit unbound state");
+        loaded.selection->control_bindings[3] == "" &&
+        loaded.selection->control_bindings[4] == "Key_S" &&
+        loaded.selection->control_bindings[7] == "Key_L" &&
+        loaded.selection->control_bindings[12] == "Key_X",
+        "round-trips all 13 keyboard overrides and explicit unbound state");
+    {
+        std::ofstream legacy_v4(root / "viper-racing-setup.cfg", std::ios::binary);
+        legacy_v4 << "VIPER-RACING-SETUP 4\ntrack=bemidji\ncar=sports\nlaps=3\n"
+            "opponent_strength=2\nsteer_left=Key_A\nsteer_right=Key_D\n"
+            "throttle=Key_W\nbraking=Key_S\n";
+    }
+    const auto legacy_v4 = viper::load_setup_selection_preference(root);
+    check(legacy_v4.selection &&
+        legacy_v4.selection->control_bindings[0] == "Key_A" &&
+        legacy_v4.selection->control_bindings[3] == "Key_S" &&
+        !legacy_v4.selection->control_bindings[4],
+        "loads version-4 preferences with the original four bindings");
 
     const std::vector<std::string> tracks{"bemidji", "dundas"};
     const std::vector<std::string> cars{"viper", "sports"};

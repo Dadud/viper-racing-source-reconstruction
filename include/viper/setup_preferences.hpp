@@ -16,9 +16,9 @@ struct SetupSelectionPreference {
     std::string car;
     std::optional<std::uint32_t> laps;
     std::optional<std::uint32_t> opponent_strength;
-    // Optional overrides for the four keyboard actions consumed by the live
-    // route-motion prototype. Empty strings explicitly mean unbound.
-    std::array<std::optional<std::string>, 4> control_bindings{};
+    // Optional overrides for the 13 named keyboard actions in options.def.
+    // Empty strings explicitly mean unbound.
+    std::array<std::optional<std::string>, 13> control_bindings{};
 };
 
 struct SetupPreferenceLoadResult {

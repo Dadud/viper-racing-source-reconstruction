@@ -24,9 +24,12 @@ constexpr std::string_view header_v1 = "VIPER-RACING-SETUP 1\n";
 constexpr std::string_view header_v2 = "VIPER-RACING-SETUP 2\n";
 constexpr std::string_view header_v3 = "VIPER-RACING-SETUP 3\n";
 constexpr std::string_view header_v4 = "VIPER-RACING-SETUP 4\n";
+constexpr std::string_view header_v5 = "VIPER-RACING-SETUP 5\n";
 
-constexpr std::array<std::string_view, 4> binding_names{
-    "steer_left", "steer_right", "throttle", "braking"};
+constexpr std::array<std::string_view, 13> binding_names{
+    "steer_left", "steer_right", "throttle", "braking", "e_brake",
+    "reverse", "clutch", "airlift", "look_left", "look_right",
+    "look_back", "downshift", "upshift"};
 
 bool valid_binding(const std::string_view value) noexcept
 {
@@ -140,11 +143,14 @@ SetupPreferenceLoadResult load_setup_selection_preference(
     const bool version_2 = contents.starts_with(header_v2);
     const bool version_3 = contents.starts_with(header_v3);
     const bool version_4 = contents.starts_with(header_v4);
-    if (contents.size() > 512U || (!version_1 && !version_2 && !version_3 && !version_4)) {
+    const bool version_5 = contents.starts_with(header_v5);
+    if (contents.size() > 512U || (!version_1 && !version_2 && !version_3 &&
+            !version_4 && !version_5)) {
         result.error = "setup preference has an invalid header or size";
         return result;
     }
-    const auto header_size = version_4 ? header_v4.size() : version_3 ? header_v3.size()
+    const auto header_size = version_5 ? header_v5.size() : version_4 ? header_v4.size()
+        : version_3 ? header_v3.size()
         : version_2 ? header_v2.size() : header_v1.size();
     std::vector<std::string_view> lines;
     std::size_t cursor = header_size;
@@ -154,7 +160,8 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         lines.emplace_back(contents.data() + cursor, end - cursor);
         cursor = end + 1U;
     }
-    const auto expected_lines = version_4 ? 8U : version_3 ? 4U : version_2 ? 3U : 2U;
+    const auto expected_lines = version_5 ? 17U : version_4 ? 8U :
+        version_3 ? 4U : version_2 ? 3U : 2U;
     if (cursor != contents.size() || lines.size() != expected_lines) {
         result.error = "setup preference has an invalid field layout";
         return result;
@@ -174,7 +181,7 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         return result;
     }
     std::optional<std::uint32_t> laps;
-    if (version_2 || version_3 || version_4) {
+    if (version_2 || version_3 || version_4 || version_5) {
         constexpr std::string_view laps_prefix = "laps=";
         const auto laps_line = lines[2];
         std::uint32_t value{};
@@ -193,7 +200,7 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         laps = value;
     }
     std::optional<std::uint32_t> opponent_strength;
-    if (version_3 || version_4) {
+    if (version_3 || version_4 || version_5) {
         constexpr std::string_view strength_prefix = "opponent_strength=";
         const auto strength_line = lines[3];
         std::uint32_t value{};
@@ -211,9 +218,10 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         }
         opponent_strength = value;
     }
-    std::array<std::optional<std::string>, 4> control_bindings{};
-    if (version_4) {
-        for (std::size_t index = 0; index < binding_names.size(); ++index) {
+    std::array<std::optional<std::string>, 13> control_bindings{};
+    if (version_4 || version_5) {
+        const auto binding_count = version_5 ? binding_names.size() : 4U;
+        for (std::size_t index = 0; index < binding_count; ++index) {
             const auto prefix = std::string(binding_names[index]) + "=";
             if (!lines[4U + index].starts_with(prefix)) {
                 result.error = "control binding fields are missing or reordered";
@@ -283,7 +291,7 @@ SetupPreferenceSaveResult save_setup_selection_preference(
             result.error = "could not create temporary setup preference";
             return result;
         }
-        output << header_v4 << "track=" << *track << "\ncar=" << *car
+        output << header_v5 << "track=" << *track << "\ncar=" << *car
                << "\nlaps=" << laps << "\nopponent_strength="
                << opponent_strength << '\n';
         for (std::size_t index = 0; index < binding_names.size(); ++index) {
