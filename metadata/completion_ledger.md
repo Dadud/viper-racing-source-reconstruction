@@ -70,6 +70,15 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25, full Release validation after DirectDraw startup model:** The
+  `build/full-check` Visual Studio 18 x64 Release build completed. The full
+  CTest suite passed 57/57, including all eight track and five vehicle asset
+  validation/render smokes, frontend lifecycle, keyboard, trace replay, and
+  the new DirectDraw classifier regression. One lifecycle run initially
+  failed to read the second race title; the focused retry and subsequent full
+  rerun both passed. This validates the current reconstructed prototype and
+  build, not original gameplay or physical-race parity.
+
 - **2026-10-25, bounded DirectDraw startup classification regression:** Added
   a source projection of the original engine's 32-bit video-memory adjustment,
   class thresholds, AGP upgrade, and resolution-flag fallthrough at `0x44EC00`.
