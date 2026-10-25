@@ -68,6 +68,17 @@ try {
         $tickHeader, 'body_kinematics_non_finite')
     $bodyKinematicsMissingCountColumn = [Array]::IndexOf(
         $tickHeader, 'body_kinematics_missing_float_count')
+    $bodyIntegratorTimerReadyColumn = [Array]::IndexOf(
+        $tickHeader, 'body_integrator_timer_ramp_source_ready')
+    $bodyIntegratorTimerFiniteColumn = [Array]::IndexOf(
+        $tickHeader, 'body_integrator_timer_known_fields_finite')
+    $bodyIntegratorTimerMissingCountColumn = [Array]::IndexOf(
+        $tickHeader, 'body_integrator_timer_missing_count')
+    $bodyIntegratorTimerMissingOffsets = [int[]]::new(3)
+    for ($lane = 0; $lane -lt 3; ++$lane) {
+        $bodyIntegratorTimerMissingOffsets[$lane] = [Array]::IndexOf(
+            $tickHeader, "body_integrator_timer_missing_offset_$lane")
+    }
     $bodyKinematicsMissingOffsets = [int[]]::new(44)
     for ($lane = 0; $lane -lt 44; ++$lane) {
         $bodyKinematicsMissingOffsets[$lane] = [Array]::IndexOf(
@@ -109,7 +120,11 @@ try {
         $bodyTimerColumn -lt 0 -or $bodyKinematicsReadyColumn -lt 0 -or
         $bodyKinematicsNonFiniteColumn -lt 0 -or
         $bodyKinematicsMissingCountColumn -lt 0 -or
-        @($bodyKinematicsMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0) {
+        @($bodyKinematicsMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        $bodyIntegratorTimerReadyColumn -lt 0 -or
+        $bodyIntegratorTimerFiniteColumn -lt 0 -or
+        $bodyIntegratorTimerMissingCountColumn -lt 0 -or
+        @($bodyIntegratorTimerMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
     if (@($bodyBasisColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -159,6 +174,18 @@ try {
             $fields[$bodyKinematicsMissingCountColumn] -ne '0' -or
             $reportedMissingOffsets.Count -ne 0) {
             throw "Body kinematics diagnostics differ at line $($index + 1): ready=$($fields[$bodyKinematicsReadyColumn]), nonfinite=$($fields[$bodyKinematicsNonFiniteColumn]), missingCount=$($fields[$bodyKinematicsMissingCountColumn]), offsets=$($reportedMissingOffsets -join ';')"
+        }
+        if ($fields[$bodyIntegratorTimerReadyColumn] -notin @('0', '1') -or
+            $fields[$bodyIntegratorTimerFiniteColumn] -notin @('0', '1') -or
+            $fields[$bodyIntegratorTimerMissingCountColumn] -notmatch '^[0-3]$') {
+            throw "Body integrator timer diagnostics are malformed at line $($index + 1)"
+        }
+        $timerMissingOffsets = @($bodyIntegratorTimerMissingOffsets | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($fields[$_])
+        } | ForEach-Object { $fields[$_] })
+        if ($timerMissingOffsets.Count -ne
+            [int]$fields[$bodyIntegratorTimerMissingCountColumn]) {
+            throw "Body integrator timer missing-field count differs at line $($index + 1)"
         }
         foreach ($column in $bodyBasisColumns + $bodyPositionColumns) {
             $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)

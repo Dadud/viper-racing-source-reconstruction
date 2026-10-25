@@ -180,6 +180,17 @@ Do not promote the initial
 constructor value of `+0x50C` to a per-frame value until the callback/sample
 state that mutates it is connected.
 
+The production per-tick body diagnostic now separately reports ownership of
+the three body fields read by `0x433570` (`+0x50C`, `+0xE44`, and `+0x510`),
+including missing offsets and finiteness of the two timer floats. This probe is
+exercised by the existing `capture_player_tick_physics_state` call, but it
+does not run or mutate the timer helper. Its ordinal-pair table at `0x4D45B0`
+and the shared-integrator call ordering remain unowned, so the `+0x50C` ramp
+must stay outside production suspension inputs until that source chain is
+connected. Regression verifies the timer gate independently from rigid-body
+kinematics: unavailable timer fields do not invalidate an otherwise complete
+`0x43ECE0` snapshot.
+
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
 checks the physics object's virtual `+0x2C` gate and calls virtual `+8`, which

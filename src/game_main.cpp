@@ -1674,6 +1674,10 @@ struct PlayerPhysicsTickContext {
     bool body_kinematics_reader_inventory_mismatch{};
     std::size_t body_kinematics_missing_float_count{};
     std::array<std::uint32_t, 44> body_kinematics_missing_float_offsets{};
+    bool body_integrator_timer_ramp_source_ready{};
+    bool body_integrator_timer_known_fields_finite{};
+    std::size_t body_integrator_timer_missing_count{};
+    std::array<std::uint32_t, 3> body_integrator_timer_missing_offsets{};
     // Post-callback byte-backed body fields in this order: orientation basis,
     // position, linear/angular velocity, accumulated force/moment, then the
     // constructor timer sentinel. Unknown native bytes remain empty.
@@ -2400,6 +2404,14 @@ struct WindowState {
             kinematics_diagnostic.missing_float_count;
         tick.body_kinematics_missing_float_offsets =
             kinematics_diagnostic.missing_float_offsets;
+        tick.body_integrator_timer_ramp_source_ready =
+            kinematics_diagnostic.integrator_timer_ramp_source_ready;
+        tick.body_integrator_timer_known_fields_finite =
+            kinematics_diagnostic.integrator_timer_known_fields_finite;
+        tick.body_integrator_timer_missing_count =
+            kinematics_diagnostic.missing_integrator_timer_count;
+        tick.body_integrator_timer_missing_offsets =
+            kinematics_diagnostic.missing_integrator_timer_offsets;
         constexpr std::array<std::uint32_t, 25> offsets{
             0x38U, 0x3cU, 0x40U, 0x44U, 0x48U, 0x4cU,
             0x50U, 0x54U, 0x58U, 0x5cU, 0x60U, 0x64U,
@@ -3668,6 +3680,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",body_kinematics_missing_float_count";
         for (std::size_t lane = 0U; lane < 44U; ++lane)
             physics_tick_trace << ",body_kinematics_missing_offset_" << lane;
+        physics_tick_trace << ",body_integrator_timer_ramp_source_ready"
+            ",body_integrator_timer_known_fields_finite"
+            ",body_integrator_timer_missing_count";
+        for (std::size_t lane = 0U; lane < 3U; ++lane)
+            physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_projected_depth";
@@ -3853,6 +3870,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (lane < tick.body_kinematics_missing_float_count)
                             physics_tick_trace << std::hex
                                 << tick.body_kinematics_missing_float_offsets[lane]
+                                << std::dec;
+                    }
+                    physics_tick_trace << ','
+                        << tick.body_integrator_timer_ramp_source_ready
+                        << ',' << tick.body_integrator_timer_known_fields_finite
+                        << ',' << tick.body_integrator_timer_missing_count;
+                    for (std::size_t lane = 0U; lane < 3U; ++lane) {
+                        physics_tick_trace << ',';
+                        if (lane < tick.body_integrator_timer_missing_count)
+                            physics_tick_trace << std::hex
+                                << tick.body_integrator_timer_missing_offsets[lane]
                                 << std::dec;
                     }
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {

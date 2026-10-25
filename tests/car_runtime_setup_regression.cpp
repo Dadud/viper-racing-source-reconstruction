@@ -270,6 +270,9 @@ int main()
         add_vector(0x24cU, {51.0F, 52.0F, 53.0F});
         add_vector(0x258U, {61.0F, 62.0F, 63.0F});
         add_matrix(0x264U, angular_matrix_input);
+        add_float(0x50cU, 0.75F);
+        add_float(0xe44U, -100.0F);
+        add_float(0x510U, 1.0F);
         kinematics_writes.push_back({0x10U, 2U, 0x12ffU});
         kinematics_writes.push_back({0x12U, 2U, 0xabcdU});
         require(viper::apply_ncar_body_object_writes(
@@ -294,8 +297,34 @@ int main()
                 kinematics_body);
         require(diagnostic_kinematics.input.has_value() &&
                 diagnostic_kinematics.missing_float_count == 0U &&
-                !diagnostic_kinematics.contains_non_finite_value,
-            "kinematics diagnostic reader must expose a complete finite snapshot");
+                !diagnostic_kinematics.contains_non_finite_value &&
+                diagnostic_kinematics.missing_integrator_timer_count == 0U &&
+                diagnostic_kinematics.integrator_timer_ramp_source_ready &&
+                diagnostic_kinematics.integrator_timer_known_fields_finite,
+            "runtime diagnostic must expose complete body kinematics and the owned 0x433570 body inputs");
+        auto missing_integrator_timer_body = kinematics_body;
+        missing_integrator_timer_body.initialized_bytes[0x50cU] = 0U;
+        const auto missing_integrator_timer_diagnostic =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                missing_integrator_timer_body);
+        require(missing_integrator_timer_diagnostic.input.has_value() &&
+                !missing_integrator_timer_diagnostic.integrator_timer_ramp_source_ready &&
+                missing_integrator_timer_diagnostic.missing_integrator_timer_count == 1U &&
+                missing_integrator_timer_diagnostic.missing_integrator_timer_offsets[0] ==
+                    0x50cU,
+            "timer producer ownership must be gated independently from 0x43ECE0 kinematics");
+        auto non_finite_integrator_timer_body = kinematics_body;
+        const std::array<viper::NcarObjectFieldWrite, 1> nan_timer{ {{
+            0xe44U, 4U, 0x7fc00000U}} };
+        require(viper::apply_ncar_body_object_writes(
+                    non_finite_integrator_timer_body, nan_timer),
+            "test body must accept the explicit NaN timer fixture");
+        const auto non_finite_integrator_timer_diagnostic =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                non_finite_integrator_timer_body);
+        require(!non_finite_integrator_timer_diagnostic.integrator_timer_known_fields_finite &&
+                non_finite_integrator_timer_diagnostic.integrator_timer_ramp_source_ready,
+            "timer ownership must distinguish initialized but non-finite state from unknown state");
         auto incomplete_kinematics_body = kinematics_body;
         incomplete_kinematics_body.initialized_bytes[0x210U + 8U * 4U] = 0U;
         require(!viper::read_ncar_body_integration_kinematics_input(

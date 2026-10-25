@@ -2152,6 +2152,18 @@ read_ncar_body_integration_kinematics_input_diagnostic(
     const NcarBodyRuntimeObjectState& body) noexcept
 {
     BodyKinematicsInputReadResult result{};
+    constexpr std::array<std::uint32_t, 3> timer_offsets{
+        0x50cU, 0xe44U, 0x510U};
+    for (const auto offset : timer_offsets) {
+        if (!read_ncar_body_object_u32(body, offset)) {
+            result.missing_integrator_timer_offsets[
+                result.missing_integrator_timer_count++] = offset;
+        }
+    }
+    result.integrator_timer_ramp_source_ready =
+        read_ncar_body_object_u32(body, 0x50cU).has_value() &&
+        read_ncar_body_object_u32(body, 0xe44U).has_value();
+
     constexpr std::array<std::pair<std::uint32_t, std::size_t>, 10> fields{{
         {0x05cU, 3U}, {0x234U, 3U}, {0x24cU, 3U}, {0x200U, 1U},
         {0x1f0U, 1U}, {0x240U, 3U}, {0x258U, 3U}, {0x038U, 9U},
@@ -2190,6 +2202,11 @@ read_ncar_body_integration_kinematics_input_diagnostic(
         !finite_array(input->orientation_matrix_0x0e) ||
         !finite_array(input->angular_transform_matrix_0x99) ||
         !finite_array(input->body_matrix_0x210);
+    const auto timer_ramp = read_ncar_body_object_u32(body, 0x50cU);
+    const auto timer_record_time = read_ncar_body_object_u32(body, 0xe44U);
+    result.integrator_timer_known_fields_finite =
+        (!timer_ramp || finite(std::bit_cast<float>(*timer_ramp))) &&
+        (!timer_record_time || finite(std::bit_cast<float>(*timer_record_time)));
     if (!result.contains_non_finite_value) result.input = *input;
     return result;
 }

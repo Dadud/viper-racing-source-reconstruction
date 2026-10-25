@@ -1088,6 +1088,13 @@ struct BodyKinematicsInputReadResult {
     std::size_t missing_float_count{};
     bool contains_non_finite_value{};
     bool reader_inventory_mismatch{};
+    // Read-only ownership probe for the immediately preceding 0x433570
+    // timer helper. It is reported separately because these fields are not
+    // consumed by 0x43ECE0's kinematics reader.
+    std::array<std::uint32_t, 3> missing_integrator_timer_offsets{};
+    std::size_t missing_integrator_timer_count{};
+    bool integrator_timer_known_fields_finite{};
+    bool integrator_timer_ramp_source_ready{};
 };
 
 struct BodyIntegrationKinematicsResult {
