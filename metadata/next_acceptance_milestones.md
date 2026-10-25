@@ -120,11 +120,11 @@ cannot create that state from route motion.
 
 Therefore the next implementation boundary is the state producer and its
 ownership, not a call to `advance_four_wheel_body_step`: reconstruct the
-mutable body state and callback write paths, resolve whether the GCAR source
-buffer feeds the live interpolation consumer or locate its live producer, and
-establish the tick/fraction and callback ordering. Only then can the session
-feed evidence-backed `+0x50C` and `+0xE8` values into the existing wheel/body
-composition. In parallel, the polarity
+mutable body state and callback write paths, locate the live player's
+wheel-history producer independently of the `0x960`-record GCAR ring (now
+identified as ghost playback), and establish the tick/fraction and callback
+ordering. Only then can the session feed evidence-backed `+0x50C` and `+0xE8`
+values into the existing wheel/body composition. In parallel, the polarity
 initializer still needs the actual common-startup timer backend and a single
 shared stream whose call order includes non-wheel consumers. Keep these as
 explicit dependencies; do not claim the existing models are live physics.

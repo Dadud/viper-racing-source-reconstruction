@@ -66,6 +66,26 @@ earlier virtual/state gates around this call remain unresolved. Evidence:
 [`ncar_replay_cursor.evidence.json`](ncar_replay_cursor.evidence.json),
 [`ncar_interpolation_callsite.evidence.json`](ncar_interpolation_callsite.evidence.json).
 
+### Ring ownership correction: ghost playback
+
+The `0x960`-record `+0xEF4` ring belongs to the GhostBegin/ghost-playback
+path; it is not evidence for the live player's physics history. `0x4278F0`
+allocates the object and calls `0x427A40`; that initializer asks `0x40E910`
+for an active global ghost record and, when present, copies its record window
+through `0x427BF0`. The supplying global `DAT_004ECD48` is selected by
+`0x40DC90`, called from `0x40DA70`; that orchestration includes the literal
+diagnostic strings “GhostBegin” and “no submission”. `0x40DA70` is called by
+`0x45B8F0`. Evidence: `0x40DA70`
+(`ev_7dc940aa65bd28e3293481a5b3a4817930c4cd2d1f0f649527d6207514af41c7`),
+`0x40DC90`
+(`ev_a615072704a8f2905c3ca6811193021913d7de8c92ef005a6f37d676842db6dd`),
+and `0x427A40`
+(`ev_8290048bf6efb0217ac92c856c8346901528a32c6c3492a8b53cbab89915be5e`).
+The update and ring-selection projections remain useful for reconstructed
+ghost playback only. The live-player `+0x50C` writer, per-frame wheel-history
+source, and body-force route must be traced through the player/NCAR callback
+path independently.
+
 The direct subset is exposed as `update_ncar_interpolated_object`. It models
 the record ushort at `0x1E` into object `+0xD70` (`value*14000/32768 - 2000`),
 the byte at `0x20` into `+0x500` (scaled by `256*0.00007324219`, then `-1.2`),
