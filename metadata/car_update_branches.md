@@ -261,8 +261,9 @@ before the payload, and returns the payload pointer. Thus the allocator
 baseline at PCAR `+0xECC` is `0xA3A3A3A3`, not zero. However, the shared
 constructor path calls `0x49C1F0(this, +0x510)`, which may dispatch an indirect
 manager virtual at `+0x78`; its object-side effects have not been resolved.
-Keep the post-construction `+0xECC` unknown in the live projection until that
-manager edge is audited or a controlled first-callback capture observes it.
+Keep the constructor's post-state for `+0xECC` unknown; a controlled
+first-callback capture can establish only the sampled runtime value, not the
+constructor's complete effects.
 That capture has now been made against the already-running original
 `race.bin` process (PID 25904; the executable path and Viper Racing window were
 checked before attach). At `0x4384D0` entry, the same object pointer
