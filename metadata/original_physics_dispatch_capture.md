@@ -884,3 +884,24 @@ the local response inputs that produce current `+0xF4`, and upstream
 tire-query/contact inputs remain unresolved; keep the production physics path
 disconnected. The `0x442530` static ordering used to interpret the vector rows
 is in Evidence `ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7`.
+
+### Pre-integrator caller boundary review (2026-10-25)
+
+The only resolved direct call to the PCAR per-frame integrator `0x431150` is
+at `0x42AC98` (`ev_0aa8a86631c14ad5545da2543aac443ae9ea6fc414ec59e0c356dd4d533c6011`).
+The instructions immediately before it call `0x42A650`, conditionally call
+`0x429E90`, and conditionally call `0x42A930`. Their hash-matched Ghidra
+dossiers show `0x42A650` handles the aftershock condition and updates body
+controls; `0x429E90` checks wheel feature IDs and updates avoidance state; and
+`0x42A930` uses the shared random helper to toggle body state. None writes the
+live wheel object's `+0x158`. Evidence:
+`0x431150` `ev_fb7a9b21717cfb6308ed0b4ff5c8e3f5b185399be225d0fbbfbde36ee68b1217`,
+`0x42A650` `ev_bf3e206cf19b8fff21f293e1c67245445de2d76355f6e587387877a356b50df1`,
+`0x429E90` `ev_ff8a87a2cd12b8e96c02ad01d952e46aac6c8a74adbd2ca06bb93608a72663d3`,
+and `0x42A930` `ev_54f8c062b927cfee6a8380864eb4f7e4fd525ac84a0631c0df11ca9bd7a83882`.
+
+This excludes those immediate direct-call helpers as the field producer in
+the analyzed path. It does not exclude writes through other dispatch paths,
+computed aliases, bulk copies, or cross-thread activity. The last dominating
+write remains unknown; do not enable the production suspension/force path on
+this evidence.
