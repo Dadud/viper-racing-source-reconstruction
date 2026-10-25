@@ -127,8 +127,9 @@ The existing Windows session cannot yet form valid rows for
 registration plus body X/Z at `+0x5C/+0x64` and linear-velocity X/Z at
 `+0x234/+0x23C`. The session now retains the player's body plus the inherited
 shared-body constructor subset for bound ACAR records. Their byte masks prove
-which constructor fields and record-derived transforms were initialized, but
-do not prove those values track the race. `0x431150` body integration is not
+which constructor fields and record-derived transforms were initialized,
+including the `0x433AA0` timer seeds `+0x50C = 1.0f` and `+0xE44 = -100.0f`,
+but do not prove those values track the race. `0x431150` body integration is not
 called in production, and visible player/opponent poses remain route-owned.
 Consequently, these initial body values are stale/zero motion rather than the
 current participant state required by `0x419E80`.

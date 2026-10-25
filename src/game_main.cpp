@@ -3801,6 +3801,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     const auto constructor_subobjects =
                         viper::plan_ncar_constructor_subobject_defaults(
                             read_u32_le(record_bytes.data() + 0x194U));
+                    const auto common_initializer =
+                        viper::plan_ncar_object_initialization({});
                     const std::array<viper::NcarObjectFieldWrite, 1> acar_vtable_write{{
                         {0x00U, 4U, 0x004c7b78U}}};
                     std::array<float, 12> transform{};
@@ -3811,13 +3813,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (!viper::materialize_ncar_body_constructor(
                             body_state.body_object, body_plan) ||
                         !viper::apply_ncar_body_object_writes(
+                            body_state.body_object,
+                            constructor_subobjects.writes) ||
+                        !viper::apply_ncar_body_object_writes(
                             body_state.body_object, acar_vtable_write) ||
                         !viper::apply_ncar_body_object_writes(
                             body_state.body_object,
-                            constructor_subobjects.embedded_curve_selector_writes) ||
-                        !viper::apply_ncar_body_object_writes(
-                            body_state.body_object,
-                            constructor_subobjects.source_record_identity_writes) ||
+                            common_initializer.writes_before_backend_refresh) ||
                         !viper::copy_ncar_runtime_record_transform_to_body(
                             body_state.body_object, transform)) {
                         stream_ok = false;

@@ -722,9 +722,11 @@ record. Ghidra evidence for `0x4285D0` shows its call to `0x43DFB0`; that base
 constructor calls `0x42FF90`, whose shared initialization calls `0x43E490`,
 copies the runtime-record transform through `0x433C00`, and sets body ordinal
 `+0x510` from record `+0x194`; the derived constructor then installs ACAR
-vtable `0x4C7B78`. The session materializes only those byte-backed body
-defaults, known common subobject defaults, final vtable, initial transform,
-and ordinal.
+vtable `0x4C7B78`. It also invokes the shared `0x433AA0` initialization path;
+its known direct prefix initializes `+0x50C` to `1.0f` and `+0xE44` to
+`-100.0f`. The session materializes these byte-backed body defaults, known
+common subobject defaults, final vtable, initial transform, ordinal, and timer
+sentinel.
 `ncar_geometry_regression` checks the serialized ACAR tag, transform lanes,
 and ordinal handoff. Evidence: `0x4285D0`
 `ev_c941698728b470e4b3fcebf760e0ff8820c50a118fbfde13aa4c63fbc2c791a5`,

@@ -134,22 +134,28 @@ int main()
             viper::plan_ncar_body_constructor(*acar_body_observation);
         const auto acar_common_defaults =
             viper::plan_ncar_constructor_subobject_defaults(3U);
+        const auto acar_object_initializer =
+            viper::plan_ncar_object_initialization({});
         const std::array<viper::NcarObjectFieldWrite, 1> acar_vtable{{
             {0x00U, 4U, 0x004c7b78U}}};
         require(viper::materialize_ncar_body_constructor(
                     acar_body_state, acar_body_plan) &&
                 viper::apply_ncar_body_object_writes(acar_body_state,
+                    acar_common_defaults.writes) &&
+                viper::apply_ncar_body_object_writes(acar_body_state,
                     acar_vtable) &&
                 viper::apply_ncar_body_object_writes(acar_body_state,
-                    acar_common_defaults.embedded_curve_selector_writes) &&
-                viper::apply_ncar_body_object_writes(acar_body_state,
-                    acar_common_defaults.source_record_identity_writes) &&
+                    acar_object_initializer.writes_before_backend_refresh) &&
                 viper::copy_ncar_runtime_record_transform_to_body(
                     acar_body_state, acar_transform),
             "ACAR records must materialize their inherited shared body constructor subset");
         require(viper::read_ncar_body_object_u32(acar_body_state, 0x00U) ==
                     0x004c7b78U &&
                 viper::read_ncar_body_object_u32(acar_body_state, 0x510U) == 3U &&
+                viper::read_ncar_body_object_u32(acar_body_state, 0x50cU) ==
+                    std::bit_cast<std::uint32_t>(1.0F) &&
+                viper::read_ncar_body_object_u32(acar_body_state, 0xe44U) ==
+                    std::bit_cast<std::uint32_t>(-100.0F) &&
                 viper::read_ncar_body_object_u32(acar_body_state, 0x38U) ==
                     std::bit_cast<std::uint32_t>(acar_transform[0]) &&
                 viper::read_ncar_body_object_u32(acar_body_state, 0x5cU) ==
