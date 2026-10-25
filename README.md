@@ -43,7 +43,9 @@ without CLI asset overrides opens a keyboard setup window: up/down selects a
 track, left/right selects a car, and Enter loads the race. After the current
 race prototype displays results, Enter returns to setup. Escape exits. This is
 a basic runtime selector and session loop, not the original frontend or a full
-settings editor. Explicit `--track`/`--car`, validation, smoke, audio smoke, and
+settings editor. Page Up/Down changes the quick-race lap count from 1 to 99;
+the value is stored with the reconstruction's track/car selection. Explicit
+`--track`/`--car`, validation, smoke, audio smoke, and
 trace-recording commands bypass the selector. `--play-trace` without explicit
 track/car overrides opens setup and keeps the replayed results available for
 return to setup. The runtime can load and validate the eight

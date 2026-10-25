@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_frontend_race_$([guid]::NewGuid().ToString('N'))"
 $capture = Join-Path $root 'capture.csv'
-$raceTrace = Join-Path $root 'viper-bemidji-one-lap.csv'
+$raceTrace = Join-Path $root 'viper-bemidji-two-lap.csv'
 $config = Join-Path $root 'Config'
 
 Add-Type @'
@@ -88,7 +88,7 @@ try {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add($captureLines[0])
     $template = $captureLines[1].Split(',')
-    for ($frame = 0; $frame -lt 1800; ++$frame) {
+    for ($frame = 0; $frame -lt 3600; ++$frame) {
         $fields = [string[]]$template.Clone()
         $fields[0] = [string]$frame
         $fields[1] = '0'
@@ -112,6 +112,7 @@ try {
     # The shipped options.def begins at car_no 0 (Exotic), and Win32 bundle
     # enumeration orders the five installed choices with Viper at index 4.
     1..4 | ForEach-Object { Press-Key $setup 39 }
+    Press-Key $setup 33
     Press-Key $setup 13
     $race = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 45
     $title = [System.Text.StringBuilder]::new(256)
@@ -119,8 +120,9 @@ try {
         [void][ViperRaceFrontendWin32]::GetWindowText($race, $title, $title.Capacity)
         if ($title.Length -eq 0) { Start-Sleep -Milliseconds 50 }
     }
-    if ($title.ToString() -notmatch 'bemidji.*viper') {
-        throw "Setup selection did not start the expected Viper/Bemidji race: $($title.ToString())"
+    if ($title.ToString() -notmatch 'bemidji.*viper' -or
+        $title.ToString() -notmatch 'Lap 1/2') {
+        throw "Setup selection did not start the expected two-lap Viper/Bemidji race: $($title.ToString())"
     }
 
     $setup = Wait-ResultsReturn $process 60
@@ -142,7 +144,8 @@ try {
     if (-not (Test-Path -LiteralPath $preferencePath)) { throw 'Setup selection preference was not written' }
     $preference = [System.IO.File]::ReadAllText($preferencePath)
     if ($preference -notmatch '(?m)^track=bemidji$' -or
-        $preference -notmatch '(?m)^car=sports$') {
+        $preference -notmatch '(?m)^car=sports$' -or
+        $preference -notmatch '(?m)^laps=2$') {
         throw "Saved selection did not contain Bemidji/Sports: $preference"
     }
 
@@ -160,14 +163,15 @@ try {
         [void][ViperRaceFrontendWin32]::GetWindowText($restoredRace, $restoredTitle, $restoredTitle.Capacity)
         if ($restoredTitle.Length -eq 0) { Start-Sleep -Milliseconds 50 }
     }
-    if ($restoredTitle.ToString() -notmatch 'bemidji.*sports') {
-        throw "Relaunched setup did not restore Bemidji/Sports: $($restoredTitle.ToString())"
+    if ($restoredTitle.ToString() -notmatch 'bemidji.*sports' -or
+        $restoredTitle.ToString() -notmatch 'Lap 1/2') {
+        throw "Relaunched setup did not restore Bemidji/Sports with two laps: $($restoredTitle.ToString())"
     }
     Press-Key $restoredRace 27
     if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after the persisted-selection check' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "relaunch exited with code $($process.ExitCode)" }
-    Write-Output 'Viper/Bemidji and Sports/Bemidji trace races reached results; Sports/Bemidji persisted across a clean relaunch.'
+    Write-Output 'Two-lap Viper/Bemidji and Sports/Bemidji trace races reached results; track, car, and lap count persisted across a clean relaunch.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <chrono>
 #include <cstdint>
 #include <fstream>
 #include <iterator>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -18,7 +20,8 @@ namespace viper {
 namespace {
 
 constexpr std::string_view file_name = "viper-racing-setup.cfg";
-constexpr std::string_view header = "VIPER-RACING-SETUP 1\n";
+constexpr std::string_view header_v1 = "VIPER-RACING-SETUP 1\n";
+constexpr std::string_view header_v2 = "VIPER-RACING-SETUP 2\n";
 
 char ascii_lower(const char value) noexcept
 {
@@ -114,24 +117,29 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         result.error = "failed while reading setup preference";
         return result;
     }
-    if (contents.size() > 256U || !contents.starts_with(header)) {
+    const bool version_1 = contents.starts_with(header_v1);
+    const bool version_2 = contents.starts_with(header_v2);
+    if (contents.size() > 256U || (!version_1 && !version_2)) {
         result.error = "setup preference has an invalid header or size";
         return result;
     }
-    const auto first_end = contents.find('\n', header.size());
-    const auto second_end = first_end == std::string::npos
-        ? std::string::npos : contents.find('\n', first_end + 1U);
-    if (first_end == std::string::npos || second_end == std::string::npos ||
-        second_end + 1U != contents.size()) {
+    const auto header_size = version_2 ? header_v2.size() : header_v1.size();
+    std::vector<std::string_view> lines;
+    std::size_t cursor = header_size;
+    while (cursor < contents.size()) {
+        const auto end = contents.find('\n', cursor);
+        if (end == std::string::npos) break;
+        lines.emplace_back(contents.data() + cursor, end - cursor);
+        cursor = end + 1U;
+    }
+    if (cursor != contents.size() || lines.size() != (version_2 ? 3U : 2U)) {
         result.error = "setup preference has an invalid field layout";
         return result;
     }
     constexpr std::string_view track_prefix = "track=";
     constexpr std::string_view car_prefix = "car=";
-    const std::string_view track_line(contents.data() + header.size(),
-        first_end - header.size());
-    const std::string_view car_line(contents.data() + first_end + 1U,
-        second_end - first_end - 1U);
+    const auto track_line = lines[0];
+    const auto car_line = lines[1];
     if (!track_line.starts_with(track_prefix) || !car_line.starts_with(car_prefix)) {
         result.error = "setup preference fields are missing or reordered";
         return result;
@@ -142,7 +150,27 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         result.error = "setup preference contains an invalid resource stem";
         return result;
     }
-    result.selection = SetupSelectionPreference{std::move(*track), std::move(*car)};
+    std::optional<std::uint32_t> laps;
+    if (version_2) {
+        constexpr std::string_view laps_prefix = "laps=";
+        const auto laps_line = lines[2];
+        std::uint32_t value{};
+        if (!laps_line.starts_with(laps_prefix)) {
+            result.error = "setup preference lap field is missing or reordered";
+            return result;
+        }
+        const auto raw_laps = laps_line.substr(laps_prefix.size());
+        const auto [end, parse_error] = std::from_chars(raw_laps.data(),
+            raw_laps.data() + raw_laps.size(), value);
+        if (parse_error != std::errc{} || end != raw_laps.data() + raw_laps.size() ||
+            value < 1U || value > 99U) {
+            result.error = "setup preference lap count must be between 1 and 99";
+            return result;
+        }
+        laps = value;
+    }
+    result.selection = SetupSelectionPreference{
+        std::move(*track), std::move(*car), laps};
     return result;
 }
 
@@ -157,8 +185,13 @@ SetupPreferenceSaveResult save_setup_selection_preference(
     }
     const auto track = normalized_stem(selection.track);
     const auto car = normalized_stem(selection.car);
+    const auto laps = selection.laps.value_or(1U);
     if (!track || !car) {
         result.error = "track and car must be valid resource stems";
+        return result;
+    }
+    if (laps < 1U || laps > 99U) {
+        result.error = "lap count must be between 1 and 99";
         return result;
     }
     result.path = config_directory / file_name;
@@ -180,7 +213,8 @@ SetupPreferenceSaveResult save_setup_selection_preference(
             result.error = "could not create temporary setup preference";
             return result;
         }
-        output << header << "track=" << *track << "\ncar=" << *car << '\n';
+        output << header_v2 << "track=" << *track << "\ncar=" << *car
+               << "\nlaps=" << laps << '\n';
         output.flush();
         if (!output) {
             result.error = "failed while writing temporary setup preference";

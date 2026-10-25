@@ -475,6 +475,7 @@ std::string configured_car_stem(const std::filesystem::path& data_dir,
 struct FrontendSelection {
     std::string track;
     std::string car;
+    std::uint32_t laps{1U};
 };
 
 struct SetupWindowState {
@@ -482,6 +483,7 @@ struct SetupWindowState {
     std::vector<std::string> cars;
     std::size_t track_index{};
     std::size_t car_index{};
+    std::uint32_t laps{1U};
     std::filesystem::path config_directory;
     std::array<std::string, 5> career_rows{};
     int career_slot{};
@@ -528,12 +530,13 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
         write(L"<  " + track + L"  >", 74, 228, 42);
         write(L"CAR", 490, 190, 30);
         write(L"<  " + car + L"  >", 490, 228, 42);
+        SetTextColor(dc, RGB(118, 208, 155));
+        write(L"RACE LAPS: " + std::to_wstring(state.laps), 74, 284, 34);
         SetTextColor(dc, RGB(190, 205, 198));
-        write(L"UP / DOWN: CHOOSE TRACK", 74, 332, 30);
-        write(L"LEFT / RIGHT: CHOOSE CAR", 74, 370, 30);
-        write(L"ENTER: START RACE", 74, 426, 30);
-        write(L"C: CAREER SLOTS", 74, 464, 30);
-        write(L"ESC: EXIT", 74, 502, 30);
+        write(L"UP / DOWN: CHOOSE TRACK", 74, 334, 28);
+        write(L"LEFT / RIGHT: CHOOSE CAR", 74, 368, 28);
+        write(L"PAGE UP / DOWN: CHANGE LAPS", 74, 402, 28);
+        write(L"ENTER: START RACE    C: CAREER SLOTS    ESC: EXIT", 74, 454, 30);
     }
     if (state.career_screen) {
         SetTextColor(dc, RGB(118, 208, 155));
@@ -641,6 +644,10 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                 state->car_index = (state->car_index + state->cars.size() - 1U) % state->cars.size();
             else if (wparam == VK_RIGHT && !state->cars.empty())
                 state->car_index = (state->car_index + 1U) % state->cars.size();
+            else if (wparam == VK_PRIOR)
+                state->laps = std::min(99U, state->laps + 1U);
+            else if (wparam == VK_NEXT)
+                state->laps = std::max(1U, state->laps - 1U);
             else if (wparam == VK_RETURN && !state->tracks.empty() && !state->cars.empty()) {
                 state->accepted = true;
                 DestroyWindow(hwnd);
@@ -672,6 +679,7 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
 std::optional<FrontendSelection> show_setup_frontend(
     std::vector<std::string> tracks, std::vector<std::string> cars,
     const std::string_view initial_track, const std::string_view initial_car,
+    const std::uint32_t initial_laps,
     const std::filesystem::path& config_directory)
 {
     if (tracks.empty() || cars.empty())
@@ -679,6 +687,7 @@ std::optional<FrontendSelection> show_setup_frontend(
     SetupWindowState state{};
     state.tracks = std::move(tracks);
     state.cars = std::move(cars);
+    state.laps = std::clamp(initial_laps, 1U, 99U);
     state.config_directory = config_directory;
     for (std::size_t slot = 0; slot < state.career_rows.size(); ++slot) {
         const auto loaded = viper::load_career_slot(config_directory,
@@ -733,7 +742,7 @@ std::optional<FrontendSelection> show_setup_frontend(
         throw std::runtime_error("setup frontend message loop failed");
     if (!state.accepted) return std::nullopt;
     return FrontendSelection{
-        state.tracks[state.track_index], state.cars[state.car_index]};
+        state.tracks[state.track_index], state.cars[state.car_index], state.laps};
 }
 
 class D3DWindow {
@@ -3056,7 +3065,8 @@ void report_start_grid(const viper::GameAssets& assets)
 int run_selected_race(const Options& options, const std::string_view track,
                      const std::string_view car,
                      const std::vector<TraceInputFrame>* playback_trace,
-                     const bool hold_results_for_frontend)
+                     const bool hold_results_for_frontend,
+                     const std::uint32_t selected_laps)
 {
     const auto config_path = options.data_dir / "options.def";
     viper::GameOptions configured_options;
@@ -3166,8 +3176,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         *entrants.player_record_index,
         participant_names,
         configured_car_record_tags,
-        static_cast<std::uint32_t>(std::clamp(
-            assets.options().integer("GAME", "laps").value_or(1), 1, 99)),
+        std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),
         assets.ideal_line(), assets.player_model(), assets.ai_model(),
         assets.track_objects(),
@@ -3202,6 +3211,8 @@ int wmain(int argc, wchar_t** argv)
             !options.audio_smoke && !options.record_trace;
         auto selected_track = track;
         auto selected_car = car;
+        auto selected_laps = static_cast<std::uint32_t>(std::clamp(
+            configured_options.integer("GAME", "laps").value_or(1), 1, 99));
         auto setup_config_directory = options.setup_config_directory
             ? *options.setup_config_directory
             : resolve_setup_config_directory(data_directory);
@@ -3218,16 +3229,21 @@ int wmain(int argc, wchar_t** argv)
                 setup_tracks, setup_cars, saved.selection, selected_track, selected_car);
             selected_track = setup_tracks[indices.track];
             selected_car = setup_cars[indices.car];
+            if (saved.selection && saved.selection->laps)
+                selected_laps = std::clamp(*saved.selection->laps, 1U, 99U);
         }
         while (true) {
             if (interactive_frontend) {
                 const auto selection = show_setup_frontend(setup_tracks, setup_cars,
-                    selected_track, selected_car, setup_config_directory);
+                    selected_track, selected_car, selected_laps,
+                    setup_config_directory);
                 if (!selection) return 0;
                 selected_track = selection->track;
                 selected_car = selection->car;
+                selected_laps = selection->laps;
                 const auto saved = viper::save_setup_selection_preference(
-                    setup_config_directory, {selected_track, selected_car});
+                    setup_config_directory,
+                    {selected_track, selected_car, selected_laps});
                 if (!saved.saved)
                     std::cerr << "Could not persist setup selection: "
                               << saved.error << '\n';
@@ -3236,7 +3252,7 @@ int wmain(int argc, wchar_t** argv)
             runtime_options.data_dir = data_directory;
             const auto result = run_selected_race(runtime_options, selected_track,
                 selected_car, playback_trace ? &*playback_trace : nullptr,
-                interactive_frontend);
+                interactive_frontend, selected_laps);
             if (result != 10) return result;
             if (!interactive_frontend) return 0;
         }

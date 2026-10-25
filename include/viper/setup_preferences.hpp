@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -12,6 +13,7 @@ namespace viper {
 struct SetupSelectionPreference {
     std::string track;
     std::string car;
+    std::optional<std::uint32_t> laps;
 };
 
 struct SetupPreferenceLoadResult {

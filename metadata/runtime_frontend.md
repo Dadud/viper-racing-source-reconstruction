@@ -7,9 +7,12 @@ top-level `.car` bundles in the same Win32 file-search order used by the saved
 `car_no` loader. `options.def` supplies the initial `GLOBAL.track_no` and
 `GLOBAL.car_no` selections. On Enter, the runtime persists selected track/car
 resource stems in the separate, versioned `Config/viper-racing-setup.cfg`
-file. A saved stem is applied only if its bundle remains in the current
-inventory; a missing track or car independently falls back to its
-`options.def` selection. Original GameData and `options.def` are not modified.
+file. Version 2 stores the lap count with the selected track and car; version 1
+files remain readable. A saved stem is applied only if its bundle remains in
+the current inventory; a missing track or car independently falls back to its
+`options.def` selection. Page Up/Down changes the quick-race lap count from 1
+to 99; its initial value comes from `GAME.laps`. Original GameData and
+`options.def` are not modified.
 
 Use Up/Down to choose a track, Left/Right to choose a car, and Enter to load
 the assets and start the existing race session. On race results, Enter returns
@@ -30,17 +33,17 @@ asset loading. It does not validate a real saved career, run a complete race,
 verify every selector row, persist changed choices, or establish parity with
 the original menus.
 
-`game_frontend_race_lifecycle_smoke` creates a deterministic one-lap
+`game_frontend_race_lifecycle_smoke` creates a deterministic two-lap
 Viper/Bemidji throttle trace, launches through the real setup window, selects
-Viper, plays the full trace, and waits for Enter to return from standings to
-setup. It then changes to Sports, launches the second full trace session, and
-exits from setup after its results. Replay exhaustion keeps the results window
-open only when playback was started through the interactive frontend; explicit
-CLI replay still closes when the trace ends. The smoke then relaunches against
-the same Config directory and verifies the last selected Sports/Bemidji pair
-loads into the race. This verifies repeated setup/race/result resource
-lifecycles for the route prototype, not physical simulation or original-game
-parity.
+Viper and two laps, plays the full trace, and waits for Enter to return from
+standings to setup. It then changes to Sports, launches the second full trace
+session, and exits from setup after its results. Replay exhaustion keeps the
+results window open only when playback was started through the interactive
+frontend; explicit CLI replay still closes when the trace ends. The smoke then
+relaunches against the same Config directory and verifies the last selected
+Sports/Bemidji pair and two-lap setting load into the race. This verifies
+settings persistence and repeated setup/race/result resource lifecycles for the
+route prototype, not physical simulation or original-game parity.
 
 Race standings display localized AI driver names from the selected
 `GAME.opponent_strength` profile in `english.lng`, aligned through the
@@ -83,8 +86,9 @@ hotkey is unavailable.
   gameplay input.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
-- Implement and retain supported settings, control rebinding, random-track
-  behavior, mode/difficulty/lap selection, and native-compatible writeback.
+- Implement and retain supported settings beyond quick-race lap count, control
+  rebinding, random-track behavior, mode/difficulty selection, and
+  native-compatible writeback.
 - Connect validated career payloads to the reconstructed career action/event
   loop, preserving upgrades and progression through results and native saves.
 - Compare controlled original and reconstructed menu/race/results captures.
