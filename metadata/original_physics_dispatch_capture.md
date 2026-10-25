@@ -382,7 +382,18 @@ per-body bookkeeping and `0x43ECE0` force collection. Evidence
 `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5` is
 static Ghidra pseudocode, not runtime behavior. It does not reveal a writer
 for PCAR's live five-byte wheel-history records. The GCAR GhostBegin ring and
-NCAR three-slot sample queue therefore remain invalid substitutes. The next
-physics capture must first attach to a verified `race.bin` child, then trace
-writes and cadence for the five-byte records while pairing them with the
-selected PCAR's wheel update and input/body state.
+NCAR three-slot sample queue therefore remain invalid substitutes. A verified
+original `race.bin` gameplay capture is now available below. The remaining
+wheel-history capture should trace writes and cadence for the five-byte records
+while pairing them with the selected PCAR's wheel update and input/body state.
+
+## Bounded original Quick Race throttle capture (2026-10-25)
+
+A fresh verified child was obtained through the official installed launcher.
+The child loaded the official ISO `race.bin` (`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`) with the manifest-verified staged `Data` tree and expected install `GameRoot\Data` working directory. The first `GetAvailableVidMem` result reported total memory `0xFFFF0000`, reproducing the host-specific DirectDraw startup gate; a one-query process-local override supplied `0x00200000`. Two later availability queries were not modified. This intervention is part of the capture environment, not native game behavior.
+
+Using the original window, the run entered Quick Race with Dodge Viper, Bemidji, Arcade, three laps, and the default player grid slot. Frida attached to the suspended child before resume and observed the run through a 1.5-second bounded synthetic DirectInput probe. The probe targeted `DIK_UP` (selector 200), waited 1.5 seconds after load, then returned pressed for 1.5 seconds only where the native key-state read originally returned zero. It patched 54 of 105 observed reads and then returned to the original values. Script source digest: `DB5E3C52E740D8F32842EA713A96366E9DA6E18B5A7E575AC926CD31328D82C4`; load Evidence `ev_60d7cc9de11efef528662e1bc74c82cbeeaffa7898fc35f6fe5cd8e8353e3324`.
+
+The same child's PCAR input hook recorded throttle rising from `0.3696` at callback 354 to `0.6864` at 360 and `1.0` at 366, remaining at `1.0` through callback 444. After the synthetic window ended, it fell to `0.6832` at callback 450, `0.3664` at 456, and `0.0496` at 462; steering and brake stayed zero in these samples. The PCAR state sampler observed near-stationary speed `0.00114` at callback 300, `0.18342` at 360, and `6.74418` at 420. After release it observed `11.18478` at callback 480, followed by coasting deceleration (`9.88664` at 540 and `8.82998` at 600). The matching object was `0x4CB20CC`. Session Evidence `ev_1147a41717365bacee15a9c3a15eaf8b657666f8052c2e3e062ef1f27633f97` retains the Frida messages; the observed event sequence includes the synthetic window start/end, DIK read values, input callback scalars, and periodic state samples.
+
+This is a controlled original-client input-to-PCAR response observation. It confirms that the targeted key-state result reaches the original PCAR throttle scalar path and accompanies increasing body speed, then that speed decreases during coast. It does not establish physical keyboard delivery on this host, the complete throttle transfer function, steering or braking behavior, tire/wheel forces, native field meanings, or parity of the reconstruction's current motion model. The bounded data also does not supply the missing per-wheel history/context rows required to connect production wheel dynamics. No original executable, asset, configuration, or raw memory dump was added to the repository.
