@@ -25,7 +25,11 @@ readback, and rejects an invalid readback, out-of-bounds payload, byte/header
 mismatch, or unknown factory type atomically. Entries explicitly
 report `native_object_materialized=false` and
 `fixed_step_callback_supported=false`: this is an identity/factory inventory,
-not native allocation, constructor execution, or fixed-step dispatch. A
+not native allocation or constructor execution. The live fixed-step loop now
+routes only the known PCAR callback projection through its bound ordered
+stream entry and increments a per-entry projection count. That does not
+dispatch the native task array: other active callbacks remain unavailable,
+and the PCAR callback itself is incomplete. A
 focused regression covers ordering, PCAR factory metadata, malformed-span
 rejection, and a same-size buffer with a mismatched cursor prefix.
 

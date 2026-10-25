@@ -30,7 +30,10 @@ sampling controls once per outer update and retaining the latest accepted
 simulation pose for rendering. The modeled PCAR control prefix and selector
 branch run once per scheduled fixed step; trace rows expose the callback step
 count and the replay regression checks it against the physics tick count. The
-`+0x4F0/+0x4EC` shared-global getter stores also run before the late tail. Tail
+`+0x4F0/+0x4EC` shared-global getter stores also run before the late tail. The
+projection runs at the PCAR's bound index in the validated ordered task stream
+(index 7 in the captured Viper/Bemidji order), with a per-entry count checked
+against callback and physics tick counts during replay. Tail
 effects apply only when every consumed byte is initialized in the session body;
 otherwise those fields remain unknown without aborting the race update.
 Timestamp handling and the earlier `0x434A80` /
@@ -40,8 +43,9 @@ connected. Route kinematics still own player and opponent motion.
 The session now also retains one ordered semantic task collection from the
 validated serialized stream: finite CHKP geometry and supported inactive STAT
 state are materialized, while other records remain explicit as unavailable
-active callbacks. This does not connect native allocation, registration, or
-fixed-step task dispatch.
+active callbacks. The known partial PCAR projection is dispatched at its bound
+entry; native task allocation/registration and all other task callbacks remain
+unimplemented.
 
 The bounded video-memory override reached the original main menu, Quick Race
 setup, and a rendered race-start scene (`metadata/graphics_startup.md`). No

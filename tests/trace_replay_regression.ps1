@@ -51,6 +51,9 @@ try {
     $physicsStepsIndex = [Array]::IndexOf($header, 'physics_steps_scheduled')
     $physicsTickIndex = [Array]::IndexOf($header, 'physics_step_count')
     $pcarCallbackTickIndex = [Array]::IndexOf($header, 'pcar_callback_step_count')
+    $pcarTaskIndex = [Array]::IndexOf($header, 'pcar_callback_task_stream_index')
+    $pcarTaskDispatchIndex = [Array]::IndexOf(
+        $header, 'pcar_task_projection_dispatch_steps')
     $physicsTimeIndex = [Array]::IndexOf($header, 'physics_simulation_time')
     $sharedFloatSourceIndex = [Array]::IndexOf($header, 'control_0x509344')
     $sharedByteSourceIndex = [Array]::IndexOf($header, 'control_0x509420')
@@ -59,6 +62,7 @@ try {
     if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0 -or
         $pcarMultiplierIndex -lt 0 -or $physicsStepsIndex -lt 0 -or
         $physicsTickIndex -lt 0 -or $pcarCallbackTickIndex -lt 0 -or
+        $pcarTaskIndex -lt 0 -or $pcarTaskDispatchIndex -lt 0 -or
         $physicsTimeIndex -lt 0 -or $sharedFloatSourceIndex -lt 0 -or
         $sharedByteSourceIndex -lt 0 -or $sharedFloatCacheIndex -lt 0 -or
         $sharedByteCacheIndex -lt 0) {
@@ -104,13 +108,19 @@ try {
             [cultureinfo]::InvariantCulture)
         $pcarCallbackTick = [int]::Parse($fields[$pcarCallbackTickIndex],
             [cultureinfo]::InvariantCulture)
+        $pcarTaskStreamIndex = [int]::Parse($fields[$pcarTaskIndex],
+            [cultureinfo]::InvariantCulture)
+        $pcarTaskDispatchSteps = [int]::Parse($fields[$pcarTaskDispatchIndex],
+            [cultureinfo]::InvariantCulture)
         $physicsTime = [single]::Parse($fields[$physicsTimeIndex],
             [cultureinfo]::InvariantCulture)
         if ($scheduledSteps -lt 0 -or $scheduledSteps -gt 2 -or
             $physicsTick -lt $previousPhysicsTick -or
             $pcarCallbackTick -ne $physicsTick -or
+            $pcarTaskStreamIndex -ne 7 -or
+            $pcarTaskDispatchSteps -ne $pcarCallbackTick -or
             [Math]::Abs($physicsTime - ($physicsTick * 0.016)) -gt 0.0001) {
-            throw "Fixed-step clock or PCAR callback cadence is inconsistent at frame $($index - 1)"
+            throw "Fixed-step clock, PCAR task binding, or callback cadence is inconsistent at frame $($index - 1)"
         }
         if ($physicsTick -gt 0) { $observedPhysicsStep = $true }
         $previousPhysicsTick = $physicsTick

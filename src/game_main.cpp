@@ -2283,8 +2283,7 @@ struct WindowState {
         last_physics_step_schedule = schedule;
         bool lap_completed = false;
         for (std::int32_t step = 0; step < schedule.steps; ++step) {
-            if (!update_player_pcar_callback()) return false;
-            ++pcar_callback_step_count;
+            if (!dispatch_player_pcar_callback_projection()) return false;
             auto candidate_motion = motion;
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
                 left, right, accelerate, brake, 0.016F, target_laps,
@@ -2677,6 +2676,41 @@ struct WindowState {
         accelerate = control_update_state.analog_0x5093f4.value > 0.2F;
         brake = control_update_state.analog_0x509320.value > 0.2F;
         return true;
+    }
+
+    bool dispatch_player_pcar_callback_projection()
+    {
+        if (!physics_task_runtime_collection.has_value() ||
+            !player_pcar_task_binding.has_value()) return false;
+        auto& entries = physics_task_runtime_collection->entries;
+        const auto target_index =
+            player_pcar_task_binding->stream_record_index;
+        if (target_index >= entries.size()) return false;
+
+        // The original task array walks records in stream order. The PCAR
+        // vtable's +0x2C gate is a fixed true return, so project the known
+        // part of its +0x08 callback at that entry. Other active task
+        // callbacks remain explicitly unavailable and are not synthesized.
+        for (std::size_t index = 0U; index <= target_index; ++index) {
+            auto& entry = entries[index];
+            if (entry.stream_record_index != index) return false;
+            if (index != target_index) continue;
+            if (entry.record_tag != 0x50434152U ||
+                entry.stream_cursor !=
+                    player_pcar_task_binding->serialized_stream_cursor ||
+                entry.status !=
+                    viper::PhysicsTaskRuntimeEntryStatus::
+                        active_callback_unavailable ||
+                entry.known_callback_projection_steps ==
+                    std::numeric_limits<std::uint32_t>::max()) {
+                return false;
+            }
+            if (!update_player_pcar_callback()) return false;
+            ++entry.known_callback_projection_steps;
+            ++pcar_callback_step_count;
+            return true;
+        }
+        return false;
     }
 
     bool results_ready() const noexcept
@@ -3307,6 +3341,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier"
               << ",physics_steps_scheduled,physics_step_count"
               << ",pcar_callback_step_count"
+              << ",pcar_callback_task_stream_index"
+              << ",pcar_task_projection_dispatch_steps"
               << ",physics_simulation_time,physics_catchup_limited";
         trace << ",directinput_keyboard_state_read,directinput_up_pressed";
         trace << '\n' << std::setprecision(9);
@@ -3486,8 +3522,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     .callback_multiplier.value;
                 trace << ',' << state.last_physics_step_schedule.steps
                       << ',' << state.physics_step_count
-                      << ',' << state.pcar_callback_step_count
-                      << ',' << static_cast<float>(state.physics_step_count) * 0.016F
+                      << ',' << state.pcar_callback_step_count;
+                if (state.player_pcar_task_binding.has_value() &&
+                    state.physics_task_runtime_collection.has_value() &&
+                    state.player_pcar_task_binding->stream_record_index <
+                        state.physics_task_runtime_collection->entries.size()) {
+                    const auto task_index =
+                        state.player_pcar_task_binding->stream_record_index;
+                    trace << ',' << task_index << ','
+                          << state.physics_task_runtime_collection->entries[
+                                task_index].known_callback_projection_steps;
+                } else {
+                    trace << ",,";
+                }
+                trace << ',' << static_cast<float>(state.physics_step_count) * 0.016F
                       << ',' << state.last_physics_step_schedule.catchup_limited
                       << ',' << state.directinput_keyboard_state_read
                       << ',' << state.directinput_up_pressed;

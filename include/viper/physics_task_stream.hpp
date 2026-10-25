@@ -233,6 +233,10 @@ struct PhysicsTaskRuntimeEntry {
     std::size_t stream_record_index{};
     std::uint32_t record_tag{};
     std::uint32_t stream_cursor{};
+    // Counts the known PCAR callback projection dispatched through this
+    // ordered entry. It does not imply that the rest of the native callback
+    // or the task object's native allocation is implemented.
+    std::uint32_t known_callback_projection_steps{};
     PhysicsTaskRuntimeEntryStatus status{
         PhysicsTaskRuntimeEntryStatus::active_callback_unavailable};
     std::optional<PhysicsCheckpointTaskRuntimeState> checkpoint;
