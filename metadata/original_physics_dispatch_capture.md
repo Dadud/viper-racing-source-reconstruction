@@ -155,3 +155,26 @@ that throttle alone caused the observed force and motion; the car was already
 moving, and terrain/collision inputs were not held constant. The native
 per-wheel force producers and their complete runtime inputs remain the next
 seam to trace; do not use these values as a throttle-to-force lookup table.
+
+## Follow-up force-writer probe
+
+A later passive probe hooked `0x43E6F0` and observed 58 selected-PCAR accumulator
+updates over about 3.1 seconds. The sampled force vector was passed through
+`arg0`; `arg1` was the point argument, and the body force/moment bytes changed
+across the helper call. Evidence ID:
+`ev_508defee4d9d7bb7cd6ca513958ff9ca00c4048824e7ba5aa9befc3ffa19f2f0`.
+
+The probe's return address was consistently `0x43113F`, inside the forwarding
+wrapper at `0x431130` that calls `0x43E6F0`. That identifies a body-level
+force-addition callsite. Although the probe also recorded a wheel pointer
+offset of `+0x554`, that pointer came from the previously observed wheel-update
+context and does not establish that this writer belongs to that wheel. All 58
+samples had throttle zero, and the run did not inject input. Do not count this
+as per-wheel force evidence or use its wheel label as attribution.
+
+The private probe bundle is
+`../../analysis/reference_captures/pcar_force_writer_probe_20261025.evidence.json`
+(SHA-256 `AF041F571D7CBAD131DF1AF2B4A24547A2A5FBC0AFDB1836F744B16F6CD75A43`).
+The next capture should use the helper's actual call stack or an in-function
+callsite under `0x442530` to associate force writes with a wheel update; it
+should record all four wheel slots and retain the upstream response inputs.
