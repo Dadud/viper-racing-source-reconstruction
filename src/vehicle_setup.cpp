@@ -899,6 +899,21 @@ std::optional<float> advance_ncar_surface_polarity_phase_0x419620(
     return result;
 }
 
+void initialize_ncar_surface_polarity_state_0x419430(
+    NcarSurfacePolarityState& state,
+    const std::int32_t stack_argument_0_second_sample,
+    const std::int32_t stack_argument_1_first_sample) noexcept
+{
+    state.table_0x4f0910 = generate_ncar_surface_polarity_table_0x419430(
+        stack_argument_0_second_sample, stack_argument_1_first_sample);
+    state.index_a_0x4f0aa4 = 0x60U;
+    state.index_b_0x4f0aa8 = 0x20U;
+    state.phase_0x4f0908 = std::bit_cast<float>(0x3cb0f880U);
+    state.increment_0x4f0a94 = std::bit_cast<float>(0x3ee99762U);
+    state.wrap_0x4f0a98 = std::bit_cast<float>(0x3f7ffffdU);
+    state.initialized = true;
+}
+
 std::optional<std::int64_t> advance_ncar_surface_polarity_value_0x4193f0(
     NcarSurfacePolarityState& state,
     const std::int32_t scale) noexcept
@@ -1361,6 +1376,54 @@ PhysicsVector3 transform_body_local_point(
             static_cast<long double>(basis[5]) * point.y +
             static_cast<long double>(basis[8]) * point.z),
     };
+}
+
+std::array<float, 97> generate_ncar_surface_polarity_table_0x419430(
+    const std::int32_t stack_argument_0_second_sample,
+    const std::int32_t stack_argument_1_first_sample) noexcept
+{
+    // The initializer uses x87 FPREM plus __ftol (truncate toward zero). Its
+    // startup path selects 53-bit precision; keep intermediates in double.
+    const auto truncate_fmod = [](const double numerator, const double divisor) {
+        return static_cast<std::int32_t>(std::trunc(std::fmod(numerator, divisor)));
+    };
+
+    constexpr double inverse_177 = 0.005649717514124293785310734463276836;
+    constexpr double inverse_169 = 0.005917159763313609467455621301775148;
+    auto x = truncate_fmod(
+        static_cast<double>(stack_argument_0_second_sample) * inverse_177,
+        177.0) + 2;
+    auto y = truncate_fmod(stack_argument_0_second_sample, 177.0) + 2;
+    auto z = truncate_fmod(
+        static_cast<double>(stack_argument_1_first_sample) * inverse_169,
+        178.0) + 1;
+    auto p = truncate_fmod(stack_argument_1_first_sample, 169.0);
+
+    std::array<float, 97> table{};
+    for (auto& value : table) {
+        double accumulator = 0.0;
+        double step = 0.5;
+        for (int bit = 0; bit < 24; ++bit) {
+            const auto previous_x = x;
+            const auto wrapped_product = std::bit_cast<std::int32_t>(
+                std::bit_cast<std::uint32_t>(x) *
+                std::bit_cast<std::uint32_t>(y));
+            const auto residue = std::fmod(
+                std::fmod(static_cast<double>(wrapped_product), 179.0) * z,
+                179.0);
+            const auto t = static_cast<std::int32_t>(std::trunc(residue));
+            x = z;
+            y = previous_x;
+            z = t;
+            p = truncate_fmod(static_cast<double>(p) * 53.0 + 1.0, 169.0);
+            const auto decision = truncate_fmod(
+                static_cast<double>(p) * t, 64.0);
+            if (decision >= 32) accumulator += step;
+            step *= 0.5;
+        }
+        value = static_cast<float>(accumulator);
+    }
+    return table;
 }
 
 EmbeddedRecordContactResponse prepare_embedded_record_contact(

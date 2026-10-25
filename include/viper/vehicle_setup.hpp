@@ -799,6 +799,13 @@ struct NcarSurfacePolarityState {
     bool initialized{};
 };
 
+// Reconstructs the full state written by initializer 0x419430, including the
+// table and the observed phase/index constants.
+void initialize_ncar_surface_polarity_state_0x419430(
+    NcarSurfacePolarityState& state,
+    std::int32_t stack_argument_0_second_sample,
+    std::int32_t stack_argument_1_first_sample) noexcept;
+
 // The 0x4193C0 wrapper narrows each 0x413BD0 return to EAX, sign-extends it
 // with CDQ, and takes a signed remainder modulo 30,000. Because it pushes the
 // first sample before obtaining the second, the initializer's stack argument
@@ -807,6 +814,13 @@ struct NcarSurfacePolaritySeedPair {
     std::int32_t stack_argument_0_second_sample_remainder{};
     std::int32_t stack_argument_1_first_sample_remainder{};
 };
+
+// Generates the 97-entry table initialized by 0x419430 from its two signed
+// timer remainders. This is a static reconstruction of the observed x87/
+// fmod recurrence; exact native parity still needs a captured fixed-seed table.
+[[nodiscard]] std::array<float, 97> generate_ncar_surface_polarity_table_0x419430(
+    std::int32_t stack_argument_0_second_sample,
+    std::int32_t stack_argument_1_first_sample) noexcept;
 
 [[nodiscard]] NcarSurfacePolaritySeedPair
 make_ncar_surface_polarity_seed_pair_0x4193c0(

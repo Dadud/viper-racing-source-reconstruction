@@ -67,10 +67,25 @@ pairs therefore return to entry depth. In each 24-step loop body, four
 x87 pushes with net +1; the next loop's `FSTP` removes that value. The first
 body starts at depth 3 and peaks at 5; final loop cleanup and the two base
 value pops return to depth zero. If the math-emulation flag is set,
-`0x4BD45A` instead calls `0x4BCD2C`; that separate stack path remains
-untraced, so the unconditional complete initializer trace is unresolved.
-The generated table still lacks native fixture comparison and exact
-`std::fmod` bitwise-equivalence validation. The startup precision path is also
+`0x4BD45A` instead calls `0x4BCD2C`. Its normal finite-divisor path spills
+and reconstructs the two operands; the helper returns two x87 entries to the
+wrapper, which then leaves one remainder. This preserves the same net stack
+delta of -1. The helper's fmod-style arithmetic is inferred from its scaled
+subtraction and `FPREM` sequence; exceptional/subnormal inputs and exact
+cross-runtime rounding remain unverified. Evidence for the helper body:
+`ev_6ded80ba5fff59ba866006f376b70ca489fb9b07a86f06cd62de27add710acfc`.
+The portable reconstruction is implemented as
+`generate_ncar_surface_polarity_table_0x419430` in
+`src/vehicle_setup.cpp`. It carries `(x,y,z,p)` across all 97 entries, resets
+the accumulator and half-step for each entry, uses explicit 32-bit product
+wrap semantics, and stores each 24-bit binary fraction as binary32.
+`initialize_ncar_surface_polarity_state_0x419430` composes the table with the
+observed phase constants and indices. Regression checks cover deterministic
+output, `[0,1)` bounds, seed sensitivity, and the initialized state words.
+These checks validate the port's contract, not parity with the native
+executable. The generated table still lacks a native fixed-seed
+fixture comparison and exact `std::fmod` bitwise-equivalence validation. The
+startup precision path is also
 partly resolved: CRT entry `0x4BD690` calls
 `0x4BF720`, which invokes `__fpmath` and `__setdefaultprecision` (`0x4BE300`).
 Its `__controlfp(0x10000,0x30000)` call sets x87 precision control to 53

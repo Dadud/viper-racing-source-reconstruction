@@ -399,6 +399,32 @@ int main()
         require(polarity_seeds.stack_argument_0_second_sample_remainder == -29999 &&
                 polarity_seeds.stack_argument_1_first_sample_remainder == 1,
             "polarity seed wrapper must use signed low-dword remainders and native push order");
+        const auto polarity_table =
+            viper::generate_ncar_surface_polarity_table_0x419430(0, 0);
+        const auto repeated_polarity_table =
+            viper::generate_ncar_surface_polarity_table_0x419430(0, 0);
+        require(polarity_table == repeated_polarity_table &&
+                std::all_of(polarity_table.begin(), polarity_table.end(),
+                    [](const float value) {
+                        return value >= 0.0F && value < 1.0F;
+                    }) &&
+                polarity_table !=
+                    viper::generate_ncar_surface_polarity_table_0x419430(1, 0),
+            "polarity table recurrence must be deterministic, bounded, and seed-sensitive");
+        viper::NcarSurfacePolarityState initialized_polarity{};
+        viper::initialize_ncar_surface_polarity_state_0x419430(
+            initialized_polarity, 0, 0);
+        require(initialized_polarity.initialized &&
+                initialized_polarity.table_0x4f0910 == polarity_table &&
+                initialized_polarity.index_a_0x4f0aa4 == 0x60U &&
+                initialized_polarity.index_b_0x4f0aa8 == 0x20U &&
+                std::bit_cast<std::uint32_t>(initialized_polarity.phase_0x4f0908) ==
+                    0x3cb0f880U &&
+                std::bit_cast<std::uint32_t>(initialized_polarity.increment_0x4f0a94) ==
+                    0x3ee99762U &&
+                std::bit_cast<std::uint32_t>(initialized_polarity.wrap_0x4f0a98) ==
+                    0x3f7ffffdU,
+            "polarity initializer must populate all recovered table and phase state");
         const auto minimum_timer_seed =
             viper::make_ncar_surface_polarity_seed_pair_0x4193c0(
                 0x80000000U, 0xffffffffU);
