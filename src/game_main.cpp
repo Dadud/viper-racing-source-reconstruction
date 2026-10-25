@@ -2518,9 +2518,9 @@ void load_keyboard_bindings(WindowState& state,
     const auto native_steering_binding_kind = [](const std::uint32_t kind) {
         return kind == 1U || kind == 3U || kind == 4U || kind == 6U;
     };
-    if (!state.control_game_pad &&
-        (native_steering_binding_kind(state.control_bindings[0].kind) ||
-         native_steering_binding_kind(state.control_bindings[1].kind))) {
+    if (state.control_game_pad ||
+        native_steering_binding_kind(state.control_bindings[0].kind) ||
+        native_steering_binding_kind(state.control_bindings[1].kind)) {
         state.control_squared_steering_gate_0x5093fc = false;
     }
 }
