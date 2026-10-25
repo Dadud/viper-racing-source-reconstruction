@@ -183,3 +183,27 @@ captures prove startup and drawing only under the process-only video-memory
 override in this environment; they do not establish general compatibility.
 Cleanup is verified and hashes of the launcher, engine, ISO, and all 31
 GameData files match their baselines.
+
+### Follow-up launch check on 2026-10-25
+
+The official ISO-backed launcher was started with its primary thread suspended
+from `GameRoot` and the launcher-owned child bridge attached before resume.
+Both `CreateProcessA` and `CreateProcessW` hooks reported ready. The primary
+thread resumed with prior suspend count 1, but the Frida session detached
+without a matching race-child event; no child PID was recovered and no new
+simulation sample was captured. Before launch, all 32 staged `Data` hashes,
+the official launcher and engine hashes, `Config/options.cfg`, and the mounted
+`F:` volume label (`VIPER`) matched the expected capture setup.
+
+The same Windows session already had `C:\Sierra\Viper Racing\Data\race.bin`
+running from the installed 2016 v1.2.5 patch (SHA-256
+`8FB719439D58EC58BE971682C110B06A9C0702CDE057FFB48B054263E1C501BD`, file
+size 1,851,392). It is not the official ISO engine (SHA-256
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`, file
+size 1,314,816). The patch's instruction file identifies it as the 2016
+v1.2.5 release; raw `.text` windows around the integrator and wheel-update
+addresses also differ substantially from the ISO image. The patch was left
+running and was not used as original-engine evidence. The failed official
+launch does not establish why no child was created. A future capture must
+recover the launch path that produced the already-retained ISO-hash race
+session, then attach the bounded PCAR probe before gameplay.
