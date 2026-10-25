@@ -74,6 +74,10 @@ try {
         $tickHeader, 'body_integrator_timer_known_fields_finite')
     $bodyIntegratorTimerMissingCountColumn = [Array]::IndexOf(
         $tickHeader, 'body_integrator_timer_missing_count')
+    $bodyIntegratorRampColumn = [Array]::IndexOf(
+        $tickHeader, 'body_integrator_ramp_0x50c')
+    $bodyVehicleOrdinalColumn = [Array]::IndexOf(
+        $tickHeader, 'body_vehicle_ordinal_0x510')
     $bodyIntegratorTimerMissingOffsets = [int[]]::new(3)
     for ($lane = 0; $lane -lt 3; ++$lane) {
         $bodyIntegratorTimerMissingOffsets[$lane] = [Array]::IndexOf(
@@ -108,11 +112,17 @@ try {
         [Array]::IndexOf($tickHeader, 'body_moment_z'))
     $wheelActiveColumns = [int[]]::new(4)
     $wheelDepthColumns = [int[]]::new(4)
+    $wheelPreupdateColumns = [int[]]::new(4)
+    $wheelPriorDepthColumns = [int[]]::new(4)
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         $wheelActiveColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_active")
         $wheelDepthColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_projected_depth")
+        $wheelPreupdateColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_preupdate_value_0x158")
+        $wheelPriorDepthColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_previous_contact_depth_0xe8")
     }
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
@@ -124,6 +134,7 @@ try {
         $bodyIntegratorTimerReadyColumn -lt 0 -or
         $bodyIntegratorTimerFiniteColumn -lt 0 -or
         $bodyIntegratorTimerMissingCountColumn -lt 0 -or
+        $bodyIntegratorRampColumn -lt 0 -or $bodyVehicleOrdinalColumn -lt 0 -or
         @($bodyIntegratorTimerMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
@@ -131,7 +142,9 @@ try {
         @($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($bodyMotionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
-        @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
+        @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelPreupdateColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing body or wheel state fields'
     }
     $expectedTick = 0
@@ -180,6 +193,13 @@ try {
             $fields[$bodyIntegratorTimerMissingCountColumn] -notmatch '^[0-3]$') {
             throw "Body integrator timer diagnostics are malformed at line $($index + 1)"
         }
+        foreach ($column in @($bodyIntegratorRampColumn, $bodyVehicleOrdinalColumn)) {
+            if ([string]::IsNullOrWhiteSpace($fields[$column])) { continue }
+            $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($value) -or [single]::IsInfinity($value)) {
+                throw "Body integrator source snapshot is non-finite at line $($index + 1)"
+            }
+        }
         $timerMissingOffsets = @($bodyIntegratorTimerMissingOffsets | Where-Object {
             -not [string]::IsNullOrWhiteSpace($fields[$_])
         } | ForEach-Object { $fields[$_] })
@@ -220,6 +240,16 @@ try {
                     throw "Wheel $wheel projected depth is non-finite at line $($index + 1)"
                 }
                 $wheelDepthObserved[$wheel] = $true
+            }
+            foreach ($column in @(
+                $wheelPreupdateColumns[$wheel], $wheelPriorDepthColumns[$wheel])) {
+                if ([string]::IsNullOrWhiteSpace($fields[$column])) { continue }
+                $historyValue = [single]::Parse(
+                    $fields[$column], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($historyValue) -or
+                    [single]::IsInfinity($historyValue)) {
+                    throw "Wheel $wheel history snapshot is non-finite at line $($index + 1)"
+                }
             }
         }
         ++$expectedTick

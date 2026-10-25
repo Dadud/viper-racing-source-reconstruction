@@ -1815,8 +1815,12 @@ struct PlayerPhysicsTickContext {
     // position, linear/angular velocity, accumulated force/moment, then the
     // constructor timer sentinel. Unknown native bytes remain empty.
     std::array<std::optional<float>, 25> body_state_after_tick{};
+    std::optional<float> body_integrator_ramp_0x50c_after_tick;
+    std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
+    std::array<std::optional<float>, 4> wheel_preupdate_value_0x158_after_tick{};
+    std::array<std::optional<float>, 4> wheel_previous_contact_depth_0xe8_after_tick{};
 };
 
 struct WindowState {
@@ -2568,6 +2572,14 @@ struct WindowState {
             if (bits.has_value())
                 tick.body_state_after_tick[index] = std::bit_cast<float>(*bits);
         }
+        if (const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, 0x50cU)) {
+            tick.body_integrator_ramp_0x50c_after_tick =
+                std::bit_cast<float>(*bits);
+        }
+        tick.body_vehicle_ordinal_0x510_after_tick =
+            viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, 0x510U);
         for (std::size_t wheel = 0U; wheel < player_wheel_contact_states.size();
              ++wheel) {
             tick.wheel_contact_active_after_tick[wheel] =
@@ -2575,6 +2587,17 @@ struct WindowState {
             if (player_wheel_terrain_queries_succeeded[wheel]) {
                 tick.wheel_contact_depth_after_tick[wheel] =
                     player_wheel_contact_results[wheel].projected_depth;
+            }
+            const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
+            if (const auto bits = viper::read_ncar_wheel_object_u32(
+                    wheel_object, 0x158U)) {
+                tick.wheel_preupdate_value_0x158_after_tick[wheel] =
+                    std::bit_cast<float>(*bits);
+            }
+            if (const auto bits = viper::read_ncar_wheel_object_u32(
+                    wheel_object, 0xe8U)) {
+                tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
+                    std::bit_cast<float>(*bits);
             }
         }
     }
@@ -3889,12 +3912,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             physics_tick_trace << ",body_kinematics_missing_offset_" << lane;
         physics_tick_trace << ",body_integrator_timer_ramp_source_ready"
             ",body_integrator_timer_known_fields_finite"
-            ",body_integrator_timer_missing_count";
+            ",body_integrator_timer_missing_count"
+            ",body_integrator_ramp_0x50c,body_vehicle_ordinal_0x510";
         for (std::size_t lane = 0U; lane < 3U; ++lane)
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
-                << ",wheel" << wheel << "_projected_depth";
+                << ",wheel" << wheel << "_projected_depth"
+                << ",wheel" << wheel << "_preupdate_value_0x158"
+                << ",wheel" << wheel << "_previous_contact_depth_0xe8";
         }
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
@@ -4092,7 +4118,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     physics_tick_trace << ','
                         << tick.body_integrator_timer_ramp_source_ready
                         << ',' << tick.body_integrator_timer_known_fields_finite
-                        << ',' << tick.body_integrator_timer_missing_count;
+                        << ',' << tick.body_integrator_timer_missing_count
+                        << ',';
+                    if (tick.body_integrator_ramp_0x50c_after_tick)
+                        physics_tick_trace << *tick.body_integrator_ramp_0x50c_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.body_vehicle_ordinal_0x510_after_tick)
+                        physics_tick_trace << *tick.body_vehicle_ordinal_0x510_after_tick;
                     for (std::size_t lane = 0U; lane < 3U; ++lane) {
                         physics_tick_trace << ',';
                         if (lane < tick.body_integrator_timer_missing_count)
@@ -4110,6 +4142,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_contact_depth_after_tick[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_contact_depth_after_tick[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_preupdate_value_0x158_after_tick[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_preupdate_value_0x158_after_tick[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_previous_contact_depth_0xe8_after_tick[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_previous_contact_depth_0xe8_after_tick[wheel];
                         }
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';

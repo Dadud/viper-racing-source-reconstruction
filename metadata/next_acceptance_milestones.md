@@ -35,12 +35,15 @@ The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
 per-tick controls/timing plus post-callback byte-backed body orientation basis,
 position, native linear/angular velocity (`+0x234/+0x240`), force/moment
-accumulators, and wheel contact-active/projected-depth state. Unknown body
-fields and unsuccessful wheel depths remain blank. The
+accumulators, and wheel contact-active/projected-depth state. It also exposes
+initialized body timer sources `+0x50C` and `+0x510`, plus byte-backed wheel
+`+0x158` and prior contact-depth `+0xE8` on each tick; unknown bytes remain
+blank. The
 trace replay regression checks contiguous tick ordering, pre-increment timer
 values, logical-input provenance, input snapshot size, finite body/contact
-samples, and byte-identical repeated playback. The body values currently expose
-the static constructor state; this is instrumentation, not physics acceptance.
+samples, the new history columns, and byte-identical repeated playback. The
+body and wheel values currently expose constructor/contact-observation state;
+this is instrumentation, not physics acceptance.
 Next wire a complete observed body update and preserve paired per-tick physical
 state captures against the original.
 Four wheel contact projections now transform constructor wheel anchors through
