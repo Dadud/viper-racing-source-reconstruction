@@ -59,11 +59,15 @@ descriptor-driven `fmod` CRT dispatcher at `0x4C0580`; the adjacent
 operands without popping them, then selects class- and exception-specific
 handlers through the descriptor table. Its first handler pointer at
 `0x4E98E0` targets `0x4BD464`, whose `FPREM` loop ends with `FSTP ST(1),ST`,
-leaving one remainder and reducing stack depth by one. The status-class index
-selecting that slot has not been verified, and the regular finite-input handler
-has not been identified; therefore the initializer's complete x87 stack trace
-and exact `std::fmod` equivalence remain unresolved. The startup precision path
-is also partly resolved: CRT entry `0x4BD690` calls
+leaving one remainder and reducing stack depth by one. `__trandisp2` maps the
+normal `FXAM` class to lookup-table index zero for either sign; two normal
+operands therefore select combined index zero and this `fmod` handler. This
+establishes the one-pop `FPREM` path for normal finite operands when the CRT's
+`0x4E9754` math-emulation flag is clear. `__fpmath` initializes that flag from
+`0x4BE370`; when set, the same helper instead calls `0x4BCD2C`, whose separate
+emulation stack path remains untraced. The complete initializer stack trace
+and exact `std::fmod` bitwise equivalence therefore remain unresolved. The
+startup precision path is also partly resolved: CRT entry `0x4BD690` calls
 `0x4BF720`, which invokes `__fpmath` and `__setdefaultprecision` (`0x4BE300`).
 Its `__controlfp(0x10000,0x30000)` call sets x87 precision control to 53
 significand bits. The pre-initializer game setup `0x415C60` changes
@@ -82,7 +86,12 @@ the port is checked against a native fixed-seed table fixture. Evidence:
 The `fmod` descriptor and handler pointer are directly observed in
 `ev_831f99655f66f55f6b5d1d67f4e9d8ab614b346d99a3c2366f48895f5edf84f2`;
 the `__trandisp2` class-table dispatch is observed in
-`ev_4818ba019dd88b819e85fc77487ad6e489a537923d6706150559fb44f4fb5d58`.
+`ev_4818ba019dd88b819e85fc77487ad6e489a537923d6706150559fb44f4fb5d58`, and
+the class lookup bytes at `0x4E9A5D` are observed in
+`ev_fc25145551b9555fcf16c943d49face1f95c9314eaac5bebf7a389fee4b3195c`.
+The `__fpmath` flag setup and alternate helper body are observed in
+`ev_8745e92eac2ae8bba84e2003792cc2d70ae42a08cd4b2f788219886e098f8fa5` and
+`ev_6ded80ba5fff59ba866006f376b70ca489fb9b07a86f06cd62de27add710acfc`.
 
 The precision-path call-chain evidence is `ev_5a5d630562475ee9e0a0e94a7961357c5b3b2c0e46c6817cbd917899342dd71b`
 (CRT entry), `ev_528ea60e8a455ee3e00b8b275c96ca8152c35467fa67f6bd80760ceba03d9755`
