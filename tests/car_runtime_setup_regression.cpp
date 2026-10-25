@@ -36,6 +36,46 @@ int main()
 {
     try {
         {
+            std::vector<std::byte> runtime_record(0xecU);
+            write_u32_le(runtime_record, 0xe4U,
+                std::bit_cast<std::uint32_t>(200.0F));
+            write_u32_le(runtime_record, 0xe8U,
+                std::bit_cast<std::uint32_t>(200.0F));
+            const auto scales =
+                viper::initialize_ncar_wheel_pair_scales_from_runtime_record(
+                    runtime_record);
+            require(scales.has_value() &&
+                    scales->source_value_0xe4 == 200.0F &&
+                    scales->source_value_0xe8 == 200.0F &&
+                    scales->first_scale_0xdd4 == 35039.3671875F &&
+                    scales->second_scale_0xdd8 == 35039.3671875F,
+                "PCAR constructor must scale record +0xE4/+0xE8 into wheel-pair fields");
+            viper::NcarBodyRuntimeObjectState body{};
+            const std::array<viper::NcarObjectFieldWrite, 2> writes{{
+                {0xdd4U, 4U, std::bit_cast<std::uint32_t>(scales->first_scale_0xdd4)},
+                {0xdd8U, 4U, std::bit_cast<std::uint32_t>(scales->second_scale_0xdd8)},
+            }};
+            require(viper::apply_ncar_body_object_writes(body, writes) &&
+                    viper::read_ncar_body_object_u32(body, 0xdd4U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            35039.3671875F)} &&
+                    viper::read_ncar_body_object_u32(body, 0xdd8U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            35039.3671875F)},
+                "wheel-pair scales must be retained in initialized byte-backed body fields");
+            runtime_record.resize(0xe8U);
+            require(!viper::initialize_ncar_wheel_pair_scales_from_runtime_record(
+                        runtime_record),
+                "wheel-pair constructor mapping must reject a truncated runtime record");
+            runtime_record.resize(0xecU);
+            write_u32_le(runtime_record, 0xe8U,
+                std::bit_cast<std::uint32_t>(
+                    std::numeric_limits<float>::quiet_NaN()));
+            require(!viper::initialize_ncar_wheel_pair_scales_from_runtime_record(
+                        runtime_record),
+                "wheel-pair constructor mapping must reject non-finite source values");
+        }
+        {
             std::array<viper::NcarOrdinalPairRowInput, 4> rows{{
                 {true, 0.0F, 0.0F, 0.0F, 0.0F},
                 {true, 2.0F, 0.0F, 5.0F, 0.0F},

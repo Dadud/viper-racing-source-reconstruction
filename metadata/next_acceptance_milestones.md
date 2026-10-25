@@ -197,12 +197,15 @@ rendered pose. Record every still-observed external callback/input in a
 machine-readable trace. The live session now composes modeled `0x43B290` from
 keyboard samples and configured `CONTROL` sensitivities/ranges/rates; its
 outputs at `0x509358`, `0x5093F4`, and `0x509320` drive the current route
-adapter. The PCAR callback reads the throttle/brake accessors, places
-transformed values on the car through setter helpers, and reaches the
-`0x431150` integrator, whose four `0x442530` wheel updates accumulate contact
-forces through `0x43E6F0`. This establishes the control-to-wheel-update call
-chain, but the live PCAR setter state, complete wheel/contact inputs, force
-collector, and body-integrator state are still not owned by `WindowState`.
+adapter. Original static analysis shows the PCAR callback reads throttle/brake
+accessors, places transformed values on the car through setter helpers, and
+reaches `0x431150`, whose four `0x442530` wheel updates accumulate contact
+forces through `0x43E6F0`. This is the original call chain; production
+`WindowState` still dispatches only the partial callback projection and does
+not call that wheel/force/body sequence. The byte-backed PCAR constructor now
+also owns the `+0xDD4/+0xDD8` scales written by `0x433C00` from runtime-record
+`+0xE4/+0xE8`. Complete wheel/contact inputs, force collection, and
+body-integrator state remain unowned.
 Build those persistent inputs and connect them to the existing wheel/body
 compositions before replacing route motion as the rendered pose authority.
 All currently modeled `0x441C10` outputs are now materialized at their wheel
@@ -501,13 +504,15 @@ leave the paired outputs at their default values. This closes model
 correctness gaps only. The native TPPB v2 `track.bpp` plane/tree is parsed and
 the runtime queries it from byte-backed PCAR pose and wheel constructor
 geometry; those contact observations are not yet fed into the composed wheel
-force/body step. A controlled original-process schedule now co-observes
+force/body step. Constructor helper `0x433C00` writes the paired wheel scales
+from runtime-record `+0xE4/+0xE8`, and the Windows byte-backed PCAR now retains
+them at body `+0xDD4/+0xDD8` and in its tick trace. A controlled original-process schedule now co-observes
 throttle/brake/steering globals, wheel state, body response, and tire force
 writer activity; the pair scales were `35039.3671875` in all 28 retained
-updates for that one active Viper session. This is a session observation, not
-the scale producer or a portable default. Remaining live inputs include
-surface-code response mapping, response polarity, prior `+0x158` state,
-suspension parameters, and tire response inputs. Do not
+updates for that one active Viper session. The constructor source is resolved;
+applicability to other car records/modes still needs record-backed checks.
+Remaining live inputs include surface-code response mapping, response polarity,
+prior `+0x158` state, suspension parameters, and tire response inputs. Do not
 repeat a capture that only rereads the six pair operands. Capture the missing
 upstream inputs and timestamp-correlated wheel/accumulator/body samples for
 throttle, steering, braking, and coast. The captured `+0xF4` row is sampled

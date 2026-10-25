@@ -62,6 +62,9 @@ try {
     $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
     $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
     $bodyTimerColumn = [Array]::IndexOf($tickHeader, 'body_timer_0xe44')
+    $bodyWheelPairScaleColumns = @(
+        [Array]::IndexOf($tickHeader, 'body_wheel_pair_scale_0xdd4'),
+        [Array]::IndexOf($tickHeader, 'body_wheel_pair_scale_0xdd8'))
     $bodyKinematicsReadyColumn = [Array]::IndexOf(
         $tickHeader, 'body_kinematics_input_ready')
     $bodyKinematicsNonFiniteColumn = [Array]::IndexOf(
@@ -130,7 +133,9 @@ try {
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
         $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0 -or
-        $bodyTimerColumn -lt 0 -or $bodyKinematicsReadyColumn -lt 0 -or
+        $bodyTimerColumn -lt 0 -or
+        @($bodyWheelPairScaleColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        $bodyKinematicsReadyColumn -lt 0 -or
         $bodyKinematicsNonFiniteColumn -lt 0 -or
         $bodyKinematicsMissingCountColumn -lt 0 -or
         @($bodyKinematicsMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -242,6 +247,16 @@ try {
         }
         if ([Math]::Abs($bodyTimer - (-100.0)) -gt 0.00001) {
             throw 'PCAR +0xE44 changed without its runtime timer/ordinal producer being connected'
+        }
+        foreach ($column in $bodyWheelPairScaleColumns) {
+            if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                throw 'PCAR constructor wheel-pair scale is missing from the byte-backed body trace'
+            }
+            $scale = [single]::Parse(
+                $fields[$column], [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($scale) -or [single]::IsInfinity($scale)) {
+                throw "PCAR constructor wheel-pair scale is non-finite at line $($index + 1)"
+            }
         }
         foreach ($column in $bodyMotionColumns) {
             if ([string]::IsNullOrWhiteSpace($fields[$column])) { continue }

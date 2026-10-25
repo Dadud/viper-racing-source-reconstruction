@@ -1231,9 +1231,12 @@ control globals. A pair-scale sample retained 28 rows from 282 integrator
 calls; `+0xDD4` and `+0xDD8` were both `35039.3671875` in every row. These
 observations support the known pair equation and show live control-correlated
 wheel/body response for this active Viper session. They do not establish a
-clean initial condition, identify the scale constructor/configuration
-producer, generalize the value to other cars/modes, or validate a reconstructed
-force law.
+clean initial condition, generalize the value to other cars/modes, or validate
+a reconstructed force law. Static Ghidra analysis later resolved the scale
+producer: constructor helper `0x433C00` stores body `+0xDD4/+0xDD8` from
+runtime-record `+0xE4/+0xE8`, each multiplied by `175.19684`; the byte-backed
+PCAR constructor now materializes this mapping and exposes it in fixed-step
+traces. Evidence `ev_7884fb79acfb26d4c7b0004cd2a167966a9b097e9fd4e49a6650ec607b8731e`.
 
 Evidence IDs: controlled body/input and force-writer capture
 `ev_fdbb99472a90683e5903479bcd142a289fdb406bbaf525e0ac3e63c7a094d318`;
@@ -1243,6 +1246,6 @@ pair-scale capture
 `ev_29bbd154a34bbb917107333c3625f0af58d69e3e6d909c0e942dd08204dd6625`.
 Their script hashes, schedules, and the private export path are recorded in
 `../../analysis/reference_captures/controlled_player_physics_20261025.json`.
-The next trace should find the `+0xDD4/+0xDD8` write/initialization site and
-trace live suspension/tire inputs at `0x442530` back to their producers, then
-correlate those inputs with per-wheel `+0xF4` and PCAR force/moment deltas.
+The next capture should trace remaining live suspension/tire inputs at
+`0x442530` back to their producers, then correlate those inputs with per-wheel
+`+0xF4` and PCAR force/moment deltas.

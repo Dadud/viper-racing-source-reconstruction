@@ -287,6 +287,19 @@ struct NcarBodyRuntimeObjectState {
     NcarBodyRuntimeObjectState& destination,
     const std::array<float, 12>& transform) noexcept;
 
+struct NcarWheelPairScaleSetup {
+    float source_value_0xe4{};
+    float source_value_0xe8{};
+    float first_scale_0xdd4{};
+    float second_scale_0xdd8{};
+};
+
+// Projects the two paired-wheel scales written by PCAR constructor helper
+// 0x433C00 from runtime-record +0xE4/+0xE8.
+[[nodiscard]] std::optional<NcarWheelPairScaleSetup>
+initialize_ncar_wheel_pair_scales_from_runtime_record(
+    std::span<const std::byte> runtime_record) noexcept;
+
 // Reads one little-endian DWORD only when all four bytes have an observed
 // initialization/write owner. Unknown native storage remains unavailable.
 [[nodiscard]] std::optional<std::uint32_t> read_ncar_body_object_u32(

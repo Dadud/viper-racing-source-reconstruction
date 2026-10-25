@@ -2335,6 +2335,29 @@ bool copy_ncar_runtime_record_transform_to_body(
     return apply_ncar_body_object_writes(destination, writes);
 }
 
+std::optional<NcarWheelPairScaleSetup>
+initialize_ncar_wheel_pair_scales_from_runtime_record(
+    const std::span<const std::byte> runtime_record) noexcept
+{
+    constexpr float native_scale = 175.19684F;
+    constexpr std::size_t first_offset = 0xe4U;
+    constexpr std::size_t second_offset = 0xe8U;
+    if (runtime_record.size() < second_offset + sizeof(std::uint32_t))
+        return std::nullopt;
+    const auto first = std::bit_cast<float>(
+        read_u32_le(runtime_record.data(), first_offset));
+    const auto second = std::bit_cast<float>(
+        read_u32_le(runtime_record.data(), second_offset));
+    const auto first_scale = first * native_scale;
+    const auto second_scale = second * native_scale;
+    if (!std::isfinite(first) || !std::isfinite(second) ||
+        !std::isfinite(first_scale) || !std::isfinite(second_scale)) {
+        return std::nullopt;
+    }
+    return NcarWheelPairScaleSetup{
+        first, second, first_scale, second_scale};
+}
+
 std::optional<std::uint32_t> read_ncar_body_object_u32(
     const NcarBodyRuntimeObjectState& source,
     const std::uint32_t offset) noexcept

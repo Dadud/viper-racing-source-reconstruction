@@ -1952,7 +1952,7 @@ struct PlayerPhysicsTickContext {
     // Post-callback byte-backed body fields in this order: orientation basis,
     // position, linear/angular velocity, accumulated force/moment, then the
     // constructor timer sentinel. Unknown native bytes remain empty.
-    std::array<std::optional<float>, 25> body_state_after_tick{};
+    std::array<std::optional<float>, 27> body_state_after_tick{};
     std::optional<float> body_integrator_ramp_0x50c_after_tick;
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
@@ -2407,6 +2407,26 @@ struct WindowState {
             player_runtime_state = {};
             return false;
         }
+        const auto wheel_pair_scales =
+            viper::initialize_ncar_wheel_pair_scales_from_runtime_record(
+                player_runtime_car_record);
+        if (!wheel_pair_scales.has_value()) {
+            player_runtime_state = {};
+            return false;
+        }
+        // PCAR constructor helper 0x433C00 scales runtime-record +0xE4/+0xE8
+        // into body +0xDD4/+0xDD8 before the integrator consumes them.
+        const std::array<viper::NcarObjectFieldWrite, 2> wheel_pair_scale_writes{{
+            {0xdd4U, 4U, std::bit_cast<std::uint32_t>(
+                wheel_pair_scales->first_scale_0xdd4)},
+            {0xdd8U, 4U, std::bit_cast<std::uint32_t>(
+                wheel_pair_scales->second_scale_0xdd8)},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, wheel_pair_scale_writes)) {
+            player_runtime_state = {};
+            return false;
+        }
         // PCAR constructor 0x42FF90 calls 0x433AA0 after the placement
         // handoff. Reuse the initializer's evidence-backed direct-write
         // prefix, which includes the exact +0xE44 timestamp sentinel.
@@ -2724,6 +2744,14 @@ struct WindowState {
         for (std::size_t index = 0U; index < offsets.size(); ++index) {
             const auto bits = viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offsets[index]);
+            if (bits.has_value())
+                tick.body_state_after_tick[index] = std::bit_cast<float>(*bits);
+        }
+        for (const auto [index, offset] :
+             {std::pair<std::size_t, std::uint32_t>{25U, 0xdd4U},
+              std::pair<std::size_t, std::uint32_t>{26U, 0xdd8U}}) {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, offset);
             if (bits.has_value())
                 tick.body_state_after_tick[index] = std::bit_cast<float>(*bits);
         }
@@ -4276,6 +4304,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",body_pos_x,body_pos_y,body_pos_z,body_vel_x,body_vel_y,body_vel_z"
             ",body_ang_x,body_ang_y,body_ang_z,body_force_x,body_force_y,body_force_z"
             ",body_moment_x,body_moment_y,body_moment_z,body_timer_0xe44"
+            ",body_wheel_pair_scale_0xdd4,body_wheel_pair_scale_0xdd8"
             ",body_kinematics_input_ready,body_kinematics_non_finite"
             ",body_kinematics_reader_inventory_mismatch"
             ",body_kinematics_missing_float_count";
