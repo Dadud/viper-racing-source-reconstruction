@@ -606,3 +606,16 @@ startup abort remains unexplained. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md)
 for the observed dialog, Frida evidence ID, and limits. Do not treat this as a
 gameplay comparison or as timer-branch evidence.
+
+### Immediate physics evidence milestone (2026-10-25)
+
+The compact controlled capture is now documented in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+It improves input-to-wheel/body evidence but does not cross the source seam:
+wheel `+0x158` is stable within each callback, its producer is not known, and
+suspension/tire inputs for `+0xE8/+0xF4` remain unowned by the reconstructed
+session. Next, recover those producers and inputs; then compose the existing
+wheel updates, pair differential, force accumulation, and body integration in
+a single frame with traceable source-owned inputs. Keep constructor defaults
+out of the live update. After integration, compare identical clean-start
+original and reconstructed schedules to measure drift and refine tolerances.

@@ -1311,3 +1311,48 @@ before/after each stage. Repeat the bounded throttle, steering, braking, and
 coast schedule with input globals in the same row. The current sample only
 establishes coast-call ordering and accumulator writes; it does not source the
 remaining tire inputs or validate reconstruction output.
+### Controlled PCAR input-to-wheel/body capture (2026-10-25)
+
+A compact 8.1-second read-only Frida capture on the previously identified
+`race.bin` process used the PCAR vtable filter (`0x4C8188`) at the native
+`0x442530` wheel callback/integrator boundary. The schedule injected only zero
+DIK reads: SPACE reset at 700–1000 ms, UP throttle at 1600–3000 ms, LEFT steer
+at 3900–4900 ms, and DOWN brake at 5600–6600 ms. This was an intervention on
+DirectInput reads inside an already-running process, not physical keyboard
+delivery, a clean startup, or an original-versus-reconstruction comparison.
+
+The probe observed 505 PCAR callback/integrator entries and retained every
+sixth entry (85 samples) plus four ordered wheel rows per retained entry (340
+rows). The wrapper saw 295 key reads per scheduled key; it patched 11 reset,
+49 throttle, 37 steering, and 37 brake reads. During the throttle phase the
+native throttle global ranged from about 0.213 to 1.0 and PCAR speed reached
+8.593; during steering the steer global ranged from -0.161 to -1.0 and speed
+ranged 6.925–9.822; during braking the brake global ranged from 0.230 to 1.0
+and speed fell from 5.643 to 0.0365. Each phase's retained wheel rows had all
+four contact/active bytes set. The observed wheel feature byte was 10 in 42/44
+steering rows and all 40 braking rows; reset and throttle rows were zero. These
+values describe this Viper session only.
+
+Within each sampled wheel callback, each wheel's `+0x158` pair-history value
+was stable; `+0xE8` changed during the callback. Body force/moment accumulators
+changed across the ordered wheel calls and reset at the next integrator entry.
+Position and velocity changed between complete integrator entries. This ties
+controlled inputs to live PCAR and wheel updates more directly than the prior
+coast-only sample, and supports continuing the existing wheel update/pair
+models. It does not provide provenance for the missing `+0x158` history or
+suspension/tire inputs, determine exact force equations, or validate any
+reconstructed output. The inter-phase residual bucket overlaps scheduled
+windows, so it is not a pure coast baseline.
+
+Evidence `ev_8e7012b2e69a5d11b6d19ae87d825cfaca592141a8193f8e6f71a12e3a95361e`;
+probe script SHA-256 `d57d35eb23eebc48f16d0b88b608b619cf654e4ec730e5d8e63bb9a6d5f030c4`.
+The target was the already identified x86 `race.bin` (SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`). Preserve
+raw probe output outside this source-only repository.
+
+Next useful source milestone: identify and reproduce the native producer of
+wheel `+0x158` and gather the suspension/tire state that feeds `+0xE8/+0xF4`.
+Only then should these updates be composed into a body frame. The existing
+wheel-pair differential model already accepts the ordered four wheel updates,
+explicit scale inputs, and contact gates; its unresolved caller inputs should
+not be filled with constructor defaults or values guessed from this run.
