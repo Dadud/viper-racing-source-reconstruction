@@ -226,6 +226,20 @@ for all three components. Four first-update direct tire writes and all four
 suspension X components now replay through the corresponding portable models
 in `ncar_force_capture_regression`.
 
+The static `0x442530` body also exposes the final tire-basis transform. It
+stores the response vector in wheel `+0xF4..+0xFC`, projects that vector onto
+the basis at `+0x110..+0x118`, and stores `+0x100..+0x108 = +0xF4 -
+dot(+0x110, +0xF4) * +0x110` before the direct `0x443C09` call. Decoding the
+four first-update `rawObject` snapshots from the capture reproduces the
+captured `+0x100` values with maximum absolute component error below
+`7.3e-6`; REA analysis evidence is `ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7`.
+The asset-free regression now starts from each captured `+0xF4` vector and
+`+0x110` basis, runs `apply_wheel_tire_basis_update`, and checks the native
+`+0x100` output within `1e-4` before replaying the accumulator write. This
+validates the basis projection stage from original object bytes. It does not
+derive the pre-projection tire response vector or collision normal and does
+not make the live runtime physics-owned.
+
 The complete response capture is kept outside the repository at
 `../../analysis/reference_captures/pcar_wheel_response_input_probe_20261025.json`
 (SHA-256 `DEC4580293D4BCBAC4B6920597D65D3FBB0D60160D88C8E94F1540887FCA0264`,

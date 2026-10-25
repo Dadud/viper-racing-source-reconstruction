@@ -238,12 +238,16 @@ events and wheel-object state across eight PCAR updates. All 32 sampled direct
 `0x443C09` vectors match wheel `+0x100..+0x108` bit-for-bit; all 32 suspension
 wrapper rows expose the clamped response magnitude, and the first four
 captured X components match magnitude times the native caller's X direction
-local. The regression now replays those four suspension X components and four
-direct tire-force calls. The checked-in response probe also has exact stage
-hooks for the suspension and tire callsites, but those additional stack rows
-have not yet been captured. This closes more of the wheel-to-accumulator
-boundary; the direction/tire-vector producers, native collision/query state,
-and live session ownership remain unresolved. See
+local. Static analysis also shows that the native direct tire vector is the
+captured wheel `+0xF4` response projected off basis `+0x110`; the four captured
+first-update object snapshots reproduce `+0x100` within `7.3e-6`, and the
+asset-free regression now replays that transform before its four direct tire
+accumulator calls. The regression also checks the four captured suspension X
+compositions. The checked-in response probe has exact stage hooks for the
+suspension and tire callsites, but those additional stack rows have not yet
+been captured. This closes another wheel-to-accumulator stage; the pre-
+projection response inputs, suspension direction producers, native
+collision/query state, and live session ownership remain unresolved. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#corrected-wheel-scoped-force-callsites).
 
 ### State required before the live physics integration can be wired

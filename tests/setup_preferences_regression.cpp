@@ -31,15 +31,21 @@ int main()
     check(missing.file_missing && !missing.selection && missing.error.empty(),
         "missing preference is a safe first-run state");
 
+    const std::array<std::optional<std::string>, 4> bindings{
+        "Key_A", "Key_D", "Key_W", std::string{}};
     const auto first_save = viper::save_setup_selection_preference(root,
-        {"Bemidji", "Sports", 3U});
+        {"Bemidji", "Sports", 3U, std::nullopt, bindings});
     check(first_save.saved && first_save.path == root / "viper-racing-setup.cfg",
         "writes normalized selector identifiers under Config");
     const auto loaded = viper::load_setup_selection_preference(root);
     check(loaded.selection && loaded.selection->track == "bemidji" &&
         loaded.selection->car == "sports" && loaded.selection->laps == 3U &&
-        loaded.selection->opponent_strength == 0U,
-        "round-trips selected track, car, lap count, and opponent profile");
+        loaded.selection->opponent_strength == 0U &&
+        loaded.selection->control_bindings[0] == "Key_A" &&
+        loaded.selection->control_bindings[1] == "Key_D" &&
+        loaded.selection->control_bindings[2] == "Key_W" &&
+        loaded.selection->control_bindings[3] == "",
+        "round-trips selector settings, keyboard overrides, and explicit unbound state");
 
     const std::vector<std::string> tracks{"bemidji", "dundas"};
     const std::vector<std::string> cars{"viper", "sports"};
@@ -98,6 +104,12 @@ int main()
         {"../outside", "sports"});
     check(!invalid_save.saved && !invalid_save.error.empty(),
         "refuses to write path-like resource stems");
+    auto invalid_binding = viper::SetupSelectionPreference{"bemidji", "sports"};
+    invalid_binding.control_bindings[0] = "Key_../outside";
+    const auto invalid_binding_save = viper::save_setup_selection_preference(
+        root, invalid_binding);
+    check(!invalid_binding_save.saved && !invalid_binding_save.error.empty(),
+        "refuses malformed or unsupported stored keyboard bindings");
     const auto invalid_laps_save = viper::save_setup_selection_preference(root,
         {"bemidji", "sports", 100U});
     check(!invalid_laps_save.saved && !invalid_laps_save.error.empty(),

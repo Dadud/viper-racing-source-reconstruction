@@ -514,7 +514,27 @@ struct FrontendSelection {
     std::string car;
     std::uint32_t laps{1U};
     std::uint32_t opponent_strength{};
+    std::array<std::string, 4> control_bindings{};
 };
+
+constexpr std::array<std::string_view, 4> supported_control_names{
+    "steer_left", "steer_right", "throttle", "braking"};
+
+std::optional<std::string> keyboard_binding_name(const UINT key)
+{
+    if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9'))
+        return "Key_" + std::string(1, static_cast<char>(key));
+    switch (key) {
+    case VK_LEFT: return "Key_Left";
+    case VK_RIGHT: return "Key_Right";
+    case VK_UP: return "Key_Up";
+    case VK_DOWN: return "Key_Down";
+    case VK_SPACE: return "Key_Space";
+    case VK_RETURN: return "Key_Return";
+    case VK_TAB: return "Key_Tab";
+    default: return std::nullopt;
+    }
+}
 
 constexpr std::array<std::string_view, viper::ai_driver_group_count>
     opponent_strength_names{"Easy", "Intermediate", "Hard", "Career 1",
@@ -531,14 +551,40 @@ struct SetupWindowState {
     std::array<std::string, 5> career_rows{};
     int career_slot{};
     bool career_screen{};
+    bool controls_screen{};
+    std::array<std::string, 4> control_bindings{};
+    std::array<std::string, 4> default_control_bindings{};
+    std::optional<std::size_t> capture_control;
+    std::string settings_message;
     bool career_delete_confirmation{};
     std::string career_message;
     bool accepted{};
 };
 
+bool persist_setup_preferences(SetupWindowState& state)
+{
+    std::array<std::optional<std::string>, 4> bindings{};
+    for (std::size_t index = 0; index < bindings.size(); ++index)
+        bindings[index] = state.control_bindings[index];
+    const auto saved = viper::save_setup_selection_preference(
+        state.config_directory,
+        {state.tracks[state.track_index], state.cars[state.car_index],
+            state.laps, state.opponent_strength, bindings});
+    state.settings_message = saved.saved ? "SETTINGS SAVED"
+        : "SAVE FAILED: " + saved.error;
+    return saved.saved;
+}
+
 std::wstring ascii_to_wide(const std::string_view text)
 {
     return std::wstring(text.begin(), text.end());
+}
+
+std::wstring binding_label(const std::string_view binding)
+{
+    if (binding.empty()) return L"UNBOUND";
+    if (binding.starts_with("Key_")) return ascii_to_wide(binding.substr(4U));
+    return ascii_to_wide(binding);
 }
 
 void draw_setup_window(HWND hwnd, const SetupWindowState& state)
@@ -560,7 +606,7 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
         DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &rect,
             format | DT_SINGLELINE | DT_VCENTER);
     };
-    if (!state.career_screen) {
+    if (!state.career_screen && !state.controls_screen) {
         write(L"VIPER RACING", 56, 42, 54);
         SetTextColor(dc, RGB(118, 208, 155));
         write(L"RACE SETUP", 58, 110, 34);
@@ -582,7 +628,24 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
         write(L"LEFT / RIGHT: CHOOSE CAR", 74, 390, 26);
         write(L"PAGE UP / DOWN: CHANGE LAPS", 74, 418, 26);
         write(L"[ / ]: CHANGE OPPONENT STRENGTH", 74, 446, 26);
-        write(L"ENTER: START RACE    C: CAREER SLOTS    ESC: EXIT", 74, 486, 30);
+        write(L"ENTER: START RACE    K: CONTROLS    C: CAREER    ESC: EXIT", 74, 486, 30);
+    }
+    if (state.controls_screen) {
+        SetTextColor(dc, RGB(118, 208, 155));
+        write(L"KEYBOARD CONTROLS", 74, 120, 34);
+        SetTextColor(dc, RGB(238, 244, 240));
+        for (std::size_t index = 0; index < supported_control_names.size(); ++index) {
+            std::wstring row = std::to_wstring(index + 1U) + L"  ";
+            row += ascii_to_wide(supported_control_names[index]);
+            row += L"   [ " + binding_label(state.control_bindings[index]) + L" ]";
+            if (state.capture_control == index) row += L"   PRESS A KEY";
+            write(row, 100, 190 + static_cast<int>(index) * 48, 36);
+        }
+        SetTextColor(dc, RGB(190, 205, 198));
+        write(L"1-4: REMAP   BACKSPACE: UNBIND   R: RESET DEFAULTS", 100, 410, 30);
+        write(L"ESC: BACK TO RACE SETUP", 100, 456, 30);
+        if (!state.settings_message.empty())
+            write(ascii_to_wide(state.settings_message), 100, 492, 30);
     }
     if (state.career_screen) {
         SetTextColor(dc, RGB(118, 208, 155));
@@ -628,6 +691,43 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
         return 0;
     case WM_KEYDOWN:
         if (state && (lparam & (1LL << 30)) == 0) {
+            if (state->controls_screen) {
+                if (state->capture_control) {
+                    if (wparam == VK_ESCAPE) {
+                        state->capture_control.reset();
+                    } else if (wparam == VK_BACK) {
+                        state->control_bindings[*state->capture_control].clear();
+                        state->capture_control.reset();
+                    } else if (const auto name = keyboard_binding_name(
+                                   static_cast<UINT>(wparam)); name) {
+                        state->control_bindings[*state->capture_control] = *name;
+                        state->capture_control.reset();
+                    }
+                    if (!state->capture_control)
+                        (void)persist_setup_preferences(*state);
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam == VK_ESCAPE) {
+                    if (persist_setup_preferences(*state))
+                        state->controls_screen = false;
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam == 'R') {
+                    state->control_bindings = state->default_control_bindings;
+                    (void)persist_setup_preferences(*state);
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wparam >= '1' && wparam <= '4') {
+                    state->capture_control = static_cast<std::size_t>(wparam - '1');
+                    state->settings_message.clear();
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                return 0;
+            }
             if (state->career_screen) {
                 if (state->career_delete_confirmation) {
                     if (wparam == 'Y') {
@@ -680,6 +780,12 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                     InvalidateRect(hwnd, nullptr, FALSE);
                     return 0;
                 }
+                return 0;
+            }
+            if (wparam == 'K') {
+                state->controls_screen = true;
+                state->capture_control.reset();
+                InvalidateRect(hwnd, nullptr, FALSE);
                 return 0;
             }
             if (wparam == VK_UP && !state->tracks.empty())
@@ -738,6 +844,8 @@ std::optional<FrontendSelection> show_setup_frontend(
     const std::string_view initial_track, const std::string_view initial_car,
     const std::uint32_t initial_laps,
     const std::uint32_t initial_opponent_strength,
+    const std::array<std::string, 4>& initial_control_bindings,
+    const std::array<std::string, 4>& default_control_bindings,
     const std::filesystem::path& config_directory)
 {
     if (tracks.empty() || cars.empty())
@@ -749,6 +857,8 @@ std::optional<FrontendSelection> show_setup_frontend(
     state.opponent_strength = initial_opponent_strength < opponent_strength_names.size()
         ? initial_opponent_strength : 0U;
     state.config_directory = config_directory;
+    state.control_bindings = initial_control_bindings;
+    state.default_control_bindings = default_control_bindings;
     for (std::size_t slot = 0; slot < state.career_rows.size(); ++slot) {
         const auto loaded = viper::load_career_slot(config_directory,
             static_cast<int>(slot));
@@ -803,7 +913,7 @@ std::optional<FrontendSelection> show_setup_frontend(
     if (!state.accepted) return std::nullopt;
     return FrontendSelection{
         state.tracks[state.track_index], state.cars[state.car_index], state.laps,
-        state.opponent_strength};
+        state.opponent_strength, state.control_bindings};
 }
 
 class D3DWindow {
@@ -4149,6 +4259,19 @@ int run_selected_race(const Options& options, const std::string_view track,
     const auto setup_config_directory = options.setup_config_directory
         ? *options.setup_config_directory
         : resolve_setup_config_directory(options.data_dir);
+    const auto setup_preference = viper::load_setup_selection_preference(
+        setup_config_directory);
+    if (!setup_preference.error.empty())
+        std::cerr << "Ignoring setup preference: " << setup_preference.error << '\n';
+    if (setup_preference.selection) {
+        for (std::size_t index = 0; index < supported_control_names.size(); ++index) {
+            const auto& binding = setup_preference.selection->control_bindings[index];
+            if (binding)
+                configured_options.set_string("CONTROL",
+                    std::string(supported_control_names[index]),
+                    binding->empty() ? std::string{} : *binding);
+        }
+    }
     auto assets = load_assets(options.data_dir, track, car,
         std::move(configured_options), setup_config_directory);
     if (assets.player_setup_version_warning())
@@ -4307,6 +4430,13 @@ int wmain(int argc, wchar_t** argv)
         auto setup_config_directory = options.setup_config_directory
             ? *options.setup_config_directory
             : resolve_setup_config_directory(data_directory);
+        std::array<std::string, 4> default_control_bindings{};
+        for (std::size_t index = 0; index < supported_control_names.size(); ++index) {
+            if (const auto value = configured_options.get(
+                    "CONTROL", supported_control_names[index]))
+                default_control_bindings[index] = std::string(*value);
+        }
+        auto selected_control_bindings = default_control_bindings;
         std::vector<std::string> setup_tracks;
         std::vector<std::string> setup_cars;
         if (interactive_frontend) {
@@ -4324,22 +4454,33 @@ int wmain(int argc, wchar_t** argv)
                 selected_laps = std::clamp(*saved.selection->laps, 1U, 99U);
             if (saved.selection && saved.selection->opponent_strength)
                 selected_opponent_strength = *saved.selection->opponent_strength;
+            if (saved.selection) {
+                for (std::size_t index = 0; index < selected_control_bindings.size(); ++index)
+                    if (saved.selection->control_bindings[index])
+                        selected_control_bindings[index] =
+                            *saved.selection->control_bindings[index];
+            }
         }
         while (true) {
             if (interactive_frontend) {
                 const auto selection = show_setup_frontend(setup_tracks, setup_cars,
                     selected_track, selected_car, selected_laps,
                     selected_opponent_strength,
+                    selected_control_bindings, default_control_bindings,
                     setup_config_directory);
                 if (!selection) return 0;
                 selected_track = selection->track;
                 selected_car = selection->car;
                 selected_laps = selection->laps;
                 selected_opponent_strength = selection->opponent_strength;
+                selected_control_bindings = selection->control_bindings;
+                std::array<std::optional<std::string>, 4> saved_bindings{};
+                for (std::size_t index = 0; index < saved_bindings.size(); ++index)
+                    saved_bindings[index] = selected_control_bindings[index];
                 const auto saved = viper::save_setup_selection_preference(
                     setup_config_directory,
                     {selected_track, selected_car, selected_laps,
-                        selected_opponent_strength});
+                        selected_opponent_strength, saved_bindings});
                 if (!saved.saved)
                     std::cerr << "Could not persist setup selection: "
                               << saved.error << '\n';

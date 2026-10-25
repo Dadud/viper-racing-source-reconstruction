@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $trace = Join-Path ([System.IO.Path]::GetTempPath()) "viper_keyboard_$([guid]::NewGuid().ToString('N')).csv"
+$configDir = Join-Path ([System.IO.Path]::GetTempPath()) "viper_keyboard_config_$([guid]::NewGuid().ToString('N'))"
 
 Add-Type @'
 using System;
@@ -50,9 +51,15 @@ function Send-RaceKey([IntPtr]$Window, [int]$Key, [string]$Name) {
 
 $process = $null
 try {
+    [void](New-Item -ItemType Directory -Path $configDir)
+    $setupPreference = Join-Path $configDir 'viper-racing-setup.cfg'
+    [System.IO.File]::WriteAllText($setupPreference,
+        "VIPER-RACING-SETUP 4`ntrack=bemidji`ncar=viper`nlaps=2`nopponent_strength=0`nsteer_left=Key_A`nsteer_right=Key_D`nthrottle=Key_W`nbraking=Key_S`n")
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --track bemidji --car viper --software --record-trace `"$trace`""
+    # Omit explicit track/car flags so startup loads the frontend selection
+    # and its Config-owned keyboard overrides before entering the race.
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software --record-trace `"$trace`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)
@@ -67,10 +74,10 @@ try {
     }
     if ($window -eq [IntPtr]::Zero) { throw 'Timed out waiting for the race window' }
 
-    # The shipped binding maps throttle to Key_UP. Posted key events exercise
+    # The temporary v4 preference maps throttle to W and braking to S. Posted key events exercise
     # the VK-to-DIK adapter and the live evaluator; the trace records consumed
     # runtime input values, not the posted messages themselves.
-    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]0x26, [IntPtr]0)) {
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]87, [IntPtr]0)) {
         throw 'Could not post throttle key-down'
     }
     Start-Sleep -Milliseconds 600
@@ -80,16 +87,16 @@ try {
         throw 'Could not post focus loss'
     }
     Start-Sleep -Milliseconds 250
-    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]0x26, [IntPtr]0)) {
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]87, [IntPtr]0)) {
         throw 'Could not post throttle key-up'
     }
     Start-Sleep -Milliseconds 300
     # Braking must remove forward speed without becoming a reverse input.
-    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]0x28, [IntPtr]0)) {
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]83, [IntPtr]0)) {
         throw 'Could not post brake key-down'
     }
     Start-Sleep -Milliseconds 700
-    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]0x28, [IntPtr]0)) {
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]83, [IntPtr]0)) {
         throw 'Could not post brake key-up'
     }
     Start-Sleep -Milliseconds 150
@@ -169,7 +176,7 @@ try {
     for ($index = 0; $index -lt $throttle.Count; ++$index) {
         if ($throttle[$index] -eq '1') { $pressedIndex = $index; break }
     }
-    if ($pressedIndex -lt 0) { throw 'The live trace never recorded throttle while Up was held' }
+    if ($pressedIndex -lt 0) { throw 'The live trace never recorded throttle while remapped W was held' }
     if (-not ($nativeThrottle | Where-Object { $_ -gt 0.0 })) {
         throw 'The 0x43B290 control update did not raise its native throttle output'
     }
@@ -188,7 +195,7 @@ try {
         [void]$parsedRows.Add($line.Split(','))
     }
     $brakeRows = @($parsedRows | Where-Object { $_[6] -eq '1' })
-    if ($brakeRows.Count -eq 0) { throw 'VK_DOWN never reached the route adapter as braking input' }
+    if ($brakeRows.Count -eq 0) { throw 'Remapped S never reached the route adapter as braking input' }
     foreach ($row in $brakeRows) {
         $speed = [single]::Parse($row[$speedColumn], [cultureinfo]::InvariantCulture)
         if ($speed -lt -0.001) { throw 'Braking input selected reverse motion instead of slowing the car' }
@@ -269,4 +276,7 @@ try {
         $process.WaitForExit()
     }
     Remove-Item -LiteralPath $trace -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $configDir) {
+        Remove-Item -LiteralPath $configDir -Recurse -Force
+    }
 }

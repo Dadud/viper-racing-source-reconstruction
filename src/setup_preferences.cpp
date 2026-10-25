@@ -23,6 +23,24 @@ constexpr std::string_view file_name = "viper-racing-setup.cfg";
 constexpr std::string_view header_v1 = "VIPER-RACING-SETUP 1\n";
 constexpr std::string_view header_v2 = "VIPER-RACING-SETUP 2\n";
 constexpr std::string_view header_v3 = "VIPER-RACING-SETUP 3\n";
+constexpr std::string_view header_v4 = "VIPER-RACING-SETUP 4\n";
+
+constexpr std::array<std::string_view, 4> binding_names{
+    "steer_left", "steer_right", "throttle", "braking"};
+
+bool valid_binding(const std::string_view value) noexcept
+{
+    if (value.empty()) return true;
+    std::string_view key = value;
+    if (key.starts_with("Key_")) key.remove_prefix(4U);
+    if (key == "Left" || key == "Right" || key == "Up" || key == "Down" ||
+        key == "Space" || key == "Return" || key == "Enter" || key == "Tab")
+        return true;
+    return key.size() == 1U &&
+        ((key[0] >= 'A' && key[0] <= 'Z') ||
+         (key[0] >= 'a' && key[0] <= 'z') ||
+         (key[0] >= '0' && key[0] <= '9'));
+}
 
 char ascii_lower(const char value) noexcept
 {
@@ -121,11 +139,12 @@ SetupPreferenceLoadResult load_setup_selection_preference(
     const bool version_1 = contents.starts_with(header_v1);
     const bool version_2 = contents.starts_with(header_v2);
     const bool version_3 = contents.starts_with(header_v3);
-    if (contents.size() > 256U || (!version_1 && !version_2 && !version_3)) {
+    const bool version_4 = contents.starts_with(header_v4);
+    if (contents.size() > 512U || (!version_1 && !version_2 && !version_3 && !version_4)) {
         result.error = "setup preference has an invalid header or size";
         return result;
     }
-    const auto header_size = version_3 ? header_v3.size()
+    const auto header_size = version_4 ? header_v4.size() : version_3 ? header_v3.size()
         : version_2 ? header_v2.size() : header_v1.size();
     std::vector<std::string_view> lines;
     std::size_t cursor = header_size;
@@ -135,7 +154,7 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         lines.emplace_back(contents.data() + cursor, end - cursor);
         cursor = end + 1U;
     }
-    const auto expected_lines = version_3 ? 4U : version_2 ? 3U : 2U;
+    const auto expected_lines = version_4 ? 8U : version_3 ? 4U : version_2 ? 3U : 2U;
     if (cursor != contents.size() || lines.size() != expected_lines) {
         result.error = "setup preference has an invalid field layout";
         return result;
@@ -155,7 +174,7 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         return result;
     }
     std::optional<std::uint32_t> laps;
-    if (version_2 || version_3) {
+    if (version_2 || version_3 || version_4) {
         constexpr std::string_view laps_prefix = "laps=";
         const auto laps_line = lines[2];
         std::uint32_t value{};
@@ -174,7 +193,7 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         laps = value;
     }
     std::optional<std::uint32_t> opponent_strength;
-    if (version_3) {
+    if (version_3 || version_4) {
         constexpr std::string_view strength_prefix = "opponent_strength=";
         const auto strength_line = lines[3];
         std::uint32_t value{};
@@ -192,8 +211,25 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         }
         opponent_strength = value;
     }
+    std::array<std::optional<std::string>, 4> control_bindings{};
+    if (version_4) {
+        for (std::size_t index = 0; index < binding_names.size(); ++index) {
+            const auto prefix = std::string(binding_names[index]) + "=";
+            if (!lines[4U + index].starts_with(prefix)) {
+                result.error = "control binding fields are missing or reordered";
+                return result;
+            }
+            const auto raw = lines[4U + index].substr(prefix.size());
+            if (raw == "-") control_bindings[index] = std::string{};
+            else if (!valid_binding(raw)) {
+                result.error = "setup preference contains an invalid keyboard binding";
+                return result;
+            } else control_bindings[index] = std::string(raw);
+        }
+    }
     result.selection = SetupSelectionPreference{
-        std::move(*track), std::move(*car), laps, opponent_strength};
+        std::move(*track), std::move(*car), laps, opponent_strength,
+        std::move(control_bindings)};
     return result;
 }
 
@@ -222,6 +258,12 @@ SetupPreferenceSaveResult save_setup_selection_preference(
         result.error = "opponent strength must be between 0 and 7";
         return result;
     }
+    for (const auto& binding : selection.control_bindings) {
+        if (binding && !valid_binding(*binding)) {
+            result.error = "control binding is not a supported keyboard key";
+            return result;
+        }
+    }
     result.path = config_directory / file_name;
     std::error_code error;
     std::filesystem::create_directories(config_directory, error);
@@ -241,9 +283,18 @@ SetupPreferenceSaveResult save_setup_selection_preference(
             result.error = "could not create temporary setup preference";
             return result;
         }
-        output << header_v3 << "track=" << *track << "\ncar=" << *car
+        output << header_v4 << "track=" << *track << "\ncar=" << *car
                << "\nlaps=" << laps << "\nopponent_strength="
                << opponent_strength << '\n';
+        for (std::size_t index = 0; index < binding_names.size(); ++index) {
+            output << binding_names[index] << '=';
+            if (selection.control_bindings[index] &&
+                !selection.control_bindings[index]->empty())
+                output << *selection.control_bindings[index];
+            else
+                output << '-';
+            output << '\n';
+        }
         output.flush();
         if (!output) {
             result.error = "failed while writing temporary setup preference";

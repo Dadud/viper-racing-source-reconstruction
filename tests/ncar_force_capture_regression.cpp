@@ -29,6 +29,8 @@ struct CapturedSuspensionForceComposition {
 struct CapturedTireForceWrite {
     std::array<float, 3> force;
     std::array<float, 3> tire_vector_0x100;
+    std::array<float, 3> tire_response_vector_0xf4;
+    std::array<float, 3> wheel_basis_0x110;
     std::array<float, 3> point;
     std::array<float, 3> center;
     std::array<float, 3> before_force;
@@ -61,6 +63,8 @@ constexpr std::array<CapturedSuspensionForceComposition, 4>
 constexpr std::array<CapturedTireForceWrite, 4> captured_tire_force_writes{{
     {{244.78858947753906F, 0.31991028785705566F, 340.5751647949219F},
      {244.78858947753906F, 0.31991028785705566F, 340.5751647949219F},
+     {244.7991943359375F, 0.0060527632012963295F, 340.5678405761719F},
+     {-0.033768028020858765F, 0.9991574287414551F, 0.023332256823778152F},
      {127.27809143066406F, -4.048957347869873F, -297.0700378417969F},
      {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
      {0.11652549356222153F, 3807.73095703125F, 3.512221097946167F},
@@ -69,6 +73,8 @@ constexpr std::array<CapturedTireForceWrite, 4> captured_tire_force_writes{{
      {-321.40850830078125F, 517.05615234375F, -5490.5908203125F}},
     {{-222.8980255126953F, 1.0346245765686035F, -366.89886474609375F},
      {-222.8980255126953F, 1.0346245765686035F, -366.89886474609375F},
+     {-222.86328125F, 0.0064383940771222115F, -366.9228820800781F},
+     {-0.033768028020858765F, 0.9991574287414551F, 0.023332256823778152F},
      {128.1427459716797F, -4.050186634063721F, -295.7660217285156F},
      {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
      {245.0271759033203F, 7796.6904296875F, 347.7664489746094F},
@@ -77,6 +83,8 @@ constexpr std::array<CapturedTireForceWrite, 4> captured_tire_force_writes{{
      {-5492.80078125F, -3.80810546875F, -8036.919921875F}},
     {{226.5311737060547F, -5.693071365356445F, 105.29019927978516F},
      {226.5311737060547F, -5.693071365356445F, 105.29019927978516F},
+     {226.6313018798828F, -2.887934684753418F, 105.22645568847656F},
+     {0.03566182404756546F, 0.9991059899330139F, -0.0227042343467474F},
      {129.30755615234375F, -4.050251007080078F, -298.4309387207031F},
      {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
      {22.25668716430664F, 11965.259765625F, -15.288314819335938F},
@@ -85,6 +93,8 @@ constexpr std::array<CapturedTireForceWrite, 4> captured_tire_force_writes{{
      {-31.828041076660156F, -363.9851379394531F, -5592.189453125F}},
     {{-59.2712516784668F, -2.932826519012451F, -222.1579132080078F},
      {-59.2712516784668F, -2.932826519012451F, -222.1579132080078F},
+     {-59.16529846191406F, 0.03558860346674919F, -222.22537231445312F},
+     {0.03566182404756546F, 0.9991059899330139F, -0.0227042343467474F},
      {130.18624877929688F, -4.05150032043457F, -297.1057434082031F},
      {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
      {250.23202514648438F, 15967.9921875F, 94.37833404541016F},
@@ -156,10 +166,11 @@ constexpr std::array<CapturedForceWrite, 8> captured_wheel_writes{{
 
 void require_close(const std::array<float, 3>& actual,
                    const std::array<float, 3>& expected,
-                   const char* message)
+                   const char* message,
+                   const float tolerance = 0.02F)
 {
     for (std::size_t axis = 0U; axis < actual.size(); ++axis) {
-        if (!(std::fabs(actual[axis] - expected[axis]) <= 0.02F)) {
+        if (!(std::fabs(actual[axis] - expected[axis]) <= tolerance)) {
             throw std::runtime_error(message);
         }
     }
@@ -211,6 +222,22 @@ int main()
                 throw std::runtime_error(
                     "captured 0x443C09 force must equal wheel +0x100 vector");
             }
+            const viper::WheelTireBasisUpdateInput basis_input{
+                {sample.tire_response_vector_0xf4[0],
+                 sample.tire_response_vector_0xf4[1],
+                 sample.tire_response_vector_0xf4[2]},
+                {sample.wheel_basis_0x110[0], sample.wheel_basis_0x110[1],
+                 sample.wheel_basis_0x110[2]},
+                {}, 0.0F};
+            const auto basis_update =
+                viper::apply_wheel_tire_basis_update(basis_input);
+            require_close(
+                {basis_update.corrected_vector_0x100_0x108.x,
+                 basis_update.corrected_vector_0x100_0x108.y,
+                 basis_update.corrected_vector_0x100_0x108.z},
+                sample.tire_vector_0x100,
+                "native tire-basis projection differs from captured +0x100",
+                1.0e-4F);
             viper::NcarForceMomentAccumulator accumulator{
                 sample.before_force, sample.before_moment};
             if (!viper::accumulate_ncar_force_moment(

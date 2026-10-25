@@ -18,7 +18,15 @@ to 99; its initial value comes from `GAME.laps`. Original GameData and
 
 Use Up/Down to choose a track, Left/Right to choose a car, `[`/`]` to choose
 one of the eight Easy, Intermediate, Hard, and Career 1–5 opponent profiles,
-and Enter to load the assets and start the existing race session. During a
+and Enter to load the assets and start the existing race session. Press `K`
+for the keyboard controls page. Select steering left/right, throttle, or brake
+with keys 1–4, press the desired supported key to bind it, or Backspace to
+unbind it. Press `R` to restore the binding values from the installed
+`options.def`; Escape returns to race setup. The four effective bindings are
+saved in version-4 `Config/viper-racing-setup.cfg` alongside selection
+preferences, while versions 1–3 remain readable and `options.def` is never
+modified. Only these four bindings currently affect the live route-motion
+prototype. During a
 race, press P to
 pause or resume. Pause clears held gameplay controls, freezes player/opponent
 simulation and race time, and stops the looping engine buffers. Resume resets
@@ -73,12 +81,12 @@ This connects runtime keyboard state to the recovered binding logic. In the
 route-motion prototype, the separate Reverse binding requests backward route
 motion; braking reduces speed magnitude and no longer drives the car backward.
 This control mapping remains provisional kinematics, not a gearbox or physical
-simulation. A Windows smoke test records throttle while Up is held, confirms
-the control clears when focus is lost, and checks that Down brakes while R
+simulation. A Windows smoke test starts with temporary W/S Config remaps, records throttle while W is held,
+confirms the control clears when focus is lost, and checks that S brakes while R
 produces backward route motion. It also pauses while throttle is held and
 asserts that race time, player route state, opponent route state, and fixed-step
-count remain constant until resume. DirectInput polling, controller support,
-and control rebinding UI remain open.
+count remain constant until resume. DirectInput polling and controller support
+remain open.
 
 Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to
@@ -104,7 +112,7 @@ hotkey is unavailable.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
 - Implement and retain additional settings beyond quick-race lap count and
-  opponent profile, including control rebinding, random-track behavior,
+  opponent profile, including random-track behavior,
   race-mode selection, and native-compatible writeback.
 - Connect validated career payloads to the reconstructed career action/event
   loop, preserving upgrades and progression through results and native saves.
