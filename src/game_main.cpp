@@ -15,6 +15,7 @@
 #include "viper/sound_resource.hpp"
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/physics_task_stream.hpp"
+#include "viper/physics_task_factory.hpp"
 #include "viper/track_object_task_records.hpp"
 #include "viper/world_track_objects.hpp"
 #include "viper/career_file_store.hpp"
@@ -1570,6 +1571,8 @@ struct WindowState {
     std::vector<viper::ConfiguredCarTaskRecordInput> configured_car_task_records;
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
     std::optional<viper::PhysicsTaskRecordStreamSession> full_task_record_stream;
+    std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
+    std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
     std::optional<float> player_body_inverse_mass_0x200;
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
@@ -2901,12 +2904,56 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 serialized.record_size == ordered.record_bytes.size();
         }
         if (stream_ok) {
+            state.full_task_record_readback =
+                viper::read_physics_task_record_stream(stream.bytes);
+            const auto& decoded = *state.full_task_record_readback;
+            stream_ok = decoded.status ==
+                    viper::PhysicsTaskRecordStreamReadStatus::complete &&
+                decoded.consumed_bytes == stream.bytes.size() &&
+                decoded.records.size() == ordered_track_records.records.size() &&
+                decoded.final_cursor == stream.final_cursor;
+            for (std::size_t index = 0U;
+                 stream_ok && index < decoded.records.size(); ++index) {
+                const auto& ordered = ordered_track_records.records[index];
+                const auto& readback = decoded.records[index];
+                stream_ok = readback.record_tag == ordered.record_tag &&
+                    readback.cursor_offset == ordered.cursor_offset &&
+                    readback.record_size == ordered.record_bytes.size();
+            }
+        }
+        std::size_t materialized_inactive_stat_count = 0U;
+        std::size_t unresolved_stat_count = 0U;
+        if (stream_ok) {
+            state.inactive_stat_task_states.clear();
+            for (const auto& readback : state.full_task_record_readback->records) {
+                if (readback.record_tag != 0x53544154U) continue;
+                const auto record_bytes = std::span<const std::byte>(stream.bytes)
+                    .subspan(readback.record_bytes_offset, readback.record_size);
+                const auto task = viper::materialize_inactive_stat_task_runtime_state(
+                    record_bytes, readback.cursor_offset);
+                if (task.status ==
+                        viper::PhysicsStatTaskRuntimeMaterializationStatus::complete &&
+                    task.state.has_value()) {
+                    state.inactive_stat_task_states.push_back(*task.state);
+                    ++materialized_inactive_stat_count;
+                } else {
+                    ++unresolved_stat_count;
+                }
+            }
+        }
+        if (stream_ok) {
             std::cout << "; serialized " << stream.records.size()
-                      << " ordered records from cursor 0x" << std::hex
+                      << " ordered records and decoded readback from cursor 0x" << std::hex
                       << stream.initial_cursor << " through 0x" << stream.final_cursor
-                      << std::dec;
+                      << std::dec << "; materialized "
+                      << materialized_inactive_stat_count
+                      << " inactive STAT task states";
+            if (unresolved_stat_count != 0U)
+                std::cout << " (" << unresolved_stat_count
+                          << " STAT constructors remain unresolved)";
         } else {
             state.full_task_record_stream.reset();
+            state.full_task_record_readback.reset();
             std::cout << "; full stream serialization validation failed";
         }
     }

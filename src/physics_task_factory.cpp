@@ -810,6 +810,75 @@ PhysicsStatTaskConstructorPlan plan_physics_stat_task_constructor(
     return plan;
 }
 
+PhysicsStatTaskRuntimeMaterialization
+materialize_inactive_stat_task_runtime_state(
+    const std::span<const std::byte> record_bytes,
+    const std::uint32_t serialized_stream_cursor)
+{
+    PhysicsStatTaskRuntimeMaterialization result;
+    const auto read_u32 = [&](const std::size_t offset) {
+        return std::to_integer<std::uint32_t>(record_bytes[offset]) |
+            (std::to_integer<std::uint32_t>(record_bytes[offset + 1U]) << 8U) |
+            (std::to_integer<std::uint32_t>(record_bytes[offset + 2U]) << 16U) |
+            (std::to_integer<std::uint32_t>(record_bytes[offset + 3U]) << 24U);
+    };
+    if (record_bytes.size() != 0x48U || read_u32(0U) != 0x53544154U ||
+        read_u32(4U) != record_bytes.size()) {
+        result.status = PhysicsStatTaskRuntimeMaterializationStatus::malformed_record;
+        return result;
+    }
+
+    PhysicsStatTaskConstructorObservation observation{};
+    for (std::size_t index = 0U;
+         index < observation.record_words_0x08_to_0x34.size(); ++index) {
+        observation.record_words_0x08_to_0x34[index] =
+            read_u32(0x08U + index * sizeof(std::uint32_t));
+    }
+    observation.collision_volume_flag_0x38 = read_u32(0x38U);
+    for (std::size_t axis = 0U; axis < observation.child_center_0x3c_to_0x44.size();
+         ++axis) {
+        observation.child_center_0x3c_to_0x44[axis] =
+            std::bit_cast<float>(read_u32(0x3cU + axis * sizeof(std::uint32_t)));
+    }
+    if (observation.collision_volume_flag_0x38 != 0U) {
+        result.status = PhysicsStatTaskRuntimeMaterializationStatus::
+            unsupported_collision_volume;
+        return result;
+    }
+
+    // The host representation owns the child inline; native virtual behavior
+    // for this class is inactive and its +0x0C callback is a no-op.
+    observation.child_allocation_succeeded = true;
+    const auto constructor = plan_physics_stat_task_constructor(observation);
+    if (constructor.status != PhysicsStatTaskConstructorStatus::child_constructed ||
+        !constructor.child_bound_0x28.has_value()) {
+        result.status = PhysicsStatTaskRuntimeMaterializationStatus::
+            incomplete_constructor_state;
+        return result;
+    }
+
+    PhysicsStatTaskRuntimeState state{};
+    state.serialized_stream_cursor = serialized_stream_cursor;
+    for (const auto& write : constructor.record_copy_writes) {
+        if (write.byte_offset < 0x38U || write.byte_offset > 0x64U ||
+            ((write.byte_offset - 0x38U) % sizeof(std::uint32_t)) != 0U) {
+            result.status = PhysicsStatTaskRuntimeMaterializationStatus::
+                incomplete_constructor_state;
+            return result;
+        }
+        state.copied_record_words_0x38_to_0x64[
+            (write.byte_offset - 0x38U) / sizeof(std::uint32_t)] = write.value;
+    }
+    state.child_center = constructor.child_center;
+    state.child_bound_0x28 = constructor.child_bound_0x28;
+    state.child_count = constructor.child_count_after;
+    state.active_gate = false;
+    state.update_callback_is_noop = true;
+    result.status = PhysicsStatTaskRuntimeMaterializationStatus::complete;
+    result.state = std::move(state);
+    return result;
+}
+
 PhysicsWoblTaskConstructorPlan plan_physics_wobl_task_constructor(
     const PhysicsWoblTaskConstructorObservation& observation)
 {

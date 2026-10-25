@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -412,6 +413,51 @@ int main()
                     truncated_load.constructor_argument_2_stream_offset == 0xAD4U &&
                     truncated_load.factory_input_indeterminate,
                 "failed record reads retain the already-read constructor cursor");
+
+        auto stat_record = make_physics_record(0x53544154U, 0x48U);
+        const auto write_stat_word = [&stat_record](const std::size_t offset,
+                                                     const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte) {
+                stat_record[offset + byte] = static_cast<std::byte>(
+                    (value >> (byte * 8U)) & 0xffU);
+            }
+        };
+        for (std::size_t index = 0U; index < 12U; ++index)
+            write_stat_word(0x08U + index * 4U,
+                0x100U + static_cast<std::uint32_t>(index));
+        write_stat_word(0x38U, 0U);
+        write_stat_word(0x3cU, std::bit_cast<std::uint32_t>(1.0F));
+        write_stat_word(0x40U, std::bit_cast<std::uint32_t>(2.0F));
+        write_stat_word(0x44U, std::bit_cast<std::uint32_t>(3.0F));
+        const auto stat_state = viper::materialize_inactive_stat_task_runtime_state(
+            stat_record, 0x80U);
+        require(stat_state.status ==
+                    viper::PhysicsStatTaskRuntimeMaterializationStatus::complete &&
+                    stat_state.state.has_value() &&
+                    stat_state.state->serialized_stream_cursor == 0x80U &&
+                    stat_state.state->copied_record_words_0x38_to_0x64[0] == 0x100U &&
+                    stat_state.state->copied_record_words_0x38_to_0x64[11] == 0x10bU &&
+                    stat_state.state->child_center == std::array<float, 3>{1.0F, 2.0F, 3.0F} &&
+                    stat_state.state->child_bound_0x28 == 3.0F &&
+                    stat_state.state->child_count == 1U &&
+                    !stat_state.state->active_gate &&
+                    stat_state.state->update_callback_is_noop &&
+                    stat_state.state->virtual_0x18_size == 0x12U,
+                "STAT inactive runtime materialization lost constructor or vtable state");
+        write_stat_word(0x38U, 1U);
+        const auto unsupported_stat =
+            viper::materialize_inactive_stat_task_runtime_state(stat_record, 0x80U);
+        require(unsupported_stat.status ==
+                    viper::PhysicsStatTaskRuntimeMaterializationStatus::
+                        unsupported_collision_volume && !unsupported_stat.state.has_value(),
+                "STAT collision-volume constructor was treated as supported");
+        write_stat_word(4U, 0x47U);
+        const auto malformed_stat =
+            viper::materialize_inactive_stat_task_runtime_state(stat_record, 0x80U);
+        require(malformed_stat.status ==
+                    viper::PhysicsStatTaskRuntimeMaterializationStatus::malformed_record &&
+                    !malformed_stat.state.has_value(),
+                "STAT runtime materializer accepted an inconsistent declared size");
 
         constexpr std::array<std::uint32_t, 1> car_tag{0x50434152U};
         const auto overflow = viper::plan_physics_task_stream_offsets(

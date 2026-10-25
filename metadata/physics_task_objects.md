@@ -81,6 +81,35 @@ dispatch table. Allocation success, constructor return, and whether the shared
 panic reporter returns remain explicit observations. The factory evidence is
 `0x422580` (`ev_16e9359e1fff260aa38cf33c56d1c882043ea11712c8fa31761a929ff9f41f37`).
 
+## Constructor vtable task gates
+
+The vtable slots used by the record loader are source-backed for six classes.
+The `+0x18` method is reached through `0x426F20` only when `+0x2C` returns
+true. The `+0x0C` method is called by the outer dispatcher for every retained
+non-null task. This distinguishes inert records from active classes whose
+callbacks require live state:
+
+| Class | Vtable | `+0x18` target/result | `+0x2C` target/result | `+0x0C` note |
+|---|---:|---|---|---|
+| PCAR | `0x4C8188` | `0x434B90` → `0x3C` | `0x427DE0` → true | active callback class |
+| ACAR | `0x4C7B78` | `0x42BB30` → `0x18C` | `0x427DE0` → true | active callback class |
+| CHKP | `0x4C82A0` | `0x437EE0` → `0x12` | `0x437F00` → false | constructor backend call remains external |
+| STAT | `0x4C8100` | `0x437EE0` → `0x12` | `0x437F00` → false | `0x4371A0` is `RET` |
+| OBST | `0x4C8018` | `0x437310` → `0x1E` | `0x427DE0` → true | active callback class |
+| WOBL | `0x4C8058` | `0x437350` → `0` | `0x427DE0` → true | active callback class |
+
+Vtable-byte evidence, respectively: PCAR `ev_874b9bf3d0f1172ffbf6a1ce420897a8ba871dc6c42d1cda31c1d25b2f64970a`,
+ACAR `ev_b5ed0300987be37c7a82b807cbe4a395301bb768054f1cd8943743b6a4731fce`,
+CHKP `ev_d17a36fe8330a8e009c6d72d4363a7dfe984e63b382e7e89beb1a35b3f0a21da`,
+STAT `ev_7ac572dcedbad874ec3ffa3be1d5c07341073351ab29a5ee3aad8d9aa16eba0c`,
+OBST `ev_8bb0177b48eb9d7332e9f5e13b9cabfa2dfea5a12a8a3478047c3b47b1ce4405`,
+and WOBL `ev_410081d14eb0a59e3a16bdc516429685bd321017f4c72a295295385b9d499f85`.
+The constant-returning stub bodies are present in `disasm/engine_.text.asm`:
+`0x427DE0` returns true, `0x437F00` returns false, `0x437EE0` returns `0x12`,
+and `0x4371A0` returns. These results are fixed code behavior, not observations
+or planner defaults. This does not recover the active classes' mutable callback
+state or constructor side effects.
+
 `plan_physics_stat_task_constructor` projects the derived constructor selected
 for `STAT`. After common base initialization it installs vtable `0x4C8100`
 and copies the 12 DWORDs from record offsets `+0x08..+0x34` to object offsets
@@ -98,6 +127,17 @@ common base initializer `0x4375C0`,
 `ev_1bd5688db76155c26f088bb709fc8bce8430eb03d9df862ba2786ca8ef1b6ae0`; and
 child box constructor `0x42D460`,
 `ev_e8bea9ef634610ace27b2bc375673e9184ebccd218aeb9e9e60d0c9688f83277`.
+
+The STAT vtable bytes at `0x4C8100` establish virtual `+0x0C = 0x4371A0`
+(`RET`), `+0x18 = 0x437EE0` (returns `0x12`), and `+0x2C = 0x437F00`
+(`xor al,al; ret`, always inactive). Vtable evidence is
+`ev_7ac572dcedbad874ec3ffa3be1d5c07341073351ab29a5ee3aad8d9aa16eba0c`;
+the method bodies appear in `disasm/engine_.text.asm`. Since the reader only
+calls `0x426F20` when `+0x2C` is true, STAT does not consume time-ring data or
+receive the `+0x34` cursor through that path. The runtime now materializes the
+record-copy and single-child semantic state for valid STAT records, keeps the
+stream cursor for identity, and represents the known inactive/no-op gates. It
+does not claim the omitted common-base bytes or native pointer layout.
 
 `plan_physics_wobl_task_constructor` models the WOBL record's shared-resource
 link. It first records the record `+0x1C` value at object `+0x4AC`, then

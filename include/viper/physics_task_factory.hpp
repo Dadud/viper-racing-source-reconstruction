@@ -457,6 +457,41 @@ struct PhysicsStatTaskConstructorPlan {
     bool constructor_returns_this{true};
 };
 
+enum class PhysicsStatTaskRuntimeMaterializationStatus : std::uint8_t {
+    complete,
+    malformed_record,
+    unsupported_collision_volume,
+    incomplete_constructor_state,
+};
+
+// Owned semantic state for the one STAT class whose runtime gates are fully
+// inert: virtual +0x2C is a constant false and virtual +0x0C is a no-op.
+// Unknown common-base bytes and native pointer values are intentionally absent.
+struct PhysicsStatTaskRuntimeState {
+    std::uint32_t serialized_stream_cursor{};
+    std::array<std::uint32_t, 12> copied_record_words_0x38_to_0x64{};
+    std::array<float, 3> child_center{};
+    std::optional<float> child_bound_0x28;
+    std::uint32_t child_count{1U};
+    std::uint32_t virtual_0x18_size{0x12U};
+    bool active_gate{};
+    bool update_callback_is_noop{true};
+};
+
+struct PhysicsStatTaskRuntimeMaterialization {
+    PhysicsStatTaskRuntimeMaterializationStatus status{
+        PhysicsStatTaskRuntimeMaterializationStatus::malformed_record};
+    std::optional<PhysicsStatTaskRuntimeState> state;
+};
+
+// Materializes the recoverable STAT fields from one complete record. The
+// record's collision-volume branch is rejected because its handler is not
+// reconstructed. This is semantic runtime state, not a native x86 allocation.
+[[nodiscard]] PhysicsStatTaskRuntimeMaterialization
+materialize_inactive_stat_task_runtime_state(
+    std::span<const std::byte> record_bytes,
+    std::uint32_t serialized_stream_cursor);
+
 // Projects the STAT record constructor's derived fields and single box child.
 [[nodiscard]] PhysicsStatTaskConstructorPlan
 plan_physics_stat_task_constructor(
