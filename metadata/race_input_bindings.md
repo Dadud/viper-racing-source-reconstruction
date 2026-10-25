@@ -66,6 +66,13 @@ in session state and appended to race traces. The existing keyboard smoke
 reaches throttle through VK-to-DIK mapping, the binding evaluator, and the
 reconstructed throttle ramp; after focus loss the output decays to zero.
 
+The `CONTROL nonlinear_steering` option maps to global `0x5093FC` through the
+registration at `0x43B030` (key pointer `0x4D5A40`). The native helper
+`0x43BA30` clears that option when `game_pad` is false and either steering
+binding kind is one of 1, 3, 4, or 6, as checked by `0x446F90`. The live
+callback now applies this initialization rule and passes the resulting gate to
+the reconstructed `0x43B8C0` scale; its state is included in race traces.
+
 This connects the recovered input update and its sensitivity controls to the
 live session. The route-motion adapter still thresholds those analog outputs
 at 0.2 because it accepts digital controls; its pose remains non-physical.

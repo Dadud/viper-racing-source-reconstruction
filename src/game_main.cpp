@@ -1537,6 +1537,7 @@ struct WindowState {
     float control_brake_sensitivity{1.0F};
     float control_brake_speed{1.0F};
     bool control_game_pad{};
+    bool control_squared_steering_gate_0x5093fc{};
     viper::RaceLoop43B290Plan last_control_update{};
     HWND window{};
     std::wstring title_base;
@@ -2185,6 +2186,8 @@ struct WindowState {
             control_update_state.controls.flag_0x5093f8 != 0U;
         pcar_callback_globals.gate_0x509420 =
             control_update_state.controls.flag_0x509420 != 0U;
+        pcar_callback_globals.gate_0x5093fc =
+            control_squared_steering_gate_0x5093fc;
         const auto body_word = [&](const std::uint32_t offset) {
             return viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offset);
@@ -2488,6 +2491,8 @@ void load_keyboard_bindings(WindowState& state,
         options.real("CONTROL", "brake_speed").value_or(1.0F);
     state.control_game_pad =
         options.boolean("CONTROL", "game_pad").value_or(false);
+    state.control_squared_steering_gate_0x5093fc =
+        options.boolean("CONTROL", "nonlinear_steering").value_or(false);
 
     constexpr std::array<std::pair<std::string_view, std::size_t>, 13> action_slots{{
         {"steer_left", 0U}, {"steer_right", 1U}, {"throttle", 2U},
@@ -2509,6 +2514,14 @@ void load_keyboard_bindings(WindowState& state,
                     std::string(*configured));
             state.control_bindings[slot] = {1U, *selector};
         }
+    }
+    const auto native_steering_binding_kind = [](const std::uint32_t kind) {
+        return kind == 1U || kind == 3U || kind == 4U || kind == 6U;
+    };
+    if (!state.control_game_pad &&
+        (native_steering_binding_kind(state.control_bindings[0].kind) ||
+         native_steering_binding_kind(state.control_bindings[1].kind))) {
+        state.control_squared_steering_gate_0x5093fc = false;
     }
 }
 
@@ -2754,7 +2767,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_velocity_projection,pcar_scaled_smoother_request"
               << ",pcar_body_0x500,pcar_body_0xdcc,pcar_body_0xbe4"
               << ",pcar_body_0x630,pcar_body_0x7d4"
-              << ",pcar_body_0x978,pcar_body_0xb1c";
+              << ",pcar_body_0x978,pcar_body_0xb1c"
+              << ",pcar_gate_0x5093fc";
         trace << '\n' << std::setprecision(9);
         if (!trace) {
             std::cerr << "Could not write race trace header.\n";
@@ -2889,6 +2903,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
                     else trace << ',';
                 }
+                trace << ',' << state.pcar_callback_globals.gate_0x5093fc;
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";
