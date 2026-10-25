@@ -1805,6 +1805,14 @@ struct AcarCurveSourceRuntimeState {
     viper::AcarCurveSourceRecord source_record{};
 };
 
+// Persistent shared-body constructor state for one configured ACAR record.
+// This is the inherited 0x43E490/0x42FF90 body subset only; the ACAR driver
+// object, wheels, callbacks, and simulation dispatch are not materialized.
+struct AcarBodyRuntimeState {
+    viper::ConfiguredCarTaskStreamBinding stream_binding{};
+    viper::NcarBodyRuntimeObjectState body_object{};
+};
+
 struct WindowState;
 void refresh_keyboard_controls(WindowState& state);
 
@@ -1878,6 +1886,7 @@ struct WindowState {
     std::optional<viper::ReplayFile> loaded_replay;
     std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
     std::vector<AcarCurveSourceRuntimeState> ai_acar_curve_sources;
+    std::vector<AcarBodyRuntimeState> ai_acar_body_states;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
@@ -3758,6 +3767,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             }
             if (stream_ok) {
                 state.ai_acar_curve_sources.clear();
+                state.ai_acar_body_states.clear();
                 for (const auto& binding : state.configured_car_stream_bindings) {
                     if (binding.record_tag != 0x41434152U) continue;
                     if (binding.record_bytes_offset > stream.bytes.size() ||
@@ -3770,11 +3780,50 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         .subspan(binding.record_bytes_offset, binding.record_size);
                     const auto curve_source =
                         viper::read_car_curve_source_record(record_bytes);
-                    if (!curve_source.has_value()) {
+                    const auto body_observation =
+                        viper::make_ncar_body_constructor_observation_from_runtime_record(
+                            record_bytes, binding.stream_cursor, false);
+                    if (!curve_source.has_value() || !body_observation.has_value()) {
                         stream_ok = false;
                         break;
                     }
                     state.ai_acar_curve_sources.push_back({binding, *curve_source});
+
+                    // 0x4285D0 enters 0x43DFB0, whose shared 0x42FF90
+                    // constructor invokes 0x43E490 and then 0x433C00. Retain
+                    // that inherited body state and record placement for each
+                    // ACAR, without treating it as a constructed/registered
+                    // ACAR callback object.
+                    AcarBodyRuntimeState body_state{};
+                    body_state.stream_binding = binding;
+                    const auto body_plan =
+                        viper::plan_ncar_body_constructor(*body_observation);
+                    const auto constructor_subobjects =
+                        viper::plan_ncar_constructor_subobject_defaults(
+                            read_u32_le(record_bytes.data() + 0x194U));
+                    const std::array<viper::NcarObjectFieldWrite, 1> acar_vtable_write{{
+                        {0x00U, 4U, 0x004c7b78U}}};
+                    std::array<float, 12> transform{};
+                    for (std::size_t lane = 0U; lane < transform.size(); ++lane) {
+                        transform[lane] = std::bit_cast<float>(read_u32_le(
+                            record_bytes.data() + 0x18U + lane * sizeof(float)));
+                    }
+                    if (!viper::materialize_ncar_body_constructor(
+                            body_state.body_object, body_plan) ||
+                        !viper::apply_ncar_body_object_writes(
+                            body_state.body_object, acar_vtable_write) ||
+                        !viper::apply_ncar_body_object_writes(
+                            body_state.body_object,
+                            constructor_subobjects.embedded_curve_selector_writes) ||
+                        !viper::apply_ncar_body_object_writes(
+                            body_state.body_object,
+                            constructor_subobjects.source_record_identity_writes) ||
+                        !viper::copy_ncar_runtime_record_transform_to_body(
+                            body_state.body_object, transform)) {
+                        stream_ok = false;
+                        break;
+                    }
+                    state.ai_acar_body_states.push_back(std::move(body_state));
                 }
             }
             for (std::size_t index = 0U;
@@ -3873,7 +3922,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ", inverse mass " << *state.player_body_inverse_mass_0x200
                       << ", four wheel anchors/core setups and tire responses); retained "
                       << state.ai_acar_curve_sources.size()
-                      << " AI ACAR curve source records; materialized "
+                      << " AI ACAR curve source records and "
+                      << state.ai_acar_body_states.size()
+                      << " ACAR shared-body initial states; materialized "
                       << retained_checkpoint_count
                       << " inert CHKP records and "
                       << retained_inactive_stat_count
@@ -3894,6 +3945,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.inactive_stat_task_states.clear();
             state.configured_car_stream_bindings.clear();
             state.ai_acar_curve_sources.clear();
+            state.ai_acar_body_states.clear();
             state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }

@@ -98,6 +98,66 @@ int main()
         require(viper::read_ncar_body_object_u32(body_runtime_state, 0x234U) == 0U &&
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0x50cU),
             "body reads must expose initialized velocity but keep unwritten derived state unknown");
+
+        // The inherited ACAR constructor enters this same body base path,
+        // copies record +0x18..+0x44 through 0x433C00, and stores record
+        // ordinal +0x194 at body +0x510. Keep that supported subset distinct
+        // from full ACAR object/callback construction.
+        std::array<std::byte, 0x1e4U> acar_runtime_record{};
+        const auto write_record_u32 = [&](const std::size_t offset,
+                                          const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < sizeof(value); ++byte) {
+                acar_runtime_record[offset + byte] = static_cast<std::byte>(
+                    (value >> (byte * 8U)) & 0xffU);
+            }
+        };
+        write_record_u32(0x00U, 0x41434152U);
+        write_record_u32(0x04U, 0x1e4U);
+        for (const auto [offset, value] : std::array<std::pair<std::size_t, float>, 4>{{
+                 {0x08U, 4.0F}, {0x0cU, 0.5F}, {0x10U, 0.5F}, {0x14U, 0.5F}}}) {
+            write_record_u32(offset, std::bit_cast<std::uint32_t>(value));
+        }
+        std::array<float, 12> acar_transform{};
+        for (std::size_t lane = 0U; lane < acar_transform.size(); ++lane) {
+            acar_transform[lane] = static_cast<float>(lane + 1U);
+            write_record_u32(0x18U + lane * sizeof(float),
+                std::bit_cast<std::uint32_t>(acar_transform[lane]));
+        }
+        write_record_u32(0x194U, 3U);
+        const auto acar_body_observation =
+            viper::make_ncar_body_constructor_observation_from_runtime_record(
+                acar_runtime_record, 0x1200U, false);
+        require(acar_body_observation.has_value(),
+            "complete ACAR runtime records must expose shared body constructor inputs");
+        viper::NcarBodyRuntimeObjectState acar_body_state{};
+        const auto acar_body_plan =
+            viper::plan_ncar_body_constructor(*acar_body_observation);
+        const auto acar_common_defaults =
+            viper::plan_ncar_constructor_subobject_defaults(3U);
+        const std::array<viper::NcarObjectFieldWrite, 1> acar_vtable{{
+            {0x00U, 4U, 0x004c7b78U}}};
+        require(viper::materialize_ncar_body_constructor(
+                    acar_body_state, acar_body_plan) &&
+                viper::apply_ncar_body_object_writes(acar_body_state,
+                    acar_vtable) &&
+                viper::apply_ncar_body_object_writes(acar_body_state,
+                    acar_common_defaults.embedded_curve_selector_writes) &&
+                viper::apply_ncar_body_object_writes(acar_body_state,
+                    acar_common_defaults.source_record_identity_writes) &&
+                viper::copy_ncar_runtime_record_transform_to_body(
+                    acar_body_state, acar_transform),
+            "ACAR records must materialize their inherited shared body constructor subset");
+        require(viper::read_ncar_body_object_u32(acar_body_state, 0x00U) ==
+                    0x004c7b78U &&
+                viper::read_ncar_body_object_u32(acar_body_state, 0x510U) == 3U &&
+                viper::read_ncar_body_object_u32(acar_body_state, 0x38U) ==
+                    std::bit_cast<std::uint32_t>(acar_transform[0]) &&
+                viper::read_ncar_body_object_u32(acar_body_state, 0x5cU) ==
+                    std::bit_cast<std::uint32_t>(acar_transform[9]) &&
+                viper::read_ncar_body_object_u32(acar_body_state, 0x64U) ==
+                    std::bit_cast<std::uint32_t>(acar_transform[11]),
+            "ACAR body pose and participant ordinal must come from its serialized runtime record");
+
         const std::array<viper::NcarObjectFieldWrite, 1> pcar_helper_byte{{
             {0xd74U, 1U, 1U}}};
         require(viper::apply_ncar_body_object_writes(

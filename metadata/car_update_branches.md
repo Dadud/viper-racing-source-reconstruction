@@ -125,22 +125,21 @@ rows or prove the exact first-update descriptor contents.
 The existing Windows session cannot yet form valid rows for
 `NcarIntegratorTimerInput::ordinal_rows`. A row requires descriptor ordinal
 registration plus body X/Z at `+0x5C/+0x64` and linear-velocity X/Z at
-`+0x234/+0x23C`. The persistent player `NcarBodyRuntimeObjectState` is the only
-runtime-owned PCAR body object; its byte-initialization mask can prove whether
-those offsets were initialized, but initialization is not evidence that the
-values track the race. `0x431150` body integration is not called in production,
-and the player pose remains route-owned. Consequently, reading the player's
-constructor/seeded body fields would provide stale or zero motion, not the
+`+0x234/+0x23C`. The session now retains the player's body plus the inherited
+shared-body constructor subset for bound ACAR records. Their byte masks prove
+which constructor fields and record-derived transforms were initialized, but
+do not prove those values track the race. `0x431150` body integration is not
+called in production, and visible player/opponent poses remain route-owned.
+Consequently, these initial body values are stale/zero motion rather than the
 current participant state required by `0x419E80`.
 
-Configured AI entrants and rendered opponent cars do not close this gap:
-`initialize_opponents` retains route segment/fraction and a synthetic route
-speed in `OpponentMotion`, then advances visible poses through the route
-adapter. It does not construct persistent PCAR body objects for those cars,
-does not own descriptor registration ordinals, and does not derive the native
-body position/velocity fields. Their route poses/speeds therefore must not be
-converted into timer rows. The single player object also cannot stand in for
-all registered descriptor slots: the native setup walks a registry of object
+Configured AI entrants still move through `OpponentMotion`'s route segment,
+fraction, and synthetic speed adapter. ACAR records now retain their observed
+initial body transform and native ordinal, but the session does not create the
+ACAR task objects or manager pointer registry, nor evolve their native body
+position/velocity. Their route poses/speeds and constructor snapshots must not
+be converted into timer rows. The player object also cannot stand in for all
+registered descriptor slots: the native setup walks a registry of object
 pointers and leaves unregistered ordinal rows zero-filled.
 
 The next safe implementation boundary is to make body integration the

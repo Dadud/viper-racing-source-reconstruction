@@ -717,6 +717,25 @@ to 2 with stride `0x1A4`. The constructor then sets `+0x534` and calls
 The setter bodies and their stride helpers are directly analyzed in
 `ev_7f2a7638cef433bcdbf414083f784135b5b01cd65d2b69716ca37eb6939c7e6e`.
 
+The runtime now retains the inherited shared body subset for every bound ACAR
+record. Ghidra evidence for `0x4285D0` shows its call to `0x43DFB0`; that base
+constructor calls `0x42FF90`, whose shared initialization calls `0x43E490`,
+copies the runtime-record transform through `0x433C00`, and sets body ordinal
+`+0x510` from record `+0x194`; the derived constructor then installs ACAR
+vtable `0x4C7B78`. The session materializes only those byte-backed body
+defaults, known common subobject defaults, final vtable, initial transform,
+and ordinal.
+`ncar_geometry_regression` checks the serialized ACAR tag, transform lanes,
+and ordinal handoff. Evidence: `0x4285D0`
+`ev_c941698728b470e4b3fcebf760e0ff8820c50a118fbfde13aa4c63fbc2c791a5`,
+`0x43DFB0` `ev_feefea8447a3a65f61cb349cdc59190de6a96f6d2c0652ff468fb93d826a7864`,
+`0x42FF90` `ev_188f23266930a8dddb21b4d48cc3f890b1c8ef3c31663ffc607bcccc229a5f96`,
+`0x43E490` `ev_cddb7e08b5efadc854ea2056b1e8341b4c14e1a23d6199e65d179aba2bac06e0`,
+and `0x433C00` `ev_fbd640d5fbdc72a165c76c2dee2639411e71c3beaf9416d13c51fc2bd9d7ee93`.
+These are persistent initial body records, not constructed ACAR task objects:
+the AI-specific derived fields, wheel objects, native registration pointers,
+driver callbacks, update dispatch, and dynamic body simulation remain absent.
+
 The constructor's `0x433C00` path also configures the curve object at `+0xBFC`
 from the vehicle record. `0x440060` derives six evaluator coefficients from
 record fields `+0x68/+0x6C/+0x70/+0x74/+0x84`; `0x4401D0` then uses those
