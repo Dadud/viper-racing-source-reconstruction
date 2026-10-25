@@ -264,9 +264,13 @@ unchanged timer fields for that ordinary-race capture; it does not reveal the
 in-window lookup or which gameplay event replaces the constructor sentinel.
 The PCAR vtable's `+0x40` slot dispatches through `0x4384B0` and `0x43E030` to
 `0x433620`, which stores current time at `+0xE44` while rebuilding the body
-pose and zeroing velocity. Capture that virtual call and its following timer
-callbacks, then capture descriptor rows and selected record during the active
-window. The wheel `+0x158` producer remains unknown. Repair and
+pose and zeroing velocity. A synthetic configured Airlift `DIK_SPACE` getter
+result now confirms that this input reaches the virtual `+0x40` reset path and
+records the before/after position, velocity, and timer fields. The original
+child exited before post-reset timer callbacks or descriptor rows were
+captured, so the next capture should resume from that reset and sample
+`0x433570` plus the pair lookup during the active window. The wheel `+0x158`
+producer remains unknown. Repair and
 capture provenance are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 A bounded checked-in Frida probe now samples the native `elapsed < 6.2` branch,

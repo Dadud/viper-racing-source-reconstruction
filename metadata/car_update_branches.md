@@ -63,6 +63,20 @@ not that a null row was consumed. This explains the unchanged timer values in
 this captured ordinary-race state, but does not observe the table, the
 in-window path, or what event changes the `-100.0` constructor sentinel.
 
+#### Controlled Space/Airlift reset follow-up (2026-10-25)
+
+A synthetic override of one configured Airlift `DIK_SPACE` getter result
+(`0x413170`, selector `0x39`) caused a PCAR virtual `+0x40` dispatch to
+`0x4384B0` and its `0x43E030`/`0x433620` reset for body `0x4C520CC`, ordinal
+7. The dispatch returned at `0x43D6CF`, after the indirect call at
+`0x43D6CC`. The captured body position changed to the reset argument,
+six velocity components cleared, `+0xE44` changed from `1638.176` to
+`1710.128`, `+0x50C` changed from 1 to 0, and `+0xEC0` became 1. This ties
+the synthetic Airlift read to the reset callback. The original child exited
+before post-reset `0x433570` or pair-lookup samples; launcher dialog cause is
+unknown. Evidence and full state values are recorded in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+
 The original image SHA-256 is
 `F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`.
 Frida Evidence ID: `ev_d22019b61d5529b067f4da008a0c97fa50319434e65b46d0314a11435f4f7fcf`.

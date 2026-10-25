@@ -554,6 +554,34 @@ probe only while the 6.2-second gate is active. The exported REA bundle is
 SHA-256 `3A43F68AEFD0409BCAD6A6C1520BB9D7B0D4D051C7961FCFDBB40BE185FF1035`;
 it remains outside the source repository.
 
+### Controlled Space/Airlift PCAR reset capture (2026-10-25)
+
+A bounded Frida intervention on the foreground, hash-verified staged client
+changed one `0x413170` result for configured Airlift `DIK_SPACE` (`0x39`) from
+0 to 1. This is an input-getter intervention, not evidence of ordinary
+keyboard delivery. The call then dispatched the PCAR virtual `+0x40` slot to
+`0x4384B0`; the captured return address `0x43D6CF` follows the indirect call at
+`0x43D6CC`. The adapter reached `0x43E030`/`0x433620` for body `0x4C520CC`,
+ordinal 7.
+
+Immediately before the reset, body `+0xE44/+0x50C` were
+`1638.176/1`; position was `[1.4895753,-2.2523859,-376.2540]`, and velocity
+was `[0.4922669,-0.0137439,0.1320876,0.0005475,0.0182445,0.0146403]`.
+The reset arguments were position `[-9.6729488,9.585392,-426.83655]` and
+direction `[-0.9999619,0.00872665,-9.6729488]`. Afterwards position matched
+the first argument, all six velocity values were zero, `+0xE44` was
+`1710.128`, `+0x50C` was zero, and wrapper field `+0xEC0` was one. This
+confirms that the Airlift getter result reaches the pose/time reset path.
+
+The child detached/exited before subsequent timer-helper or pair-lookup rows
+were captured. The launcher remained on `Our Apologies`; the cause is unknown.
+No post-reset timer-row or selected descriptor is established. REA Evidence
+`ev_b12c10eccdbf5c449de740f08ed80db60efc10ba56d1778f9d1e4f0d0889a174`;
+external bundle
+`../../analysis/reference_captures/wheel_history_probe_20261025/pcar_space_reset_gate_20261025.evidence.json`,
+SHA-256
+`4600FA2253E352EB285099337BA0BF16B55B873051FCA8176B8101516F8AD4E5`.
+
 ### Bounded timer-branch input probe prepared (2026-10-25)
 
 Added `tools/pcar_timer_branch_probe.js` to sample the computed elapsed value
