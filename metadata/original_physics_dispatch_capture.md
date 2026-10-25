@@ -793,6 +793,28 @@ through computed pointers, bulk copies, or aliases whose store instruction
 does not encode `+0x158`; the actual runtime wheel-field producer remains
 unknown and still requires runtime evidence.
 
+### Serialized wheel-row `+0x158` destination provenance (2026-10-25)
+
+The apparent direct-store candidate at `0x432B88` is confirmed to belong to a
+serialized/body snapshot row, not to a store into the live wheel objects used
+by `0x442530`. In `0x4329C0`, the destination base is computed as
+`*(this+8) + param_1`. The function writes the body value `this+0x50C` to
+destination offset `+0x158`, then loops over the four live wheel objects from
+`this+0x554`, advancing by their `0x1A4` stride. Each call to `0x444120` writes
+only a 14-float (`0x38`-byte) summary row to the separate destination array,
+advancing that output pointer by `0x38`. `0x444120` contains no write to
+`this+0x158`; its arguments are the live wheel, output row, and body. This
+rules out `0x432B88` / `0x4329C0` as the live wheel `+0x158` producer for the
+current analyzed dataflow. It does not rule out other alias, copy, or computed
+pointer paths elsewhere in the binary.
+
+Evidence: `0x4329C0` dossier
+`ev_1dc471e1a7284d6b467f8bbb7b2f9bbea2a982f18243ff4fd106f9f04f522540`;
+`0x444120` dossier
+`ev_9841f780fd22b6fe86b663dcb2f89fe3e3c11eca1459e3059c0140c189920d86`.
+Both are Ghidra-derived static evidence for the identified binary; pseudocode
+is not original source and cannot resolve targetless indirect flows.
+
 ### Throttle-aligned wheel response capture (2026-10-25)
 
 A follow-up used the installed official launcher and a verified staged copy
