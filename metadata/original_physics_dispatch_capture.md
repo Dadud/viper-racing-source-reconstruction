@@ -455,3 +455,43 @@ retry produced wheel-history samples; the exit cause remains unknown. The next
 run should verify the child session remains attached immediately after each
 script load and retrieve bridge events before changing the resume interval
 again.
+
+### Wheel-history response capture and probe address repair (2026-10-25)
+
+The checked-in `tools/pcar_wheel_response_input_probe.js` had five instruction
+addresses written below the `race.bin` image base (`0x430A0`, `0x430B2`,
+`0x430BE`, `0x430D8`, and `0x43C04`). Because its resolver subtracts the
+preferred image base, these wrapped to invalid hook pointers. Static REA
+instruction decoding confirmed the intended sites are `0x4430A0`, `0x4430B2`,
+`0x4430BE`, `0x4430D8`, and `0x443C04`, all inside `0x442530`. The script now
+uses those addresses, rejects any address outside the loaded image, stays armed
+through race navigation (up to 120 seconds), and detaches as soon as the eighth
+selected-PCAR integrator returns. Two earlier staged runs crashed in
+`frida-agent.dll` with `0xC0000409`; the invalid hook addresses are the likely
+cause, not a proven crash diagnosis.
+
+A hash-verified staging tree launched the original ISO client into a Bemidji
+Quick Race. The capture used the same first-query, process-local
+`GetAvailableVidMem` override described above; it did not patch game memory.
+The selected player was PCAR object `0x4C920CC`. The completed capture contains
+eight ordered `0x431150` integrator returns, 32 wheel updates, 128 instruction /
+callsite rows, and 192 stage rows. Across these 32 wheel-entry snapshots, body
+`+0x50C` stayed at 1, `+0xE44` stayed at -100, and ordinal `+0x510` stayed at 7.
+Wheel `+0x158` values were wheel-specific (initially approximately -35.18,
++35.18, -38.18, and +38.18) and later changed as the car moved. Wheel `+0xE8`
+was sampled before and after each update; it changed during some suspension
+updates and was subsequently retained. This confirms that these wheel fields
+are not interchangeable with the observed body timer fields and records their
+same-update values. It does not identify the producer of `+0x158`, the source
+or cadence of the body timer, nor prove the timer value is valid for production
+simulation. Do not connect the route-contact approximation or constructor
+defaults to the production wheel integrator based on this capture.
+
+The full deterministic REA Evidence bundle remains outside the public source
+repository at
+`analysis/reference_captures/pcar_wheel_history_response_20261025.evidence.json`
+(36,342,021 bytes, SHA-256
+`6D2AE29B3A3B4E743F078F059B3F68A0B5768B1EC04C9A9F6DD73B0F22B55FFF`, 154
+records, no unknowns). Staged game files and original captures remain outside
+Git. The capture is an observed original-client sample, not a gameplay parity
+acceptance result.

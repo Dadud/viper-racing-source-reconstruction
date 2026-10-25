@@ -5,11 +5,20 @@
 const engine = Process.findModuleByName("race.bin");
 if (!engine) throw new Error("race.bin module not found");
 
-const at = va => engine.base.add(va - 0x400000);
+const imageBase = 0x400000;
+const imageEnd = imageBase + engine.size;
+const at = va => {
+  if (!Number.isInteger(va) || va < imageBase || va >= imageEnd) {
+    throw new RangeError(`Address 0x${Number(va).toString(16)} is outside race.bin`);
+  }
+  return engine.base.add(va - imageBase);
+};
 const selectedLimit = 8;
 const rowLimit = 128;
 const stageLimit = 192;
-const captureMs = 2500;
+// Keep the hook armed through menu navigation so it can capture the first
+// eight selected-PCAR integrators after the player enters a race.
+const captureMs = 120000;
 let player = null;
 let selectedIntegrators = 0;
 let selectedWheelCalls = 0;
@@ -17,6 +26,8 @@ const active = new Map();
 const rows = [];
 const stageRows = [];
 const listeners = [];
+let completed = false;
+let finishTimer = null;
 const threadId = () => Process.getCurrentThreadId();
 const safe = fn => { try { return fn(); } catch (_) { return null; } };
 const bytesHex = (pointer, size) => safe(() => {
@@ -31,6 +42,20 @@ const vector3 = (pointer, offset = 0) => safe(() => [
   pointer.add(offset + 4).readFloat(),
   pointer.add(offset + 8).readFloat()
 ]);
+const finish = () => {
+  if (completed) return;
+  completed = true;
+  if (finishTimer !== null) clearTimeout(finishTimer);
+  for (const listener of listeners) listener.detach();
+  send({
+    event: "pcar_wheel_response_input_probe_done",
+    player: player ? player.toString() : null,
+    selectedIntegrators,
+    selectedWheelCalls,
+    rows,
+    stageRows
+  });
+};
 
 listeners.push(Interceptor.attach(at(0x4384d0), {
   onEnter() {
@@ -45,7 +70,13 @@ listeners.push(Interceptor.attach(at(0x431150), {
     if (!player || !object.equals(player) || selectedIntegrators >= selectedLimit) return;
     active.set(threadId(), { serial: ++selectedIntegrators, object, nextWheel: 0, wheel: null });
   },
-  onLeave() { active.delete(threadId()); }
+  onLeave() {
+    const id = threadId();
+    const state = active.get(id);
+    if (!state) return;
+    active.delete(id);
+    if (state.serial === selectedLimit) finish();
+  }
 }));
 
 listeners.push(Interceptor.attach(at(0x442530), {
@@ -140,7 +171,7 @@ listeners.push(Interceptor.attach(at(0x43e6f0), {
 
 // At this exact point the finalized suspension magnitude is clamped and
 // stored to the wheel before 0x443F60 runs.
-listeners.push(Interceptor.attach(at(0x430a0), {
+listeners.push(Interceptor.attach(at(0x4430a0), {
   onEnter() {
     const state = active.get(threadId());
     if (!state || !state.wheel || stageRows.length >= stageLimit) return;
@@ -168,9 +199,9 @@ listeners.push(Interceptor.attach(at(0x430a0), {
 // [esp+0x74] after the two wrapper arguments have been pushed, so its matching
 // magnitude operand is [esp+0x28] at that same instruction.
 for (const site of [
-  { address: 0x430b2, stage: "suspension-force-x", directionOffset: 0x64, magnitudeOffset: 0x20 },
-  { address: 0x430be, stage: "suspension-force-y", directionOffset: 0x68, magnitudeOffset: 0x20 },
-  { address: 0x430d8, stage: "suspension-force-z", directionOffset: 0x74, magnitudeOffset: 0x28 }
+  { address: 0x4430b2, stage: "suspension-force-x", directionOffset: 0x64, magnitudeOffset: 0x20 },
+  { address: 0x4430be, stage: "suspension-force-y", directionOffset: 0x68, magnitudeOffset: 0x20 },
+  { address: 0x4430d8, stage: "suspension-force-z", directionOffset: 0x74, magnitudeOffset: 0x28 }
 ]) {
   listeners.push(Interceptor.attach(at(site.address), {
     onEnter() {
@@ -196,7 +227,7 @@ for (const site of [
 
 // At the tire-force writer call, +0x100 is the vector after the final scalar
 // projection and +0xC8 remains the transformed application point.
-listeners.push(Interceptor.attach(at(0x43c04), {
+listeners.push(Interceptor.attach(at(0x443c04), {
   onEnter() {
     const state = active.get(threadId());
     if (!state || !state.wheel || stageRows.length >= stageLimit) return;
@@ -227,14 +258,4 @@ send({
   rowLimit
 });
 
-setTimeout(() => {
-  for (const listener of listeners) listener.detach();
-  send({
-    event: "pcar_wheel_response_input_probe_done",
-    player: player ? player.toString() : null,
-    selectedIntegrators,
-    selectedWheelCalls,
-    rows,
-    stageRows
-  });
-}, captureMs);
+finishTimer = setTimeout(finish, captureMs);

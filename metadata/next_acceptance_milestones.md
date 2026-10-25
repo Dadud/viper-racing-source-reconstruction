@@ -207,6 +207,15 @@ position/velocity rows for all registered participants. Regression verifies
 the timer gate independently from rigid-body kinematics: unavailable timer
 fields do not invalidate an otherwise complete `0x43ECE0` snapshot.
 
+A fresh hash-verified original-client race capture now samples all four wheels
+for eight consecutive selected-PCAR integrator calls. It records body
+`+0x50C/+0xE44/+0x510` alongside each wheel's `+0x158/+0xE8` before and after
+the update. The values remain distinct and `+0xE8` responds during some wheel
+updates, but the capture does not expose the `+0x158` producer or timer
+generation/cadence. It therefore narrows the instrumentation gap without
+changing the production gate above. Repair and capture provenance are in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
 checks the physics object's virtual `+0x2C` gate and calls virtual `+8`, which
