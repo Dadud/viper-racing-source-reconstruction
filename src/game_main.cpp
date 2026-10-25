@@ -1639,6 +1639,11 @@ struct PlayerPhysicsTickContext {
     std::uint32_t scheduled_step_count{};
     std::uint64_t outer_update_index{};
     float simulation_time_seconds{};
+    bool body_kinematics_input_ready{};
+    bool body_kinematics_non_finite{};
+    bool body_kinematics_reader_inventory_mismatch{};
+    std::size_t body_kinematics_missing_float_count{};
+    std::array<std::uint32_t, 44> body_kinematics_missing_float_offsets{};
     // Post-callback byte-backed body fields in this order: orientation basis,
     // position, linear/angular velocity, accumulated force/moment, then the
     // constructor timer sentinel. Unknown native bytes remain empty.
@@ -2352,6 +2357,19 @@ struct WindowState {
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
+        const auto kinematics_diagnostic =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                player_runtime_state.body_object);
+        tick.body_kinematics_input_ready =
+            kinematics_diagnostic.input.has_value();
+        tick.body_kinematics_non_finite =
+            kinematics_diagnostic.contains_non_finite_value;
+        tick.body_kinematics_reader_inventory_mismatch =
+            kinematics_diagnostic.reader_inventory_mismatch;
+        tick.body_kinematics_missing_float_count =
+            kinematics_diagnostic.missing_float_count;
+        tick.body_kinematics_missing_float_offsets =
+            kinematics_diagnostic.missing_float_offsets;
         constexpr std::array<std::uint32_t, 25> offsets{
             0x38U, 0x3cU, 0x40U, 0x44U, 0x48U, 0x4cU,
             0x50U, 0x54U, 0x58U, 0x5cU, 0x60U, 0x64U,
@@ -3614,7 +3632,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",body_basis_5,body_basis_6,body_basis_7,body_basis_8"
             ",body_pos_x,body_pos_y,body_pos_z,body_vel_x,body_vel_y,body_vel_z"
             ",body_ang_x,body_ang_y,body_ang_z,body_force_x,body_force_y,body_force_z"
-            ",body_moment_x,body_moment_y,body_moment_z,body_timer_0xe44";
+            ",body_moment_x,body_moment_y,body_moment_z,body_timer_0xe44"
+            ",body_kinematics_input_ready,body_kinematics_non_finite"
+            ",body_kinematics_reader_inventory_mismatch"
+            ",body_kinematics_missing_float_count";
+        for (std::size_t lane = 0U; lane < 44U; ++lane)
+            physics_tick_trace << ",body_kinematics_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_projected_depth";
@@ -3789,6 +3812,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     for (const auto& value : tick.body_state_after_tick) {
                         physics_tick_trace << ',';
                         if (value.has_value()) physics_tick_trace << *value;
+                    }
+                    physics_tick_trace << ',' << tick.body_kinematics_input_ready
+                        << ',' << tick.body_kinematics_non_finite
+                        << ',' << tick.body_kinematics_reader_inventory_mismatch
+                        << ',' << tick.body_kinematics_missing_float_count;
+                    for (std::size_t lane = 0U; lane < 44U; ++lane) {
+                        physics_tick_trace << ',';
+                        if (lane < tick.body_kinematics_missing_float_count)
+                            physics_tick_trace << std::hex
+                                << tick.body_kinematics_missing_float_offsets[lane]
+                                << std::dec;
                     }
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
                         physics_tick_trace << ',';
