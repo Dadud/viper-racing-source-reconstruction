@@ -524,3 +524,22 @@ for this PCAR while the timer/ramp remain at their sentinel/initialized
 values. The hook recorded no native global clock or participant-pair inputs,
 so it does not establish why the update branch did not change state. REA
 Evidence ID: `ev_770c662bc5d1d3b75035846b3be9a34eea2585864a13854a5affa545800ad678`.
+
+### Bounded timer-branch input probe prepared (2026-10-25)
+
+Added `tools/pcar_timer_branch_probe.js` to sample the computed elapsed value
+and x87 comparison status at `0x43358D`, then observe whether execution reaches
+the ordinal pair-row lookup at `0x4335E5`. It records the row pointer and the
+two consumed values only when the pointer is readable, along with body timer
+fields and the optional native tick global. It is bounded to 16 selected-PCAR
+calls or 120 seconds, checks instruction addresses against the loaded image,
+and performs no target writes. `node --check` passed. This is a capture tool,
+not gameplay code.
+
+An initial inline attempt to hook these branch sites was loaded after the
+previous race had already accumulated a large number of fixed-step updates;
+the child Frida session detached before a completion row was returned. No
+branch-input values were recovered and the detach cause is unknown. The
+checked-in probe should be loaded before starting the next race and its session
+status verified while the child is still live. It still does not trace writes
+to each wheel object's `+0x158`.

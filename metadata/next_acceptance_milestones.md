@@ -218,6 +218,8 @@ not establish why the helper's update branch is inactive. This narrows the
 instrumentation gap without changing the production gate above. Repair and
 capture provenance are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+A bounded checked-in Frida probe now records the elapsed gate value and
+participant-pair lookup if reached; it still needs an early-in-race capture.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
