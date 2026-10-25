@@ -143,13 +143,14 @@ The player race session now binds exactly one decoded `PCAR` entry back to
 the setup/placement-derived player record. The binding requires a complete
 readback, the expected logical cursor, a `0x1E4`-byte record, and exact byte
 equality; it retains stream index, cursor, and byte range alongside the
-session. This catches a record-order or setup/stream mismatch, but the player
-body and wheel constructor projections are still prepared before the full
-stream is assembled. The binding is not an independent native PCAR allocation,
+session. The player body/wheel constructor projection now runs after complete
+stream decoding and consumes the bound PCAR byte span from that stream. The
+setup/placement-derived candidate record is still produced earlier as input
+to ordered serialization. This is not an independent native PCAR allocation,
 does not establish the native `+0x34` registration cursor, and does not run
 PCAR/NCAR callbacks. Regression covers exact identity plus cursor, byte, and
-duplicate-record rejection. The next integration step is to make the full
-stream loader the source of the player constructor call.
+duplicate-record rejection; asset-backed track/car startup smokes exercise the
+production stream-to-constructor path.
 
 `plan_physics_wobl_task_constructor` models the WOBL record's shared-resource
 link. It first records the record `+0x1C` value at object `+0x4AC`, then

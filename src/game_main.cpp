@@ -1624,11 +1624,9 @@ struct WindowState {
     ULONGLONG last_title_update{};
     ULONGLONG last_tick{};
 
-    bool initialize_player_constructor_inputs(
+    bool prepare_player_constructor_record(
         const viper::CarFileResourcePayloads& car_resources,
         const std::span<const std::byte> player_setup,
-        const std::span<const viper::ModelVertex> model_vertices,
-        const std::array<viper::TireDefinition, 4>& tire_definitions,
         const std::optional<std::uint32_t> serialized_stream_offset,
         const viper::CarTrackConstructionPlan& construction,
         const std::string_view model_name)
@@ -1685,6 +1683,27 @@ struct WindowState {
             player_task_record_stream.reset();
             return false;
         }
+        return true;
+    }
+
+    bool initialize_player_constructor_inputs(
+        const std::span<const std::byte> serialized_player_record,
+        const std::span<const viper::ModelVertex> model_vertices,
+        const std::array<viper::TireDefinition, 4>& tire_definitions,
+        const std::optional<std::uint32_t> serialized_stream_offset,
+        const viper::CarTrackConstructionPlan& construction)
+    {
+        bool host_fdiv_compatibility = false;
+#if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
+#else
+        // The x86 compatibility probe is not yet wired into this runtime.
+        return false;
+#endif
+        if (!serialized_stream_offset.has_value() ||
+            serialized_player_record.size() !=
+                viper::CarFileRuntimeMapping::runtime_record_size) return false;
+        player_runtime_car_record.assign(serialized_player_record.begin(),
+            serialized_player_record.end());
         const auto body_observation =
             viper::make_ncar_body_constructor_observation_from_runtime_record(
                 player_runtime_car_record, serialized_stream_offset,
@@ -2837,23 +2856,18 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     const auto* player_placement =
         state.graphics.car_placement_plan(player_car_index);
     if (player_placement == nullptr ||
-        !state.initialize_player_constructor_inputs(player_car_resources,
-            player_car_setup, player_model.vertices, wheel_tires,
-            serialized_stream_offset, *player_placement, car_name)) {
-        std::cerr << "Could not prepare the mapped PCAR record and wheel constructor inputs.\n";
+        !state.prepare_player_constructor_record(player_car_resources,
+            player_car_setup, serialized_stream_offset, *player_placement,
+            car_name)) {
+        std::cerr << "Could not prepare the mapped PCAR task record.\n";
         DestroyWindow(hwnd);
         return 1;
     }
-    std::cout << "Prepared the session PCAR record from the active CARF setup and native "
+    std::cout << "Prepared a candidate PCAR record from the active CARF setup and native "
               << "placement plan: " << state.player_runtime_car_record.size()
               << " bytes, framed at physics-task cursor 0x" << std::hex
               << state.player_task_record_stream->snapshot().records[0].cursor_offset
-              << std::dec
-              << "; derived body scale "
-              << state.player_body_constructor_plan->scaled_dimensions_0x1f0_to_0x1fc[0]
-              << ", inverse mass " << *state.player_body_inverse_mass_0x200
-              << ", four materialized initial wheel world anchors, core setups, and "
-              << "axle-selected tire responses.\n";
+              << std::dec << ".\n";
     state.configured_car_task_records.push_back({player_car_index,
         state.player_runtime_car_record});
     const auto prepared_ai_record_count = state.prepare_ai_runtime_car_records(
@@ -2876,6 +2890,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << (ordered_track_records.complete ? "complete" : "incomplete");
     if (ordered_track_records.failed_manifest_entry.has_value())
         std::cout << " at entry " << *ordered_track_records.failed_manifest_entry;
+    bool player_constructor_ready = false;
     if (ordered_track_records.complete) {
         state.full_task_record_stream.emplace(
             state.physics_task_manifest->initial_cursor);
@@ -2928,7 +2943,18 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 stream_ok = binding.status ==
                         viper::PlayerPcarTaskBindingStatus::complete &&
                     binding.binding.has_value();
-                if (stream_ok) state.player_pcar_task_binding = *binding.binding;
+                if (stream_ok) {
+                    state.player_pcar_task_binding = *binding.binding;
+                    const auto player_record_bytes =
+                        std::span<const std::byte>(stream.bytes).subspan(
+                            binding.binding->record_bytes_offset,
+                            binding.binding->record_size);
+                    stream_ok = player_placement != nullptr &&
+                        state.initialize_player_constructor_inputs(
+                            player_record_bytes, player_model.vertices, wheel_tires,
+                            binding.binding->serialized_stream_cursor,
+                            *player_placement);
+                }
             } else {
                 stream_ok = false;
             }
@@ -2961,7 +2987,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << state.player_pcar_task_binding->stream_record_index
                       << " bound at cursor 0x" << std::hex
                       << state.player_pcar_task_binding->serialized_stream_cursor
-                      << std::dec << "; materialized "
+                      << std::dec << "; initialized player constructor state from the "
+                      << "bound stream record (body scale "
+                      << state.player_body_constructor_plan
+                          ->scaled_dimensions_0x1f0_to_0x1fc[0]
+                      << ", inverse mass " << *state.player_body_inverse_mass_0x200
+                      << ", four wheel anchors/core setups and tire responses); materialized "
                       << materialized_inactive_stat_count
                       << " inactive STAT task states";
             if (unresolved_stat_count != 0U)
@@ -2973,8 +3004,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }
+        player_constructor_ready = stream_ok &&
+            state.player_constructor_inputs_ready;
     }
     std::cout << ".\n";
+    if (!player_constructor_ready) {
+        std::cerr << "Could not bind and initialize the player constructor state from the "
+                  << "complete ordered task stream.\n";
+        DestroyWindow(hwnd);
+        return 1;
+    }
     if (playback_trace != nullptr) state.graphics.set_vsync(false);
     const auto spawn = state.graphics.car_position(player_car_index);
     if (!state.place_on_route(spawn[0], spawn[1])) {
