@@ -37,6 +37,17 @@ function Find-RaceWindow([int]$ProcessId) {
     return [IntPtr]::Zero
 }
 
+function Send-RaceKey([IntPtr]$Window, [int]$Key, [string]$Name) {
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($Window, 0x0100, [IntPtr]$Key, [IntPtr]0)) {
+        throw "Could not post $Name key-down"
+    }
+    Start-Sleep -Milliseconds 180
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($Window, 0x0101, [IntPtr]$Key, [IntPtr]0)) {
+        throw "Could not post $Name key-up"
+    }
+    Start-Sleep -Milliseconds 180
+}
+
 $process = $null
 try {
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -73,6 +84,13 @@ try {
         throw 'Could not post throttle key-up'
     }
     Start-Sleep -Milliseconds 300
+    # These keys come from the shipped options.def. The runtime must expose
+    # the reconstructed callback outputs even while their physical/camera/
+    # transmission effects remain incomplete.
+    Send-RaceKey $window 69 'e-brake'       # Key_E
+    Send-RaceKey $window 82 'reverse'       # Key_R
+    Send-RaceKey $window 67 'clutch'        # Key_C
+    Send-RaceKey $window 32 'airlift'       # Key_SPACE
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]27, [IntPtr]0)) {
         throw 'Could not close the race window'
     }
@@ -86,6 +104,15 @@ try {
     $header = $rows[0].Split(',')
     $nativeThrottleColumn = [Array]::IndexOf($header, 'control_0x5093f4')
     if ($nativeThrottleColumn -lt 0) { throw 'Trace omitted the native throttle control output' }
+    $actionColumns = @{
+        eBrake = [Array]::IndexOf($header, 'control_0x5093b8')
+        reverse = [Array]::IndexOf($header, 'control_0x5093f0')
+        clutch = [Array]::IndexOf($header, 'control_0x5093c8')
+        airlift = [Array]::IndexOf($header, 'control_0x509360')
+    }
+    foreach ($entry in $actionColumns.GetEnumerator()) {
+        if ($entry.Value -lt 0) { throw "Trace omitted the $($entry.Key) action output" }
+    }
     $throttle = @($rows | Select-Object -Skip 1 | ForEach-Object { $_.Split(',')[5] })
     $nativeThrottle = @($rows | Select-Object -Skip 1 | ForEach-Object {
         [single]::Parse($_.Split(',')[$nativeThrottleColumn], [cultureinfo]::InvariantCulture)
@@ -108,7 +135,15 @@ try {
         if ($nativeThrottle[$index] -eq 0.0) { $nativeReleased = $true; break }
     }
     if (-not $nativeReleased) { throw 'The native throttle response did not decay to zero after focus loss' }
-    Write-Output 'VK_UP reached the live DIK binding evaluator; the reconstructed 0x43B290 throttle response rose and decayed on focus loss.'
+    foreach ($action in $actionColumns.GetEnumerator()) {
+        $observed = $false
+        foreach ($row in $rows | Select-Object -Skip 1) {
+            $value = [single]::Parse($row.Split(',')[$action.Value], [cultureinfo]::InvariantCulture)
+            if ($value -gt 0.0) { $observed = $true; break }
+        }
+        if (-not $observed) { throw "The shipped keyboard binding never reached the traced $($action.Key) output" }
+    }
+    Write-Output 'VK_UP and the shipped e-brake, reverse, clutch, and airlift keys reached their reconstructed 0x43B290 trace outputs; throttle decayed after focus loss.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

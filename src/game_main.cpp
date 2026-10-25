@@ -2767,6 +2767,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_normal_z";
         }
         trace << ",control_0x509358,control_0x5093f4,control_0x509320"
+              << ",control_0x5093b8"
               << ",control_0x5093f0,control_0x5093c8,control_0x5093cc"
               << ",control_0x5093f8,control_0x509360,control_0x509344"
               << ",control_0x509420,control_0x509340"
@@ -2880,7 +2881,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 trace << ',' << state.control_update_state.steering.value_0x509358
                       << ',' << state.control_update_state.analog_0x5093f4.value
-                      << ',' << state.control_update_state.analog_0x509320.value;
+                      << ',' << state.control_update_state.analog_0x509320.value
+                      << ',' << state.control_update_state.controls.value_0x5093b8;
                 const auto& live_controls = state.control_update_state.controls;
                 trace << ',' << static_cast<unsigned>(live_controls.flag_0x5093f0)
                       << ',' << live_controls.value_0x5093c8
