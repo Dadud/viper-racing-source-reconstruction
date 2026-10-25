@@ -83,6 +83,14 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25, direct wheel `+0x158` candidate revalidation:** Re-opened the
+  hash-matched original `race.bin` in Ghidra and rechecked the three previously
+  classified non-wheel direct stores. Their containing procedures confirm
+  garage conversion, pending-list count, and resource-handle object contexts.
+  This narrows direct encoded candidates but does not exclude computed aliases
+  or bulk copies; the live wheel producer remains unresolved. Procedure
+  evidence is recorded in `metadata/original_physics_dispatch_capture.md`.
+
 - **2026-10-25, tire response scalar projection regression:** Extended
   `ncar_force_capture_regression` with a synthetic case that independently
   checks the tire vector projection against basis `+0x110..+0x118` and the

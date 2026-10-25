@@ -788,6 +788,20 @@ function dossiers `ev_472e5bfc79a705e4af49ea09d44a0d3d3c3d05308100792e1c336237ca
 `ev_ad3f62ea81f822c9b45d471294d9967d45605abe03a35bcc5fe6518e78e89048`, and
 `ev_6bd8674a8bd3817801629729523575dee58da149ad8b12491012fd89fe77edce`.
 
+The three remaining direct-store procedures were re-opened against the
+hash-matched `race.bin` in Ghidra. `0x45E4B0` writes `param_3[0x70]` to the
+`param_1 + 0x158` conversion record and is called by garage/display paths
+`0x45EC20` and `0x48D800` (evidence
+`ev_550af7b4771b19e3e9ddebd8e187e87e7a869f3b5073b348f57d9a88d70415d4`).
+`0x46DF60` reads and decrements `param_1 + 0x158` while iterating its pending
+list count (evidence
+`ev_42fc40744734c4f7dc6a8c97339f04c01f7fdbea728448a3c53535aa642435e5`).
+`0x4843C0` stores a resource handle in object `this + 0x158`, with wrapper
+`0x4843A0` as its caller (evidence
+`ev_48196c322b84aa5bf18c471f2976f4d596fe5766a72c8caaad4df94d00026d24`).
+This confirms their distinct object contexts in the current binary; it still
+does not exclude writes through computed aliases or bulk copies.
+
 This narrows direct statically encoded stores only. It does not find writes
 through computed pointers, bulk copies, or aliases whose store instruction
 does not encode `+0x158`; the actual runtime wheel-field producer remains
