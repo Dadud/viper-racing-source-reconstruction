@@ -2170,8 +2170,7 @@ struct WindowState {
         return true;
     }
 
-    void update_player_wheel_contacts(const float x, const float y, const float z,
-                                      const float yaw)
+    void update_player_wheel_contacts_from_body()
     {
         player_wheel_terrain_queries_succeeded.fill(false);
         player_wheel_contact_observations = {};
@@ -2182,8 +2181,35 @@ struct WindowState {
                 state.contact_active_0x168 = 0U;
             return;
         }
-        const float cosine = std::cos(yaw);
-        const float sine = std::sin(yaw);
+        const auto read_body_float = [this](const std::uint32_t offset)
+            -> std::optional<float> {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, offset);
+            if (!bits.has_value()) return std::nullopt;
+            return std::bit_cast<float>(*bits);
+        };
+        std::array<float, 9> body_basis{};
+        for (std::size_t index = 0U; index < body_basis.size(); ++index) {
+            const auto value = read_body_float(0x38U +
+                static_cast<std::uint32_t>(index * sizeof(float)));
+            if (!value) {
+                for (auto& state : player_wheel_contact_states)
+                    state.contact_active_0x168 = 0U;
+                return;
+            }
+            body_basis[index] = *value;
+        }
+        const auto body_x = read_body_float(0x5cU);
+        const auto body_y = read_body_float(0x60U);
+        const auto body_z = read_body_float(0x64U);
+        if (!body_x || !body_y || !body_z) {
+            for (auto& state : player_wheel_contact_states)
+                state.contact_active_0x168 = 0U;
+            return;
+        }
+        const viper::PhysicsVector3 body_position{*body_x, *body_y, *body_z};
+        const viper::PhysicsVector3 body_up{
+            body_basis[3], body_basis[4], body_basis[5]};
         for (std::size_t wheel = 0; wheel < player_wheel_contact_states.size(); ++wheel) {
             const auto& core = player_wheel_core_initialization->wheels[wheel];
             if (!core.has_value()) {
@@ -2195,25 +2221,24 @@ struct WindowState {
             // stores +0x04..+0x0C, then added back by 0x437BA0. This is the
             // equivalent local point before the current renderer's yaw-only
             // pose transform.
-            const float local_x = core->position_relative_to_selected_vertex[0] +
-                core->selected_model_vertex[0];
-            const float local_y = core->position_relative_to_selected_vertex[1] +
-                core->selected_model_vertex[1];
-            const float local_z = core->position_relative_to_selected_vertex[2] +
-                core->selected_model_vertex[2];
-            const viper::PhysicsVector3 wheel_world_point{
-                x + local_x * cosine + local_z * sine,
-                y + local_y,
-                z - local_x * sine + local_z * cosine};
+            const viper::PhysicsVector3 local_anchor{
+                core->position_relative_to_selected_vertex[0] +
+                    core->selected_model_vertex[0],
+                core->position_relative_to_selected_vertex[1] +
+                    core->selected_model_vertex[1],
+                core->position_relative_to_selected_vertex[2] +
+                    core->selected_model_vertex[2]};
+            const auto wheel_world_point = viper::transform_body_local_point({
+                local_anchor, body_basis, body_position});
 
-            // The live renderer has yaw but no roll/pitch, so its modeled body
-            // query axis remains world-up. The native cheat reset hook is off
-            // for the ordinary quick-race path.
+            // This terrain projection now starts from the PCAR's initialized
+            // byte-backed pose and full basis. It remains a terrain sample,
+            // not the native collision-world query or a force update.
             viper::WheelContactObservation observation{};
             observation.body_query_enabled = true;
             observation.reset_feature_hook_active = false;
             observation.contact_projection_origin = wheel_world_point;
-            observation.contact_direction = {0.0F, 1.0F, 0.0F};
+            observation.contact_direction = body_up;
             observation.wheel_depth_limit_0x44 = core->value_0x44;
             const auto query = viper::sample_terrain_surface(
                 viper::make_terrain_surface_query_input(
@@ -2390,6 +2415,7 @@ struct WindowState {
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
+            update_player_wheel_contacts_from_body();
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             auto candidate_motion = motion;
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
@@ -2408,8 +2434,6 @@ struct WindowState {
                         motion, candidate_motion, surface.query_succeeded)) return true;
                 player_simulated_pose = std::array<float, 4>{route_result.x,
                     surface.sampled_position[1], route_result.z, route_result.yaw};
-                update_player_wheel_contacts(route_result.x,
-                    surface.sampled_position[1], route_result.z, route_result.yaw);
             } else if (route_result.finished) {
                 motion = candidate_motion;
             }

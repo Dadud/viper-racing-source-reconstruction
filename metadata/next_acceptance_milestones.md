@@ -16,7 +16,11 @@ Viper/Bemidji, Sports/Bemidji, and Sports/Dundas additionally exercise selector
 changes and saved-selection reload. `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
-body accumulators, collisions, or pose integration. This is explicitly
+body accumulators, collisions, or pose integration. Their terrain projection
+origin now comes from the initialized PCAR body's byte-backed basis and
+position, rather than the route pose. The body remains static in the live
+session, and the projection remains a terrain sample rather than the native
+collision-world query. This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
 [`completion_ledger.md`](completion_ledger.md). Existing portable physics
 models are substantial but many still accept caller observations and are not
@@ -26,14 +30,20 @@ Each scheduled player tick now retains an immutable input/timing context
 including live-keyboard versus logical-replay provenance, recovered controls,
 callback globals, scheduler clock, and the pre-increment native tick time.
 This is a provenance boundary feeding the existing projections; it does not
-make their route-driven movement or route-derived terrain/contact samples
-physics-owned. The opt-in `--record-tick-trace PATH` writes every scheduled
+make their route-driven movement or terrain/contact samples physics-owned.
+The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
 per-tick controls/timing. The trace replay regression checks contiguous tick
 ordering, pre-increment timer values, logical-input provenance, input snapshot
 size, and byte-identical repeated playback. This is input/timing evidence, not
 physics acceptance; next wire a complete observed body update and preserve
 per-tick physical state in paired original/reconstruction captures.
+Four wheel contact projections now transform constructor wheel anchors through
+the initialized byte-backed PCAR body basis and position and project along its
+up axis. `trace_replay_regression.ps1` confirms the supported terrain query
+samples remain valid through a deterministic full Viper/Bemidji race. This
+does not advance body pose, run the native collision query, produce native
+forces, or transfer pose authority from the route prototype.
 The player now owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
 and persistent contact outputs. This closes object-state materialization only;
