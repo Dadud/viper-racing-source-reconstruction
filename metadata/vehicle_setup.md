@@ -656,15 +656,17 @@ combined scalar corresponds to the wheel store at `+0x178`; field meanings
 remain raw offsets.
 
 The per-frame wheel update context at `0x4329C0` copies body `+0x50C` into
-wheel-context `+0x158` before calling the wheel routine. The NCAR body
-constructor `0x43E490` does not initialize body `+0x50C` in its observed
-pseudocode. Its value is instead written by the reconstructed interpolation
-and callback paths: `0x432420` interpolates or resets it from record byte
-`0x3A`, while `0x439160` decrements or clears it and the callback main path
-can set it to `1.0` or `0.8`. Those effects are modeled, but the live runtime
-does not yet own the native physics-record ring and callback state that drive
-them. Consequently, wheel `+0x158` remains unavailable to live suspension and
-must not be guessed from the CARF constructor. Evidence: `0x4329C0` dossier
+wheel-context `+0x158` before calling the wheel routine. The local player uses
+the PCAR callback `0x4384D0`; the PCAR derived constructor `0x42FF90` sets
+`+0x50C = 1.0`, which is constructor state only. The shared integrator path
+contains a ramp/reset writer at `0x433570`; NCAR callback `0x439200` has
+additional gated decrement/assignment paths. The record-driven `0x432420`
+writer belongs to the separate GCAR GhostBegin playback ring and is not the
+player's live ring. These per-frame effects are modeled, but the runtime does
+not yet own the mutable PCAR body, callback inputs, and live wheel-history
+producer needed to drive them. Consequently, wheel `+0x158` remains
+unavailable to live suspension and must not be guessed from constructor state.
+Evidence: `0x4329C0` dossier
 `ev_ec495a0523b6b3e8a6e16deb0b941496b12fb9879319d848e6ea55c41bb6ad6e`,
 `0x43E490` dossier
 `ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`, and

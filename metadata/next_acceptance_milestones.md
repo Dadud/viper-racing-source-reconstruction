@@ -90,40 +90,43 @@ constructor value of `+0x50C` to a per-frame value until the callback/sample
 state that mutates it is connected.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
-Native order inside NCAR callback `0x439200` is known: its timed sample/queue
-prefix and accepted-sample handling run before its conditional `0x431150`
-integrator branch. The sample therefore captures the pre-integrator state for
-that callback. `0x420930` only retrieves the registered object; the live race
-session still lacks the mutable body state the capture requires, and the
-relationship between the accepted sample window and the separate `+0xEC4`
-callback record remains unresolved. The runtime must reproduce this ordering
-once it owns that state. See `metadata/car_update_branches.md` and the NCAR
-callback evidence listed there.
+The local player is dispatched as PCAR: per-step task dispatch `0x421050`
+checks the physics object's virtual `+0x2C` gate and calls virtual `+8`, which
+resolves through PCAR vtable `0x4C8188` to callback `0x4384D0`. That callback
+conditionally calls shared wheel/body integrator `0x431150`; NCAR callback
+`0x439200` is a separate sample/queue/interpolation path and must not be used
+as the player callback. The PCAR callback's modeled control prefix still
+requires body velocity and basis, and the production session does not own the
+mutable PCAR body state or call its integrator. The 3-slot NCAR `0x3E` sample
+history is distinct from the `0x960`-record GCAR `0x3C` wheel-history ring;
+the latter is tied to GhostBegin playback and is not a live-player ring.
+See `metadata/physics_task_objects.md`, `metadata/car_update_branches.md`, and
+the next-state dependencies below.
 
 ### State required before the live physics integration can be wired
 
 The current audit does not support treating route pose, terrain contacts, or
-the constructor's `+0x50C = 1.0` as substitutes for native frame state. The
-`0x4329C0` wheel-context copy reads mutable body `+0x50C`; observed callback
-and physics-record paths can change it. Wheel `+0xE8` is interpolated from
-two adjacent five-byte samples in the separate `0x3C`-stride object ring,
-using a fraction derived from global tick and object timing fields. This ring
-is distinct from the timed NCAR sample pipeline's three-slot `0x3E` history.
-The `0x4278F0` GCAR constructor allocates `0x960` records at this stride, and
-the `0x427BF0` path can copy supplied records into it. The constructor's
-identity-helper loop does not initialize an empty buffer, and the evidence does
-not yet establish that this replay/sample buffer supplies the live race ring.
-Neither mutable body-integrator state nor live ring contents, timing lifecycle,
-producer ordering, and callback gates are currently owned by the race session.
-The timed sample pipeline explicitly consumes body state from its caller; it
-cannot create that state from route motion.
+the PCAR constructor's `+0x50C = 1.0` as substitutes for native frame state.
+The `0x4329C0` wheel-context copy reads mutable body `+0x50C`. Its constructor
+value is only initial state; `0x433570` can update it on the shared
+`0x431150` integrator path, while other callback writers have their own gates.
+The production session does not dispatch native PCAR callback `0x4384D0` or
+execute shared integrator `0x431150`; it lacks their mutable body, timer,
+table, and callback state. Wheel `+0xE8`
+is interpolated from adjacent five-byte samples by `0x444240`, using records
+selected through `0x427630` and a fraction derived from global tick and object
+timing fields. This particular `0x3C`-stride ring is owned by the
+`0x4278F0`/`0x427A40` GCAR GhostBegin playback path; it is not evidence for a
+live-player wheel-history producer. It is distinct from NCAR's timed three-slot
+`0x3E` sample history.
 
-Therefore the next implementation boundary is the state producer and its
-ownership, not a call to `advance_four_wheel_body_step`: reconstruct the
-mutable body state and callback write paths, locate the live player's
-wheel-history producer independently of the `0x960`-record GCAR ring (now
-identified as ghost playback), and establish the tick/fraction and callback
-ordering. Only then can the session feed evidence-backed `+0x50C` and `+0xE8`
+Therefore the next implementation boundary is the local PCAR state producer
+and its ownership, not a call to `advance_four_wheel_body_step`: construct a
+persistent mutable PCAR body from the recovered setup/task initialization,
+reconstruct the callback and force-collection writes on `0x4384D0` and shared
+`0x431150`, locate the live player's wheel-history producer independently of
+the GCAR GhostBegin ring, and establish tick/fraction and callback ordering.
+Only then can the session feed evidence-backed per-frame `+0x50C` and `+0xE8`
 values into the existing wheel/body composition. In parallel, the polarity
 initializer still needs the actual common-startup timer backend and a single
 shared stream whose call order includes non-wheel consumers. Keep these as
