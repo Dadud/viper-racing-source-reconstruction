@@ -244,24 +244,40 @@ dispatcher `ev_fe4426a5bcbb23c30fad316f8eaeef291572c55b46ff256eb471d7f73ab37065`
 ordered dispatcher `ev_fe23f6aa4f139a225258e4e3840980edb75f9054efbcb99f578d1c8659715581`,
 and time helper `ev_0a58326f5d24a379708f32a4362f904394176e74a0f11e0033471e13c34ec0bf`.
 
-A targeted constructor audit now covers PCAR-derived constructor `0x43DFB0`,
-base car constructor `0x42FF90`, body constructor `0x43E490`, and shared body
-initializer `0x4375C0`. Their analyzed direct stores contain no write to
-`+0xECC`. The base constructor's nearby `0x433AA0` initializer writes through
-`+0xEAC` and then resumes at other fields; it does not store `+0xECC` either.
+A targeted constructor audit now covers the PCAR constructor `0x4381E0`, its
+derived initializer `0x43DFB0`, base car constructor `0x42FF90`, body
+constructor `0x43E490`, and shared body initializer `0x4375C0`. Their analyzed
+direct stores contain no write to `+0xECC`. A sibling derived constructor
+`0x4278F0` does write `this+0x510` into `this+0xECC`; this confirms the offset
+has class-specific meaning and that sibling writes cannot establish PCAR's
+timestamp initialization. The base constructor's nearby `0x433AA0` initializer writes through
+`+0xEAC` and then resumes at other fields; it does not store `+0xECC`
+either.
 Setup initializer `0x433C00` also has no direct field reference in the
-`+0xEC0..+0xF00` range. This narrows the known direct-constructor writers, but
-does not prove that every transitive helper, allocator, or runtime path leaves
-the field untouched. In particular, whether the object allocation is
-zero-filled before construction remains unresolved. Keep `+0xECC` unknown in
-the live projection until allocator evidence or a controlled first-callback
-capture establishes its initial value. Evidence: `0x43DFB0`
+`+0xEC0..+0xF00` range. The PCAR factory `0x422580` allocates exactly
+`0xEF0` bytes through `0x414170` before invoking `0x4381E0`. That allocator
+fills the allocated payload with `0xA3` bytes, writes its four-byte size header
+before the payload, and returns the payload pointer. Thus the allocator
+baseline at PCAR `+0xECC` is `0xA3A3A3A3`, not zero. However, the shared
+constructor path calls `0x49C1F0(this, +0x510)`, which may dispatch an indirect
+manager virtual at `+0x78`; its object-side effects have not been resolved.
+Keep the post-construction `+0xECC` unknown in the live projection until that
+manager edge is audited or a controlled first-callback capture observes it.
+Evidence: `0x43DFB0`
 `ev_feefea8447a3a65f61cb349cdc59190de6a96f6d2c0652ff468fb93d826a7864`,
 `0x42FF90` `ev_a3e97a69dfdfc6c057b9d575b684e30323444ffb2eb38cfff8f6fc133e7bbec8`,
 `0x43E490` `ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`,
 `0x4375C0` `ev_1bd5688db76155c26f088bb709fc8bce8430eb03d9df862ba2786ca8ef1b6ae0`,
 `0x433AA0` `ev_756b10b890523555eb04d7c83fcf07710bdf17ae783af5d6f1d8d44e89e102df`,
 and `0x433C00` `ev_fbd640d5fbdc72a165c76c2dee2639411e71c3beaf9416d13c51fc2bd9d7ee93`.
+The PCAR and sibling constructor dossiers are `0x4381E0`
+`ev_e4e0c82c8c2d3c4addf3236a4240dafc232f81acb001d931e1824f47dcb68093` and
+`0x4278F0` `ev_0e875134732b6d19b3ec2e544a4b320f6bcf6805a3ce9a755180727ed75d5e02`.
+Factory and allocator evidence is `0x422580`
+`ev_16e9359e1fff260aa38cf33c56d1c882043ea11712c8fa31761a929ff9f41f37` and
+`0x414170` `ev_9b2a0d435a2b992bc2b54868b063b387802e906ce55e69836ba1ddd82c9210ae`;
+the unresolved registration helper is `0x49C1F0`
+`ev_c4ac0a309efa295362a52e7b57ee0180b494ba07ff9ab630202872a479735123`.
 
 When byte `+0xC3D` is set and the signed dword at `+0xC7C` is below
 `0x3C23D70A`, `0x4402D0` is called with `this+0xBFC`; it sets subobject byte
