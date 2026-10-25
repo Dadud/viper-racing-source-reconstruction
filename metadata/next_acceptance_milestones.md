@@ -100,6 +100,30 @@ callback record remains unresolved. The runtime must reproduce this ordering
 once it owns that state. See `metadata/car_update_branches.md` and the NCAR
 callback evidence listed there.
 
+### State required before the live physics integration can be wired
+
+The current audit does not support treating route pose, terrain contacts, or
+the constructor's `+0x50C = 1.0` as substitutes for native frame state. The
+`0x4329C0` wheel-context copy reads mutable body `+0x50C`; observed callback
+and physics-record paths can change it. Wheel `+0xE8` is interpolated from
+two adjacent five-byte samples in the separate `0x3C`-stride object ring,
+using a fraction derived from global tick and object timing fields. This ring
+is distinct from the timed NCAR sample pipeline's three-slot `0x3E` history.
+Neither the live body-integrator state nor the interpolation ring's bytes,
+capacity, timing lifecycle, producer ordering, and callback gates are currently
+owned by the race session. The sample pipeline explicitly consumes already
+updated body state; it cannot create that state from route motion.
+
+Therefore the next implementation boundary is the state producer and its
+ownership, not a call to `advance_four_wheel_body_step`: reconstruct the
+mutable body state and callback write paths, identify the fixed-step/ring
+allocation and population source, and establish the tick/fraction and callback
+ordering. Only then can the session feed evidence-backed `+0x50C` and `+0xE8`
+values into the existing wheel/body composition. In parallel, the polarity
+initializer still needs the actual common-startup timer backend and a single
+shared stream whose call order includes non-wheel consumers. Keep these as
+explicit dependencies; do not claim the existing models are live physics.
+
 ### 2. Close the physical race loop: terrain, collision, damage, and finish
 
 **Outcome:** The player-owned simulation from milestone 1 runs stably for a
