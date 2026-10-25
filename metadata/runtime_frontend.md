@@ -33,17 +33,18 @@ asset loading. It does not validate a real saved career, run a complete race,
 verify every selector row, persist changed choices, or establish parity with
 the original menus.
 
-`game_frontend_race_lifecycle_smoke` creates a deterministic two-lap
-Viper/Bemidji throttle trace, launches through the real setup window, selects
-Viper and two laps, plays the full trace, and waits for Enter to return from
-standings to setup. It then changes to Sports, launches the second full trace
-session, and exits from setup after its results. Replay exhaustion keeps the
-results window open only when playback was started through the interactive
-frontend; explicit CLI replay still closes when the trace ends. The smoke then
-relaunches against the same Config directory and verifies the last selected
-Sports/Bemidji pair and two-lap setting load into the race. This verifies
-settings persistence and repeated setup/race/result resource lifecycles for the
-route prototype, not physical simulation or original-game parity.
+`game_frontend_race_lifecycle_smoke` creates a deterministic two-lap throttle
+trace, launches through the real setup window, selects Viper and two laps, and
+completes Viper/Bemidji. It returns from standings to setup, changes the car to
+Sports, then completes Sports/Bemidji. It next wraps the installed track
+selector from Bemidji to Dundas and completes Sports/Dundas. Replay exhaustion
+keeps the results window open only when playback was started through the
+interactive frontend; explicit CLI replay still closes when the trace ends.
+The smoke relaunches against the same Config directory and verifies the
+Sports/Dundas pair and two-lap setting load into the race. This verifies track
+selection, settings persistence, and repeated setup/race/result resource
+lifecycles for the route prototype, not physical simulation or original-game
+parity.
 
 Race standings display localized AI driver names from the selected
 `GAME.opponent_strength` profile in `english.lng`, aligned through the
@@ -80,10 +81,10 @@ hotkey is unavailable.
 ## Acceptance still open
 
 - Run a complete Viper/Bemidji race from the setup window, inspect standings,
-  return to setup, choose another track/car, and start the second session.
-  The lifecycle smoke now covers two full trace-driven Bemidji sessions,
-  Viper-to-Sports selection, asset reload, and result returns, but no manual
-  gameplay input.
+  return to setup, choose another track/car, and start the next session. The
+  lifecycle smoke now covers Viper/Bemidji, Sports/Bemidji, and Sports/Dundas
+  two-lap trace-driven sessions, asset reload, results returns, and persisted
+  track/car/lap settings, but no manual gameplay input or original parity.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
 - Implement and retain supported settings beyond quick-race lap count, control

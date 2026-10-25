@@ -88,7 +88,9 @@ try {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add($captureLines[0])
     $template = $captureLines[1].Split(',')
-    for ($frame = 0; $frame -lt 3600; ++$frame) {
+    # Dundas' ideal line is longer than Bemidji's, so budget enough frames for
+    # all entrants to finish the same two-lap scripted race on either track.
+    for ($frame = 0; $frame -lt 28800; ++$frame) {
         $fields = [string[]]$template.Clone()
         $fields[0] = [string]$frame
         $fields[1] = '0'
@@ -126,6 +128,7 @@ try {
     }
 
     $setup = Wait-ResultsReturn $process 60
+    Write-Output 'Viper/Bemidji returned to setup.'
     Press-Key $setup 37
     Press-Key $setup 13
     $secondRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30
@@ -135,6 +138,22 @@ try {
         throw "Returning to setup did not preserve Viper selection for the car change: $($secondTitle.ToString())"
     }
     $setup = Wait-ResultsReturn $process 60
+    Write-Output 'Sports/Bemidji returned to setup.'
+    # Bemidji is the final installed track in tracks.tab order; Down wraps to Dundas.
+    Press-Key $setup 40
+    Press-Key $setup 13
+    $thirdRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30
+    $thirdTitle = [System.Text.StringBuilder]::new(256)
+    for ($attempt = 0; $attempt -lt 20 -and $thirdTitle.Length -eq 0; ++$attempt) {
+        [void][ViperRaceFrontendWin32]::GetWindowText($thirdRace, $thirdTitle, $thirdTitle.Capacity)
+        if ($thirdTitle.Length -eq 0) { Start-Sleep -Milliseconds 50 }
+    }
+    if ($thirdTitle.ToString() -notmatch 'dundas.*sports' -or
+        $thirdTitle.ToString() -notmatch 'Lap 1/2') {
+        throw "Frontend did not start the expected two-lap Dundas/Sports race: $($thirdTitle.ToString())"
+    }
+    $setup = Wait-ResultsReturn $process 60
+    Write-Output 'Sports/Dundas returned to setup.'
     Press-Key $setup 27
     if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after Escape from the returned setup window' }
     $process.Refresh()
@@ -143,10 +162,10 @@ try {
     $preferencePath = Join-Path $config 'viper-racing-setup.cfg'
     if (-not (Test-Path -LiteralPath $preferencePath)) { throw 'Setup selection preference was not written' }
     $preference = [System.IO.File]::ReadAllText($preferencePath)
-    if ($preference -notmatch '(?m)^track=bemidji$' -or
+    if ($preference -notmatch '(?m)^track=dundas$' -or
         $preference -notmatch '(?m)^car=sports$' -or
         $preference -notmatch '(?m)^laps=2$') {
-        throw "Saved selection did not contain Bemidji/Sports: $preference"
+        throw "Saved selection did not contain Dundas/Sports/two laps: $preference"
     }
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -163,15 +182,15 @@ try {
         [void][ViperRaceFrontendWin32]::GetWindowText($restoredRace, $restoredTitle, $restoredTitle.Capacity)
         if ($restoredTitle.Length -eq 0) { Start-Sleep -Milliseconds 50 }
     }
-    if ($restoredTitle.ToString() -notmatch 'bemidji.*sports' -or
+    if ($restoredTitle.ToString() -notmatch 'dundas.*sports' -or
         $restoredTitle.ToString() -notmatch 'Lap 1/2') {
-        throw "Relaunched setup did not restore Bemidji/Sports with two laps: $($restoredTitle.ToString())"
+        throw "Relaunched setup did not restore Dundas/Sports with two laps: $($restoredTitle.ToString())"
     }
     Press-Key $restoredRace 27
     if (-not $process.WaitForExit(15000)) { throw 'Viper Racing did not exit after the persisted-selection check' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "relaunch exited with code $($process.ExitCode)" }
-    Write-Output 'Two-lap Viper/Bemidji and Sports/Bemidji trace races reached results; track, car, and lap count persisted across a clean relaunch.'
+    Write-Output 'Two-lap Viper/Bemidji, Sports/Bemidji, and Sports/Dundas trace races reached results; track, car, and lap count persisted across a clean relaunch.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
