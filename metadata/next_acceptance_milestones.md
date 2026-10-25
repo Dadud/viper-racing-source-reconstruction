@@ -211,9 +211,12 @@ A fresh hash-verified original-client race capture now samples all four wheels
 for eight consecutive selected-PCAR integrator calls. It records body
 `+0x50C/+0xE44/+0x510` alongside each wheel's `+0x158/+0xE8` before and after
 the update. The values remain distinct and `+0xE8` responds during some wheel
-updates, but the capture does not expose the `+0x158` producer or timer
-generation/cadence. It therefore narrows the instrumentation gap without
-changing the production gate above. Repair and capture provenance are in
+updates. Static analysis identifies the `0x433570` timer helper, and a live
+read-only follow-up observed 16 calls without changes to `+0x50C/+0xE44/+0x510`.
+The wheel `+0x158` producer remains unknown, and the unchanged timer sample does
+not establish why the helper's update branch is inactive. This narrows the
+instrumentation gap without changing the production gate above. Repair and
+capture provenance are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 
 The model `advance_four_wheel_body_step` currently has no production call site.

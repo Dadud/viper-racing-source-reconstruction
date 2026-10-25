@@ -490,8 +490,8 @@ defaults to the production wheel integrator based on this capture.
 The full deterministic REA Evidence bundle remains outside the public source
 repository at
 `analysis/reference_captures/pcar_wheel_history_response_20261025.evidence.json`
-(36,342,021 bytes, SHA-256
-`6D2AE29B3A3B4E743F078F059B3F68A0B5768B1EC04C9A9F6DD73B0F22B55FFF`, 154
+(50,971,212 bytes, SHA-256
+`07A9CBD23E79F6BE011B7A19FAFAB1FC5E93F7C38749758D1CB3D578AA9633F9`, 173
 records, no unknowns). Staged game files and original captures remain outside
 Git. The capture is an observed original-client sample, not a gameplay parity
 acceptance result.
@@ -515,3 +515,12 @@ and `+0x50C == 1` throughout the selected eight updates, so it did not observe
 this ramp advancing. This leaves the runtime invocation/input and wheel-field
 copy producer unresolved. Ghidra Evidence ID:
 `ev_98635cd43aa39a1c3cd84a9f9cd488bca08e122c47540014cd16fec738b76d7c`.
+
+A bounded read-only Frida hook at `0x433570` then observed 16 calls for the
+same selected PCAR in that live staged race. All 16 paired entry/return samples
+kept body `+0x50C == 1`, `+0xE44 == -100`, and ordinal `+0x510 == 7`; none of
+the calls changed those fields. This confirms the helper is actually reached
+for this PCAR while the timer/ramp remain at their sentinel/initialized
+values. The hook recorded no native global clock or participant-pair inputs,
+so it does not establish why the update branch did not change state. REA
+Evidence ID: `ev_770c662bc5d1d3b75035846b3be9a34eea2585864a13854a5affa545800ad678`.
