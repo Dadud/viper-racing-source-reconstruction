@@ -24,6 +24,7 @@ const bytesHex = (pointer, size) => safe(() => {
   return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
 });
 const readFloat = (pointer, offset) => safe(() => pointer.add(offset).readFloat());
+const readU32 = (pointer, offset) => safe(() => pointer.add(offset).readU32());
 const readByte = (pointer, offset) => safe(() => pointer.add(offset).readU8());
 const vector3 = (pointer, offset = 0) => safe(() => [
   pointer.add(offset).readFloat(),
@@ -53,11 +54,38 @@ listeners.push(Interceptor.attach(at(0x442530), {
     if (!state) return;
     const index = state.nextWheel++;
     selectedWheelCalls++;
-    state.wheel = { index, pointer: this.context.ecx };
+    const wheel = this.context.ecx;
+    const body = state.object;
+    state.wheel = { index, pointer: wheel };
+    this.edge = {
+      stage: "wheel-history-body-copy",
+      integrator: state.serial,
+      wheelIndex: index,
+      wheel: wheel.toString(),
+      body: body.toString(),
+      nativeTick: readU32(at(0x508774)),
+      bodyRamp_0x50c_before: readFloat(body, 0x50c),
+      bodyRecordTime_0xe44_before: readFloat(body, 0xe44),
+      vehicleOrdinal_0x510: readU32(body, 0x510),
+      wheelContext_0x158_before: readFloat(wheel, 0x158),
+      wheelHistory_0xe8_before: readFloat(wheel, 0xe8),
+      stackAtWheelEntry: bytesHex(this.context.esp, 0x40)
+    };
   },
   onLeave() {
     const state = active.get(threadId());
-    if (state) state.wheel = null;
+    if (state) {
+      if (this.edge && stageRows.length < stageLimit) {
+        const body = state.object;
+        const wheel = state.wheel.pointer;
+        this.edge.bodyRamp_0x50c_after = readFloat(body, 0x50c);
+        this.edge.bodyRecordTime_0xe44_after = readFloat(body, 0xe44);
+        this.edge.wheelContext_0x158_after = readFloat(wheel, 0x158);
+        this.edge.wheelHistory_0xe8_after = readFloat(wheel, 0xe8);
+        stageRows.push(this.edge);
+      }
+      state.wheel = null;
+    }
   }
 }));
 

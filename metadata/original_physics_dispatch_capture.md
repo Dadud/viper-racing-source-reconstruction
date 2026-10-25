@@ -258,6 +258,16 @@ It records the exact bounded source hash used for that run. The checked-in
 extends that capture with stack snapshots at the suspension and tire-force
 callsites; those added stage rows still require a fresh controlled run.
 
+The checked-in response probe now also emits one `wheel-history-body-copy`
+stage per selected wheel update. Each row pairs the PCAR `+0x50C`, `+0xE44`,
+and `+0x510` values with wheel `+0x158` and `+0xE8` before and after
+`0x442530`, the global tick, wheel/body identity, and bounded entry-stack
+bytes. The eight-update limit yields 32 rows, within the existing stage cap.
+This is designed to test whether the timer-produced body value is copied into
+the wheel context and how prior depth changes in the same update. The updated
+probe passed `node --check` but has not yet run against a controlled original
+race; no new runtime result is claimed.
+
 The 32 force-writer rows also contain complete raw `0x1A4`-byte wheel-object
 snapshots. Decoding offsets `+0x158` and `+0xE8` gives these ranges across the
 eight sampled integrator calls (eight rows per wheel): wheel 0,
