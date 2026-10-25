@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 
 namespace viper {
@@ -44,6 +45,12 @@ struct AcarCurveSourceRecord {
     float value_0x80{};
     float value_0x84{};
 };
+
+// Reads the eight source floats used by the ACAR constructor curve setup from
+// a complete mapped PCAR/ACAR runtime record. Header and bounds are validated;
+// no native object pointer or callback state is inferred.
+[[nodiscard]] std::optional<AcarCurveSourceRecord>
+read_car_curve_source_record(std::span<const std::byte> runtime_record) noexcept;
 
 // Models 0x440100 followed by 0x4401D0 for the fields used by the recovered
 // evaluator. The six input coefficients map in order to offsets +0x44..+0x58.

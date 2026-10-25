@@ -2,7 +2,35 @@
 
 #include "viper/legacy_fdiv.hpp"
 
+#include <bit>
+#include <cstddef>
+
 namespace viper {
+
+std::optional<AcarCurveSourceRecord> read_car_curve_source_record(
+    const std::span<const std::byte> runtime_record) noexcept
+{
+    constexpr std::size_t record_size = 0x1e4U;
+    constexpr std::uint32_t pcar_tag = 0x50434152U;
+    constexpr std::uint32_t acar_tag = 0x41434152U;
+    if (runtime_record.size() != record_size) return std::nullopt;
+    const auto read_u32 = [runtime_record](const std::size_t offset) noexcept {
+        return std::to_integer<std::uint32_t>(runtime_record[offset])
+            | (std::to_integer<std::uint32_t>(runtime_record[offset + 1U]) << 8U)
+            | (std::to_integer<std::uint32_t>(runtime_record[offset + 2U]) << 16U)
+            | (std::to_integer<std::uint32_t>(runtime_record[offset + 3U]) << 24U);
+    };
+    const auto tag = read_u32(0U);
+    if ((tag != pcar_tag && tag != acar_tag) || read_u32(4U) != record_size)
+        return std::nullopt;
+    const auto read_float = [&read_u32](const std::size_t offset) noexcept {
+        return std::bit_cast<float>(read_u32(offset));
+    };
+    return AcarCurveSourceRecord{
+        read_float(0x68U), read_float(0x6cU), read_float(0x70U),
+        read_float(0x74U), read_float(0x78U), read_float(0x7cU),
+        read_float(0x80U), read_float(0x84U)};
+}
 
 ConfiguredUpdateCurve configure_update_curve(
     const std::uintptr_t parameter_1,

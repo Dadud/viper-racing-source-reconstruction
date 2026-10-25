@@ -37,6 +37,17 @@ configured-car identities. This lets the runtime associate each selected AI
 ACAR record with its stream entry, but ACAR objects and their callback state
 are still not constructed; opponent motion remains on the route prototype.
 
+For each bound AI `ACAR`, `WindowState` now retains the eight mapped curve
+source floats from record `+0x68..+0x84` alongside its configured-car and
+stream-entry identity. `read_car_curve_source_record` validates the complete
+`0x1E4` PCAR/ACAR header before exposing those inputs. The same bounded reader
+feeds the player's existing constructor curve projection, removing its
+duplicate offset decoder. Regression verifies exact field mapping, the
+constructor curve's mapped outputs, and rejection of wrong-tag, wrong-size,
+and truncated records. The retained AI values are constructor inputs only;
+native object pointers, ACAR model-node lists, runtime update state, and AI
+callback execution remain unresolved.
+
 Before populating that object array, `0x420480` obtains the track-state record
 from `0x45C2C0` and passes it to `0x426000`. That helper switches on the DWORD
 at input offset `+0x18` (decompiler expression `param_1[6]`): selector 0

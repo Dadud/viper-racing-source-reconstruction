@@ -1553,6 +1553,11 @@ struct MaterializedNcarRuntimeState {
     bool constructor_outputs_materialized{};
 };
 
+struct AcarCurveSourceRuntimeState {
+    viper::ConfiguredCarTaskStreamBinding stream_binding{};
+    viper::AcarCurveSourceRecord source_record{};
+};
+
 struct WindowState {
     DirectSoundAudio audio;
     D3DWindow graphics;
@@ -1574,6 +1579,7 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
     std::vector<viper::PhysicsTaskObjectInventoryEntry> physics_task_object_inventory;
     std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
+    std::vector<AcarCurveSourceRuntimeState> ai_acar_curve_sources;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
@@ -1756,6 +1762,11 @@ struct WindowState {
         // The derived ACAR constructor configures its embedded curve and
         // selector from the same mapped runtime car record. Persist the
         // numeric fields consumed by the recovered PCAR callback branch.
+        const auto curve_source = viper::read_car_curve_source_record(
+            player_runtime_car_record);
+        if (!curve_source.has_value()) return false;
+        const auto configured_curve = viper::configure_acar_update_curve(
+            0U, *curve_source, host_fdiv_compatibility);
         const auto runtime_word = [&](const std::uint32_t offset) {
             std::uint32_t value{};
             for (std::uint32_t byte = 0; byte < 4U; ++byte) {
@@ -1767,13 +1778,6 @@ struct WindowState {
         const auto runtime_float = [&](const std::uint32_t offset) {
             return std::bit_cast<float>(runtime_word(offset));
         };
-        const viper::AcarCurveSourceRecord curve_source{
-            runtime_float(0x68U), runtime_float(0x6cU),
-            runtime_float(0x70U), runtime_float(0x74U),
-            runtime_float(0x78U), runtime_float(0x7cU),
-            runtime_float(0x80U), runtime_float(0x84U)};
-        const auto configured_curve = viper::configure_acar_update_curve(
-            0U, curve_source, host_fdiv_compatibility);
         std::array<viper::NcarObjectFieldWrite, 25> embedded_numeric_writes{};
         std::size_t embedded_write_count{};
         const auto write_embedded = [&](const std::uint32_t offset,
@@ -2946,6 +2950,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 if (stream_ok)
                     state.configured_car_stream_bindings = bindings.bindings;
             }
+            if (stream_ok) {
+                state.ai_acar_curve_sources.clear();
+                for (const auto& binding : state.configured_car_stream_bindings) {
+                    if (binding.record_tag != 0x41434152U) continue;
+                    if (binding.record_bytes_offset > stream.bytes.size() ||
+                        binding.record_size > stream.bytes.size() -
+                            binding.record_bytes_offset) {
+                        stream_ok = false;
+                        break;
+                    }
+                    const auto record_bytes = std::span<const std::byte>(stream.bytes)
+                        .subspan(binding.record_bytes_offset, binding.record_size);
+                    const auto curve_source =
+                        viper::read_car_curve_source_record(record_bytes);
+                    if (!curve_source.has_value()) {
+                        stream_ok = false;
+                        break;
+                    }
+                    state.ai_acar_curve_sources.push_back({binding, *curve_source});
+                }
+            }
             for (std::size_t index = 0U;
                  stream_ok && index < decoded.records.size(); ++index) {
                 const auto& ordered = ordered_track_records.records[index];
@@ -3010,7 +3035,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << state.player_body_constructor_plan
                           ->scaled_dimensions_0x1f0_to_0x1fc[0]
                       << ", inverse mass " << *state.player_body_inverse_mass_0x200
-                      << ", four wheel anchors/core setups and tire responses); materialized "
+                      << ", four wheel anchors/core setups and tire responses); retained "
+                      << state.ai_acar_curve_sources.size()
+                      << " AI ACAR curve source records; materialized "
                       << materialized_inactive_stat_count
                       << " inactive STAT task states";
             if (unresolved_stat_count != 0U)
@@ -3021,6 +3048,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.full_task_record_readback.reset();
             state.physics_task_object_inventory.clear();
             state.configured_car_stream_bindings.clear();
+            state.ai_acar_curve_sources.clear();
             state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }

@@ -269,6 +269,11 @@ if(BUILD_TESTING)
         viper_physics_scheduler viper_scene_model viper_resource_bundle)
     add_test(NAME physics_task_stream_regression
         COMMAND viper_physics_task_stream_regression)
+    add_executable(viper_update_curve_regression
+        tests/update_curve_regression.cpp)
+    target_link_libraries(viper_update_curve_regression PRIVATE viper_update_curve)
+    add_test(NAME update_curve_regression
+        COMMAND viper_update_curve_regression)
     add_executable(viper_game_options_regression tests/game_options_regression.cpp)
     target_link_libraries(viper_game_options_regression PRIVATE viper_frontend_model)
     add_test(NAME game_options_regression COMMAND viper_game_options_regression)
