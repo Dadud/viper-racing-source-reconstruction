@@ -65,7 +65,7 @@ std::uint32_t get_u32(const std::uint8_t* p) { return (std::uint32_t(p[0])<<24)|
 
 void send_handshake(Socket s, bool accept) {
     // 12 bytes: magic, protocol version, role/status, reserved.
-    const std::array<std::uint8_t, 12> hello{'V','R','N','1',0,0,accept?std::uint8_t{1}:std::uint8_t{0},0,0,0,0,0};
+    const std::array<std::uint8_t, 12> hello{'V','R','N','2',0,0,accept?std::uint8_t{1}:std::uint8_t{0},0,0,0,0,0};
     auto bytes = hello;
     put_u16(bytes.data()+4, protocol_version);
     send_all(s, bytes.data(), bytes.size());
@@ -73,7 +73,7 @@ void send_handshake(Socket s, bool accept) {
 void receive_handshake(Socket s, bool expect_accept) {
     std::array<std::uint8_t,12> hello{};
     receive_all(s, hello.data(), hello.size());
-    if (std::memcmp(hello.data(), "VRN1", 4) || get_u16(hello.data()+4) != protocol_version || hello[6] != (expect_accept ? 1 : 0))
+    if (std::memcmp(hello.data(), "VRN2", 4) || get_u16(hello.data()+4) != protocol_version || hello[6] != (expect_accept ? 1 : 0))
         throw std::runtime_error("incompatible multiplayer protocol handshake");
 }
 }

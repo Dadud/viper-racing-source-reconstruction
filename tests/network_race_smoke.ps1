@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $hostProcess = $null
 $joinProcess = $null
+$common = "--data-dir `"$DataDir`" --track bemidji --car viper --software --smoke-frames 8"
 
 function New-RaceProcessStartInfo([string]$Arguments) {
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -37,7 +38,33 @@ $port = ([Net.IPEndPoint]$portListener.LocalEndpoint).Port
 $portListener.Stop()
 
 try {
-    $common = "--data-dir `"$DataDir`" --track bemidji --car viper --software --smoke-frames 8"
+    # A connected pair must reject incompatible setup before either runtime
+    # starts consuming race controls.
+    $mismatchListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    $mismatchListener.Start()
+    $mismatchPort = ([Net.IPEndPoint]$mismatchListener.LocalEndpoint).Port
+    $mismatchListener.Stop()
+    $hostProcess = Start-RaceProcess "$common --host $mismatchPort"
+    Start-Sleep -Milliseconds 300
+    $joinProcess = Start-RaceProcess "--data-dir `"$DataDir`" --track dundas --car viper --software --smoke-frames 8 --join 127.0.0.1 $mismatchPort"
+    $mismatchDeadline = [DateTime]::UtcNow.AddSeconds(15)
+    while ([DateTime]::UtcNow -lt $mismatchDeadline) {
+        $hostProcess.Refresh()
+        $joinProcess.Refresh()
+        if ($hostProcess.HasExited -and $joinProcess.HasExited) { break }
+        Start-Sleep -Milliseconds 100
+    }
+    $hostProcess.Refresh()
+    $joinProcess.Refresh()
+    if (-not $hostProcess.HasExited -or -not $joinProcess.HasExited -or
+        $hostProcess.ExitCode -eq 0 -or $joinProcess.ExitCode -eq 0) {
+        throw "Mismatched multiplayer setup was not rejected (host=$($hostProcess.ExitCode), join=$($joinProcess.ExitCode))"
+    }
+    $joinProcess.Dispose()
+    $hostProcess.Dispose()
+    $joinProcess = $null
+    $hostProcess = $null
+
     $hostProcess = Start-RaceProcess "$common --host $port"
     Start-Sleep -Milliseconds 300
     $joinProcess = Start-RaceProcess "$common --join 127.0.0.1 $port"

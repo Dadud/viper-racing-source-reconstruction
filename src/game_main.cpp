@@ -1963,7 +1963,8 @@ struct WindowState {
     std::vector<viper::RouteOpponentAiDecision> last_opponent_ai_decisions;
     viper::net::Session* network_session{};
     std::optional<viper::net::RaceInput> remote_race_input;
-    std::uint32_t network_input_sequence{};
+    // Sequence zero is reserved for the pre-race configuration agreement.
+    std::uint32_t network_input_sequence{1U};
     std::vector<std::array<float, 4>> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
     // session. The complete ordered stream is validated and the recovered
@@ -4925,7 +4926,32 @@ int run_selected_race(const Options& options, const std::string_view track,
         network_session.emplace(*options.network_mode == Options::NetworkMode::host
             ? viper::net::Session::host(options.network_port)
             : viper::net::Session::join(options.network_host, options.network_port));
-        std::cout << "Reconstructed client connected; exchanging provisional route controls.\n";
+        if (opponent_strength < 0 || opponent_strength >=
+                static_cast<int>(viper::ai_driver_group_count))
+            throw std::runtime_error(
+                "multiplayer requires a supported opponent-strength profile");
+        const viper::net::RaceConfiguration local_configuration{
+            std::string(track), std::string(car),
+            static_cast<std::uint16_t>(selected_laps),
+            static_cast<std::uint8_t>(opponent_strength),
+            static_cast<std::uint8_t>(participant_names.size())};
+        const auto local_payload = viper::net::encode_race_configuration(
+            local_configuration);
+        network_session->send_state(0U, 0U, local_payload);
+        viper::net::StateSnapshot remote_configuration_snapshot;
+        if (!network_session->receive_state(remote_configuration_snapshot))
+            throw std::runtime_error(
+                "multiplayer peer sent a stale race configuration");
+        viper::net::RaceConfiguration remote_configuration;
+        if (!viper::net::decode_race_configuration(
+                remote_configuration_snapshot.payload, remote_configuration))
+            throw std::runtime_error(
+                "multiplayer peer sent an invalid race configuration");
+        if (remote_configuration != local_configuration)
+            throw std::runtime_error(
+                "multiplayer clients selected different tracks, cars, laps, "
+                "opponent profiles, or entrant counts");
+        std::cout << "Reconstructed clients agreed on race setup; exchanging provisional route controls.\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
         options.record_trace, options.record_physics_tick_trace,
