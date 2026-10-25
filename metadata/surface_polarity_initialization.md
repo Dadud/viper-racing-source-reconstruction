@@ -53,21 +53,25 @@ loaded 64 against the accumulated candidate and its carry flag selects whether
 the current half-step is added. The step begins at 0.5 and is halved 24 times.
 Constants used include 1/177, 177, 1/169, 178, 169, 179, 53, 1, 64, 32, and
 0.5. Exact generated output has not been checked against a native table
-fixture. The x87 register-stack trace is unresolved: `0x4BD45A` jumps to the
-descriptor-driven `fmod` CRT dispatcher at `0x4C0580`; the adjacent
-`0x4BD464` sequence is not reached by fallthrough. The dispatcher saves both
-operands without popping them, then selects class- and exception-specific
-handlers through the descriptor table. Its first handler pointer at
-`0x4E98E0` targets `0x4BD464`, whose `FPREM` loop ends with `FSTP ST(1),ST`,
-leaving one remainder and reducing stack depth by one. `__trandisp2` maps the
-normal `FXAM` class to lookup-table index zero for either sign; two normal
-operands therefore select combined index zero and this `fmod` handler. This
-establishes the one-pop `FPREM` path for normal finite operands when the CRT's
-`0x4E9754` math-emulation flag is clear. `__fpmath` initializes that flag from
-`0x4BE370`; when set, the same helper instead calls `0x4BCD2C`, whose separate
-emulation stack path remains untraced. The complete initializer stack trace
-and exact `std::fmod` bitwise equivalence therefore remain unresolved. The
-startup precision path is also partly resolved: CRT entry `0x4BD690` calls
+fixture. The normal/zero x87 register-stack path is now mapped when the CRT's
+`0x4E9754` math-emulation flag is clear. `0x4BD45A` jumps to the descriptor-
+driven `fmod` dispatcher at `0x4C0580`; its first handler pointer at
+`0x4E98E0` targets `0x4BD464`. `__trandisp2` maps positive and negative
+normal `FXAM` classes to lookup index zero, so two normal operands select the
+`FPREM` loop, which ends with `FSTP ST(1),ST` and returns one value (net stack
+delta -1). For the recurrence's normal-divisor/zero-numerator case, the
+combined lookup index is `0x10`, selecting `0x4C08D4`, which pops both inputs,
+pushes zero, and also has net stack delta -1. The four setup `fmod`/`__ftol`
+pairs therefore return to entry depth. In each 24-step loop body, four
+`fmod` calls, two `__ftol` `FISTP` pops, and one `FCOMP` pop balance the eight
+x87 pushes with net +1; the next loop's `FSTP` removes that value. The first
+body starts at depth 3 and peaks at 5; final loop cleanup and the two base
+value pops return to depth zero. If the math-emulation flag is set,
+`0x4BD45A` instead calls `0x4BCD2C`; that separate stack path remains
+untraced, so the unconditional complete initializer trace is unresolved.
+The generated table still lacks native fixture comparison and exact
+`std::fmod` bitwise-equivalence validation. The startup precision path is also
+partly resolved: CRT entry `0x4BD690` calls
 `0x4BF720`, which invokes `__fpmath` and `__setdefaultprecision` (`0x4BE300`).
 Its `__controlfp(0x10000,0x30000)` call sets x87 precision control to 53
 significand bits. The pre-initializer game setup `0x415C60` changes
@@ -92,6 +96,12 @@ the class lookup bytes at `0x4E9A5D` are observed in
 The `__fpmath` flag setup and alternate helper body are observed in
 `ev_8745e92eac2ae8bba84e2003792cc2d70ae42a08cd4b2f788219886e098f8fa5` and
 `ev_6ded80ba5fff59ba866006f376b70ca489fb9b07a86f06cd62de27add710acfc`.
+
+The normal FPREM handler and zero-result handler bytes are observed in
+`ev_aa09d6ee3b5acfc1afe0b30c34eb47762cc227405f019ead1085697de3380d6b` and
+`ev_e3051cc71358d20047e16a49957ff27be977447ff341bc3beb5ad354a074acfd`;
+their descriptor dispatch targets are in
+`ev_831f99655f66f55f6b5d1d67f4e9d8ab614b346d99a3c2366f48895f5edf84f2`.
 
 The precision-path call-chain evidence is `ev_5a5d630562475ee9e0a0e94a7961357c5b3b2c0e46c6817cbd917899342dd71b`
 (CRT entry), `ev_528ea60e8a455ee3e00b8b275c96ca8152c35467fa67f6bd80760ceba03d9755`
