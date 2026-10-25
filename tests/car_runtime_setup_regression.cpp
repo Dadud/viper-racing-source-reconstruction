@@ -65,6 +65,69 @@ int main()
                     std::fabs(timer_state.record_time_0xe44 - 0.016F) < 1.0e-7F,
                 "0x433570 timer must derive its pair distance from participant rows");
 
+            {
+                viper::NcarIntegratorTimerState unresolved_state{0.7F, -1.0F};
+                viper::NcarIntegratorTimerInput unresolved_input{};
+                unresolved_input.vehicle_ordinal_0x510 = 1U;
+                const auto unresolved = viper::advance_ncar_integrator_timer(
+                    unresolved_state, unresolved_input);
+                const auto expected_ramp =
+                    (1.0F * 1.0F * 0.027777778F + 0.15F) * 0.8695652F;
+                require(!unresolved.input_complete && unresolved.time_window_reached &&
+                        unresolved.quadratic_ramp_branch &&
+                        unresolved.ordinal_record_lookup_reached &&
+                        std::fabs(unresolved_state.ramp_0x50c - expected_ramp) < 1.0e-6F &&
+                        unresolved_state.record_time_0xe44 == -1.0F,
+                    "timer must retain the known ramp write but leave unresolved pair state untouched");
+            }
+
+            {
+                viper::NcarIntegratorTimerState six_second_state{
+                    0.2F, -6.0F};
+                viper::NcarIntegratorTimerInput known_null_record{};
+                known_null_record.record_lookup_resolved = true;
+                known_null_record.record_nonnull = false;
+                const auto six_second = viper::advance_ncar_integrator_timer(
+                    six_second_state, known_null_record);
+                require(six_second.input_complete && six_second.time_window_reached &&
+                        !six_second.quadratic_ramp_branch &&
+                        six_second.ordinal_record_lookup_reached &&
+                        !six_second.record_radius_gate_passed &&
+                        six_second_state.ramp_0x50c == 1.0F &&
+                        six_second_state.record_time_0xe44 == -6.0F,
+                    "six-second timer boundary must use the constant ramp branch without advancing a null record");
+            }
+
+            {
+                constexpr auto six_point_two = std::bit_cast<float>(0x40c66666U);
+                viper::NcarIntegratorTimerState cutoff_state{
+                    0.4F, -six_point_two};
+                viper::NcarIntegratorTimerInput cutoff_input{};
+                const auto cutoff = viper::advance_ncar_integrator_timer(
+                    cutoff_state, cutoff_input);
+                require(cutoff.input_complete && !cutoff.time_window_reached &&
+                        !cutoff.ordinal_record_lookup_reached &&
+                        cutoff_state.ramp_0x50c == 0.4F &&
+                        cutoff_state.record_time_0xe44 == -six_point_two,
+                    "6.2-second boundary must return before the ramp and ordinal-table lookup");
+            }
+
+            {
+                viper::NcarIntegratorTimerState distant_state{0.1F, 0.0F};
+                viper::NcarIntegratorTimerInput distant_input{};
+                distant_input.record_lookup_resolved = true;
+                distant_input.record_nonnull = true;
+                distant_input.record_x_0x04 = 100.0F;
+                const auto distant = viper::advance_ncar_integrator_timer(
+                    distant_state, distant_input);
+                require(distant.input_complete && distant.time_window_reached &&
+                        distant.ordinal_record_lookup_reached &&
+                        !distant.record_radius_gate_passed &&
+                        !distant.record_time_advanced &&
+                        distant_state.record_time_0xe44 == 0.0F,
+                    "out-of-radius participant pairs must not advance the shared record timer");
+            }
+
             const auto terminal_ordinal =
                 viper::resolve_ncar_ordinal_pair_lookup(rows, 3U);
             require(terminal_ordinal.input_complete && !terminal_ordinal.record.has_value() &&
