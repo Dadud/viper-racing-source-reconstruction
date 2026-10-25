@@ -2,7 +2,9 @@
 
 `viper_network_session` provides the reconstructed client's TCP host/join
 transport. `viper_game --host PORT` and `viper_game --join HOST PORT` connect
-one peer before entering the selected race. Each client sends its own complete
+one peer before entering the selected race. `--network-slot N` chooses that
+client's zero-based human grid slot (the configured default remains in effect
+when omitted). Each client sends its own complete
 route-motion state after its local runtime update. The receiver replaces the
 peer-owned route entrant with that snapshot and projects its pose onto the
 shared ideal line; it does not re-simulate the peer from locally received
@@ -32,12 +34,14 @@ remain inside the route adapter's finite value ranges. The receiver also
 rejects a simulation tick that moves backwards under 32-bit serial arithmetic,
 while allowing repeated ticks when no fixed update occurred.
 
-Before opening the race window, both clients send a `VRC1` configuration as
-state sequence 0 and compare the peer's record with their own. The bounded
-record contains track and car resource stems, lap count, opponent-strength
-profile, and entrant count. Both clients abort before entering gameplay if
-the payload is malformed or any field differs. Resource stems are restricted
-to 1–32 ASCII letters, digits, `_`, or `-`; laps must be 1–99; the profile must
+Before opening the race window, both clients send a `VRC2` configuration as
+state sequence 0. The bounded record contains track and car resource stems,
+lap count, opponent-strength profile, entrant count, and the local human's
+grid slot. Shared race fields must match and the two player slots must be
+distinct and in range. Each receiver applies the peer's state to that
+negotiated slot and skips local AI advancement for it; this removes the prior
+slot-0/slot-1 assumption. Resource stems are restricted to 1–32 ASCII letters,
+digits, `_`, or `-`; laps must be 1–99; the profile must
 be one of the eight parsed AIDR groups; and entrant count must be 2–64. The
 first per-update state exchange begins at sequence 1. This agrees on the
 race fields currently owned by the runtime; it does not prove identical asset
@@ -54,8 +58,9 @@ route-motion prototype, this is not accepted gameplay multiplayer.
 
 `network_session_regression` checks handshake, bidirectional framing, tick and
 payload preservation, stale sequence rejection and wraparound, exact race
-state/configuration bytes, malformed state flags, bounded state values, and
-configuration bounds. `race_progression_regression` verifies that projecting
+state/configuration bytes, malformed state flags, bounded state values,
+configuration bounds, and distinct compatible player slots.
+`race_progression_regression` verifies that projecting
 a replicated route state reproduces its pose without advancing it. With
 external game assets installed, `game_network_race_smoke` verifies mismatched
 setup rejection and connects two matching Viper/Bemidji clients through the

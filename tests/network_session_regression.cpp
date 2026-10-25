@@ -64,11 +64,11 @@ int main() {
         return 1;
     }
     const RaceConfiguration expected_configuration{
-        "bemidji", "viper", 3U, 0U, 8U};
+        "bemidji", "viper", 3U, 0U, 8U, 2U};
     const auto encoded_configuration = encode_race_configuration(
         expected_configuration);
-    const std::array<std::uint8_t, 22> expected_configuration_bytes{
-        'V', 'R', 'C', '1', 7, 5, 0, 3, 0, 8,
+    const std::array<std::uint8_t, 23> expected_configuration_bytes{
+        'V', 'R', 'C', '2', 7, 5, 0, 3, 0, 8, 2,
         'b', 'e', 'm', 'i', 'd', 'j', 'i', 'v', 'i', 'p', 'e', 'r'};
     RaceConfiguration decoded_configuration;
     if (!std::equal(encoded_configuration.begin(), encoded_configuration.end(),
@@ -76,6 +76,16 @@ int main() {
         !decode_race_configuration(encoded_configuration, decoded_configuration) ||
         decoded_configuration != expected_configuration) {
         std::cerr << "race configuration codec did not preserve the setup\n";
+        return 1;
+    }
+    auto peer_configuration = expected_configuration;
+    peer_configuration.player_slot = 7U;
+    auto reused_slot_configuration = expected_configuration;
+    if (!compatible_race_configurations(expected_configuration,
+            peer_configuration) ||
+        compatible_race_configurations(expected_configuration,
+            reused_slot_configuration)) {
+        std::cerr << "race configuration did not enforce distinct peer slots\n";
         return 1;
     }
     auto malformed_configuration = encoded_configuration;
@@ -93,6 +103,13 @@ int main() {
     if (!rejected_invalid_configuration) {
         std::cerr << "race configuration codec accepted a path-like resource name\n";
         return 1;
+    }
+    try {
+        (void)encode_race_configuration(
+            {"bemidji", "viper", 3U, 0U, 8U, 8U});
+        std::cerr << "race configuration accepted an out-of-range player slot\n";
+        return 1;
+    } catch (const std::invalid_argument&) {
     }
     constexpr std::uint16_t port=39173;
     std::exception_ptr host_error;

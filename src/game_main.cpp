@@ -124,6 +124,7 @@ struct Options {
     std::optional<std::filesystem::path> record_physics_tick_trace;
     std::optional<std::filesystem::path> play_trace;
     std::optional<std::filesystem::path> load_replay;
+    std::optional<std::size_t> network_player_slot;
     enum class NetworkMode { host, join };
     std::optional<NetworkMode> network_mode;
     std::string network_host;
@@ -141,8 +142,9 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--load-replay PATH] [--software] [--help]\n"
-        << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges provisional race controls.\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--load-replay PATH] [--software] [--help]\n"
+        << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges route-race snapshots.\n"
+        << "  --network-slot N selects a zero-based local player grid slot for multiplayer.\n"
         << "  --load-replay PATH validates and retains a native replay container for the race session; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
@@ -277,6 +279,19 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--load-replay") {
             if (++i >= argc) throw std::runtime_error("--load-replay requires a path");
             options.load_replay = std::filesystem::path(argv[i]);
+        } else if (arg == L"--network-slot") {
+            if (++i >= argc) throw std::runtime_error("--network-slot requires a zero-based grid slot");
+            const std::wstring_view value(argv[i]);
+            std::size_t slot{};
+            if (value.empty()) throw std::runtime_error("--network-slot requires a nonnegative integer");
+            for (const wchar_t ch : value) {
+                if (ch < L'0' || ch > L'9' ||
+                    slot > (std::numeric_limits<std::size_t>::max() -
+                        static_cast<std::size_t>(ch - L'0')) / 10U)
+                    throw std::runtime_error("--network-slot requires a nonnegative integer");
+                slot = slot * 10U + static_cast<std::size_t>(ch - L'0');
+            }
+            options.network_player_slot = slot;
         } else if (arg == L"--smoke-frames") {
             if (++i >= argc) throw std::runtime_error("--smoke-frames requires a positive frame count");
             unsigned frames{};
@@ -1963,6 +1978,7 @@ struct WindowState {
     std::vector<viper::RouteOpponentAiDecision> last_opponent_ai_decisions;
     viper::net::Session* network_session{};
     std::optional<std::uint32_t> remote_simulation_tick;
+    std::optional<std::size_t> remote_player_car_index;
     // Sequence zero is reserved for the pre-race configuration agreement.
     std::uint32_t network_state_sequence{1U};
     std::vector<std::array<float, 4>> pose_buffer;
@@ -2823,7 +2839,8 @@ struct WindowState {
 
     bool apply_remote_race_state(const viper::RouteMotionState& remote_state)
     {
-        const auto remote_car_index = player_car_index == 0U ? 1U : 0U;
+        if (!remote_player_car_index.has_value()) return false;
+        const auto remote_car_index = *remote_player_car_index;
         if (terrain == nullptr || remote_car_index >= opponent_motions.size() ||
             remote_car_index >= opponent_simulated_poses.size() ||
             remote_state.route_segment >= route.size() ||
@@ -2942,7 +2959,8 @@ struct WindowState {
                 if (car == player_car_index) continue;
                 auto& ai = opponent_motions[car];
                 const bool remote_controlled = network_session != nullptr &&
-                    car == (player_car_index == 0U ? 1U : 0U);
+                    remote_player_car_index.has_value() &&
+                    car == *remote_player_car_index;
                 if (remote_controlled) {
                     // This entrant is owned by the connected peer. Its route,
                     // lap, clock, and finish state arrive as complete snapshots;
@@ -3755,7 +3773,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool force_default_placement,
                const viper::GameOptions& options,
                const viper::ReplayFile* const loaded_replay,
-               viper::net::Session* const network_session)
+               viper::net::Session* const network_session,
+               const std::optional<std::size_t> remote_player_car_index)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -3770,6 +3789,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     }
     WindowState state;
     state.network_session = network_session;
+    state.remote_player_car_index = remote_player_car_index;
     if (loaded_replay) {
         state.loaded_replay = *loaded_replay;
         std::cout << "Retained validated native replay container: "
@@ -4833,7 +4853,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         std::cerr << "Warning: player CSU version is not 1; native loader continues with its first 0x8c bytes\n";
     report_start_grid(assets);
     if (options.validate_assets) return 0;
-    const auto driver_order = viper::initialize_single_race_driver_order();
+    auto driver_order = viper::initialize_single_race_driver_order();
     constexpr std::array<std::string_view, viper::ai_driver_group_count> ai_name_profiles{
         "Easy", "Intermediate", "Hard", "Career1", "Career2", "Career3",
         "Career4", "Career5"};
@@ -4859,6 +4879,23 @@ int run_selected_race(const Options& options, const std::string_view track,
     viper::SingleRaceEntrantObservation entrant_observation{};
     entrant_observation.configured_car_count = assets.options()
         .integer("GAME", "car_count").value_or(8);
+    if (options.network_player_slot.has_value()) {
+        if (!options.network_mode)
+            throw std::runtime_error("--network-slot requires --host or --join");
+        const auto participant_count = entrant_observation.configured_car_count;
+        if (participant_count < 1 || *options.network_player_slot >=
+                static_cast<std::size_t>(participant_count) ||
+            static_cast<std::size_t>(participant_count) > driver_order.size())
+            throw std::runtime_error("--network-slot is outside the configured race grid");
+        const auto selector = participant_count - 1;
+        const auto selector_entry = std::find(driver_order.begin(),
+            driver_order.end(), selector);
+        if (selector_entry == driver_order.end())
+            throw std::runtime_error("could not place the network player in the selected grid slot");
+        std::iter_swap(selector_entry,
+            driver_order.begin() + static_cast<std::ptrdiff_t>(
+                *options.network_player_slot));
+    }
     entrant_observation.driver_order_values = driver_order;
     entrant_observation.ai_names_by_slot = ai_names;
     entrant_observation.opponent_strength_value = opponent_strength;
@@ -4925,6 +4962,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         }
     }
     std::optional<viper::net::Session> network_session;
+    std::optional<std::size_t> remote_player_car_index;
     if (options.network_mode) {
         if (participant_names.size() < 2U)
             throw std::runtime_error("multiplayer state replication needs at least two race entrants");
@@ -4943,7 +4981,8 @@ int run_selected_race(const Options& options, const std::string_view track,
             std::string(track), std::string(car),
             static_cast<std::uint16_t>(selected_laps),
             static_cast<std::uint8_t>(opponent_strength),
-            static_cast<std::uint8_t>(participant_names.size())};
+            static_cast<std::uint8_t>(participant_names.size()),
+            static_cast<std::uint8_t>(*entrants.player_record_index)};
         const auto local_payload = viper::net::encode_race_configuration(
             local_configuration);
         network_session->send_state(0U, 0U, local_payload);
@@ -4956,10 +4995,12 @@ int run_selected_race(const Options& options, const std::string_view track,
                 remote_configuration_snapshot.payload, remote_configuration))
             throw std::runtime_error(
                 "multiplayer peer sent an invalid race configuration");
-        if (remote_configuration != local_configuration)
+        if (!viper::net::compatible_race_configurations(
+                local_configuration, remote_configuration))
             throw std::runtime_error(
                 "multiplayer clients selected different tracks, cars, laps, "
-                "opponent profiles, or entrant counts");
+                "opponent profiles, entrant counts, or overlapping player slots");
+        remote_player_car_index = remote_configuration.player_slot;
         std::cout << "Reconstructed clients agreed on race setup; replicating route-race state.\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
@@ -4984,7 +5025,8 @@ int run_selected_race(const Options& options, const std::string_view track,
             &assets.bundle("race.res"), &assets.bundle("ui.res"),
             &assets.bundle("drivers.res")},
         options.grid_mode, assets.options(), loaded_replay,
-        network_session ? &*network_session : nullptr);
+        network_session ? &*network_session : nullptr,
+        remote_player_car_index);
 }
 
 } // namespace

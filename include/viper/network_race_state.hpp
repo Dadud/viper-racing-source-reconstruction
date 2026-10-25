@@ -28,8 +28,14 @@ struct RaceConfiguration {
     std::uint16_t laps{};
     std::uint8_t opponent_strength{};
     std::uint8_t entrant_count{};
+    std::uint8_t player_slot{};
     bool operator==(const RaceConfiguration&) const = default;
 };
+
+// Peers may choose different player slots, but all shared race settings must
+// match and each peer must own a distinct entrant.
+bool compatible_race_configurations(const RaceConfiguration& local,
+                                    const RaceConfiguration& remote) noexcept;
 
 std::vector<std::uint8_t> encode_race_configuration(
     const RaceConfiguration& configuration);

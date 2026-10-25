@@ -67,7 +67,9 @@ try {
 
     $hostProcess = Start-RaceProcess "$common --host $port"
     Start-Sleep -Milliseconds 300
-    $joinProcess = Start-RaceProcess "$common --join 127.0.0.1 $port"
+    # The default human occupies the final slot (7). Put the peer in slot 6
+    # so the setup handshake exercises distinct, non-hardcoded ownership.
+    $joinProcess = Start-RaceProcess "$common --network-slot 6 --join 127.0.0.1 $port"
 
     $deadline = [DateTime]::UtcNow.AddSeconds(50)
     while ([DateTime]::UtcNow -lt $deadline) {

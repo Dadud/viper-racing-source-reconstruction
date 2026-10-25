@@ -129,18 +129,20 @@ std::vector<std::uint8_t> encode_race_configuration(
         !valid_resource_stem(configuration.car) ||
         configuration.laps < 1U || configuration.laps > 99U ||
         configuration.opponent_strength >= 8U ||
-        configuration.entrant_count < 2U || configuration.entrant_count > 64U)
+        configuration.entrant_count < 2U || configuration.entrant_count > 64U ||
+        configuration.player_slot >= configuration.entrant_count)
         throw std::invalid_argument("race configuration is outside protocol bounds");
 
-    constexpr std::size_t header_size = 10U;
+    constexpr std::size_t header_size = 11U;
     std::vector<std::uint8_t> bytes(header_size + configuration.track.size() +
         configuration.car.size());
-    bytes[0] = 'V'; bytes[1] = 'R'; bytes[2] = 'C'; bytes[3] = '1';
+    bytes[0] = 'V'; bytes[1] = 'R'; bytes[2] = 'C'; bytes[3] = '2';
     bytes[4] = static_cast<std::uint8_t>(configuration.track.size());
     bytes[5] = static_cast<std::uint8_t>(configuration.car.size());
     write_u16(bytes.data() + 6U, configuration.laps);
     bytes[8] = configuration.opponent_strength;
     bytes[9] = configuration.entrant_count;
+    bytes[10] = configuration.player_slot;
     std::copy(configuration.track.begin(), configuration.track.end(),
         bytes.begin() + static_cast<std::ptrdiff_t>(header_size));
     std::copy(configuration.car.begin(), configuration.car.end(),
@@ -152,9 +154,9 @@ std::vector<std::uint8_t> encode_race_configuration(
 bool decode_race_configuration(const std::span<const std::uint8_t> bytes,
                                RaceConfiguration& configuration)
 {
-    constexpr std::size_t header_size = 10U;
+    constexpr std::size_t header_size = 11U;
     if (bytes.size() < header_size || bytes[0] != 'V' || bytes[1] != 'R' ||
-        bytes[2] != 'C' || bytes[3] != '1')
+        bytes[2] != 'C' || bytes[3] != '2')
         return false;
     const auto track_size = static_cast<std::size_t>(bytes[4]);
     const auto car_size = static_cast<std::size_t>(bytes[5]);
@@ -165,6 +167,7 @@ bool decode_race_configuration(const std::span<const std::uint8_t> bytes,
     decoded.laps = read_u16(bytes.data() + 6U);
     decoded.opponent_strength = bytes[8];
     decoded.entrant_count = bytes[9];
+    decoded.player_slot = bytes[10];
     decoded.track.assign(reinterpret_cast<const char*>(bytes.data() + header_size),
         track_size);
     decoded.car.assign(reinterpret_cast<const char*>(bytes.data() + header_size +
@@ -172,10 +175,23 @@ bool decode_race_configuration(const std::span<const std::uint8_t> bytes,
     if (!valid_resource_stem(decoded.track) || !valid_resource_stem(decoded.car) ||
         decoded.laps < 1U || decoded.laps > 99U ||
         decoded.opponent_strength >= 8U || decoded.entrant_count < 2U ||
-        decoded.entrant_count > 64U)
+        decoded.entrant_count > 64U ||
+        decoded.player_slot >= decoded.entrant_count)
         return false;
     configuration = std::move(decoded);
     return true;
+}
+
+bool compatible_race_configurations(const RaceConfiguration& local,
+                                    const RaceConfiguration& remote) noexcept
+{
+    return local.track == remote.track && local.car == remote.car &&
+        local.laps == remote.laps &&
+        local.opponent_strength == remote.opponent_strength &&
+        local.entrant_count == remote.entrant_count &&
+        local.player_slot < local.entrant_count &&
+        remote.player_slot < remote.entrant_count &&
+        local.player_slot != remote.player_slot;
 }
 
 } // namespace viper::net
