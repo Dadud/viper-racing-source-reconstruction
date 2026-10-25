@@ -645,3 +645,27 @@ The junction therefore resolves the earlier staged-copy divergence through
 frontend startup, but it does not resolve the gameplay-start abort. The abort
 cause is unknown; this retry produced no timer or physics input values. The
 staged tree and helpers remain outside Git.
+
+### Actual wheel `+0x158` writer probe (2026-10-25)
+
+Static instruction inspection distinguishes the two same-offset fields:
+`0x4329C0` writes body `+0x50C` to its frame-context row, while `0x431150`
+passes four car-owned wheel pointers to `0x442530`, which reads each actual
+wheel's `+0x158`. The constructor `0x4419A0` and reset helper `0x441B90`
+initialize/reset that wheel field to zero. A loaded-code scan for direct
+`MOV [base+0x158],reg` stores found the context-row writer, wheel constructor
+and reset, plus unrelated object fields; this pattern scan does not cover every
+possible computed or indirect write. Since the captured actual wheel values
+change in a live race, a new bounded read-only probe at
+[`tools/pcar_wheel_158_writer_probe.js`](../tools/pcar_wheel_158_writer_probe.js)
+uses Frida Stalker during one selected `0x431150` call to watch all four actual
+wheel fields and report the preceding instruction when a value changes. It
+selects the first object entering the PCAR callback with vtable `0x4C8188`,
+then traces only the matching integrator invocation and scopes its exit hook
+to that invocation. A reported preceding instruction is a writer candidate;
+cross-thread mutations must be ruled out before treating it as the writer. The
+probe does not write target memory, but instruction tracing changes timing and
+is diagnostic evidence only. Its JavaScript syntax and repository diff checks
+pass; it has not run because the current original process is at the
+startup-abort dialog. Static scan Evidence ID:
+`ev_91884f19b8507dbff17b2371fb583d90bd02e1970601c25ad3c3093a39bfc374`.
