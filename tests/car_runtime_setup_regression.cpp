@@ -574,6 +574,20 @@ int main()
         require(std::fabs(body_step.force_collection.accumulated_linear_force.y +
                     78.48F) < 1.0e-4F,
             "four-wheel composition must source its gravity term from the body kinematics input");
+        viper::FourWheelBodyStepInput incomplete_timeout_body_step{};
+        incomplete_timeout_body_step.post_body_state.timeout_pending_0x48c = 1U;
+        incomplete_timeout_body_step.post_body_state.timeout_start_0x488 = 0.0F;
+        incomplete_timeout_body_step.post_body_input.current_time_0x425790 = 3.0F;
+        incomplete_timeout_body_step.post_body_input.timeout_resource_groups[0]
+            .destination_record_count = 1U;
+        incomplete_timeout_body_step.post_body_input.timeout_resource_groups[0]
+            .source_record_count = 1U;
+        const auto incomplete_timeout_step =
+            viper::advance_four_wheel_body_step(incomplete_timeout_body_step);
+        require(incomplete_timeout_step.post_body.timeout_callback_0x433920_reached &&
+                !incomplete_timeout_step.post_body.resource_group_inputs_complete &&
+                !incomplete_timeout_step.input_complete,
+            "four-wheel completeness must include incomplete timeout resource resets");
         const auto polarity_seeds =
             viper::make_ncar_surface_polarity_seed_pair_0x4193c0(
                 30001U, static_cast<std::uint32_t>(-29999));

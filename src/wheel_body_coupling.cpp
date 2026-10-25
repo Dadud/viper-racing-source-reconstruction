@@ -2318,6 +2318,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     post_body_input.wear_value_bits = mode_force_input.wear_value_bits;
     result.post_body = advance_ncar_post_body_tail(
         result.post_body_state, post_body_input);
+    result.input_complete = result.input_complete &&
+        result.post_body.resource_group_inputs_complete;
     if (result.post_body.wheel_damage_flags_cleared) {
         result.wheel_collisions.wheel_damage_flags.fill(0U);
     }
