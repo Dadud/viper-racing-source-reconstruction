@@ -104,6 +104,17 @@ Evidence `ev_feb945405f7bed8969dda6e8d55e41a1cd647e90e05679ed9121cdff968a77a4`).
 This is a module-presence observation only; a new controlled launcher-to-game
 handoff is required for additional physics captures.
 
+### Read-only input-path check on 2026-10-25
+
+The staged original engine remained responsive at its `Viper Racing` main
+window (PID 36860). A bounded Frida intervention on the known key-read wrapper
+`0x413170` targeting DIK_RETURN (`0x9C`) recorded zero reads during two short
+windows. A target-directed `PostMessageW` call to the same window returned
+success for WM_KEYDOWN/WM_KEYUP, but the window title did not change. These
+results do not show that either input was consumed by the frontend and produced
+no gameplay evidence. The next attempt needs a confirmed foregrounded original
+window and an observed accepted menu transition before arming the wheel probe.
+
 ## Pairing a scenario
 
 Run the original and reconstruction separately on the same Windows machine and
