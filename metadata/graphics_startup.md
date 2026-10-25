@@ -79,17 +79,28 @@ verified: the process, temporary `Data` junction, staging directory, and ISO
 mount were removed, and hashes of the original launcher, engine, and ISO
 remained unchanged.
 
-### Launcher child-creation trace
+### Launcher child-creation traces
 
-The private capture
+The initial private capture
 `../../analysis/reference_captures/launcher_handoff_frida_20261025T023744Z.json`
 instrumented the original launcher before resume. `CreateProcessA` succeeded
-with command line `Data\race.bin -1` and creation flags zero, but the hook
-could not read the returned `PROCESS_INFORMATION`; the child had already
-exited by the first host-side process query. This confirms the launcher's
-actual engine command line but captures neither the child PID/exit code nor a
-DirectDraw result. The failed API trace therefore remains unresolved. The next
-probe must suspend the created child at the `CreateProcessA` boundary (or use
-Frida child gating) before attaching and resuming it. The process, data
-junction/staging directory, Frida session, and ISO mount were cleaned up, and
-the launcher, engine, and ISO hashes remained unchanged.
+with command line `Data\race.bin -1` and creation flags zero, but the child had
+already exited before the hook could recover `PROCESS_INFORMATION`.
+
+The follow-up private capture
+`../../analysis/reference_captures/launcher_suspended_ddraw_trace_20261025T024913Z.json`
+patched only the launcher's `CreateProcessA` flags from zero to
+`CREATE_SUSPENDED`, recovered child PID/TID 36376/22800, installed Frida hooks
+on raw and apphelp-forwarded DirectDraw exports, and then resumed the child.
+The real launcher command remained `Data\race.bin -1`. DirectDrawCreate,
+QueryInterface for `IID_IDirectDraw2`, GetCaps, EnumDisplayModes,
+SetCooperativeLevel(flags `0x11`), and SetDisplayMode(640x480x16) all returned
+success; the enumeration callback accepted the 640x480 mode. Both reported
+driver and HEL capability flags had bit 0 set. Nevertheless, the child exited
+with the same generic video-driver dialog before gameplay. This moves the
+failure boundary past successful mode selection; surface creation and later
+render-resource setup are the next unknowns. The trace does not prove which
+later call fails. A screenshot is kept outside the repository. Process,
+temporary data junction/staging directory, Frida session, and ISO mount were
+cleaned up, and launcher, engine, and ISO hashes remained unchanged. All 31
+GameData SHA-256 values also match the prior baseline.
