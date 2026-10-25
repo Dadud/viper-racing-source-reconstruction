@@ -148,6 +148,12 @@ A child-only override probe
 `../../analysis/reference_captures/vidmem_override_20261025T031500Z.json`
 did not reach the memory-query hook: the REA Frida child session detached
 before resume with a closed connection, and the retained handle reported
-`0xC0000409`. No override was applied and gameplay was not reached. Cleanup
-is verified across captures, and hashes of the launcher, engine, ISO, and all
-31 GameData files match their baselines.
+`0xC0000409`. A fresh retry
+`../../analysis/reference_captures/vidmem_override_retry_20261025T031150Z.json`
+failed at the same point: the child script detached before reporting that its
+hooks were installed, so no resume marker was created and no override was
+applied. Both attempts used fresh launcher/child bindings. The repeated REA
+Frida child-script load failure prevents this process-only bypass with the
+current tool path; neither attempt reached gameplay. Cleanup is verified
+across captures, and hashes of the launcher, engine, ISO, and all 31 GameData
+files match their baselines.
