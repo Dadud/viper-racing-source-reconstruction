@@ -485,7 +485,12 @@ struct FrontendSelection {
     std::string track;
     std::string car;
     std::uint32_t laps{1U};
+    std::uint32_t opponent_strength{};
 };
+
+constexpr std::array<std::string_view, viper::ai_driver_group_count>
+    opponent_strength_names{"Easy", "Intermediate", "Hard", "Career 1",
+        "Career 2", "Career 3", "Career 4", "Career 5"};
 
 struct SetupWindowState {
     std::vector<std::string> tracks;
@@ -493,6 +498,7 @@ struct SetupWindowState {
     std::size_t track_index{};
     std::size_t car_index{};
     std::uint32_t laps{1U};
+    std::uint32_t opponent_strength{};
     std::filesystem::path config_directory;
     std::array<std::string, 5> career_rows{};
     int career_slot{};
@@ -541,11 +547,14 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
         write(L"<  " + car + L"  >", 490, 228, 42);
         SetTextColor(dc, RGB(118, 208, 155));
         write(L"RACE LAPS: " + std::to_wstring(state.laps), 74, 284, 34);
+        write(L"OPPONENT STRENGTH: " + ascii_to_wide(
+            opponent_strength_names[state.opponent_strength]), 74, 320, 34);
         SetTextColor(dc, RGB(190, 205, 198));
-        write(L"UP / DOWN: CHOOSE TRACK", 74, 334, 28);
-        write(L"LEFT / RIGHT: CHOOSE CAR", 74, 368, 28);
-        write(L"PAGE UP / DOWN: CHANGE LAPS", 74, 402, 28);
-        write(L"ENTER: START RACE    C: CAREER SLOTS    ESC: EXIT", 74, 454, 30);
+        write(L"UP / DOWN: CHOOSE TRACK", 74, 362, 26);
+        write(L"LEFT / RIGHT: CHOOSE CAR", 74, 390, 26);
+        write(L"PAGE UP / DOWN: CHANGE LAPS", 74, 418, 26);
+        write(L"[ / ]: CHANGE OPPONENT STRENGTH", 74, 446, 26);
+        write(L"ENTER: START RACE    C: CAREER SLOTS    ESC: EXIT", 74, 486, 30);
     }
     if (state.career_screen) {
         SetTextColor(dc, RGB(118, 208, 155));
@@ -657,6 +666,13 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                 state->laps = std::min(99U, state->laps + 1U);
             else if (wparam == VK_NEXT)
                 state->laps = std::max(1U, state->laps - 1U);
+            else if (wparam == VK_OEM_4)
+                state->opponent_strength = (state->opponent_strength +
+                    static_cast<std::uint32_t>(opponent_strength_names.size()) - 1U) %
+                    static_cast<std::uint32_t>(opponent_strength_names.size());
+            else if (wparam == VK_OEM_6)
+                state->opponent_strength = (state->opponent_strength + 1U) %
+                    static_cast<std::uint32_t>(opponent_strength_names.size());
             else if (wparam == VK_RETURN && !state->tracks.empty() && !state->cars.empty()) {
                 state->accepted = true;
                 DestroyWindow(hwnd);
@@ -689,6 +705,7 @@ std::optional<FrontendSelection> show_setup_frontend(
     std::vector<std::string> tracks, std::vector<std::string> cars,
     const std::string_view initial_track, const std::string_view initial_car,
     const std::uint32_t initial_laps,
+    const std::uint32_t initial_opponent_strength,
     const std::filesystem::path& config_directory)
 {
     if (tracks.empty() || cars.empty())
@@ -697,6 +714,8 @@ std::optional<FrontendSelection> show_setup_frontend(
     state.tracks = std::move(tracks);
     state.cars = std::move(cars);
     state.laps = std::clamp(initial_laps, 1U, 99U);
+    state.opponent_strength = initial_opponent_strength < opponent_strength_names.size()
+        ? initial_opponent_strength : 0U;
     state.config_directory = config_directory;
     for (std::size_t slot = 0; slot < state.career_rows.size(); ++slot) {
         const auto loaded = viper::load_career_slot(config_directory,
@@ -751,7 +770,8 @@ std::optional<FrontendSelection> show_setup_frontend(
         throw std::runtime_error("setup frontend message loop failed");
     if (!state.accepted) return std::nullopt;
     return FrontendSelection{
-        state.tracks[state.track_index], state.cars[state.car_index], state.laps};
+        state.tracks[state.track_index], state.cars[state.car_index], state.laps,
+        state.opponent_strength};
 }
 
 class D3DWindow {
@@ -3972,13 +3992,18 @@ int run_selected_race(const Options& options, const std::string_view track,
                      const std::string_view car,
                      const std::vector<TraceInputFrame>* playback_trace,
                      const bool hold_results_for_frontend,
-                     const std::uint32_t selected_laps)
+                     const std::uint32_t selected_laps,
+                     const std::optional<std::uint32_t> selected_opponent_strength = {})
 {
     const auto config_path = options.data_dir / "options.def";
     viper::GameOptions configured_options;
     std::error_code config_error;
     if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
         configured_options = viper::GameOptions::load(config_path);
+    if (selected_opponent_strength && *selected_opponent_strength <
+            opponent_strength_names.size())
+        configured_options.set_integer("GAME", "opponent_strength",
+            static_cast<int>(*selected_opponent_strength));
     const auto setup_config_directory = options.setup_config_directory
         ? *options.setup_config_directory
         : resolve_setup_config_directory(options.data_dir);
@@ -4131,6 +4156,9 @@ int wmain(int argc, wchar_t** argv)
         auto selected_car = car;
         auto selected_laps = static_cast<std::uint32_t>(std::clamp(
             configured_options.integer("GAME", "laps").value_or(1), 1, 99));
+        auto selected_opponent_strength = static_cast<std::uint32_t>(std::clamp(
+            configured_options.integer("GAME", "opponent_strength").value_or(0),
+            0, static_cast<int>(viper::ai_driver_group_count - 1U)));
         auto setup_config_directory = options.setup_config_directory
             ? *options.setup_config_directory
             : resolve_setup_config_directory(data_directory);
@@ -4149,19 +4177,24 @@ int wmain(int argc, wchar_t** argv)
             selected_car = setup_cars[indices.car];
             if (saved.selection && saved.selection->laps)
                 selected_laps = std::clamp(*saved.selection->laps, 1U, 99U);
+            if (saved.selection && saved.selection->opponent_strength)
+                selected_opponent_strength = *saved.selection->opponent_strength;
         }
         while (true) {
             if (interactive_frontend) {
                 const auto selection = show_setup_frontend(setup_tracks, setup_cars,
                     selected_track, selected_car, selected_laps,
+                    selected_opponent_strength,
                     setup_config_directory);
                 if (!selection) return 0;
                 selected_track = selection->track;
                 selected_car = selection->car;
                 selected_laps = selection->laps;
+                selected_opponent_strength = selection->opponent_strength;
                 const auto saved = viper::save_setup_selection_preference(
                     setup_config_directory,
-                    {selected_track, selected_car, selected_laps});
+                    {selected_track, selected_car, selected_laps,
+                        selected_opponent_strength});
                 if (!saved.saved)
                     std::cerr << "Could not persist setup selection: "
                               << saved.error << '\n';
@@ -4170,7 +4203,10 @@ int wmain(int argc, wchar_t** argv)
             runtime_options.data_dir = data_directory;
             const auto result = run_selected_race(runtime_options, selected_track,
                 selected_car, playback_trace ? &*playback_trace : nullptr,
-                interactive_frontend, selected_laps);
+                interactive_frontend, selected_laps,
+                interactive_frontend
+                    ? std::optional<std::uint32_t>(selected_opponent_strength)
+                    : std::nullopt);
             if (result != 10) return result;
             if (!interactive_frontend) return 0;
         }

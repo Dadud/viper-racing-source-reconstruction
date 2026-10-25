@@ -7,15 +7,19 @@ top-level `.car` bundles in the same Win32 file-search order used by the saved
 `car_no` loader. `options.def` supplies the initial `GLOBAL.track_no` and
 `GLOBAL.car_no` selections. On Enter, the runtime persists selected track/car
 resource stems in the separate, versioned `Config/viper-racing-setup.cfg`
-file. Version 2 stores the lap count with the selected track and car; version 1
-files remain readable. A saved stem is applied only if its bundle remains in
-the current inventory; a missing track or car independently falls back to its
+file. Version 3 stores the lap count and selected opponent-strength profile
+with the track and car; version 1 and version 2 files remain readable. Legacy
+files without a profile retain the `GAME.opponent_strength` option. A saved
+stem is applied only if its bundle remains in the current inventory; a missing
+track or car independently falls back to its
 `options.def` selection. Page Up/Down changes the quick-race lap count from 1
 to 99; its initial value comes from `GAME.laps`. Original GameData and
 `options.def` are not modified.
 
-Use Up/Down to choose a track, Left/Right to choose a car, and Enter to load
-the assets and start the existing race session. During a race, press P to
+Use Up/Down to choose a track, Left/Right to choose a car, `[`/`]` to choose
+one of the eight Easy, Intermediate, Hard, and Career 1–5 opponent profiles,
+and Enter to load the assets and start the existing race session. During a
+race, press P to
 pause or resume. Pause clears held gameplay controls, freezes player/opponent
 simulation and race time, and stops the looping engine buffers. Resume resets
 the wall-clock and fixed-step anchors so paused time is not replayed as
@@ -99,9 +103,9 @@ hotkey is unavailable.
   input, physical simulation, and original parity remain open.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
-- Implement and retain supported settings beyond quick-race lap count, control
-  rebinding, random-track behavior, mode/difficulty selection, and
-  native-compatible writeback.
+- Implement and retain additional settings beyond quick-race lap count and
+  opponent profile, including control rebinding, random-track behavior,
+  race-mode selection, and native-compatible writeback.
 - Connect validated career payloads to the reconstructed career action/event
   loop, preserving upgrades and progression through results and native saves.
 - Compare controlled original and reconstructed menu/race/results captures.

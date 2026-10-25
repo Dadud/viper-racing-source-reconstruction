@@ -1,12 +1,13 @@
 #include "viper/game_options.hpp"
 
 #include <charconv>
+#include <string>
 #include <cctype>
 #include <fstream>
 #include <algorithm>
 #include <iterator>
 #include <stdexcept>
-#include <string>
+#include <utility>
 
 namespace viper {
 namespace {
@@ -127,6 +128,11 @@ std::optional<bool> GameOptions::boolean(
     if (normalized == "yes" || normalized == "true" || normalized == "1") return true;
     if (normalized == "no" || normalized == "false" || normalized == "0") return false;
     return std::nullopt;
+}
+
+void GameOptions::set_integer(std::string section, std::string key, const int value)
+{
+    entries_[lower(std::move(section))][lower(std::move(key))] = std::to_string(value);
 }
 
 } // namespace viper

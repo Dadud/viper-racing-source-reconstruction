@@ -133,9 +133,12 @@ try {
     Press-Key $setup 13
     $secondRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30
     $secondTitle = [System.Text.StringBuilder]::new(256)
-    [void][ViperRaceFrontendWin32]::GetWindowText($secondRace, $secondTitle, $secondTitle.Capacity)
+    for ($attempt = 0; $attempt -lt 20 -and $secondTitle.Length -eq 0; ++$attempt) {
+        [void][ViperRaceFrontendWin32]::GetWindowText($secondRace, $secondTitle, $secondTitle.Capacity)
+        if ($secondTitle.Length -eq 0) { Start-Sleep -Milliseconds 50 }
+    }
     if ($secondTitle.ToString() -notmatch 'bemidji.*sports') {
-        throw "Returning to setup did not preserve Viper selection for the car change: $($secondTitle.ToString())"
+        throw "Returning to setup and changing to Sports did not produce the expected race window: $($secondTitle.ToString())"
     }
     $setup = Wait-ResultsReturn $process 60
     Write-Output 'Sports/Bemidji returned to setup.'

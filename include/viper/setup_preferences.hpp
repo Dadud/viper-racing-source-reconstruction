@@ -14,6 +14,7 @@ struct SetupSelectionPreference {
     std::string track;
     std::string car;
     std::optional<std::uint32_t> laps;
+    std::optional<std::uint32_t> opponent_strength;
 };
 
 struct SetupPreferenceLoadResult {

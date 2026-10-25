@@ -54,6 +54,9 @@ try {
     [void](New-Item -ItemType Directory -Path $configDir)
     $careerDir = Join-Path $configDir 'career'
     [void](New-Item -ItemType Directory -Path $careerDir)
+    $setupPreference = Join-Path $configDir 'viper-racing-setup.cfg'
+    [System.IO.File]::WriteAllText($setupPreference,
+        "VIPER-RACING-SETUP 3`ntrack=bemidji`ncar=viper`nlaps=3`nopponent_strength=0`n")
     $careerPath = Join-Path $careerDir 'career0.dat'
     $payload = [byte[]]::new(0x674)
     $name = [System.Text.Encoding]::ASCII.GetBytes('QA Delete Test')
@@ -72,6 +75,8 @@ try {
     $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software"
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
     $process = [Diagnostics.Process]::Start($startInfo)
     $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
     if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]67, [IntPtr]::Zero)) {
@@ -108,6 +113,9 @@ try {
     Start-Sleep -Milliseconds 250
     $process.Refresh()
     if ($process.HasExited) { throw 'Escape from career slots closed the app instead of returning to setup' }
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]221, [IntPtr]::Zero)) {
+        throw 'Could not select the next opponent-strength profile'
+    }
     if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]13, [IntPtr]::Zero)) {
         throw 'Could not submit Enter to the setup frontend'
     }
@@ -119,7 +127,16 @@ try {
     if (-not $process.WaitForExit(15000)) { throw 'Race window did not shut down after Escape' }
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "viper_game exited with code $($process.ExitCode)" }
-    Write-Output 'Career deletion cancel and confirmation, setup-to-race loading, and clean exit passed.'
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $savedPreference = [System.IO.File]::ReadAllText($setupPreference)
+    if ($savedPreference -notmatch '(?m)^opponent_strength=1$') {
+        throw "Setup did not persist the selected Intermediate profile: $savedPreference"
+    }
+    if ($stdout -notmatch 'selected AIDR profile 1') {
+        throw "Selected profile did not reach AI setup. stdout=$stdout stderr=$stderr"
+    }
+    Write-Output 'Career slot actions, profile selection/persistence, profile-driven AI setup, setup-to-race loading, and clean exit passed.'
 } catch {
     throw
 } finally {

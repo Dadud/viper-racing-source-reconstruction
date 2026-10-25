@@ -36,8 +36,9 @@ int main()
         "writes normalized selector identifiers under Config");
     const auto loaded = viper::load_setup_selection_preference(root);
     check(loaded.selection && loaded.selection->track == "bemidji" &&
-        loaded.selection->car == "sports" && loaded.selection->laps == 3U,
-        "round-trips selected track, car, and lap count");
+        loaded.selection->car == "sports" && loaded.selection->laps == 3U &&
+        loaded.selection->opponent_strength == 0U,
+        "round-trips selected track, car, lap count, and opponent profile");
 
     const std::vector<std::string> tracks{"bemidji", "dundas"};
     const std::vector<std::string> cars{"viper", "sports"};
@@ -52,8 +53,18 @@ int main()
     }
     const auto legacy = viper::load_setup_selection_preference(root);
     check(legacy.selection && legacy.selection->track == "dundas" &&
-        legacy.selection->car == "viper" && !legacy.selection->laps,
+        legacy.selection->car == "viper" && !legacy.selection->laps &&
+        !legacy.selection->opponent_strength,
         "loads version-1 preferences and leaves lap count at the game default");
+
+    {
+        std::ofstream legacy_v2(root / "viper-racing-setup.cfg", std::ios::binary);
+        legacy_v2 << "VIPER-RACING-SETUP 2\ntrack=dundas\ncar=viper\nlaps=4\n";
+    }
+    const auto legacy_v2 = viper::load_setup_selection_preference(root);
+    check(legacy_v2.selection && legacy_v2.selection->laps == 4U &&
+        !legacy_v2.selection->opponent_strength,
+        "loads version-2 lap preferences with the options.def profile default");
 
     const auto replaced = viper::save_setup_selection_preference(root,
         {"removed_track", "Viper"});
@@ -86,6 +97,18 @@ int main()
     const auto invalid_laps = viper::load_setup_selection_preference(root);
     check(!invalid_laps.selection && !invalid_laps.error.empty(),
         "rejects an out-of-range lap count read from Config");
+    {
+        std::ofstream invalid_profile(root / "viper-racing-setup.cfg", std::ios::binary);
+        invalid_profile << "VIPER-RACING-SETUP 3\ntrack=bemidji\ncar=sports\n"
+            "laps=3\nopponent_strength=8\n";
+    }
+    const auto invalid_profile = viper::load_setup_selection_preference(root);
+    check(!invalid_profile.selection && !invalid_profile.error.empty(),
+        "rejects an out-of-range opponent profile read from Config");
+    const auto invalid_profile_save = viper::save_setup_selection_preference(root,
+        {"bemidji", "sports", 3U, 8U});
+    check(!invalid_profile_save.saved && !invalid_profile_save.error.empty(),
+        "refuses to write opponent profiles outside the eight native groups");
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

@@ -22,6 +22,7 @@ namespace {
 constexpr std::string_view file_name = "viper-racing-setup.cfg";
 constexpr std::string_view header_v1 = "VIPER-RACING-SETUP 1\n";
 constexpr std::string_view header_v2 = "VIPER-RACING-SETUP 2\n";
+constexpr std::string_view header_v3 = "VIPER-RACING-SETUP 3\n";
 
 char ascii_lower(const char value) noexcept
 {
@@ -119,11 +120,13 @@ SetupPreferenceLoadResult load_setup_selection_preference(
     }
     const bool version_1 = contents.starts_with(header_v1);
     const bool version_2 = contents.starts_with(header_v2);
-    if (contents.size() > 256U || (!version_1 && !version_2)) {
+    const bool version_3 = contents.starts_with(header_v3);
+    if (contents.size() > 256U || (!version_1 && !version_2 && !version_3)) {
         result.error = "setup preference has an invalid header or size";
         return result;
     }
-    const auto header_size = version_2 ? header_v2.size() : header_v1.size();
+    const auto header_size = version_3 ? header_v3.size()
+        : version_2 ? header_v2.size() : header_v1.size();
     std::vector<std::string_view> lines;
     std::size_t cursor = header_size;
     while (cursor < contents.size()) {
@@ -132,7 +135,8 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         lines.emplace_back(contents.data() + cursor, end - cursor);
         cursor = end + 1U;
     }
-    if (cursor != contents.size() || lines.size() != (version_2 ? 3U : 2U)) {
+    const auto expected_lines = version_3 ? 4U : version_2 ? 3U : 2U;
+    if (cursor != contents.size() || lines.size() != expected_lines) {
         result.error = "setup preference has an invalid field layout";
         return result;
     }
@@ -151,7 +155,7 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         return result;
     }
     std::optional<std::uint32_t> laps;
-    if (version_2) {
+    if (version_2 || version_3) {
         constexpr std::string_view laps_prefix = "laps=";
         const auto laps_line = lines[2];
         std::uint32_t value{};
@@ -169,8 +173,27 @@ SetupPreferenceLoadResult load_setup_selection_preference(
         }
         laps = value;
     }
+    std::optional<std::uint32_t> opponent_strength;
+    if (version_3) {
+        constexpr std::string_view strength_prefix = "opponent_strength=";
+        const auto strength_line = lines[3];
+        std::uint32_t value{};
+        if (!strength_line.starts_with(strength_prefix)) {
+            result.error = "setup preference opponent-strength field is missing or reordered";
+            return result;
+        }
+        const auto raw_strength = strength_line.substr(strength_prefix.size());
+        const auto [end, parse_error] = std::from_chars(raw_strength.data(),
+            raw_strength.data() + raw_strength.size(), value);
+        if (parse_error != std::errc{} || end != raw_strength.data() + raw_strength.size() ||
+            value >= 8U) {
+            result.error = "setup preference opponent strength must be between 0 and 7";
+            return result;
+        }
+        opponent_strength = value;
+    }
     result.selection = SetupSelectionPreference{
-        std::move(*track), std::move(*car), laps};
+        std::move(*track), std::move(*car), laps, opponent_strength};
     return result;
 }
 
@@ -186,12 +209,17 @@ SetupPreferenceSaveResult save_setup_selection_preference(
     const auto track = normalized_stem(selection.track);
     const auto car = normalized_stem(selection.car);
     const auto laps = selection.laps.value_or(1U);
+    const auto opponent_strength = selection.opponent_strength.value_or(0U);
     if (!track || !car) {
         result.error = "track and car must be valid resource stems";
         return result;
     }
     if (laps < 1U || laps > 99U) {
         result.error = "lap count must be between 1 and 99";
+        return result;
+    }
+    if (opponent_strength >= 8U) {
+        result.error = "opponent strength must be between 0 and 7";
         return result;
     }
     result.path = config_directory / file_name;
@@ -213,8 +241,9 @@ SetupPreferenceSaveResult save_setup_selection_preference(
             result.error = "could not create temporary setup preference";
             return result;
         }
-        output << header_v2 << "track=" << *track << "\ncar=" << *car
-               << "\nlaps=" << laps << '\n';
+        output << header_v3 << "track=" << *track << "\ncar=" << *car
+               << "\nlaps=" << laps << "\nopponent_strength="
+               << opponent_strength << '\n';
         output.flush();
         if (!output) {
             result.error = "failed while writing temporary setup preference";
