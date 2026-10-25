@@ -45,15 +45,24 @@ try {
     $header = $replayedLines[0].Split(',')
     $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
     $pcarBodyStart = [Array]::IndexOf($header, 'pcar_body_0xde0')
-    if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0) {
-        throw 'Trace is missing PCAR prefix or byte-backed body fields'
+    $pcarMultiplierIndex = [Array]::IndexOf($header, 'pcar_0x40d270_multiplier')
+    if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0 -or
+        $pcarMultiplierIndex -lt 0) {
+        throw 'Trace is missing PCAR prefix, body, or multiplier fields'
     }
     $observedPcarBodyState = $false
+    $observedConfiguredPcarMultiplier = $false
     for ($index = 1; $index -lt $replayedLines.Count; ++$index) {
         if ($replayedLines[$index] -cne $repeatedLines[$index]) {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
         }
         $fields = $replayedLines[$index].Split(',')
+        $pcarMultiplier = [single]::Parse(
+            $fields[$pcarMultiplierIndex], [cultureinfo]::InvariantCulture)
+        if ([Math]::Abs($pcarMultiplier - 1.0) -gt 0.000001) {
+            throw "PCAR multiplier did not use the shipped GAME throttle_boost value at frame $($index - 1)"
+        }
+        $observedConfiguredPcarMultiplier = $true
         if ($fields[5] -eq '1' -and [single]::Parse($fields[9], [cultureinfo]::InvariantCulture) -gt 0) {
             $observedThrottle = $true
         }
@@ -72,6 +81,9 @@ try {
     }
     if (-not $observedPcarBodyState) {
         throw 'No trace frame recorded the materialized PCAR body scalar fields'
+    }
+    if (-not $observedConfiguredPcarMultiplier) {
+        throw 'No trace frame recorded the configured PCAR callback multiplier'
     }
     if (-not $observedThrottle) { throw 'Playback did not produce positive speed under throttle' }
     if (-not $observedSteering) { throw 'Playback did not produce steering response' }
