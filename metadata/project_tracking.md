@@ -36,10 +36,12 @@ on 2026-10-25 applied a bounded synthetic DIK_UP pulse and observed the
 original PCAR throttle/body response alongside eight throttle-gated integrators
 and 32 wheel updates. A hardware watch identified the live paired differential
 writer for wheel `+0x158`, and static analysis resolved its operands and stores.
-The callback calls the shared integrator directly, but that integrator performs
-earlier state updates before consuming the six differential operands. The
-runtime therefore leaves this writer disconnected until the consumed values can
-be staged at the internal read boundary. Tire-response/query
+The callback calls the shared integrator directly, which performs four ordered
+`0x442530` wheel updates before the differential reads. The four varying
+operands are each wheel's `+0xE8` history value; the updates are the identified
+producer, while their native query, suspension, and tire inputs remain
+incomplete. The runtime therefore leaves this writer disconnected until those
+upstream inputs and their state ownership can be reproduced. Tire-response/query
 inputs and a paired reconstruction baseline remain open. Separate Frida Stalker attempts
 crashed in `frida-agent.dll`; the new low-overhead capture did not use Stalker
 and does not diagnose those crashes. Details and limits are documented in
@@ -51,17 +53,16 @@ Treat one Viper/Bemidji single-player race as the release gate. Work in this
 order, and keep later systems out of the gate until this race is reliable:
 
 1. **Close the remaining upstream wheel-input evidence gaps.** The direct
-   wheel `+0x158` writer is identified but disconnected from the runtime. A
-   bounded capture places it inside the shared integrator, and static analysis
-   shows the six body operands are consumed only after earlier integrator
-   updates. Their exact values at that internal point remain unresolved.
-   Use the successful launcher-owned staged flow
-   and low-overhead hooks to identify pre-projection tire response/query
-   producers, then capture timestamped per-wheel rows with `+0x24C/+0x258`
-   accumulator deltas and body state for throttle, steering, braking, and
-   coast. Preserve fail-closed behavior wherever a consumed field or callback
-   remains unresolved; do not treat the current synthetic input trace as
-   normal keyboard delivery or as a complete force law.
+   wheel `+0x158` writer is identified but disconnected from the runtime. The
+   four varying operands are mapped to each wheel's `+0xE8` history: four
+   ordered calls to `0x442530` produce them before the differential reads.
+   Source every consumed input to those suspension updates, including native
+   contact/query state and tire response inputs, and retain per-wheel state
+   across fixed steps. Then capture timestamped per-wheel rows with
+   `+0x24C/+0x258` accumulator deltas and body state for throttle, steering,
+   braking, and coast. Preserve fail-closed behavior wherever a consumed field
+   or callback remains unresolved; do not treat the current synthetic input
+   trace as normal keyboard delivery or as a complete force law.
 2. **Implement the smallest complete physical player step.** Connect contact
    observations, per-wheel force contributors and accumulator collection to
    the byte-backed PCAR state only when every consumed field and callback

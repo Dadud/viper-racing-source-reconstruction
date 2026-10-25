@@ -206,14 +206,16 @@ All currently modeled `0x441C10` outputs are now materialized at their wheel
 offsets. The composed `advance_four_wheel_body_step` now derives the surface
 motion projection from the prior contact point and step-start body kinematics,
 before the current contact query can replace that point. This composition is
-still not called by the production race session. The live `+0xE8` producer is
-now identified: `0x442530` derives it from the wheel's native contact depth and
-stores that depth after the suspension calculation. The session has the
-constructor's initial `+0xE8` value, but its route-pose contact observation is
-not the native fixed-step body/query state, so this store is not yet wired.
-The live producer of the actual wheel object's per-step `+0x158` is identified
-inside the integrator but remains disconnected until its inputs can be staged
-at the internal read point. The random-seeded table/call lifecycle
+still not called by the production race session. The four varying operands in
+the pair differential are now mapped to the four wheel `+0xE8` history fields.
+`0x431150` calls `0x442530` once per wheel before reading those values;
+`0x442530` consumes prior `+0xE8` and stores the next history value. The
+producer order is resolved, but the session's route-pose contact observation
+is not the native fixed-step body/query state. Native contact/query, spring,
+surface, and tire inputs are not yet owned by the production session, so these
+updates remain disconnected. The live producer of the actual wheel object's
+per-step `+0x158` is identified inside the integrator but remains disconnected
+until all earlier wheel-update inputs and state are staged. The random-seeded table/call lifecycle
 for environment polarity. A separate frame-context row receives body
 `+0x50C` at `+0x158`, but that is not the actual wheel object's same-offset
 field. Static analysis establishes common-startup initialization and the
@@ -486,16 +488,17 @@ visible in the ledger.
 
 **Current dependency:** The throttle-aligned original capture supplies eight
 selected PCAR updates and 32 ordered wheel observations, including downstream
-suspension and tire projection fields. The direct wheel `+0x158` producer is
-identified but disconnected from the byte-backed runtime: its six operands are
-read only after earlier state updates inside `0x431150`. Capture their values
-at the internal read point before considering a runtime connection. The
-upstream tire response/query
-producers remain unresolved. The captured `+0xF4` row is sampled after the
+suspension and tire projection fields. Static analysis maps the four varying
+differential operands to wheel `+0xE8`; four `0x442530` calls update those
+fields before the reads. The producer ordering is understood, but its live
+inputs are not: native contact/query, suspension parameters, surface polarity,
+and tire response/query producers remain unresolved. Do not repeat a capture
+that only rereads the six pair operands. Capture the missing upstream inputs
+and timestamp-correlated wheel/accumulator/body samples for throttle, steering,
+braking, and coast. The captured `+0xF4` row is sampled after the
 current response calculation at the tire-force callsite, so it validates the
 projection output and does not reveal the locals/curves/velocity inputs that
-formed it. Then obtain timestamp-correlated wheel/accumulator/body samples for
-throttle, steering, braking, and coast. Capture identity and limits are in
+formed it. Capture identity and limits are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 
 ### 3. Complete and compare the first original-compatible single-player race

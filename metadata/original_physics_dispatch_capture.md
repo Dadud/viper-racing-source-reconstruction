@@ -1078,6 +1078,36 @@ closure was requested after collection; the Frida provider returned slowly,
 and the subsequent status showed the scripts unloaded while the original
 target remained running.
 
+### Wheel-history producer ordering (2026-10-25)
+
+Static instruction evidence resolves the identity and order of the four
+varying operands. At `0x4313AE`, `ESI+0x554` initializes the wheel pointer and
+`EDI=4`; the loop at `0x4313B9..0x4313C8` calls `0x442530` for each wheel,
+advancing by stride `0x1A4`. Only after those four calls does `0x431150` read
+the pair operands at `0x43197C..0x4319CF`. Evidence for the complete integrator
+body: `ev_dbbb10235cd7dec6c9f80627ad708da50ea04d54d1bcb629507d9df0856487cf`
+(range `0x431150..0x432120`).
+
+The offsets are wheel history fields, not four unrelated body scalars:
+`0x63C = 0x554 + 0xE8`, `0x7E0 = 0x6F8 + 0xE8`,
+`0x984 = 0x89C + 0xE8`, and `0xB28 = 0xA40 + 0xE8`. Accordingly, the first
+pair subtracts the front wheel `+0xE8` values and scales by body `+0xDD4`; the
+second subtracts the rear wheel `+0xE8` values and scales by `+0xDD8`. Inside
+`0x442530`, prior `+0xE8` is consumed at `0x442DF1`, and the updated value is
+stored at `0x4430A7`. Evidence: `ev_7621aa7734668191779fc342ada85c300b30375fa6b59cd72664d11fd58cffc9`
+(wheel updater range `0x442530..0x443EC0`).
+
+This resolves the producer and order of the four history operands: the four
+per-wheel suspension updates at the start of `0x431150` produce them before
+the differential reads. The earlier statement that the producing operation
+was unknown is superseded. It does **not** resolve the inputs required by each
+`0x442530` update (including native contact/query state, wheel suspension
+parameters, and the wheel `+0x158` source), establish controlled-input
+behavior, or make the current route-driven contact observations equivalent to
+the native query. Keep production physics disconnected until those update
+inputs and their session ownership are complete; there is no need to recapture
+the six pair operands merely to identify their identities.
+
 ### Callback-nesting and ordering re-audit (2026-10-25)
 
 A second bounded hardware-watch capture hooked `0x4384D0` and armed the four
