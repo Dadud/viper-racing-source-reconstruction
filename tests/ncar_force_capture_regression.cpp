@@ -1,4 +1,5 @@
 #include "viper/ncar_state.hpp"
+#include "viper/vehicle_setup.hpp"
 
 #include <array>
 #include <cmath>
@@ -17,6 +18,80 @@ struct CapturedForceWrite {
     std::array<float, 3> after_force;
     std::array<float, 3> after_moment;
 };
+
+struct CapturedSuspensionForceComposition {
+    float caller_magnitude_local;
+    float wheel_response_0x178;
+    float caller_direction_x;
+    float force_x;
+};
+
+struct CapturedTireForceWrite {
+    std::array<float, 3> force;
+    std::array<float, 3> tire_vector_0x100;
+    std::array<float, 3> point;
+    std::array<float, 3> center;
+    std::array<float, 3> before_force;
+    std::array<float, 3> before_moment;
+    std::array<float, 3> after_force;
+    std::array<float, 3> after_moment;
+};
+
+// The first captured PCAR update, wrapper return 0x43113F. The native
+// caller's stack is sampled at 0x43E6F0 entry: +0x38 is the clamped force
+// magnitude local, and +0x7C is its X direction multiplier. The wheel's
+// +0x178 response and emitted force X are captured independently. Source:
+// external pcar_wheel_response_input_probe_20261025.json,
+// SHA-256 DEC4580293D4BCBAC4B6920597D65D3FBB0D60160D88C8E94F1540887FCA0264,
+// REA evidence ev_a0a9aad6b86a89686831f8598ea09008e3e53d216e1718968b9718a5c7822.
+constexpr std::array<CapturedSuspensionForceComposition, 4>
+    captured_suspension_force_compositions{{
+        {3807.7324F, 3807.732421875F, 3.0602332e-05F,
+         0.11652549356222153F},
+        {3988.6409F, 3988.64086914062F, 3.0602332e-05F,
+         0.12206171452999115F},
+        {4167.5356F, 4167.53564453125F, 3.0602332e-05F,
+         0.12753631174564362F},
+        {4008.4482F, 4008.4482421875F, 3.0602332e-05F,
+         0.12266786396503448F},
+    }};
+
+// First captured PCAR integrator, direct return 0x443C09, one row for each
+// wheel. The call vector matches the wheel's +0x100..+0x108 bytes exactly.
+constexpr std::array<CapturedTireForceWrite, 4> captured_tire_force_writes{{
+    {{244.78858947753906F, 0.31991028785705566F, 340.5751647949219F},
+     {244.78858947753906F, 0.31991028785705566F, 340.5751647949219F},
+     {127.27809143066406F, -4.048957347869873F, -297.0700378417969F},
+     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
+     {0.11652549356222153F, 3807.73095703125F, 3.512221097946167F},
+     {-148.46656799316406F, 5.183233261108398F, -5614.412109375F},
+     {244.90512084960938F, 3808.05078125F, 344.0873718261719F},
+     {-321.40850830078125F, 517.05615234375F, -5490.5908203125F}},
+    {{-222.8980255126953F, 1.0346245765686035F, -366.89886474609375F},
+     {-222.8980255126953F, 1.0346245765686035F, -366.89886474609375F},
+     {128.1427459716797F, -4.050186634063721F, -295.7660217285156F},
+     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
+     {245.0271759033203F, 7796.6904296875F, 347.7664489746094F},
+     {-5678.15771484375F, 519.4635620117188F, -7922.83642578125F},
+     {22.129150390625F, 7797.72509765625F, -19.132415771484375F},
+     {-5492.80078125F, -3.80810546875F, -8036.919921875F}},
+    {{226.5311737060547F, -5.693071365356445F, 105.29019927978516F},
+     {226.5311737060547F, -5.693071365356445F, 105.29019927978516F},
+     {129.30755615234375F, -4.050251007080078F, -298.4309387207031F},
+     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
+     {22.25668716430664F, 11965.259765625F, -15.288314819335938F},
+     {29.29638671875F, -6.128640174865723F, -5704.3486328125F},
+     {248.78785705566406F, 11959.56640625F, 90.00188446044922F},
+     {-31.828041076660156F, -363.9851379394531F, -5592.189453125F}},
+    {{-59.2712516784668F, -2.932826519012451F, -222.1579132080078F},
+     {-59.2712516784668F, -2.932826519012451F, -222.1579132080078F},
+     {130.18624877929688F, -4.05150032043457F, -297.1057434082031F},
+     {128.75311279296875F, -3.5412001609802246F, -297.1089172363281F},
+     {250.23202514648438F, 15967.9921875F, 94.37833404541016F},
+     {-38.39976119995117F, -369.9322204589844F, 165.0107421875F},
+     {190.9607696533203F, 15965.0595703125F, -127.77957916259766F},
+     {74.97676086425781F, -51.737823486328125F, 130.5614776611328F}},
+}};
 
 // First fixed-step sample, captured at the original PCAR's 0x43E6F0 writer
 // for both nonzero wheel-force callsites on each of its four wheels.
@@ -107,6 +182,47 @@ int main()
                 "force accumulator differs from the original PCAR capture");
             require_close(accumulator.moment_0x258, sample.after_moment,
                 "moment accumulator differs from the original PCAR capture");
+        }
+
+        for (const auto& sample : captured_suspension_force_compositions) {
+            if (std::fabs(sample.caller_magnitude_local -
+                          sample.wheel_response_0x178) > 0.02F) {
+                throw std::runtime_error(
+                    "captured suspension local must match wheel response +0x178");
+            }
+            const viper::WheelSuspensionFinalizeInput input{
+                sample.caller_magnitude_local,
+                0.0F,
+                0.0F,
+                0.0F,
+                0.0F,
+                0.0F,
+                {sample.caller_direction_x, 0.0F, 0.0F},
+                true};
+            const auto response = viper::finalize_wheel_suspension(input);
+            if (std::fabs(response.applied_force.x - sample.force_x) > 0.02F) {
+                throw std::runtime_error(
+                    "captured suspension force X differs from native response product");
+            }
+        }
+
+        for (const auto& sample : captured_tire_force_writes) {
+            if (sample.force != sample.tire_vector_0x100) {
+                throw std::runtime_error(
+                    "captured 0x443C09 force must equal wheel +0x100 vector");
+            }
+            viper::NcarForceMomentAccumulator accumulator{
+                sample.before_force, sample.before_moment};
+            if (!viper::accumulate_ncar_force_moment(
+                    accumulator, sample.tire_vector_0x100,
+                    sample.point, sample.center)) {
+                throw std::runtime_error(
+                    "captured 0x443C09 tire vector must be accumulated");
+            }
+            require_close(accumulator.force_0x24c, sample.after_force,
+                "tire force accumulator differs from the original capture");
+            require_close(accumulator.moment_0x258, sample.after_moment,
+                "tire moment accumulator differs from the original capture");
         }
 
         viper::NcarForceMomentAccumulator zero_accumulator{

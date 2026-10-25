@@ -233,10 +233,17 @@ callsites per wheel (`0x4430E9` through wrapper `0x431130`, and direct
 `0x443C09`), records all four wheel slots and the body center, and separates
 later integrator-level writers at `0x431C2D`, `0x431D12`, and `0x431DBC`.
 Eight captured wheel additions now pass the portable `0x43E6F0` accumulator
-model's new regression fixture. This closes the wheel-to-accumulator helper
-boundary for those observed calls; the upstream tire/suspension response
-inputs, native collision/query state, and live session ownership remain
-unresolved. See
+model's new regression fixture. A second live capture recorded 128 writer
+events and wheel-object state across eight PCAR updates. All 32 sampled direct
+`0x443C09` vectors match wheel `+0x100..+0x108` bit-for-bit; all 32 suspension
+wrapper rows expose the clamped response magnitude, and the first four
+captured X components match magnitude times the native caller's X direction
+local. The regression now replays those four suspension X components and four
+direct tire-force calls. The checked-in response probe also has exact stage
+hooks for the suspension and tire callsites, but those additional stack rows
+have not yet been captured. This closes more of the wheel-to-accumulator
+boundary; the direction/tire-vector producers, native collision/query state,
+and live session ownership remain unresolved. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#corrected-wheel-scoped-force-callsites).
 
 ### State required before the live physics integration can be wired

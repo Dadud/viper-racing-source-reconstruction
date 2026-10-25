@@ -456,7 +456,7 @@ if(BUILD_TESTING)
     add_executable(viper_ncar_force_capture_regression
         tests/ncar_force_capture_regression.cpp)
     target_link_libraries(viper_ncar_force_capture_regression PRIVATE
-        viper_ncar_model)
+        viper_ncar_model viper_vehicle_model)
     add_test(NAME ncar_force_capture_regression
         COMMAND viper_ncar_force_capture_regression)
     add_executable(viper_ncar_sample_pipeline_regression

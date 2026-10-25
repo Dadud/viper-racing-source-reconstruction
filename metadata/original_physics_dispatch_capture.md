@@ -211,11 +211,36 @@ An asset-free CTest fixture replays eight nonzero observed force writes through
 `accumulate_ncar_force_moment` and checks the captured force/moment accumulator
 outputs within 0.02 units; a captured zero-vector call also checks the native
 no-write gate. This validates the shared accumulator primitive and the
-captured wheel-call inputs. It does not reconstruct how the tire/suspension
-response vectors were produced, supply those inputs to the live reconstructed
-session, or prove player-physics parity. Exact upstream wheel response inputs,
-callback state, collision/query state, and integration into `WindowState`
-remain open.
+captured wheel-call inputs. A follow-up bounded capture sampled the wheel
+object and caller stack at all four `0x43E6F0` calls in each selected wheel
+update (128 rows across eight player PCAR updates). For all 32 direct
+`0x443C09` rows, the call vector is bit-identical to wheel `+0x100..+0x108`;
+the two later helper callsites at `0x443CBC` and `0x443E6C` emitted zero vectors
+in all 64 sampled calls. The `0x43113F` wrapper rows capture the wheel's
+`+0x178` response and the force vector. In the first four-wheel update, the
+caller stack's clamped magnitude local (`+0x38` at `0x43E6F0` entry) matches
+wheel `+0x178`; its captured X direction local (`+0x7C`) multiplied by that
+magnitude reproduces the emitted X force to less than `2e-9`. Static assembly
+at `0x430B2..0x430E4` confirms the same magnitude-times-direction construction
+for all three components. Four first-update direct tire writes and all four
+suspension X components now replay through the corresponding portable models
+in `ncar_force_capture_regression`.
+
+The complete response capture is kept outside the repository at
+`../../analysis/reference_captures/pcar_wheel_response_input_probe_20261025.json`
+(SHA-256 `DEC4580293D4BCBAC4B6920597D65D3FBB0D60160D88C8E94F1540887FCA0264`,
+REA evidence `ev_a0a9aad6b86a89686831f8598ea09008e3e53d216e1718968b9718a5c35c7822`).
+It records the exact bounded source hash used for that run. The checked-in
+[`tools/pcar_wheel_response_input_probe.js`](../tools/pcar_wheel_response_input_probe.js)
+extends that capture with stack snapshots at the suspension and tire-force
+callsites; those added stage rows still require a fresh controlled run.
+
+This establishes the final force application inputs and the response scalar's
+handoff, but not the upstream derivation of the wheel direction, tire response
+vector, suspension/query state, or their live session producers. It does not
+supply these inputs to the reconstructed race session or prove player-physics
+parity. Native collision/query state, callback state, and integration into
+`WindowState` remain open.
 
 ## Bounded shared-integrator object probe
 
