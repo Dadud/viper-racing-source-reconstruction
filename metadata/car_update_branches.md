@@ -1194,9 +1194,28 @@ the beginning of `0x4384D0`: `+0xDE0 = 0x5093F4 * result(0x40D270)`,
 1.2*0x5093C8, 0, 1)`. The model names this a prefix because later callback
 branches can overwrite `+0xDE0/+0xDE4`. The runtime currently supplies 1.0
 for `result(0x40D270)`, matching the observed startup fallback; profile-driven
-settings and conditional PCAR callback branches are not yet integrated. The
-four projected values are appended to race traces. `pcar_control_update_regression`
-checks the scalar mapping with an explicit multiplier.
+settings remain unresolved. The four projected values are appended to race
+traces. `pcar_control_update_regression` checks the scalar mapping with an
+explicit multiplier.
+
+### Embedded selector branch and runtime constructor projection
+
+The bounded live PCAR constructor now configures the numeric portion of the
+embedded curve from runtime-record `+0x68..+0x84`, using the reconstructed
+`configure_acar_update_curve` path. It also applies the observed selector
+profile calculation and copies up to seven contiguous positive selector
+entries from runtime `+0x94..+0xAC`. The host byte-backed body preserves the
+native subobject links at `+0xC00` and `+0xC9C` as unknown pointer fields.
+
+After the scalar prefix, the live callback adapter snapshots only initialized
+curve, selector, and branch bytes, invokes `advance_pcar_callback_branch`, and
+persists its `+0xCBC/+0xD64`, `+0x54`, `+0xDEC`, and status-flag writes. If the
+branch returns a value for global `0x5093BC`, it is written back into the
+modeled race-loop control state so the next frame retains it. This connects
+the recovered selector path to live input state; it still does not connect
+the earlier body velocity/basis smoother, physics integration, or settings
+profile source. The native pointer values are intentionally not represented as
+host addresses.
 
 ### PCAR constructor control settings
 

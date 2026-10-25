@@ -1629,6 +1629,81 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
+        // The derived ACAR constructor configures its embedded curve and
+        // selector from the same mapped runtime car record. Persist the
+        // numeric fields consumed by the recovered PCAR callback branch.
+        const auto runtime_word = [&](const std::uint32_t offset) {
+            std::uint32_t value{};
+            for (std::uint32_t byte = 0; byte < 4U; ++byte) {
+                value |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
+                    player_runtime_car_record[offset + byte])) << (byte * 8U);
+            }
+            return value;
+        };
+        const auto runtime_float = [&](const std::uint32_t offset) {
+            return std::bit_cast<float>(runtime_word(offset));
+        };
+        const viper::AcarCurveSourceRecord curve_source{
+            runtime_float(0x68U), runtime_float(0x6cU),
+            runtime_float(0x70U), runtime_float(0x74U),
+            runtime_float(0x78U), runtime_float(0x7cU),
+            runtime_float(0x80U), runtime_float(0x84U)};
+        const auto configured_curve = viper::configure_acar_update_curve(
+            0U, curve_source, host_fdiv_compatibility);
+        std::array<viper::NcarObjectFieldWrite, 25> embedded_numeric_writes{};
+        std::size_t embedded_write_count{};
+        const auto write_embedded = [&](const std::uint32_t offset,
+                                        const std::uint8_t width,
+                                        const std::uint32_t bits) {
+            embedded_numeric_writes[embedded_write_count++] = {offset, width, bits};
+        };
+        const auto write_curve_float = [&](const std::uint32_t offset,
+                                           const float value) {
+            write_embedded(offset, 4U, std::bit_cast<std::uint32_t>(value));
+        };
+        write_curve_float(0xc04U, configured_curve.value_0x08);
+        write_curve_float(0xc08U, configured_curve.reciprocal_0x0c);
+        write_curve_float(0xc0cU, configured_curve.derived_value_0x30);
+        write_curve_float(0xc10U, configured_curve.scoring.subtract_scale_0x14);
+        write_curve_float(0xc30U, configured_curve.scoring.gate_value_0x34);
+        write_curve_float(0xc34U, configured_curve.scoring.blend_value_0x38);
+        write_curve_float(0xc38U, configured_curve.scoring.cutoff_0x3c);
+        write_embedded(0xc3cU, 1U, configured_curve.scoring.mode_0x40);
+        write_embedded(0xc3dU, 1U, configured_curve.scoring.mode_0x41);
+        write_curve_float(0xc40U, configured_curve.scoring.quadratic_0x44);
+        write_curve_float(0xc44U, configured_curve.scoring.linear_0x48);
+        write_curve_float(0xc48U, configured_curve.scoring.intercept_0x4c);
+        write_curve_float(0xc4cU, configured_curve.scoring.coefficient_0x50);
+        write_curve_float(0xc50U, configured_curve.scoring.offset_0x54);
+        write_curve_float(0xc54U, configured_curve.scoring.penalty_0x58);
+
+        constexpr float selector_epsilon = std::bit_cast<float>(0x34000000U);
+        constexpr float selector_scale = std::bit_cast<float>(0x3facfe73U);
+        constexpr float selector_denominator = std::bit_cast<float>(0x3e587910U);
+        const auto raw_profile = runtime_float(0xc8U);
+        const auto selector_profile = std::fabs(raw_profile) > selector_epsilon
+            ? raw_profile * selector_scale
+            : std::bit_cast<float>(0x3b03126fU);
+        write_curve_float(0xca0U, selector_denominator);
+        write_curve_float(0xca4U, 1.0F / selector_denominator);
+        write_curve_float(0xcacU, selector_profile);
+        std::uint32_t selector_count{};
+        for (; selector_count < 7U; ++selector_count) {
+            if (!(runtime_float(0x94U + selector_count * 4U) > 0.01F)) break;
+        }
+        write_embedded(0xcb8U, 4U, selector_count);
+        for (std::uint32_t index = 0; index < selector_count; ++index) {
+            write_embedded(0xcc4U + index * 4U, 4U,
+                runtime_word(0x94U + index * 4U));
+        }
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                std::span<const viper::NcarObjectFieldWrite>(
+                    embedded_numeric_writes.data(), embedded_write_count))) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
         player_body_inverse_mass_0x200 =
             player_body_constructor_plan->reciprocal_dimensions_0x200_to_0x20c[0];
         player_wheel_core_initialization =
@@ -2102,6 +2177,104 @@ struct WindowState {
         if (!viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object, pcar_callback_scalar_writes)) {
             return false;
+        }
+
+        const auto body_word = [&](const std::uint32_t offset) {
+            return viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, offset);
+        };
+        const auto body_float = [&](const std::uint32_t offset)
+            -> std::optional<float> {
+            const auto bits = body_word(offset);
+            if (!bits) return std::nullopt;
+            return std::bit_cast<float>(*bits);
+        };
+        const auto auto_shift = viper::read_ncar_body_object_u8(
+            player_runtime_state.body_object, 0xec8U);
+        const auto auto_clutch = viper::read_ncar_body_object_u8(
+            player_runtime_state.body_object, 0xec9U);
+        const auto branch_value_54 = body_float(0x54U);
+        const auto branch_value_c7c = body_float(0xc7cU);
+        const auto branch_cbc = body_word(0xcbcU);
+        const auto branch_d64 = body_word(0xd64U);
+        const auto branch_c34 = body_float(0xc34U);
+        if (auto_shift && auto_clutch && branch_value_54 && branch_value_c7c &&
+            branch_cbc && branch_d64 && branch_c34) {
+            std::array<float, 7> selector_entries{};
+            const auto selector_count_bits = body_word(0xcb8U);
+            if (!selector_count_bits || *selector_count_bits > selector_entries.size())
+                return false;
+            bool selector_entries_complete = true;
+            for (std::uint32_t index = 0; index < *selector_count_bits; ++index) {
+                const auto entry = body_float(0xcc4U + index * 4U);
+                if (!entry) {
+                    selector_entries_complete = false;
+                    break;
+                }
+                selector_entries[index] = *entry;
+            }
+            const auto selector_denominator = body_float(0xca0U);
+            const auto selector_floor = body_word(0xcb4U);
+            const auto selector_base = body_float(0xcc0U);
+            const auto selector_policy = body_word(0xd00U);
+            if (selector_entries_complete && selector_denominator && selector_floor &&
+                selector_base && selector_policy) {
+                viper::PcarCallbackBranchFields branch{};
+                branch.scalars = player_pcar_control_prefix;
+                branch.value_0x54 = *branch_value_54;
+                branch.value_0xec8 = *auto_shift;
+                branch.value_0xec9 = *auto_clutch;
+                branch.value_0xc7c = *branch_value_c7c;
+                branch.value_0xcbc = *branch_cbc;
+                branch.value_0xd64 = *branch_d64;
+                branch.value_0xc34 = *branch_c34;
+                const auto saved_flags = body_word(0x4U);
+                if (!saved_flags) return false;
+                branch.value_0x4 = *saved_flags;
+                viper::PcarCallbackBranchObservation branch_observation{};
+                branch_observation.globals = pcar_callback_globals;
+                branch_observation.selector_0xc98 = viper::EmbeddedSelectionFields{
+                    *selector_denominator,
+                    std::bit_cast<std::int32_t>(*selector_floor),
+                    static_cast<int>(*selector_count_bits),
+                    std::span<const float>(selector_entries.data(),
+                        static_cast<std::size_t>(*selector_count_bits)),
+                    std::bit_cast<std::int32_t>(*branch_cbc),
+                    *selector_base,
+                    *selector_policy != 0U};
+                const auto read_curve = [&](const std::uint32_t offset) {
+                    return body_float(offset).value_or(0.0F);
+                };
+                branch_observation.curve_0xbfc = viper::UpdateCurveFields{
+                    read_curve(0xc10U), read_curve(0xc30U), read_curve(0xc34U),
+                    read_curve(0xc38U),
+                    viper::read_ncar_body_object_u8(
+                        player_runtime_state.body_object, 0xc3cU).value_or(0U),
+                    viper::read_ncar_body_object_u8(
+                        player_runtime_state.body_object, 0xc3dU).value_or(0U),
+                    read_curve(0xc40U), read_curve(0xc44U), read_curve(0xc48U),
+                    read_curve(0xc4cU), read_curve(0xc50U), read_curve(0xc54U)};
+                const auto branch_result = viper::advance_pcar_callback_branch(
+                    branch, branch_observation);
+                if (!branch_result.complete) return false;
+                std::array<viper::NcarObjectFieldWrite, 6> branch_writes{{
+                    {0xcbcU, 4U, branch.value_0xcbc},
+                    {0xd64U, 4U, branch.value_0xd64},
+                    {0x54U, 4U, std::bit_cast<std::uint32_t>(branch.value_0x54)},
+                    {0xdecU, 4U, std::bit_cast<std::uint32_t>(branch.scalars.value_0xdec)},
+                    {0x4U, 4U, branch.value_0x4},
+                    {0xde4U, 4U, std::bit_cast<std::uint32_t>(branch.scalars.value_0xde4)},
+                }};
+                if (!viper::apply_ncar_body_object_writes(
+                        player_runtime_state.body_object, branch_writes)) return false;
+                player_pcar_control_prefix = branch.scalars;
+                if (branch_result.output_0x5093bc) {
+                    pcar_callback_globals.value_0x5093bc =
+                        *branch_result.output_0x5093bc;
+                    control_update_state.controls.counter_0x5093bc =
+                        std::bit_cast<std::int32_t>(*branch_result.output_0x5093bc);
+                }
+            }
         }
 
         // The current route motion model accepts digital inputs. Preserve the

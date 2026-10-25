@@ -287,6 +287,11 @@ struct NcarBodyRuntimeObjectState {
     const NcarBodyRuntimeObjectState& source,
     std::uint32_t offset) noexcept;
 
+// Reads one byte only when it has an observed initialization/write owner.
+[[nodiscard]] std::optional<std::uint8_t> read_ncar_body_object_u8(
+    const NcarBodyRuntimeObjectState& source,
+    std::uint32_t offset) noexcept;
+
 // Materializes the shared 0x43E490 body constructor's known direct writes,
 // derived dimensions/matrices, subobject initialization and finalizer stores.
 // It does not apply a derived PCAR/NCAR constructor or initialize unknown

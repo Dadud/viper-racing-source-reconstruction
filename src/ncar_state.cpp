@@ -2339,6 +2339,15 @@ std::optional<std::uint32_t> read_ncar_body_object_u32(
     return value;
 }
 
+std::optional<std::uint8_t> read_ncar_body_object_u8(
+    const NcarBodyRuntimeObjectState& source,
+    const std::uint32_t offset) noexcept
+{
+    if (offset >= ncar_body_runtime_object_bytes ||
+        source.initialized_bytes[offset] == 0U) return std::nullopt;
+    return std::to_integer<std::uint8_t>(source.bytes[offset]);
+}
+
 bool materialize_ncar_body_constructor(
     NcarBodyRuntimeObjectState& destination,
     const NcarBodyConstructorPlan& plan) noexcept
@@ -2401,7 +2410,9 @@ NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
     // 0x440100 at parent +0xBFC. Its inherited 0x43F8F0 base is followed
     // by the curve vtable and selector/evaluator defaults.
     write(0x0bfcU, 4U, 0x004c8770U);
-    for (const std::uint32_t offset : {0x0c00U, 0x0c04U, 0x0c08U,
+    // +0xC00 is a native pointer/link and must not be fabricated as a zero
+    // DWORD by the host byte-backed object.
+    for (const std::uint32_t offset : {0x0c04U, 0x0c08U,
              0x0c0cU, 0x0c10U, 0x0c14U}) {
         write(offset, 4U, 0U);
     }
@@ -2426,8 +2437,9 @@ NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
 
     // 0x43FA30's 0x43F8F0 base writes, then its overrides at +0xC98.
     write(0x0c98U, 4U, 0x004c8770U);
+    // +0xC9C is the selector's native parent pointer.
     for (const std::uint32_t offset : {0x0cacU, 0x0ca8U, 0x0ca4U,
-             0x0ca0U, 0x0c9cU}) {
+             0x0ca0U}) {
         write(offset, 4U, 0U);
     }
     write(0x0c98U, 4U, 0x004c8778U);
