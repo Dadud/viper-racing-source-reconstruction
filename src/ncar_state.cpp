@@ -2393,6 +2393,8 @@ bool materialize_ncar_body_constructor(
             std::bit_cast<std::uint32_t>(plan.scaled_dimensions_0x1f0_to_0x1fc[index])});
         writes.push_back({static_cast<std::uint32_t>(0x200U + index * 4U), 4U,
             std::bit_cast<std::uint32_t>(plan.reciprocal_dimensions_0x200_to_0x20c[index])});
+    }
+    for (std::size_t index = 0; index < plan.matrix_0x210.size(); ++index) {
         writes.push_back({static_cast<std::uint32_t>(0x210U + index * 4U), 4U,
             std::bit_cast<std::uint32_t>(*plan.matrix_0x210[index])});
         writes.push_back({static_cast<std::uint32_t>(0x264U + index * 4U), 4U,

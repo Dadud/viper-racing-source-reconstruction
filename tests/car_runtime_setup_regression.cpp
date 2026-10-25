@@ -195,6 +195,25 @@ int main()
         require(offset_write != offset_plan.inherited_base_writes_0x4375c0.end() &&
                 offset_write->value_bits == 0x12345678U,
             "body base constructor must preserve the serialized object stream offset at +0x08");
+        viper::NcarBodyRuntimeObjectState materialized_body_matrices{};
+        require(viper::materialize_ncar_body_constructor(
+                    materialized_body_matrices, offset_plan),
+            "complete ordinary body constructor plan must materialize");
+        for (std::size_t index = 0U; index < 9U; ++index) {
+            const auto expected = std::bit_cast<std::uint32_t>(
+                *offset_plan.matrix_0x210[index]);
+            require(viper::read_ncar_body_object_u32(materialized_body_matrices,
+                        static_cast<std::uint32_t>(0x210U + index * 4U)) == expected &&
+                    viper::read_ncar_body_object_u32(materialized_body_matrices,
+                        static_cast<std::uint32_t>(0x264U + index * 4U)) == expected,
+                "body materialization must persist each lane in both complete 3x3 matrices");
+        }
+        const auto materialized_kinematics =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                materialized_body_matrices);
+        require(materialized_kinematics.input.has_value() &&
+                materialized_kinematics.missing_float_count == 0U,
+            "complete constructor writes must satisfy the body kinematics byte gate");
         const std::array<float, 12> placement_transform{
             0.0F, -1.0F, 0.0F,
             1.0F, 0.0F, 0.0F,

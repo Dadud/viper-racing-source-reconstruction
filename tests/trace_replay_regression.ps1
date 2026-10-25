@@ -73,8 +73,6 @@ try {
         $bodyKinematicsMissingOffsets[$lane] = [Array]::IndexOf(
             $tickHeader, "body_kinematics_missing_offset_$lane")
     }
-    $expectedMissingKinematicsOffsets = @(
-        '274', '278', '27c', '280', '284', '220', '224', '228', '22c', '230')
     $bodyBasisColumns = [int[]]::new(9)
     for ($basis = 0; $basis -lt 9; ++$basis) {
         $bodyBasisColumns[$basis] = [Array]::IndexOf(
@@ -156,11 +154,10 @@ try {
         $reportedMissingOffsets = @($bodyKinematicsMissingOffsets | Where-Object {
             -not [string]::IsNullOrWhiteSpace($fields[$_])
         } | ForEach-Object { $fields[$_] })
-        if ($fields[$bodyKinematicsReadyColumn] -ne '0' -or
+        if ($fields[$bodyKinematicsReadyColumn] -ne '1' -or
             $fields[$bodyKinematicsNonFiniteColumn] -ne '0' -or
-            $fields[$bodyKinematicsMissingCountColumn] -ne '10' -or
-            ($reportedMissingOffsets -join ',') -cne
-                ($expectedMissingKinematicsOffsets -join ',')) {
+            $fields[$bodyKinematicsMissingCountColumn] -ne '0' -or
+            $reportedMissingOffsets.Count -ne 0) {
             throw "Body kinematics diagnostics differ at line $($index + 1): ready=$($fields[$bodyKinematicsReadyColumn]), nonfinite=$($fields[$bodyKinematicsNonFiniteColumn]), missingCount=$($fields[$bodyKinematicsMissingCountColumn]), offsets=$($reportedMissingOffsets -join ';')"
         }
         foreach ($column in $bodyBasisColumns + $bodyPositionColumns) {

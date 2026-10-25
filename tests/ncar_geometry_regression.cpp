@@ -86,6 +86,15 @@ int main()
                 body_runtime_state.initialized_bytes[0x234U] != 0U &&
                 body_runtime_state.initialized_bytes[0x50cU] == 0U,
             "body constructor state must preserve initialized pose/velocity while leaving runtime-only fields unknown");
+        for (std::size_t index = 0U; index < 9U; ++index) {
+            const auto expected = std::bit_cast<std::uint32_t>(
+                *body_constructor_plan.matrix_0x210[index]);
+            require(viper::read_ncar_body_object_u32(body_runtime_state,
+                        static_cast<std::uint32_t>(0x210U + index * 4U)) == expected &&
+                    viper::read_ncar_body_object_u32(body_runtime_state,
+                        static_cast<std::uint32_t>(0x264U + index * 4U)) == expected,
+                "body constructor must persist all nine lanes of both derived matrices");
+        }
         require(viper::read_ncar_body_object_u32(body_runtime_state, 0x234U) == 0U &&
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0x50cU),
             "body reads must expose initialized velocity but keep unwritten derived state unknown");
