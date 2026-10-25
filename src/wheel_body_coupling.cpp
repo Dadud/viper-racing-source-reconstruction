@@ -2246,8 +2246,19 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     } else {
         auto wheel_pair_input = input.wheel_pair_differential_input;
         wheel_pair_input.contact_bytes = mode_force_input.contact_bytes;
-        result.wheel_pair_differentials =
-            apply_ncar_integrator_wheel_pair_differentials(wheel_pair_input);
+        const bool wheel_pair_operands_finite =
+            std::isfinite(wheel_pair_input.first_value_0x63c) &&
+            std::isfinite(wheel_pair_input.first_reference_0x7e0) &&
+            std::isfinite(wheel_pair_input.first_scale_0xdd4) &&
+            std::isfinite(wheel_pair_input.second_value_0x984) &&
+            std::isfinite(wheel_pair_input.second_reference_0xb28) &&
+            std::isfinite(wheel_pair_input.second_scale_0xdd8);
+        if (wheel_pair_operands_finite) {
+            result.wheel_pair_differentials =
+                apply_ncar_integrator_wheel_pair_differentials(wheel_pair_input);
+        } else {
+            result.input_complete = false;
+        }
     }
     auto common_force_input = input.common_force_input;
     common_force_input.contact_bytes = mode_force_input.contact_bytes;
