@@ -1064,7 +1064,9 @@ public:
     }
 
     bool render(const std::string_view hud_text,
-                const float focus_x, const float focus_z)
+                const float focus_x, const float focus_z,
+                const std::array<float, 2>& camera_pan_clip,
+                const float camera_zoom)
     {
         if (!target_ || !context_ || !swap_chain_) return false;
         constexpr float color[]{0.035f, 0.055f, 0.075f, 1.0f};
@@ -1074,7 +1076,8 @@ public:
         context_->RSSetViewports(1, &viewport);
         context_->ClearRenderTargetView(target_.Get(), color);
         const auto focus = map_to_clip(focus_x, focus_z);
-        camera_constants_ = {focus[0], focus[1], 1.6F, 0.0F};
+        camera_constants_ = {focus[0] + camera_pan_clip[0],
+            focus[1] + camera_pan_clip[1], camera_zoom, 0.0F};
         context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
             &camera_constants_, 0U, 0U);
         context_->VSSetConstantBuffers(0U, 1U, camera_buffer_.GetAddressOf());
@@ -1916,6 +1919,10 @@ struct WindowState {
     bool playback_active{};
     bool paused{};
     bool return_to_frontend{};
+    bool camera_follow_player{true};
+    std::array<float, 2> camera_anchor_world{};
+    std::array<float, 2> camera_pan_clip{};
+    float camera_zoom{1.6F};
     viper::PhysicsStepAccumulator physics_step_accumulator{};
     viper::PhysicsStepSchedule last_physics_step_schedule{};
     std::vector<PlayerPhysicsTickContext> player_physics_ticks_this_update;
@@ -2271,9 +2278,8 @@ struct WindowState {
             player_runtime_car_record.clear();
             return false;
         }
-        if (!std::all_of(player_wheel_anchors->vertex_indices.begin(),
-                player_wheel_anchors->vertex_indices.end(),
-                [](const auto& index) { return index.has_value(); })) {
+        if (!viper::ncar_wheel_vertex_anchor_result_complete(
+                *player_wheel_anchors)) {
             player_runtime_car_record.clear();
             player_wheel_anchors.reset();
             return false;
@@ -3521,6 +3527,43 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
             DestroyWindow(hwnd);
             return 0;
         }
+        if (state && wparam == VK_F3 && (lparam & (1LL << 30)) == 0) {
+            if (state->camera_follow_player) {
+                state->camera_anchor_world =
+                    state->graphics.car_position(state->player_car_index);
+                state->camera_follow_player = false;
+            } else {
+                state->camera_follow_player = true;
+                state->camera_pan_clip = {};
+            }
+            return 0;
+        }
+        if (state && wparam == VK_F4 && (lparam & (1LL << 30)) == 0) {
+            state->camera_follow_player = true;
+            state->camera_pan_clip = {};
+            state->camera_zoom = 1.6F;
+            return 0;
+        }
+        if (state && (GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+            constexpr float pan_step = 0.055F;
+            bool handled = true;
+            if (wparam == VK_LEFT) state->camera_pan_clip[0] -= pan_step;
+            else if (wparam == VK_RIGHT) state->camera_pan_clip[0] += pan_step;
+            else if (wparam == VK_UP) state->camera_pan_clip[1] -= pan_step;
+            else if (wparam == VK_DOWN) state->camera_pan_clip[1] += pan_step;
+            else if (wparam == VK_ADD || wparam == VK_OEM_PLUS)
+                state->camera_zoom = (std::min)(4.5F, state->camera_zoom * 1.1F);
+            else if (wparam == VK_SUBTRACT || wparam == VK_OEM_MINUS)
+                state->camera_zoom = (std::max)(0.35F, state->camera_zoom / 1.1F);
+            else handled = false;
+            if (handled) {
+                state->camera_pan_clip[0] = std::clamp(
+                    state->camera_pan_clip[0], -1.5F, 1.5F);
+                state->camera_pan_clip[1] = std::clamp(
+                    state->camera_pan_clip[1], -1.5F, 1.5F);
+                return 0;
+            }
+        }
         if (state && !state->playback_active && (lparam & (1LL << 30)) == 0) {
             update_control_key(*state, static_cast<UINT>(wparam), true);
         }
@@ -3633,7 +3676,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::wstring(car_name.begin(), car_name.end());
     load_keyboard_bindings(state, options);
     const auto title_utf8 = std::string("Viper Racing — ") + std::string(track_name) +
-        " & " + std::string(car_name) + " Race (WASD / Arrows)";
+        " & " + std::string(car_name) +
+        " Race (WASD / Arrows; Ctrl+Arrows pan, Ctrl+Plus/Minus zoom; F3 follow, F4 reset)";
     const int title_length = MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1, nullptr, 0);
     if (title_length <= 0) return 1;
     std::wstring title(static_cast<std::size_t>(title_length), L'\0');
@@ -3653,6 +3697,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         DestroyWindow(hwnd);
         return 1;
     }
+    state.camera_anchor_world = state.graphics.car_position(state.player_car_index);
     const auto* player_placement =
         state.graphics.car_placement_plan(player_car_index);
     if (player_placement == nullptr ||
@@ -3711,6 +3756,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         state.full_task_record_stream.emplace(
             state.physics_task_manifest->initial_cursor);
         bool stream_ok = true;
+        std::string stream_failure_stage = "append ordered task records";
         for (const auto& record : ordered_track_records.records) {
             const auto appended = state.full_task_record_stream->append_record(
                 record.record_bytes);
@@ -3721,6 +3767,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             }
         }
         const auto stream = state.full_task_record_stream->snapshot();
+        stream_failure_stage = "validate serialized ordered-record framing";
         stream_ok = stream_ok && stream.status ==
             viper::PhysicsTaskRecordSerializationStatus::complete &&
             stream.initial_cursor == state.physics_task_manifest->initial_cursor &&
@@ -3736,6 +3783,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 serialized.record_size == ordered.record_bytes.size();
         }
         if (stream_ok) {
+            stream_failure_stage = "decode serialized task stream";
             state.full_task_record_readback =
                 viper::read_physics_task_record_stream(stream.bytes);
             const auto& decoded = *state.full_task_record_readback;
@@ -3745,6 +3793,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 decoded.records.size() == ordered_track_records.records.size() &&
                 decoded.final_cursor == stream.final_cursor;
             if (stream_ok) {
+                stream_failure_stage = "inventory serialized task objects";
                 const auto inventory = viper::inventory_physics_task_objects(
                     decoded, stream.bytes);
                 stream_ok = inventory.status ==
@@ -3753,6 +3802,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     state.physics_task_object_inventory = inventory.entries;
             }
             if (stream_ok) {
+                stream_failure_stage = "materialize serialized task objects";
                 auto runtime_collection =
                     viper::materialize_physics_task_runtime_collection(
                         decoded, stream.bytes, false);
@@ -3763,6 +3813,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         std::move(runtime_collection);
             }
             if (stream_ok) {
+                stream_failure_stage = "bind configured cars to ordered stream";
                 const auto bindings = viper::bind_configured_car_task_records_to_stream(
                     ordered_track_records, decoded, stream.bytes);
                 stream_ok = bindings.status ==
@@ -3771,6 +3822,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     state.configured_car_stream_bindings = bindings.bindings;
             }
             if (stream_ok) {
+                stream_failure_stage = "retain bound ACAR constructor state";
                 state.ai_acar_curve_sources.clear();
                 state.ai_acar_body_states.clear();
                 for (const auto& binding : state.configured_car_stream_bindings) {
@@ -3879,12 +3931,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     readback.record_size == ordered.record_bytes.size();
             }
             if (stream_ok && serialized_stream_offset.has_value()) {
+                stream_failure_stage = "bind and initialize player PCAR";
                 const auto binding = viper::bind_player_pcar_task_record(
                     decoded, stream.bytes, state.player_runtime_car_record,
                     *serialized_stream_offset);
                 stream_ok = binding.status ==
                         viper::PlayerPcarTaskBindingStatus::complete &&
                     binding.binding.has_value();
+                if (!stream_ok) {
+                    std::cerr << "\nPCAR stream binding status: "
+                              << static_cast<unsigned>(binding.status) << ".";
+                }
                 if (stream_ok) {
                     state.player_pcar_task_binding = *binding.binding;
                     const auto player_record_bytes =
@@ -3896,6 +3953,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             player_record_bytes, player_model.vertices, wheel_tires,
                             binding.binding->serialized_stream_cursor,
                             *player_placement);
+                    if (!stream_ok)
+                        std::cerr << "\nPCAR constructor projection failed; placement="
+                                  << (player_placement != nullptr) << ", body="
+                                  << state.player_body_constructor_plan.has_value()
+                                  << ", wheel-core="
+                                  << state.player_wheel_core_initialization.has_value()
+                                  << ", wheel-core-complete="
+                                  << (state.player_wheel_core_initialization.has_value() &&
+                                      state.player_wheel_core_initialization->input_complete)
+                                  << ".";
                 }
             } else {
                 stream_ok = false;
@@ -3908,6 +3975,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::size_t unsupported_stat_variant_count = 0U;
         std::size_t unavailable_active_callback_count = 0U;
         if (stream_ok && state.physics_task_runtime_collection.has_value()) {
+            stream_failure_stage = "validate retained runtime task entries";
             state.inactive_stat_task_states.clear();
             for (const auto& entry :
                  state.physics_task_runtime_collection->entries) {
@@ -3982,6 +4050,27 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << unavailable_active_callback_count
                       << " active callback records remain unavailable";
         } else {
+            std::cerr << "\nTask-stream initialization failed during: "
+                      << stream_failure_stage << ".";
+            if (state.full_task_record_stream.has_value()) {
+                const auto failed_stream =
+                    state.full_task_record_stream->snapshot();
+                std::cerr << " Serialized status "
+                          << static_cast<unsigned>(failed_stream.status)
+                          << ", records " << failed_stream.records.size()
+                          << ", expected manifest records "
+                          << state.physics_task_manifest->entries.size()
+                          << ", cursor 0x" << std::hex
+                          << failed_stream.final_cursor << std::dec << ".";
+            }
+            if (state.full_task_record_readback.has_value()) {
+                const auto& failed_readback = *state.full_task_record_readback;
+                std::cerr << " Readback status "
+                          << static_cast<unsigned>(failed_readback.status)
+                          << ", consumed " << failed_readback.consumed_bytes
+                          << " bytes, records " << failed_readback.records.size()
+                          << ".";
+            }
             state.full_task_record_stream.reset();
             state.full_task_record_readback.reset();
             state.physics_task_object_inventory.clear();
@@ -4473,10 +4562,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 if ((trace_frame % 120U) == 0U) trace.flush();
             }
-            const auto camera_focus =
-                state.graphics.car_position(state.player_car_index);
+            const auto camera_focus = state.camera_follow_player
+                ? state.graphics.car_position(state.player_car_index)
+                : state.camera_anchor_world;
             if (render_frame && !state.graphics.render(state.hud_text(),
-                    camera_focus[0], camera_focus[1])) {
+                    camera_focus[0], camera_focus[1], state.camera_pan_clip,
+                    state.camera_zoom)) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
                 return 1;

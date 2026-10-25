@@ -498,6 +498,24 @@ NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
     return result;
 }
 
+bool ncar_wheel_vertex_anchor_result_complete(
+    const NcarWheelVertexAnchorResult& result) noexcept
+{
+    for (std::size_t wheel = 0U; wheel < result.sources.size(); ++wheel) {
+        if (result.sources[wheel] == NcarWheelAnchorSource::model_vertex) {
+            if (!result.vertex_indices[wheel].has_value()) return false;
+        } else if (result.sources[wheel] ==
+                       NcarWheelAnchorSource::shared_zero_vector) {
+            if (result.vertex_indices[wheel].has_value() ||
+                result.selected_anchor_positions[wheel] !=
+                    std::array<float, 3>{0.0F, 0.0F, 0.0F}) return false;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::optional<NcarWheelVertexAnchorResult>
 select_ncar_wheel_vertex_anchors_from_runtime_record(
     const std::span<const std::byte> runtime_record,

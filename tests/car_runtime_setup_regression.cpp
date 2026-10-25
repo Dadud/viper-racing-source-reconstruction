@@ -521,6 +521,8 @@ int main()
             anchor_record, anchor_vertices);
         require(anchors.has_value(),
             "complete mapped runtime fields must permit mesh-derived wheel anchors");
+        require(viper::ncar_wheel_vertex_anchor_result_complete(*anchors),
+            "model-vertex anchor selections must be complete when every index exists");
         for (std::size_t wheel = 0; wheel < expected_candidates.size(); ++wheel) {
             require(anchors->candidate_positions[wheel] == expected_candidates[wheel] &&
                     anchors->vertex_indices[wheel] == wheel &&
@@ -547,6 +549,14 @@ int main()
                     zero_source_anchors->vertex_indices.end(),
                     [](const auto& index) { return !index.has_value(); }),
             "disabled option must retain the shared-zero source for each wheel");
+        require(viper::ncar_wheel_vertex_anchor_result_complete(
+                    *zero_source_anchors),
+            "shared-zero anchor selections must be complete without mesh indices");
+        auto invalid_zero_source_anchors = *zero_source_anchors;
+        invalid_zero_source_anchors.vertex_indices[0] = 0U;
+        require(!viper::ncar_wheel_vertex_anchor_result_complete(
+                    invalid_zero_source_anchors),
+            "shared-zero anchors must reject a fabricated model-vertex index");
         const auto zero_source_four_wheels =
             viper::initialize_ncar_four_wheel_core({
                 anchor_record, anchor_vertices, 0.5F, false, false});

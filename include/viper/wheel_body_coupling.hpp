@@ -605,6 +605,12 @@ struct NcarWheelVertexAnchorResult {
 [[nodiscard]] NcarWheelVertexAnchorResult select_ncar_wheel_vertex_anchors(
     const NcarWheelVertexAnchorInput& input) noexcept;
 
+// Validates that each selected anchor matches its option-gated source:
+// model-vertex sources require an index; shared-zero sources require no index
+// and retain the zero-vector coordinates.
+[[nodiscard]] bool ncar_wheel_vertex_anchor_result_complete(
+    const NcarWheelVertexAnchorResult& result) noexcept;
+
 // Reads mapped fields +0x58/+0x5C/+0x128 and selects anchors directly from
 // parsed FNIM rows. Returns no result if the bounded runtime record is short.
 [[nodiscard]] std::optional<NcarWheelVertexAnchorResult>
