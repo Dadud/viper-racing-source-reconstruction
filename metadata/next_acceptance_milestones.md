@@ -450,6 +450,14 @@ without observation-only substitution; then harden stability and scenario
 replay before extending mode behavior. Keep all outstanding native behaviors
 visible in the ledger.
 
+**Current dependency:** The throttle-aligned original capture now supplies
+eight selected PCAR updates and 32 ordered wheel observations, including
+downstream suspension and tire projection fields. Before production wiring,
+resolve the actual wheel `+0x158` producer and the upstream tire response/query
+producers, then obtain timestamp-correlated wheel/accumulator/body samples for
+throttle, steering, braking, and coast. Capture identity and limits are in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+
 ### 3. Complete and compare the first original-compatible single-player race
 
 **Outcome:** One supported Viper/Bemidji single-player race has a usable

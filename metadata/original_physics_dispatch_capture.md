@@ -743,3 +743,52 @@ This narrows direct statically encoded stores only. It does not find writes
 through computed pointers, bulk copies, or aliases whose store instruction
 does not encode `+0x158`; the actual runtime wheel-field producer remains
 unknown and still requires runtime evidence.
+
+### Throttle-aligned wheel response capture (2026-10-25)
+
+A follow-up used the installed official launcher and a verified staged copy
+at `../../analysis/reference_captures/wheel_history_probe_20261025/`. The
+launcher (PID 14636) created the staged `race.bin` child (PID 8412) with its
+primary thread suspended. The child bridge was adapted only to require this
+staged working directory; its SHA-256 was
+`9A413DA797797FD5BEB439FF8B747C1B164BD9850A93709A3233D9F92D11A8B8`.
+After installing the bounded hooks, the bridge resumed the child thread
+(previous suspend count 1). The engine SHA-256 was
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`; all 32
+staged `Data` files matched the earlier manifest. The process-local first
+`GetAvailableVidMem` total override (`0xFFFF0000` to `0x00200000`) was needed
+to reach gameplay. The installed `Config/options.cfg` remained at SHA-256
+`7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`, equal
+to the pre-capture backup.
+
+In Quick Race with Dodge Viper at Bemidji, a synthetic DIK_UP wrapper return
+was patched for 1.5 seconds. The original throttle global rose through
+0.4224 and 0.8250 to 1.0, then decayed after the patch ended. A separate
+throttle-gated probe began on the first selected PCAR integrator after that
+global exceeded 0.001. It recorded eight selected `0x431150` integrators,
+32 ordered `0x442530` wheel calls, 128 force-writer hook rows, and 192 stage
+rows (32 at each of six suspension/tire/history observation stages). The
+selected wheel response at `+0x178` matched the captured suspension
+magnitude local; suspension direction components, wheel response vectors,
+pre-projection tire response at `+0xF4`, projected vector at `+0x100`,
+application point at `+0xC8`, contact depth, scalar response, and contact flag
+were recorded. Body position and speed samples show motion during the same
+throttle/coast interval.
+
+The compact extract is
+`../../analysis/reference_captures/wheel_history_probe_20261025/pcar_wheel_response_after_throttle_20261025.json`,
+SHA-256 `A50A624562FCD1EC7B5277A68319753347A9BF3B39DCE834CB64E5B82A47D9C6`,
+REA Evidence ID
+`ev_6b4d1ed524461353ba232f14d2a796ec67cf3f9779b0c17b1299c306be087617`.
+The probe script SHA-256 was
+`8496F2C474B90BE7F2CCB68050C78030D908C7DE3E944B63CE0DBC8F8FBBE20B`.
+The throttle samples are tied to a synthetic key-wrapper intervention; raw
+DirectInput delivery was not established. Generic force-writer argument
+pointers are excluded because their x86 argument layout was not validated.
+The compact wheel rows have no per-row callback ordinal/timestamp, so they do
+not establish precise causal alignment to each throttle sample. No steering,
+braking, reset, controlled collision, or paired reconstruction trace was
+captured. This is not a throttle-only force law or proof that all consumed
+physics fields are owned. In particular, the actual wheel `+0x158` producer
+and upstream tire-response/query producers remain unresolved; keep the
+production physics path disconnected.

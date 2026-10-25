@@ -33,26 +33,28 @@ original-matched game.
 The full acceptance criteria and exact supporting evidence remain in the
 [completion ledger](completion_ledger.md). A successful launcher-owned capture
 on 2026-10-25 applied a bounded synthetic DIK_UP pulse and observed the
-original PCAR throttle and speed response. This establishes input-to-motion
-evidence for that intervention, but does not capture wheel-force producers or
-provide a paired reconstruction baseline. Separate Frida Stalker attempts
-crashed in `frida-agent.dll`; their failure is documented in
-[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md)
-and must not be conflated with the successful throttle capture.
+original PCAR throttle/body response alongside eight throttle-gated integrators
+and 32 wheel updates. It records downstream suspension/tire stages, but does
+not source the actual wheel `+0x158` producer, upstream tire-response/query
+inputs, or a paired reconstruction baseline. Separate Frida Stalker attempts
+crashed in `frida-agent.dll`; the new low-overhead capture did not use Stalker
+and does not diagnose those crashes. Details and limits are documented in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 
 ## Fastest correct path to the first accepted race
 
 Treat one Viper/Bemidji single-player race as the release gate. Work in this
 order, and keep later systems out of the gate until this race is reliable:
 
-1. **Complete the input-to-force evidence loop.** Reuse the verified
-   launcher-owned child flow and the existing bounded DIK_UP throttle capture.
-   The remaining capture must correlate the same intervention with per-wheel
-   force contributors, `+0x24C/+0x258` accumulators, and body position and
-   velocity at `0x431150` entry/return. The current Stalker probe is unsafe in
-   this setup because Windows crash reports identify `frida-agent.dll` as the
-   faulting module. Use a native debugger or validate a lower-overhead capture
-   method before expanding instrumentation; keep unresolved stores fail-closed.
+1. **Close the upstream wheel-input evidence gaps.** Use the successful
+   launcher-owned staged flow and low-overhead hooks. First identify the
+   actual runtime producer of each wheel's `+0x158` and the producers of the
+   pre-projection tire response/query values. Then capture timestamped
+   per-wheel rows together with `+0x24C/+0x258` accumulator deltas and body
+   state for throttle, steering, braking, and coast. Preserve fail-closed
+   behavior wherever a consumed field or callback remains unresolved; do not
+   treat the current synthetic input trace as normal keyboard delivery or as
+   a complete force law.
 2. **Implement the smallest complete physical player step.** Connect contact
    observations, per-wheel force contributors and accumulator collection to
    the byte-backed PCAR state only when every consumed field and callback
