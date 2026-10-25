@@ -1015,3 +1015,24 @@ A bounded six-second Frida hardware-watch probe armed write watchpoints on the f
 Static disassembly of the same `0x431150` body identifies all four stores: `0x4319D5` writes `PCAR+0x6AC`, `0x4319B6` writes `+0x850`, `0x431A10` writes `+0x9F4`, and `0x431A02` writes `+0xB98`. These are wheel subobject `+0x158` at bases `+0x554`, `+0x6F8`, `+0x89C`, and `+0xA40`. The already implemented `apply_ncar_integrator_wheel_pair_differentials` models the opposite-sign front/rear pair equations and contact gates. The Windows player callback now feeds it the six byte-backed body operands (`+0x63C`, `+0x7E0`, `+0xDD4`, `+0x984`, `+0xB28`, `+0xDD8`) and four initialized contact bytes, then stages and commits all four wheel writes together. Per-tick trace ownership is true only after that commit; absent or non-finite inputs leave existing bytes untouched. Supporting static evidence: disassembly `ev_2534fc83d0f6e0f4cea9397149195b61a7e7383fec5e886f81c33c3d9bc331f2`, pseudocode `ev_7a9e71a13e0b73abe7ddb371739a299361079bfb2ac0f0922555068ca2abdc3b`, and exact function resolution `ev_9b5a3813b67ec3075c3f43d23ae2eeac05178bc6ee1d6a62ec90a43a55009ad4`.
 
 This resolves the direct `+0x158` producer. It does not supply freshness for the six upstream body values, prove a changed-value native comparison, or connect suspension/tire forces to PCAR accumulators and body integration. The route-motion model therefore remains authoritative for rendered motion.
+
+### Callback-nesting and ordering re-audit (2026-10-25)
+
+A second bounded hardware-watch capture hooked `0x4384D0` and armed the four
+wheel-field watches during its first callback. The `0x4319BC` post-store trap
+occurred on the same thread while that callback's entry count was 1 and its
+leave count was 0. Thus the paired writer executes during the lifetime of the
+observed callback. The six source operands and four contact bytes were readable
+at the trap, but the written value again matched its prior bits. Evidence:
+`ev_ec4413f88ebc060e0e478f2127be4b3cf9c21ad9323c83848467b38a1f6d515c`.
+
+This nesting observation does not prove that the runtime's current placement
+before its timestamp projection matches the native instruction order, nor that
+the six byte-backed operands are refreshed before each callback. Static
+analysis confirms `0x431150` is a 4,049-byte body and the writer is an internal
+store in that integrator. Ghidra records a direct call to `0x431150` at
+`0x42AC98`, but does not assign that callsite to a containing procedure; a
+Frida fuzzy backtrace was inconclusive. Keep the runtime projection explicitly
+provisional until callback-stage order and operand freshness are established.
+Do not infer wheel-force or body-pose production from this nested same-value
+store.
