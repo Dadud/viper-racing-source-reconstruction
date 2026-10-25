@@ -498,9 +498,12 @@ fields before the reads. The portable body-step now derives the paired
 in native order. When that pipeline is disabled, its explicit six scalar
 operands are now finite-gated; invalid operands mark the step incomplete and
 leave the paired outputs at their default values. This closes model
-correctness gaps only. Its live inputs remain incomplete: native contact/query
-semantics, prior `+0x158` state, pair scales, suspension parameters, surface
-polarity, and tire response/query producers are not session-owned. Do not
+correctness gaps only. The native TPPB v2 `track.bpp` plane/tree is parsed and
+the runtime queries it from byte-backed PCAR pose and wheel constructor
+geometry; those contact observations are not yet fed into the composed wheel
+force/body step. Its other live inputs remain incomplete: surface-code response
+mapping, response polarity, prior `+0x158` state, pair scales, suspension
+parameters, and tire response inputs. Do not
 repeat a capture that only rereads the six pair operands. Capture the missing
 upstream inputs and timestamp-correlated wheel/accumulator/body samples for
 throttle, steering, braking, and coast. The captured `+0xF4` row is sampled
@@ -511,7 +514,13 @@ wheel updates, 128 accumulator-writer rows, and 192 suspension/tire/history
 stage rows. It found wheel `+0x158` unchanged within each `0x442530` call and
 some `+0xE8` histories changing; the native tick read was unavailable and the
 capture had no input schedule. It does not close input provenance or acceptance.
-Capture identity and limits are in
+Static `0x442530` analysis now names the operand families: body point velocity
+at wheel `+0x130`, tire curves reached through wheel `+0x8C`, coefficients
+`+0x90/+0x94/+0x98`, mode scales, contact-query results, and spin/contact/tire
+history fields. The next capture should correlate these inputs at one wheel
+callback with its `+0xF4` result and PCAR `+0x24C/+0x258` deltas under separate
+coast, throttle, steering, and braking windows; capture identity and static
+Evidence IDs are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 
 ### 3. Complete and compare the first original-compatible single-player race

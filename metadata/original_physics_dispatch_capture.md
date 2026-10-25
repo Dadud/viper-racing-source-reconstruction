@@ -1154,3 +1154,63 @@ is included in the private exported bundle
 `2ec142bad9e1ff6f50c1ba96a0f18ea4f4fbc3355dc6587f178582d52fde0e5f`). The
 probe source SHA-256 was
 `26fb80a24250a536a4109d1635620c0be5de366e7593f7a9c25d2088f1cdc223`.
+
+### Static producer slice for current wheel response (`+0xF4`, 2026-10-25)
+
+A fresh Ghidra function dossier (`ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`)
+and focused pseudocode view (`ev_7031c5908694232f0bcb6e0042e737b8f91c507c42431b064e587de9795c5e95`)
+were taken from the same SHA-256-verified `race.bin` listed above. The pseudocode
+is decompiler output, not original source. It resolves more of the producer chain
+than the captured `+0xF4` output alone:
+
+- `0x43E9B0` derives velocity at wheel point `+0x130` from PCAR linear and
+  angular velocity and body center; `0x22F30` transforms the wheel/body basis.
+  The wheel-local forward and lateral projections feed the speed/slip inputs.
+- The tire curves are looked up through wheel `+0x8C`; `0x435670`, `0x435750`,
+  `0x435690`, `0x435760`, `0x4356B0`, and `0x4356D0` contribute response,
+  slope, and slip terms. Wheel `+0x94/+0x98`, `+0x90`, and the selected mode
+  scales are applied around those lookups.
+- Earlier in the same update, `0x45F760` supplies a contact/query result used
+  to update wheel contact depth/history and `+0x168`; the response also reads
+  wheel spin/history (`+0x124`, `+0x13C`, `+0x158`, `+0xE8`) and smoothed tire
+  state (`+0x170/+0x174/+0x17C`). The update writes the current vector to
+  `+0xF4..+0xFC`, projects it against `+0x110..+0x118` into `+0x100..+0x108`,
+  then calls `0x43E6F0` at `0x443C09`.
+
+This narrows the next capture target to the pre-response operands, their source
+state, and contact-query result at one callback ordinal, alongside the resulting
+vector and `+0x24C/+0x258` PCAR accumulator deltas. A controlled schedule still
+needs separate coast, throttle, steering, and braking windows. Static evidence
+does not establish the numeric layouts/semantics of every curve record, prove
+query equivalence to the reconstructed terrain sampler, or show a controlled
+native response; production integration remains unaccepted.
+
+### Native wheel surface query path (`0x45F760`, 2026-10-25)
+
+Three focused Ghidra dossiers from the same binary resolve the direct query
+chain: `0x45F760` (`ev_706de19e0e8166a8a361cfa4ec84a6ce1489f0fbb8f46cb37162bfe8e3d2bdbf`),
+its coordinate/surface helper `0x4672B0`
+(`ev_5d1495f055f329bfb284cd32ca65e5e6c17f79802eb3dd7fba4ed92a49193409`),
+and tree selector `0x467260`
+(`ev_3b54b33fed139732b6d29cd5b02c95e11ebe5e2b455a9b2de89bc3e48b4e4ae5`).
+At the `0x442530` callsite, `0x45F760` receives the wheel's `+0xC8` X and
+`+0xD0` Z coordinates and returns a contact point, a normal, and a signed-short
+surface value stored at wheel `+0x19C`.
+
+The helper rounds each query coordinate to a 0.001-unit grid, selects a row
+from a `+0x38`-byte plane table via a binary traversal rooted at
+`DAT_004DCF08+0x10`, and rejects a selected row whose normal-Y term is within
+`1.1920929e-7` of zero. Otherwise it computes contact Y from the selected
+plane equation and copies the first three plane coefficients as the normal;
+the signed-short surface field is read at row offset `+0x34`. These statements
+are decompiler-derived structural observations. The root, table and record
+layout are already mapped to the track `track.bpp` TPPB v2 resource by the
+existing parser in `src/terrain_surface.cpp`; runtime wheel queries consume
+that parsed resource from byte-backed PCAR pose and constructor geometry in
+`src/game_main.cpp`. The query's contact observation is not yet composed into
+the production suspension/tire-force and body-integration path, and the
+meaning-to-response mapping for all surface codes remains unverified. The
+next implementation target is therefore downstream: establish the surface
+code and tire/suspension parameter mapping, then supply the session-owned
+contact observations to a complete four-wheel body step and compare its
+outputs under controlled input.
