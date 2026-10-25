@@ -47,6 +47,9 @@ Evidence:
 - `0x44EE00` callback bytes: `ev_83ced40ae522b925b9aa5519d3612ade5290e2c2aebae303af1304cc029a4ba9`
 - `0x458470`: `ev_9665ed7bfb7c711d15f2d19e30313017cae5cd70c8d2de5dc7b7b04c2314d542`
 - `0x458D60`: `ev_911568a9e79753d182e2e1c1fbd2ef053ac328ddae00b0334aa3da6d00c83bfb`
+- `0x44E460`: `ev_ea2e9fc8650b6b06f777b97f1acc33976af9f37c2a41c70efabf5b915a3ca920`
+- `0x44EEB0`: `ev_bf721d7a40dce61590fb82b63dbdd85f86a1bc19c0a6e2508b1dd45d44903cab`
+- `0x44EC00`: `ev_71a52c712c10d46f0d4d9461eafe3dcadcb96a5598d5a6740130cbf77fa3f7e8`
 
 ## Controlled original-client failure capture
 
@@ -120,10 +123,16 @@ The callback-level private capture
 hooked the engine callback at `0x44EE00`. It ran 23 times; the first
 640x480x16 callback returned 1 and changed byte `0x509C52` from zero to one.
 The 640x480 flag remained set after enumeration and the `0x44EEB0` wrapper,
-yet the child still exited with code 5. This contradicts the initial
-hypothesis that the observed exit came from `0x44EEB0`'s missing-640x480
-branch, assuming the captured flag state matches the branch check. The exact
-termination caller and branch are unresolved; a final probe is tracing
-`ExitProcess` arguments and call sites. Across the surface and callback
-captures, cleanup is verified and hashes of the launcher, engine, ISO, and
-all 31 GameData files match their baselines.
+yet the child still exited with code 5. The exit-origin capture
+`../../analysis/reference_captures/exit_origin_20261025T030208Z.json` hooked
+termination APIs and observed the engine call `ExitProcess(5)` at `0x44EDB0`
+(return address `0x44EDB3`); `0x44E080` had returned success immediately
+before. Static analysis places that call in `0x44EC00`, which queries
+available video memory, maps the reported amount into a supported memory
+class at `0x509C2C`, and exits with code 5 when the class is unsupported.
+Thus the DirectDraw mode gate passed, and the failure is in the later video
+memory-class gate, before surface creation. The live memory-query HRESULT and
+outputs are not yet captured; the next probe targets the
+`GetAvailableVidMem` calls and the computed class. Across the captures,
+cleanup is verified and hashes of the launcher, engine, ISO, and all 31
+GameData files match their baselines.
