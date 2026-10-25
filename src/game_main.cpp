@@ -1956,12 +1956,18 @@ struct PlayerPhysicsTickContext {
     std::optional<float> body_integrator_ramp_0x50c_after_tick;
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_contact_gate_passed_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
+    std::array<std::optional<float>, 4> wheel_contact_clamped_depth_after_tick{};
     std::array<std::optional<float>, 4> wheel_preupdate_value_0x158_after_tick{};
     // True only when this tick connected the recovered 0x431150 paired
     // differential producer to the byte-backed wheel +0x158 lanes.
     std::array<bool, 4> wheel_0x158_native_producer_owned{};
     std::array<std::optional<float>, 4> wheel_previous_contact_depth_0xe8_after_tick{};
+    // Pure +0x442530 base-suspension calculation from byte-backed constructor
+    // fields and the current contact/history observations. Surface adjustment,
+    // finalization, force accumulation, and body integration are not implied.
+    std::array<std::optional<float>, 4> wheel_base_suspension_response_0x178{};
 };
 
 struct WindowState {
@@ -2767,11 +2773,23 @@ struct WindowState {
              ++wheel) {
             tick.wheel_contact_active_after_tick[wheel] =
                 player_wheel_contact_states[wheel].contact_active_0x168;
+            tick.wheel_contact_gate_passed_after_tick[wheel] =
+                static_cast<std::uint8_t>(
+                    player_wheel_contact_results[wheel].contact_gate_passed ? 1 : 0);
             if (player_wheel_terrain_queries_succeeded[wheel]) {
                 tick.wheel_contact_depth_after_tick[wheel] =
                     player_wheel_contact_results[wheel].projected_depth;
+                tick.wheel_contact_clamped_depth_after_tick[wheel] =
+                    player_wheel_contact_results[wheel].clamped_contact_depth;
             }
             const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
+            const auto read_wheel_float = [&wheel_object](const std::uint32_t offset)
+                -> std::optional<float> {
+                const auto bits = viper::read_ncar_wheel_object_u32(
+                    wheel_object, offset);
+                if (!bits) return std::nullopt;
+                return std::bit_cast<float>(*bits);
+            };
             if (const auto bits = viper::read_ncar_wheel_object_u32(
                     wheel_object, 0x158U)) {
                 tick.wheel_preupdate_value_0x158_after_tick[wheel] =
@@ -2782,6 +2800,45 @@ struct WindowState {
                     wheel_object, 0xe8U)) {
                 tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
                     std::bit_cast<float>(*bits);
+            }
+            if (player_wheel_core_initialization &&
+                player_wheel_core_initialization->wheels[wheel] &&
+                tick.wheel_contact_clamped_depth_after_tick[wheel] &&
+                tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] &&
+                tick.wheel_preupdate_value_0x158_after_tick[wheel]) {
+                const auto positive_slope = read_wheel_float(0x24U);
+                const auto positive_intercept = read_wheel_float(0x28U);
+                const auto nonpositive_slope = read_wheel_float(0x2cU);
+                const auto nonpositive_intercept = read_wheel_float(0x30U);
+                const auto spring_scale = read_wheel_float(0x3cU);
+                const auto spring_base = read_wheel_float(0x40U);
+                const auto depth_limit = read_wheel_float(0x44U);
+                const auto threshold_scale = read_wheel_float(0x4cU);
+                const auto damage = viper::read_ncar_wheel_object_u8(
+                    wheel_object, 0x20U);
+                if (positive_slope && positive_intercept &&
+                    nonpositive_slope && nonpositive_intercept && spring_scale &&
+                    spring_base && depth_limit && threshold_scale && damage &&
+                    std::isfinite(*tick.wheel_contact_clamped_depth_after_tick[wheel]) &&
+                    std::isfinite(*tick.wheel_previous_contact_depth_0xe8_after_tick[wheel]) &&
+                    std::isfinite(*tick.wheel_preupdate_value_0x158_after_tick[wheel]) &&
+                    std::isfinite(*positive_slope) && std::isfinite(*positive_intercept) &&
+                    std::isfinite(*nonpositive_slope) && std::isfinite(*nonpositive_intercept) &&
+                    std::isfinite(*spring_scale) && std::isfinite(*spring_base) &&
+                    std::isfinite(*depth_limit) && std::isfinite(*threshold_scale)) {
+                    const viper::WheelSuspensionInput input{
+                        {*positive_slope, *positive_intercept,
+                         *nonpositive_slope, *nonpositive_intercept},
+                        *tick.wheel_contact_clamped_depth_after_tick[wheel],
+                        *tick.wheel_previous_contact_depth_0xe8_after_tick[wheel],
+                        *depth_limit, *spring_scale, *spring_base,
+                        *tick.wheel_preupdate_value_0x158_after_tick[wheel],
+                        *threshold_scale, *damage != 0U};
+                    const auto base = viper::evaluate_wheel_suspension(input);
+                    if (std::isfinite(base.combined_response_0x178))
+                        tick.wheel_base_suspension_response_0x178[wheel] =
+                            base.combined_response_0x178;
+                }
             }
         }
     }
@@ -4318,10 +4375,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
+                << ",wheel" << wheel << "_contact_gate_passed"
                 << ",wheel" << wheel << "_projected_depth"
+                << ",wheel" << wheel << "_clamped_contact_depth"
                 << ",wheel" << wheel << "_observed_value_0x158"
                 << ",wheel" << wheel << "_0x158_native_producer_owned"
-                << ",wheel" << wheel << "_previous_contact_depth_0xe8";
+                << ",wheel" << wheel << "_previous_contact_depth_0xe8"
+                << ",wheel" << wheel << "_base_suspension_response_0x178";
         }
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
@@ -4578,9 +4638,19 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 *tick.wheel_contact_active_after_tick[wheel]);
                         }
                         physics_tick_trace << ',';
+                        if (tick.wheel_contact_gate_passed_after_tick[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_contact_gate_passed_after_tick[wheel]);
+                        }
+                        physics_tick_trace << ',';
                         if (tick.wheel_contact_depth_after_tick[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_contact_depth_after_tick[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_contact_clamped_depth_after_tick[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_contact_clamped_depth_after_tick[wheel];
                         }
                         physics_tick_trace << ',';
                         if (tick.wheel_preupdate_value_0x158_after_tick[wheel]) {
@@ -4594,6 +4664,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_previous_contact_depth_0xe8_after_tick[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_previous_contact_depth_0xe8_after_tick[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_base_suspension_response_0x178[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_base_suspension_response_0x178[wheel];
                         }
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';

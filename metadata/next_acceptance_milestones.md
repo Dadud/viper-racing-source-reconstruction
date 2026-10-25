@@ -512,7 +512,12 @@ writer activity; the pair scales were `35039.3671875` in all 28 retained
 updates for that one active Viper session. The constructor source is resolved;
 applicability to other car records/modes still needs record-backed checks.
 Remaining live inputs include surface-code response mapping, response polarity,
-prior `+0x158` state, suspension parameters, and tire response inputs. Do not
+the native producer and timing for `+0x158`, and tire response inputs. Contact
+and history operands are recorded in the Windows physics tick trace, and
+constructor-backed suspension parameters feed a pure intermediate response
+calculation; the constructor terms themselves are not copied into each row.
+This does not resolve the downstream surface/finalization inputs or make the
+result live physics. Do not
 repeat a capture that only rereads the six pair operands. Capture the missing
 upstream inputs and timestamp-correlated wheel/accumulator/body samples for
 throttle, steering, braking, and coast. The captured `+0xF4` row is sampled
@@ -531,6 +536,12 @@ callback with its `+0xF4` result and PCAR `+0x24C/+0x258` deltas under separate
 coast, throttle, steering, and braking windows; capture identity and static
 Evidence IDs are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+The trace now carries contact-gate status, raw and clamped depth, byte-backed
+prior `+0xE8` and pre-update `+0x158`, and the finite-checked base suspension
+response derived from initialized constructor terms. It remains diagnostic:
+surface adjustment, finalization, force accumulation, and body integration are
+still disconnected. This operand/result row is intended to support the next
+controlled original capture without substituting invented forces.
 
 ### 3. Complete and compare the first original-compatible single-player race
 

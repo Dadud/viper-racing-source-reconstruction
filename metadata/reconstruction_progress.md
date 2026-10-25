@@ -1,5 +1,16 @@
 # Reconstruction progress
 
+- **2026-10-25, base suspension operands in live trace:** The player physics
+  tick trace now distinguishes raw projected depth from clamped contact depth,
+  records the contact gate, and evaluates the pure base suspension response
+  from initialized byte-backed wheel constructor terms, `+0xE8` history, and
+  pre-update `+0x158`. Non-finite or unknown inputs leave the response blank.
+  The result is diagnostic only; surface adjustment, tire response, force
+  accumulation, and body integration are still not connected. The Windows
+  Release runtime target builds without new warnings, all 65 CTest cases pass,
+  and a three-frame WARP grid smoke trace confirms the new columns align and
+  contain the base response. `git diff --check` passes.
+
 - **2026-10-24, FNIM bounds into NCAR reset proxy:** Extended the existing
   reset-sphere bounds observation to accept precomputed `ModelVertexBounds`,
   allowing parsed FNIM geometry to reach the native twelve-sphere constructor
