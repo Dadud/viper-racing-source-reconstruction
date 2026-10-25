@@ -33,20 +33,25 @@ as opaque tail data; the five shipped car bundles have 4,098 such bytes per
 format and bounds but does not assign meaning to this tail. Its regression
 reads all shipped car bundles using external assets.
 
-The Win32 runtime loads the selected car's idle and numbered samples into
-DirectSound PCM buffers and loops them. It uses provisional speed/throttle
-selection and pitch scaling; it does not yet consume the native `ESFX` band
-parameters. `parse_engine_sound_setup` reads the native count and seven-float
-record per band, retaining remaining bytes as opaque tail data. Native
-`0x46C410` reads exactly this prefix; Viper has three records and 140 remaining
-bytes, while each of the other four cars has two records and 168 remaining
-bytes. The runtime has not yet consumed these records.
+The Win32 runtime now requires the selected car's `%se.ens` `ESFX` setup and
+loads its idle `%si.sfx` resource plus exactly the declared band count. Each
+band tries `%s%d.sfx` first and `engine%d.sfx` second, matching the recovered
+native resource-name path. Every DirectSound band buffer retains the matching
+seven-float setup record, but those values are not yet applied to gain or
+frequency. The current speed/throttle band selector and pitch scaling remain
+provisional. The parser retains the declared count and opaque bytes after the
+records; Viper has three records and 140 tail bytes, while the other four cars
+have two records and 168 tail bytes. Missing setup, idle, or any declared band
+leaves audio disabled while the race can continue.
 `0x46C7A0` reads two values through vehicle virtual offsets `+0x48` and `+0x44`,
 then applies per-band data through `0x46CA10`; the field mapping and native
 vehicle value units still need to be tied to the reconstruction's physics.
 `--smoke-audio --smoke-frames 30` initializes the DirectSound device and
-exercises buffer creation/play calls. The smoke run does not capture speaker
-output or compare timing and pitch against the original. The separate top-level
+exercises buffer creation/play calls. On the current Windows setup, this smoke
+initialized Viper with four buffers (idle plus three bands) and Exotic, Plane,
+Sedan, and Sports with three each (idle plus two bands); all five commands
+returned successfully. The smoke run does not capture speaker output or
+compare timing and pitch against the original. The separate top-level
 `trk2.sfx` file's `MGI!` payload remains unparsed.
 
 ### Native vehicle values used by ESFX playback

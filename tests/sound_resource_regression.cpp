@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -122,6 +123,7 @@ bool validate_shipped_bundles(const std::filesystem::path& data_dir)
             data_dir / (std::string(car) + ".car"));
         std::size_t sound_count = 0U;
         std::size_t setup_count = 0U;
+        std::optional<std::uint32_t> declared_bands;
         for (const auto& entry : bundle.entries()) {
             if (entry.type_code == esfx) {
                 const auto setup = viper::parse_engine_sound_setup(bundle.payload(entry));
@@ -133,6 +135,7 @@ bool validate_shipped_bundles(const std::filesystem::path& data_dir)
                               << '/' << entry.name << '\n';
                     return false;
                 }
+                declared_bands = setup->band_count;
                 ++setup_count;
             }
             if (entry.type_code != sfx0) continue;
@@ -155,6 +158,23 @@ bool validate_shipped_bundles(const std::filesystem::path& data_dir)
             std::cerr << "unexpected ESFX setup count for " << car << ": "
                       << setup_count << '\n';
             return false;
+        }
+        const auto idle_name = std::string(car) + "i.sfx";
+        if (bundle.find(idle_name, sfx0) == nullptr) {
+            std::cerr << "missing shipped idle sample for " << car << ": "
+                      << idle_name << '\n';
+            return false;
+        }
+        for (std::uint32_t band = 0U; band < *declared_bands; ++band) {
+            const auto specific = std::string(car) + std::to_string(band) + ".sfx";
+            const auto fallback = "engine" + std::to_string(band) + ".sfx";
+            if (bundle.find(specific, sfx0) == nullptr &&
+                bundle.find(fallback, sfx0) == nullptr) {
+                std::cerr << "missing shipped engine band " << band << " for "
+                          << car << " (tried " << specific << " and "
+                          << fallback << ")\n";
+                return false;
+            }
         }
     }
     return true;

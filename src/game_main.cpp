@@ -13,6 +13,7 @@
 #include "viper/race_loop_callbacks.hpp"
 #include "viper/race_progression.hpp"
 #include "viper/sound_resource.hpp"
+#include "viper/engine_sound_setup.hpp"
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/physics_task_stream.hpp"
 #include "viper/physics_task_factory.hpp"
@@ -1419,15 +1420,23 @@ public:
         }
 
         const std::string stem(car_name);
-        if (!load_sound(car_bundle, stem + "i.sfx", true)) return false;
-        for (unsigned band = 0U; band < 3U; ++band) {
+        constexpr auto esfx = viper::resource_type_code('E', 'S', 'F', 'X');
+        const auto* setup_entry = car_bundle.find(stem + "e.ens", esfx);
+        if (setup_entry == nullptr) return false;
+        const auto setup = viper::parse_engine_sound_setup(
+            car_bundle.payload(*setup_entry));
+        if (!setup || setup->band_count == 0U) return false;
+        declared_band_count_ = setup->band_count;
+        if (!load_sound(car_bundle, stem + "i.sfx", std::nullopt)) return false;
+        for (std::uint32_t band = 0U; band < setup->band_count; ++band) {
             const auto specific = stem + std::to_string(band) + ".sfx";
-            if (!load_sound(car_bundle, specific, false)) {
+            if (!load_sound(car_bundle, specific, band, &setup->bands[band])) {
                 const auto fallback = "engine" + std::to_string(band) + ".sfx";
-                static_cast<void>(load_sound(car_bundle, fallback, false));
+                static_cast<void>(load_sound(car_bundle, fallback, band,
+                    &setup->bands[band]));
             }
         }
-        if (sounds_.size() < 2U) return false;
+        if (band_indices_.size() != declared_band_count_) return false;
 
         for (auto& sound : sounds_) {
             if (FAILED(sound.buffer->SetVolume(DSBVOLUME_MIN)) ||
@@ -1436,7 +1445,6 @@ public:
                 return false;
             }
         }
-        idle_index_ = 0U;
         static_cast<void>(sounds_[idle_index_].buffer->SetVolume(-850));
         initialized_ = true;
         return true;
@@ -1447,11 +1455,13 @@ public:
         if (!initialized_ || sounds_.empty()) return;
         const auto absolute_speed = std::abs(speed);
         std::size_t desired = idle_index_;
-        // Temporary player-only band selection; the native ESFX threshold
-        // records are known but are not parsed by this runtime yet.
+        // Temporary player-only speed band selection. The ESFX record is
+        // retained with each buffer, but its vehicle inputs remain unmapped.
         if (accelerating || absolute_speed > 0.5F) {
-            const auto band = absolute_speed < 12.0F ? 0U :
+            const auto provisional_band = absolute_speed < 12.0F ? 0U :
                 absolute_speed < 25.0F ? 1U : 2U;
+            const auto band = std::min(provisional_band,
+                declared_band_count_ == 0U ? 0U : declared_band_count_ - 1U);
             if (const auto found = band_indices_.find(band);
                 found != band_indices_.end()) {
                 desired = found->second;
@@ -1491,6 +1501,11 @@ public:
         return sounds_.size();
     }
 
+    [[nodiscard]] std::size_t band_count() const noexcept
+    {
+        return band_indices_.size();
+    }
+
     ~DirectSoundAudio()
     {
         for (auto& sound : sounds_) {
@@ -1502,10 +1517,13 @@ private:
     struct Sound {
         ComPtr<IDirectSoundBuffer> buffer;
         DWORD sample_rate{};
+        std::optional<std::array<float, 7>> engine_parameters;
     };
 
     bool load_sound(const viper::ResourceBundle& bundle,
-                    const std::string& name, const bool idle)
+                    const std::string& name,
+                    const std::optional<std::uint32_t> band,
+                    const std::array<float, 7>* engine_parameters = nullptr)
     {
         constexpr auto sfx0 = viper::resource_type_code('S', 'F', 'X', '0');
         const auto* entry = bundle.find(name, sfx0);
@@ -1550,19 +1568,12 @@ private:
             return false;
         }
         sound.sample_rate = pcm->sample_rate;
+        if (engine_parameters != nullptr) sound.engine_parameters = *engine_parameters;
         const auto index = sounds_.size();
         sounds_.push_back(std::move(sound));
-        if (idle) idle_index_ = index;
-        else band_indices_[band_from_name(name)] = index;
+        if (band) band_indices_[*band] = index;
+        else idle_index_ = index;
         return true;
-    }
-
-    static unsigned band_from_name(const std::string_view name) noexcept
-    {
-        for (auto it = name.rbegin(); it != name.rend(); ++it) {
-            if (*it >= '0' && *it <= '2') return static_cast<unsigned>(*it - '0');
-        }
-        return 0U;
     }
 
     ComPtr<IDirectSound> device_;
@@ -1570,6 +1581,7 @@ private:
     std::vector<Sound> sounds_;
     std::map<unsigned, std::size_t> band_indices_;
     std::size_t idle_index_{};
+    std::uint32_t declared_band_count_{};
     bool initialized_{};
     bool paused_{};
 };
@@ -3687,7 +3699,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                      "running without audio.\n";
     } else if (!smoke_frames || smoke_audio) {
         std::cout << "DirectSound initialized with " << state.audio.sound_count()
-                  << " parsed SFX0 PCM engine resources.\n";
+                  << " parsed SFX0 PCM engine resources ("
+                  << state.audio.band_count() << " ESFX bands).\n";
     }
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);
