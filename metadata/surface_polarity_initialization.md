@@ -32,13 +32,24 @@ they do not establish a particular runtime's clock samples or thread schedule.
 ## Table generation facts and current limit
 
 The initializer is deterministic for its two signed seed arguments. It uses a
-24-iteration binary search for each of 97 entries, fixed constants in the
-binary, x87 intermediate arithmetic, `__ftol` truncation toward zero, and
-binary32 stores. The table recurrence and comparison operand still need a
-complete x87 stack trace or captured native fixtures. Do not substitute a
-guessed recurrence or a fixed seed and call it exact. Evidence:
+24-step binary-fraction recurrence for each of 97 entries, x87 intermediates,
+`__ftol` truncation toward zero, and binary32 stores. The instruction-level
+trace maps the loop's 32-bit product, x87 accumulator, half-step, and compare:
+the candidate product uses 32-bit `IMUL` wrap semantics; `__ftol` temporarily
+sets x87 rounding control to truncate before `FISTP`; `FCOMP ST2` compares the
+loaded 64 against the accumulated candidate and its carry flag selects whether
+the current half-step is added. The step begins at 0.5 and is halved 24 times.
+Constants used include 1/177, 177, 1/169, 178, 169, 179, 53, 1, 64, 32, and
+0.5. Exact generated output has not been checked against a native table
+fixture. Do not substitute a fixed seed or claim a source-level C++ port is
+bit-exact: x64 MSVC uses SSE2 and binary64 `long double`, unlike native x87
+extended intermediates. Exact implementation needs an explicit x87-compatible
+emulator/assembly path and seed fixtures, or must retain a documented
+approximation status. Evidence:
 `ev_e4863482e00c2d90193abc28b0d55365db2fc169b52bc487a057b46678bd7999`,
-`ev_1f0144ba5ff39e36ced30debe4cd8e2dd002c63683863cfffa1cf6bf82c65226e`.
+`ev_1f0144ba5ff39e36ced30debe4cd8e2dd002c63683863cfffa1cf6bf82c65226e`,
+`ev_2b0070a9b6408f68a767b443f65869aaaa4cdf495898834d6094addf0835c787`,
+`ev_bd81caa3c16b9850abb706f99758614c9bd9b6f5d94e30edee61fc0aa582e737`.
 
 ## Runtime consumer order
 
