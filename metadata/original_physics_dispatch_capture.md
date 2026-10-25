@@ -178,3 +178,27 @@ The private probe bundle is
 The next capture should use the helper's actual call stack or an in-function
 callsite under `0x442530` to associate force writes with a wheel update; it
 should record all four wheel slots and retain the upstream response inputs.
+
+## Bounded shared-integrator object probe
+
+Prepared [`tools/pcar_integrator_object_probe.js`](../tools/pcar_integrator_object_probe.js)
+as a read-only next probe. It hooks the existing `0x431150` entry, selects the
+PCAR vtable `0x4C8188`, and snapshots the full observed body object range
+`[+0,+0x105C)` before and after every 16th selected-PCAR call, capped at 160
+sample pairs. Each record includes the object pointer, vtable, call index,
+phase, wall-clock timestamp, and a binary snapshot. The 0x105C-byte range
+covers body state and the four 0x1A4-byte wheel subobjects; it is chosen from
+the observed offsets, not a recovered allocation-size declaration. The hook
+does not change target memory or inputs. The RPC status reports total calls,
+selected calls, samples, and read failures.
+
+Use it only in the launcher-owned child flow above, after confirming the
+executable, staged Data files, and `options.cfg` hashes. Install it while the
+child is suspended, resume through the launcher bridge, then retain a quiet
+grid baseline, a short controlled throttle pulse, and a coast interval. Pair
+the snapshots with the existing PCAR control/body and `0x43ECE0` force-boundary
+hooks. Compare same-object before/after bytes and annotate four wheel bases at
+`+0x554 + 0x1A4*i`. The probe is syntax-checked only and has not been run; it
+provides no live-state result yet. Object size, internal field meanings,
+per-wheel force attribution, and a complete physics input mapping remain
+unverified.
