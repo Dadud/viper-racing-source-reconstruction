@@ -52,6 +52,9 @@ return to setup. The runtime can load and validate the eight
 shipped track bundles and five shipped car bundles. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each
 shipped track and car, plus a WARP rendering smoke for each selected track/car.
+`--load-replay PATH` validates a native v6 replay container and retains its
+decoded fixed record, frame table, and opaque payload for the race session;
+this is a container inspection path and does not enable native replay playback.
 The Windows frontend lifecycle smoke also uses a deterministic full-lap trace
 to verify Viper/Bemidji results return, selection of Sports, a second race
 session, another results return, and clean shutdown. This is acceptance evidence

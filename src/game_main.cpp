@@ -25,6 +25,7 @@
 #include "viper/pcar_control_update.hpp"
 #include "viper/setup_preferences.hpp"
 #include "viper/track_selection.hpp"
+#include "viper/replay_file.hpp"
 #include "directinput_keyboard_service.h"
 
 #include <array>
@@ -121,6 +122,7 @@ struct Options {
     std::optional<std::filesystem::path> record_trace;
     std::optional<std::filesystem::path> record_physics_tick_trace;
     std::optional<std::filesystem::path> play_trace;
+    std::optional<std::filesystem::path> load_replay;
 };
 
 struct TraceInputFrame {
@@ -134,7 +136,8 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--load-replay PATH] [--software] [--help]\n"
+        << "  --load-replay PATH validates and retains a native replay container for the race session; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
         << "Without either, searches the current and executable directories for common.res, Data/common.res, or GameData/common.res.\n";
@@ -240,6 +243,9 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--play-trace") {
             if (++i >= argc) throw std::runtime_error("--play-trace requires a path");
             options.play_trace = std::filesystem::path(argv[i]);
+        } else if (arg == L"--load-replay") {
+            if (++i >= argc) throw std::runtime_error("--load-replay requires a path");
+            options.load_replay = std::filesystem::path(argv[i]);
         } else if (arg == L"--smoke-frames") {
             if (++i >= argc) throw std::runtime_error("--smoke-frames requires a positive frame count");
             unsigned frames{};
@@ -1836,6 +1842,10 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
     std::vector<viper::PhysicsTaskObjectInventoryEntry> physics_task_object_inventory;
     std::optional<viper::PhysicsTaskRuntimeCollection> physics_task_runtime_collection;
+    // Decoded replay data is retained for the lifetime of the race session.
+    // Its packet payload is intentionally opaque until native field semantics
+    // are recovered; this does not claim to drive playback.
+    std::optional<viper::ReplayFile> loaded_replay;
     std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
     std::vector<AcarCurveSourceRuntimeState> ai_acar_curve_sources;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
@@ -3490,7 +3500,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::array<viper::TireDefinition, 4>& wheel_tires,
                const std::span<const viper::ResourceBundle* const> model_bundles,
                const bool force_default_placement,
-               const viper::GameOptions& options)
+               const viper::GameOptions& options,
+               const viper::ReplayFile* const loaded_replay)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
     constexpr wchar_t class_name[] = L"ViperRacingRuntimeWindow";
@@ -3504,6 +3515,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
+    if (loaded_replay) {
+        state.loaded_replay = *loaded_replay;
+        std::cout << "Retained validated native replay container: "
+                  << state.loaded_replay->frame_count << " frames, timestamp/index "
+                  << state.loaded_replay->timestamp_or_index << ", "
+                  << state.loaded_replay->payload.size()
+                  << " opaque payload bytes. Playback is not enabled.\n";
+    }
     state.terrain = &terrain;
     state.participant_names = participant_names;
     state.physics_task_manifest = viper::plan_track_physics_task_manifest(
@@ -4319,6 +4338,7 @@ void report_start_grid(const viper::GameAssets& assets)
 int run_selected_race(const Options& options, const std::string_view track,
                      const std::string_view car,
                      const std::vector<TraceInputFrame>* playback_trace,
+                     const viper::ReplayFile* loaded_replay,
                      const bool hold_results_for_frontend,
                      const std::uint32_t selected_laps,
                      const std::optional<std::uint32_t> selected_opponent_strength = {})
@@ -4465,7 +4485,7 @@ int run_selected_race(const Options& options, const std::string_view track,
             &assets.bundle("viper.car"), &assets.bundle("common.res"),
             &assets.bundle("race.res"), &assets.bundle("ui.res"),
             &assets.bundle("drivers.res")},
-        options.grid_mode, assets.options());
+        options.grid_mode, assets.options(), loaded_replay);
 }
 
 } // namespace
@@ -4478,6 +4498,13 @@ int wmain(int argc, wchar_t** argv)
         const auto data_directory = resolve_data_directory(options);
         std::optional<std::vector<TraceInputFrame>> playback_trace;
         if (options.play_trace) playback_trace = load_input_trace(*options.play_trace);
+        std::optional<viper::ReplayFile> loaded_replay;
+        if (options.load_replay) {
+            auto replay_result = viper::read_replay_file(*options.load_replay);
+            if (!replay_result)
+                throw std::runtime_error("could not load replay: " + replay_result.error);
+            loaded_replay = std::move(replay_result.replay);
+        }
         const auto config_path = data_directory / "options.def";
         viper::GameOptions configured_options;
         std::error_code config_error;
@@ -4565,6 +4592,7 @@ int wmain(int argc, wchar_t** argv)
             runtime_options.data_dir = data_directory;
             const auto result = run_selected_race(runtime_options, selected_track,
                 selected_car, playback_trace ? &*playback_trace : nullptr,
+                loaded_replay ? &*loaded_replay : nullptr,
                 interactive_frontend, selected_laps,
                 interactive_frontend
                     ? std::optional<std::uint32_t>(selected_opponent_strength)
