@@ -121,8 +121,37 @@ input-to-motion causal comparison. The key byte itself remained zero; the
 intervention changed only the selected wrapper's return value. Do not infer
 throttle-to-force, engine, gearbox, or tire behavior from this capture alone.
 
-The complete private REA evidence bundle is
-`../../analysis/reference_captures/pcar_throttle_body_trace_20261025.evidence.json`
-(SHA-256 `8B6BA3F000B313AC5471C13C55525EA3DC3C2B931CDEA5C12A65C3F97F299EBC`).
-It contains 18 Evidence records; originals and captures remain outside the
-public repository.
+The current private force-capture bundle is
+`../../analysis/reference_captures/pcar_throttle_body_force_capture_20261025.evidence.json`
+(SHA-256 `D09D20212312BDD0753EB76C420FD4D50CCB15AEB79A3BD51C425CD51CD970B9`).
+It contains the two retained Frida records for the force-boundary follow-up;
+originals and captures remain outside the public repository.
+
+## PCAR force accumulator at the body-integrator boundary
+
+A second bounded capture selected the live PCAR pointer from callback
+`0x4384D0`, then sampled that object's `0x43ECE0` entry and return around the
+same synthetic DIK_UP intervention. Thirty-eight of 129 matching key reads
+were overridden from 500 to 1500 ms. The hook observed 212 PCAR body-integrator
+calls in 3.4 seconds (1696 calls across all cars). At each sampled PCAR call,
+it recorded throttle/brake, body position and velocity, and the force/moment
+accumulators at `+0x24C/+0x258` before and after `0x43ECE0`. Evidence ID:
+`ev_7c1d90d1eff4e08618672c18cc0b500cab5a37c62a46cd0554764c37b6800af7`.
+
+At 489 ms, throttle was zero, force was approximately `(1124.45, 16000.35,
+314.43)`, and PCAR linear velocity was `(-4.0651, -0.0001, -1.0824)`. At
+809 ms, throttle was one, force was `(-11525.45, 16028.58, -3093.53)`, and
+velocity was `(-4.9411, -0.0009, -1.3147)`. At 1497 ms, throttle remained one
+and velocity was `(-10.1962, -0.0017, -2.7066)`. After the pulse ended, throttle
+decayed while position and velocity kept changing. The aggregate force and
+moment accumulators were zero after `0x43ECE0` returned in the sampled calls,
+matching the model's consume-and-clear boundary.
+
+This is direct evidence that the body integrator consumes changing aggregate
+force/moment state during the controlled throttle ramp. Static call-flow
+evidence places four `0x442530` wheel updates before `0x43ECE0`. The capture
+does not attribute individual force components to a specific wheel or prove
+that throttle alone caused the observed force and motion; the car was already
+moving, and terrain/collision inputs were not held constant. The native
+per-wheel force producers and their complete runtime inputs remain the next
+seam to trace; do not use these values as a throttle-to-force lookup table.

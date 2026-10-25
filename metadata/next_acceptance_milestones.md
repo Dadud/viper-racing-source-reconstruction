@@ -169,6 +169,17 @@ the latter is tied to GhostBegin playback and is not a live-player ring.
 See `metadata/physics_task_objects.md`, `metadata/car_update_branches.md`, and
 the next-state dependencies below.
 
+A new controlled original capture hooks the selected PCAR at `0x43ECE0`, after
+the four `0x442530` wheel updates. It records live `+0x24C/+0x258` aggregate
+force/moment inputs before the body update and confirms those accumulators are
+zero after the call; the same capture observes their values changing during a
+synthetic throttle ramp. This resolves that the body integration boundary is
+fed live changing forces, but not which wheel stages produced each component
+or the complete source inputs. The next physics probe is to record per-wheel
+force contributions at their accumulator writes during a controlled,
+repeatable input sweep, then map those producer inputs onto session-owned state.
+See [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#pcar-force-accumulator-at-the-body-integrator-boundary).
+
 ### State required before the live physics integration can be wired
 
 The current audit does not support treating route pose, terrain contacts, or
