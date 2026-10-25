@@ -410,6 +410,17 @@ shared stream whose call order includes non-wheel
 consumers. Keep these as
 explicit dependencies; do not claim the existing models are live physics.
 
+An expanded read-only displacement search found no additional PCAR wheel-field
+store among the queried common direct encodings: other matched `+0x158` stores
+are CARF/garage conversion, a pending list count, and a setup resource handle.
+Windows WER records show repeated
+Frida-agent BEX crashes in the earlier staged capture path, and this host has
+no discovered native debugger. Do not run the high-overhead Stalker writer
+probe in that path; obtain a native debugger or validate a lower-overhead
+capture method before the next original-client run. Search boundaries and
+WER report IDs are in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+
 ### 2. Close the physical race loop: terrain, collision, damage, and finish
 
 **Outcome:** The player-owned simulation from milestone 1 runs stably for a

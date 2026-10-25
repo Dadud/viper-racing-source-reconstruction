@@ -695,3 +695,32 @@ search on this host did not find `cdb.exe`, `windbg.exe`, `windbgx.exe`, or
 locations. The next writer-capture attempt needs an available native debugger
 or a validated lower-overhead instrumentation plan; no original-game run was
 started for this correlation.
+
+### Expanded static search for wheel `+0x158` stores (2026-10-25)
+
+The Ghidra image was searched read-only across 1,828,092 initialized bytes for
+the little-endian displacement `58 01 00 00`. It yielded 61 occurrences. The
+six `89 /r [base+0x158],reg` hits are `0x432B88`, `0x441A0D`, `0x441BC5`,
+`0x45EA8F`, `0x46DFA9`, and `0x48443D`. The first is the separate
+frame-context row copy; the next two are the actual wheel constructor and
+reset. The remaining writes are unrelated: `0x45EA8F` is in a CARF/garage
+display record conversion (`0x45E4B0`, called by `0x45EC20` and `0x48D800`);
+`0x46DFA9` updates a pending-item count in a list container; and `0x48443D`
+stores a file/resource handle in a setup object. The two direct immediate-zero
+stores (`0x46DEFB`, `0x483969`) likewise belong to the list count and setup
+resource state. The `D9 [base+0x158]` hit at `0x45E8D0` is an x87 `FLD` read,
+not a store. The bounded `MOV`/`C7` and selected x87/SSE encoding queries
+found no additional candidates at this displacement. Evidence IDs: full
+displacement search
+`ev_6f51eb9b24a516c966853d58201a9d234f8d9defed352fc3fbdbc95af1e67732`, MOV
+store query `ev_1d24616d7f1fa9244f7211b35d801cbcdfaad9a8f0bd9607ad4b502cc9248016`,
+immediate-zero query
+`ev_bfa60d701e9a1cd1ee2a4212e09c48fe94d374fa8440a7c27e11b563d30f6131`, and
+function dossiers `ev_472e5bfc79a705e4af49ea09d44a0d3d3c3d05308100792e1c336237ca9ca4ff`,
+`ev_ad3f62ea81f822c9b45d471294d9967d45605abe03a35bcc5fe6518e78e89048`, and
+`ev_6bd8674a8bd3817801629729523575dee58da149ad8b12491012fd89fe77edce`.
+
+This narrows direct statically encoded stores only. It does not find writes
+through computed pointers, bulk copies, or aliases whose store instruction
+does not encode `+0x158`; the actual runtime wheel-field producer remains
+unknown and still requires runtime evidence.
