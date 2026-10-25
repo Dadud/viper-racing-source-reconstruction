@@ -4,10 +4,12 @@
 
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -107,6 +109,105 @@ bool run()
     write_u32(nonfinite_setup, 4U, 0x7fc00000U);
     if (viper::parse_engine_sound_setup(nonfinite_setup)) {
         std::cerr << "non-finite engine ESFX tuning value was accepted\n";
+        return false;
+    }
+
+    // 0x46C930: b0 is inclusive and b3 exclusive; the middle ratio drives
+    // the configured b4->b5 interpolation.
+    viper::EngineSoundBandInput band_input{
+        {0.0F, 1.0F, 3.0F, 5.0F, 10.0F, 20.0F, 2.0F},
+        2.0F, 0.0F, true};
+    auto band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.status != viper::EngineSoundBandStatus::evaluated ||
+        band_eval.branch != viper::EngineSoundBandBranch::central_ramp ||
+        band_eval.value != 15.0F) {
+        std::cerr << "ESFX central interpolation branch mismatch\n";
+        return false;
+    }
+    band_input.control_value = -0.1F;
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.branch != viper::EngineSoundBandBranch::outside_gate ||
+        band_eval.value != 0.0F) {
+        std::cerr << "ESFX lower-bound gate mismatch\n";
+        return false;
+    }
+    band_input.control_value = 5.0F;
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.branch != viper::EngineSoundBandBranch::outside_gate) {
+        std::cerr << "ESFX exclusive upper-bound gate mismatch\n";
+        return false;
+    }
+    band_input.control_value = 3.5F;
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.branch != viper::EngineSoundBandBranch::upper_ramp ||
+        band_eval.value != 16.875F) {
+        std::cerr << "ESFX upper-ramp branch mismatch\n";
+        return false;
+    }
+    band_input.control_value = 0.5F;
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.branch != viper::EngineSoundBandBranch::lower_ramp ||
+        band_eval.value != 3.75F) {
+        std::cerr << "ESFX lower-ramp branch mismatch\n";
+        return false;
+    }
+    band_input.control_value = 2.0F;
+    band_input.division_helper_gate_clear = false;
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.status !=
+        viper::EngineSoundBandStatus::unresolved_division_helper) {
+        std::cerr << "unknown ESFX division-helper gate was treated as known\n";
+        return false;
+    }
+    band_input.division_helper_gate_clear = true;
+    band_input.band[2] = band_input.band[1];
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.status !=
+        viper::EngineSoundBandStatus::unresolved_division_helper) {
+        std::cerr << "zero ESFX denominator was treated as a finite update\n";
+        return false;
+    }
+    band_input.band[2] = 3.0F;
+    band_input.band[6] = std::numeric_limits<float>::infinity();
+    band_eval = viper::evaluate_engine_sound_band_46c930(band_input);
+    if (band_eval.status !=
+        viper::EngineSoundBandStatus::invalid_or_nonfinite_input) {
+        std::cerr << "non-finite ESFX input was not rejected\n";
+        return false;
+    }
+
+    viper::EngineSoundUpdateInput update_input;
+    update_input.band_input = {
+        {0.0F, 1.0F, 3.0F, 5.0F, 10.0F, 20.0F, 2.0F},
+        2.0F, 0.0F, true};
+    update_input.object_scale = 0.1F;
+    update_input.sound_object = viper::EngineSoundObjectState{
+        0.0F, 0.0F, false, false, false, false, false};
+    const auto update = viper::apply_engine_sound_update_46ca10(update_input);
+    if (update.status != viper::EngineSoundUpdateStatus::updated ||
+        update.sound_object.value_at_04 != 1.0F ||
+        std::abs(update.sound_object.value_at_08 - 0.9F) > 0.00001F ||
+        !update.sound_object.flag_at_29 || !update.sound_object.flag_at_2b ||
+        !update.sound_object.flag_at_2c || !update.sound_object.flag_at_2d ||
+        update.sound_object.flag_at_2a) {
+        std::cerr << "ESFX 0x46CA10 object update mismatch\n";
+        return false;
+    }
+    update_input.object_scale = -0.1F;
+    const auto disabled_update =
+        viper::apply_engine_sound_update_46ca10(update_input);
+    if (disabled_update.status !=
+            viper::EngineSoundUpdateStatus::sound_disabled_for_frame ||
+        !disabled_update.sound_object.flag_at_2a) {
+        std::cerr << "ESFX 0x46CA10 nonpositive gate mismatch\n";
+        return false;
+    }
+    update_input.sound_object.reset();
+    const auto missing_object_update =
+        viper::apply_engine_sound_update_46ca10(update_input);
+    if (missing_object_update.status !=
+        viper::EngineSoundUpdateStatus::missing_sound_object) {
+        std::cerr << "unknown ESFX sound-object state was guessed\n";
         return false;
     }
     return true;

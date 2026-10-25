@@ -538,11 +538,14 @@ records without assigning them meaning. All five car bundles contain one
 setup; Viper has three bands and 140 trailing bytes, while the other four have
 two bands and 168 trailing bytes. Native `0x46C410` copies the seven
 record values into manager state in this order: fields 3, 4, 5, 6, 1, 2, 0.
-The update routine `0x46C7A0` obtains two values from the vehicle object and
-passes the first through `0x46CA10`; that function uses per-band record data
-for sound gain and playback frequency. The runtime has not connected its own
-vehicle RPM/throttle state to these native inputs, so DirectSound band
-selection remains provisional. Evidence IDs:
+The current runtime parses this setup, requires the idle sample, loads each
+declared band using the native name/fallback order, and retains its seven
+floats beside the DirectSound buffer. Its band selection and pitch still use
+provisional route speed/throttle inputs; the native vehicle values are not yet
+connected. In particular, `+0xD70` has no live producer in the reconstruction,
+and the native getter's `+0xDE0`/`+0xC34` selection still needs correct runtime
+state ownership. All five cars have passed bounded DirectSound startup smoke,
+which verifies resource/buffer initialization but not audible parity. Evidence IDs:
 `ev_f5ee7b4ebd6c8e0d68ffdb0224d85bf883046a27e5b16642e7fb67ac89e34236`
 (`0x46C410`), `ev_f86b4719b9039a7866207664763dbe8a6fbda6300526ef0b1ab25dc20f5de927`
 (`0x46C7A0`), `ev_92cd5da97ed44864efc27dc372f8558d6815fc2f90583ddc019bf39e83564583`
