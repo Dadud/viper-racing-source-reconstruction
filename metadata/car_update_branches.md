@@ -126,17 +126,21 @@ The existing Windows session cannot yet form valid rows for
 `NcarIntegratorTimerInput::ordinal_rows`. A row requires descriptor ordinal
 registration plus body X/Z at `+0x5C/+0x64` and linear-velocity X/Z at
 `+0x234/+0x23C`. The session now retains the player's body plus the inherited
-shared-body constructor subset for bound ACAR records. Their byte masks prove
+shared-body constructor subset and separate four-wheel geometry/tire setup
+objects for bound ACAR records. Their byte masks prove
 which constructor fields and record-derived transforms were initialized,
 including the `0x433AA0` timer seeds `+0x50C = 1.0f` and `+0xE44 = -100.0f`,
-but do not prove those values track the race. `0x431150` body integration is not
+but do not prove those values track the race. The ACAR wheel/tire states are
+constructor projections and are not advanced by a native ACAR callback.
+`0x431150` body integration is not
 called in production, and visible player/opponent poses remain route-owned.
 Consequently, these initial body values are stale/zero motion rather than the
 current participant state required by `0x419E80`.
 
 Configured AI entrants still move through `OpponentMotion`'s route segment,
 fraction, and synthetic speed adapter. ACAR records now retain their observed
-initial body transform and native ordinal, but the session does not create the
+initial body transform and native ordinal and retains their wheel constructor
+geometry and Viper tire response setup, but the session does not create the
 ACAR task objects or manager pointer registry, nor evolve their native body
 position/velocity. Their route poses/speeds and constructor snapshots must not
 be converted into timer rows. The player object also cannot stand in for all

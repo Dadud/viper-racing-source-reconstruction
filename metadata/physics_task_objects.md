@@ -718,7 +718,10 @@ The setter bodies and their stride helpers are directly analyzed in
 `ev_7f2a7638cef433bcdbf414083f784135b5b01cd65d2b69716ca37eb6939c7e6e`.
 
 The runtime now retains the inherited shared body subset for every bound ACAR
-record. Ghidra evidence for `0x4285D0` shows its call to `0x43DFB0`; that base
+record, plus its four `0x4419A0` wheel objects with `0x441C10` core setup and
+the axle-specific Viper tire response setup. The Viper front/rear tire resources
+are loaded from `viper.car`, falling back to the common default only when an
+axle resource is absent. Ghidra evidence for `0x4285D0` shows its call to `0x43DFB0`; that base
 constructor calls `0x42FF90`, whose shared initialization calls `0x43E490`,
 copies the runtime-record transform through `0x433C00`, and sets body ordinal
 `+0x510` from record `+0x194`; the derived constructor then installs ACAR
@@ -734,9 +737,11 @@ and ordinal handoff. Evidence: `0x4285D0`
 `0x42FF90` `ev_188f23266930a8dddb21b4d48cc3f890b1c8ef3c31663ffc607bcccc229a5f96`,
 `0x43E490` `ev_cddb7e08b5efadc854ea2056b1e8341b4c14e1a23d6199e65d179aba2bac06e0`,
 and `0x433C00` `ev_fbd640d5fbdc72a165c76c2dee2639411e71c3beaf9416d13c51fc2bd9d7ee93`.
-These are persistent initial body records, not constructed ACAR task objects:
-the AI-specific derived fields, wheel objects, native registration pointers,
-driver callbacks, update dispatch, and dynamic body simulation remain absent.
+These are persistent initial constructor records, not constructed ACAR task
+objects. The wheel and tire objects are retained separately from the body
+record and do not have a reconstructed ACAR owner/callback dispatch. AI-specific
+derived fields, native registration pointers, driver callbacks, update
+dispatch, and dynamic body simulation remain absent.
 
 The constructor's `0x433C00` path also configures the curve object at `+0xBFC`
 from the vehicle record. `0x440060` derives six evaluator coefficients from

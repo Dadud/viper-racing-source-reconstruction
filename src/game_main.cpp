@@ -1805,12 +1805,15 @@ struct AcarCurveSourceRuntimeState {
     viper::AcarCurveSourceRecord source_record{};
 };
 
-// Persistent shared-body constructor state for one configured ACAR record.
-// This is the inherited 0x43E490/0x42FF90 body subset only; the ACAR driver
-// object, wheels, callbacks, and simulation dispatch are not materialized.
+// Persistent constructor state for one configured ACAR record. The inherited
+// body, four wheel geometry objects, and tire response setup are retained;
+// the ACAR driver object, callbacks, and simulation dispatch are not.
 struct AcarBodyRuntimeState {
     viper::ConfiguredCarTaskStreamBinding stream_binding{};
     viper::NcarBodyRuntimeObjectState body_object{};
+    std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
+    std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
+    std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
 };
 
 struct WindowState;
@@ -3567,6 +3570,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::CarFileResourcePayloads& player_car_resources,
                const std::array<std::byte, 0x8c>& player_car_setup,
                const std::array<viper::TireDefinition, 4>& wheel_tires,
+               const std::array<viper::TireDefinition, 4>& ai_wheel_tires,
                const std::span<const viper::ResourceBundle* const> model_bundles,
                const bool force_default_placement,
                const viper::GameOptions& options,
@@ -3825,6 +3829,42 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         stream_ok = false;
                         break;
                     }
+                    body_state.wheel_core_initialization =
+                        viper::initialize_ncar_four_wheel_core({
+                            record_bytes, ai_model.vertices,
+                            body_plan.scaled_dimensions_0x1f0_to_0x1fc[0], false});
+                    if (!body_state.wheel_core_initialization->input_complete) {
+                        stream_ok = false;
+                        break;
+                    }
+                    for (std::size_t wheel = 0U; wheel <
+                            body_state.wheel_objects.size(); ++wheel) {
+                        const auto wheel_offset = static_cast<std::uint32_t>(
+                            0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+                        auto wheel_plan = viper::plan_ncar_wheel_constructor(
+                            wheel_offset, viper::NcarWheelConstructorObservation{});
+                        const auto& core =
+                            body_state.wheel_core_initialization->wheels[wheel];
+                        if (!wheel_plan.unknown_fill_offsets.empty() ||
+                            !core.has_value() ||
+                            !viper::materialize_ncar_wheel_constructor(
+                                body_state.wheel_objects[wheel], wheel_offset,
+                                wheel_plan) ||
+                            !viper::apply_ncar_wheel_core_initialization(
+                                body_state.wheel_objects[wheel], wheel_offset,
+                                *core)) {
+                            stream_ok = false;
+                            break;
+                        }
+                        body_state.wheel_tire_setups[wheel] =
+                            viper::initialize_ncar_wheel_tire_setup(
+                                record_bytes, wheel, ai_wheel_tires[wheel], false);
+                        if (!body_state.wheel_tire_setups[wheel].has_value()) {
+                            stream_ok = false;
+                            break;
+                        }
+                    }
+                    if (!stream_ok) break;
                     state.ai_acar_body_states.push_back(std::move(body_state));
                 }
             }
@@ -3926,7 +3966,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << state.ai_acar_curve_sources.size()
                       << " AI ACAR curve source records and "
                       << state.ai_acar_body_states.size()
-                      << " ACAR shared-body initial states; materialized "
+                      << " ACAR body and four-wheel constructor states; materialized "
                       << retained_checkpoint_count
                       << " inert CHKP records and "
                       << retained_inactive_stat_count
@@ -4612,6 +4652,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         assets.track_objects(),
         assets.bundle(std::string(assets.car_name()) + ".car"),
         assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
+        assets.ai_wheel_tires(),
         std::array<const viper::ResourceBundle*, 7>{
             &assets.bundle(std::string(assets.track_name()) + ".trk"),
             &assets.bundle(std::string(assets.car_name()) + ".car"),

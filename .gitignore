@@ -1,6 +1,7 @@
 **/target/
 build/
 build-network/
+build-acar-wheels/
 cmake-build-*/
 out/
 .vs/

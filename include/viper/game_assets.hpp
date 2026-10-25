@@ -46,6 +46,8 @@ public:
     [[nodiscard]] const TireDefinition& default_tire() const noexcept { return default_tire_; }
     [[nodiscard]] const std::array<TireDefinition, 4>& wheel_tires() const noexcept
     { return wheel_tires_; }
+    [[nodiscard]] const std::array<TireDefinition, 4>& ai_wheel_tires() const noexcept
+    { return ai_wheel_tires_; }
     [[nodiscard]] const std::array<std::byte, 0x8c>& player_car_setup() const noexcept { return player_car_setup_; }
     [[nodiscard]] bool player_setup_file_loaded() const noexcept
     { return player_setup_file_loaded_; }
@@ -73,6 +75,7 @@ private:
     ModelResource ai_model_;
     TireDefinition default_tire_;
     std::array<TireDefinition, 4> wheel_tires_{};
+    std::array<TireDefinition, 4> ai_wheel_tires_{};
     std::array<std::byte, 0x8c> player_car_setup_{};
     bool player_setup_file_loaded_{};
     bool player_setup_version_warning_{};

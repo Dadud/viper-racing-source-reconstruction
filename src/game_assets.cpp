@@ -270,6 +270,29 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
     assets.ai_car_ = parse_car_file_resources(*ai_car_bundle, "viper", false);
     if (!assets.ai_car_.car_file)
         throw std::runtime_error("viper.car AI CARF version 6 resource is missing or invalid");
+    for (std::size_t wheel_index = 0;
+         wheel_index < assets.ai_wheel_tires_.size(); ++wheel_index) {
+        const char axle_suffix = wheel_index < 2U ? 'f' : 'r';
+        const auto tire_name = std::string("viper") + axle_suffix + ".tir";
+        const ResourceEntry* tire_entry = ai_car_bundle->find(
+            tire_name, kTireResourceType);
+        const ResourceBundle* tire_bundle = ai_car_bundle;
+        if (tire_entry == nullptr) {
+            tire_entry = common_bundle.find("def_tire.tir", kTireResourceType);
+            tire_bundle = &common_bundle;
+        }
+        if (tire_entry == nullptr)
+            throw std::runtime_error("required AI tire resource is missing: " +
+                tire_name + " and common.res def_tire.tir");
+        if (tire_entry->attributes != 1U)
+            throw std::runtime_error("AI tire resource " + tire_entry->name +
+                " has an unsupported version");
+        const auto tire = parse_tire_resource(tire_bundle->payload(*tire_entry));
+        if (!tire)
+            throw std::runtime_error("AI tire resource " + tire_entry->name +
+                " has an unsupported payload size");
+        assets.ai_wheel_tires_[wheel_index] = *tire;
+    }
     bool player_model_loaded = false;
     const auto expected_model = assets.car_name_ + "0.mod";
     for (const auto& entry : car_bundle.entries()) {
