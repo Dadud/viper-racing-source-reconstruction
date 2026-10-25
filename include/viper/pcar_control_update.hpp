@@ -48,11 +48,18 @@ struct PcarConstructorControls {
     std::array<std::uint32_t, 4> wheel_traction_0x6b0{};
     std::array<std::uint32_t, 4> wheel_abs_0x6b8{};
     std::optional<std::uint32_t> game_mode_0x4f4;
-    // Raw return byte from the first 0x43BA90 call in 0x4381E0, stored at +0xD74.
-    // The helper is intentionally not reconstructed; callers may supply an observed result.
+    // Return byte from the first 0x43BA90 call in 0x4381E0, stored at +0xD74.
+    // Unknown when its gate and 0x509328 binding kind are unavailable.
     std::optional<std::uint8_t> value_0xd74;
     bool auto_clutch_forced_by_auto_shift{};
 };
+
+// Reconstructs the first 0x43BA90 helper call in PCAR constructor 0x4381E0:
+// the 0x5093A0 gate forces 1, otherwise the 0x509328 binding kind is tested
+// by 0x446F90 (kinds 1, 3, 4, and 6 return 1).
+[[nodiscard]] std::uint8_t evaluate_pcar_constructor_helper_0x43ba90(
+    bool gate_0x5093a0,
+    std::uint32_t binding_kind_0x509328) noexcept;
 
 // Models the settings-derived control defaults and the four-wheel direct
 // stores in PCAR constructor 0x4381E0 / setters 0x4330B0 and 0x4330D0.

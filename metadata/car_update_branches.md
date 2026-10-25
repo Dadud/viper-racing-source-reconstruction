@@ -1520,12 +1520,15 @@ unresolved selected-mode value. Evidence: `0x425420`
 `ev_0c5ca75a39ac6b15a40b00d86be2b955b101b06c42c52c7e135dff0c69a2d767`,
 `0x45B6B0` `ev_7f5111ab5f3e72ba4f690fb4ec50b70f5e1de9255f5349ba386db51f29e7d78a`,
 and `0x401EA0` `ev_91167368d5f946d8c4d6403b32fa6e846847a3f686bd0fe7f7d8992776bd1f20`.
-`0x43BA90` samples control state through global `0x509328` when gate
-`0x5093A0` is clear, but that state is not yet mapped to a configured binding.
-The model now retains that raw byte only when an observation is supplied;
-helper polarity/state and the second helper result's live source are not
-reconstructed, so runtime leaves `+0xD74` unknown. Evidence:
-`0x4381E0` `ev_365b74f41f3ffe8a5d0ca349ed3801a7069ccd56fe16be69203abbe524a123f4`.
+`0x43BA90` returns 1 when gate `0x5093A0` is set. Otherwise it calls
+`0x446F90` on the DWORD at `0x509328` and returns 1 only for binding kinds 1,
+3, 4, and 6. The live session maps the gate from `CONTROL game_pad` and the
+DWORD from the configured analog binding slot at index 2; it now evaluates this
+helper and stores the exact byte at PCAR `+0xD74`. The second constructor helper
+result remains unresolved. Evidence: `0x4381E0`
+`ev_365b74f41f3ffe8a5d0ca349ed3801a7069ccd56fe16be69203abbe524a123f4`,
+`0x43BA90` `ev_6991640ee7ade673ec561159ba28b69a9b6a9840ee8a995431389df6222db7bb`,
+and `0x446F90` `ev_e461f759908e3c7c52a551b606dbf92e92dcb224c33e2173c2e92a3058bc7893`.
 
 ### Controlled PCAR shared-integrator state sample
 

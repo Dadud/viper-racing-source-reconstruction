@@ -299,9 +299,11 @@ wheel/force collection, and
 post-integrator record/event transitions. The PCAR `+0x4F4` constructor input is now sourced from
 the configured entrant count: native setup copies the setup-block DWORD at
 `+0xCA8` into global `0x508794`, and the race owner consumes that same field as
-the participant-count loop bound. `+0xD74` remains unresolved; it stores the
-result of a helper that samples gated control state at global `0x509328`, and
-that state is not yet mapped to a configured binding. Wheel `+0xE8`
+the participant-count loop bound. Constructor byte `+0xD74` now comes from
+the recovered `0x43BA90` gate and `0x446F90` binding-kind predicate, using the
+session's `CONTROL game_pad` value and configured analog binding slot 2. This
+closes only that constructor byte; the second helper result and live physics
+state remain unresolved. Wheel `+0xE8`
 is interpolated from adjacent five-byte samples by `0x444240`, using records
 selected through `0x427630` and a fraction derived from global tick and object
 timing fields. This particular `0x3C`-stride ring is owned by the

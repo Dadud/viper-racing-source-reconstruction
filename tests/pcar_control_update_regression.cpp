@@ -9,6 +9,17 @@
 
 int main()
 {
+    if (viper::evaluate_pcar_constructor_helper_0x43ba90(false, 1U) != 1U ||
+        viper::evaluate_pcar_constructor_helper_0x43ba90(false, 3U) != 1U ||
+        viper::evaluate_pcar_constructor_helper_0x43ba90(false, 4U) != 1U ||
+        viper::evaluate_pcar_constructor_helper_0x43ba90(false, 6U) != 1U ||
+        viper::evaluate_pcar_constructor_helper_0x43ba90(false, 0U) != 0U ||
+        viper::evaluate_pcar_constructor_helper_0x43ba90(false, 2U) != 0U ||
+        viper::evaluate_pcar_constructor_helper_0x43ba90(true, 0U) != 1U) {
+        std::cerr << "PCAR 0x43BA90 gate or 0x446F90 binding-kind predicate was incorrect.\n";
+        return EXIT_FAILURE;
+    }
+
     const auto defaults = viper::initialize_pcar_constructor_controls(
         std::nullopt, std::nullopt, std::nullopt, std::nullopt,
         std::nullopt, 7U);

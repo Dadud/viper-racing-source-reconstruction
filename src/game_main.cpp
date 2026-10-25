@@ -3310,14 +3310,6 @@ void load_keyboard_bindings(WindowState& state,
             std::numeric_limits<std::uint32_t>::max()) {
         throw std::runtime_error("participant count exceeds the native session field");
     }
-    state.player_pcar_constructor_controls =
-        viper::initialize_pcar_constructor_controls(
-            options.boolean("CONTROL", "traction_control"),
-            options.boolean("CONTROL", "abs_braking"),
-            options.boolean("CONTROL", "auto_shifting"),
-            options.boolean("CONTROL", "auto_clutch"),
-            options.integer("CONTROL", "yaw_control"),
-            static_cast<std::uint32_t>(state.participant_names.size()));
     // 0x43B030 resets these CONTROL values to 1.0, then reads saved overrides.
     state.control_steering_smoothing =
         options.real("CONTROL", "steer_sensitivity").value_or(1.0F);
@@ -3373,6 +3365,18 @@ void load_keyboard_bindings(WindowState& state,
         native_steering_binding_kind(state.control_bindings[1].kind)) {
         state.control_squared_steering_gate_0x5093fc = false;
     }
+    const auto constructor_helper_0xd74 =
+        viper::evaluate_pcar_constructor_helper_0x43ba90(
+            state.control_game_pad, state.control_bindings[2].kind);
+    state.player_pcar_constructor_controls =
+        viper::initialize_pcar_constructor_controls(
+            options.boolean("CONTROL", "traction_control"),
+            options.boolean("CONTROL", "abs_braking"),
+            options.boolean("CONTROL", "auto_shifting"),
+            options.boolean("CONTROL", "auto_clutch"),
+            options.integer("CONTROL", "yaw_control"),
+            static_cast<std::uint32_t>(state.participant_names.size()),
+            constructor_helper_0xd74);
 }
 
 void refresh_keyboard_controls(WindowState& state)

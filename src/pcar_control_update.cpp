@@ -20,6 +20,18 @@ float clamp_finite(const float value, const float low, const float high) noexcep
 
 } // namespace
 
+std::uint8_t evaluate_pcar_constructor_helper_0x43ba90(
+    const bool gate_0x5093a0,
+    const std::uint32_t binding_kind_0x509328) noexcept
+{
+    if (gate_0x5093a0 || binding_kind_0x509328 == 1U ||
+        binding_kind_0x509328 == 3U || binding_kind_0x509328 == 4U ||
+        binding_kind_0x509328 == 6U) {
+        return 1U;
+    }
+    return 0U;
+}
+
 void update_pcar_control(PcarControlFields& fields, const float requested_value) noexcept
 {
     const float delta = clamp_finite(requested_value - fields.value_0x500, -0.24F, 0.24F);
