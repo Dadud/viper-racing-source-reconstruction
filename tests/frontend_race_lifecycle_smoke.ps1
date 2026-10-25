@@ -142,7 +142,8 @@ try {
     }
     $setup = Wait-ResultsReturn $process 60
     Write-Output 'Sports/Bemidji returned to setup.'
-    # Bemidji is the final installed track in tracks.tab order; Down wraps to Dundas.
+    # Random is the final tracks.tab entry; one Down selects it and the next wraps to Dundas.
+    Press-Key $setup 40
     Press-Key $setup 40
     Press-Key $setup 13
     $thirdRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 30

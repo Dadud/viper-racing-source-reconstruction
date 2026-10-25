@@ -1,6 +1,7 @@
 #include "viper/replay_file.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <fstream>
 #include <limits>
 
@@ -49,8 +50,11 @@ ReplayFileResult decode_replay_file(const std::span<const std::uint8_t> bytes)
     const auto h = bytes.subspan(kRecordBytes, kHeaderBytes);
     if (read_u32(h, 0) != kCookie) return failure("unsupported replay cookie");
     if (read_u32(h, 4) != kVersion) return failure("unsupported replay version");
-    const auto timestamp = static_cast<std::int32_t>(read_u32(h, 8));
-    const auto frames = static_cast<std::int32_t>(read_u32(h, 12));
+    // These header fields are signed 32-bit values in the native format.
+    // Preserve their bit patterns without relying on implementation-defined
+    // unsigned-to-signed conversion for values with the high bit set.
+    const auto timestamp = std::bit_cast<std::int32_t>(read_u32(h, 8));
+    const auto frames = std::bit_cast<std::int32_t>(read_u32(h, 12));
     const auto packet_size = read_u32(h, 16);
     const auto word_count = read_u32(h, 20);
     const auto payload_bytes = read_u32(h, 24);

@@ -136,7 +136,7 @@ void usage(std::ostream& out)
         << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
-        << "Without either, searches the current and executable directories for common.res or GameData/common.res.\n";
+        << "Without either, searches the current and executable directories for common.res, Data/common.res, or GameData/common.res.\n";
 }
 
 std::filesystem::path executable_directory()
@@ -167,13 +167,18 @@ std::filesystem::path resolve_data_directory(const Options& options)
         throw std::runtime_error("could not determine the current directory: " +
             error.message());
     const auto executable = executable_directory();
-    const std::array<std::filesystem::path, 8> candidates{{
+    const std::array<std::filesystem::path, 13> candidates{{
         current,
+        current / "Data",
+        current / "data",
         current / "GameData",
         current / "data" / "GameData",
         executable,
+        executable / "Data",
         executable / "GameData",
+        executable.parent_path() / "Data",
         executable.parent_path() / "GameData",
+        executable.parent_path().parent_path() / "Data",
         executable.parent_path().parent_path() / "GameData",
         executable / "data" / "GameData"}};
     std::vector<std::filesystem::path> attempted;
@@ -191,7 +196,7 @@ std::filesystem::path resolve_data_directory(const Options& options)
     std::string message = "could not locate extracted game assets (common.res). Searched:";
     for (const auto& path : attempted)
         message += "\n  " + path.string() + "\\common.res";
-    message += "\nPass --data-dir PATH or set VIPER_DATA_DIR to the extracted GameData directory.";
+    message += "\nPass --data-dir PATH or set VIPER_DATA_DIR to the extracted Data/GameData directory.";
     throw std::runtime_error(std::move(message));
 }
 

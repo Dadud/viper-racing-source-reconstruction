@@ -27,7 +27,12 @@ requires exact section lengths; it does not attempt to recover truncated data.
 
 The regression uses the installed `bench.rpl` when external game data is
 available and verifies byte-for-byte decode/encode equality. A synthetic
-round-trip and malformed-length/version checks also run without external data.
+round-trip and malformed-header checks also run without external data. The
+checks cover the cookie, version, packet size, runtime word count, payload cap,
+negative and out-of-range frame counts, truncated or extra bytes, and signed
+timestamp bit preservation. Signed header words are interpreted by their bit
+pattern so decoding does not depend on implementation-defined unsigned-to-
+signed conversion behavior.
 
 ## Remaining replay work
 

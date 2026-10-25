@@ -1,6 +1,7 @@
 #include "viper/game_options.hpp"
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 
@@ -40,6 +41,22 @@ int main()
             "floating point settings must parse");
         require(!options.integer("game", "damage_on"),
             "non-numeric option values must not parse as integers");
+        auto editable = options;
+        editable.set_string("CONTROL", "throttle", "Key_W");
+        editable.set_string("CONTROL", "look_left", "");
+        const auto serialized = editable.serialize();
+        const auto round_trip = viper::GameOptions::parse(serialized);
+        require(round_trip.get("control", "throttle") == "Key_W" &&
+            round_trip.get("control", "look_left") == std::string_view{},
+            "keyboard binding strings and intentionally empty bindings must survive serialization");
+        const auto path = std::filesystem::temp_directory_path() /
+            "viper_game_options_regression.def";
+        editable.save(path);
+        const auto saved = viper::GameOptions::load(path);
+        std::filesystem::remove(path);
+        require(saved.get("control", "throttle") == "Key_W" &&
+            saved.get("control", "look_left") == std::string_view{},
+            "saved control settings must reload with binding strings intact");
         bool malformed_rejected = false;
         try {
             (void)viper::GameOptions::parse("[GAME\nlaps 2\n");

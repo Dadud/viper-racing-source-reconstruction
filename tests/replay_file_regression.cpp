@@ -1,11 +1,13 @@
 #include "viper/replay_file.hpp"
 
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -19,6 +21,13 @@ std::vector<std::uint8_t> read_all(const std::string& path)
 {
     std::ifstream input(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+void write_u32(std::vector<std::uint8_t>& bytes, const std::size_t offset,
+               const std::uint32_t value)
+{
+    for (std::size_t i = 0; i < 4; ++i)
+        bytes[offset + i] = static_cast<std::uint8_t>(value >> (8U * i));
 }
 
 } // namespace
@@ -44,12 +53,46 @@ try {
     require(viper::encode_replay_file(decoded.replay, error) == encoded,
             "replay encoding should be byte stable");
 
+    auto signed_header = sample;
+    signed_header.timestamp_or_index = -1;
+    const auto signed_bytes = viper::encode_replay_file(signed_header, error);
+    const auto signed_decoded = viper::decode_replay_file(signed_bytes);
+    require(static_cast<bool>(signed_decoded) &&
+            signed_decoded.replay.timestamp_or_index == -1,
+            "signed header fields should preserve their bit patterns");
+
     auto truncated = encoded;
     truncated.pop_back();
     require(!viper::decode_replay_file(truncated), "truncated replay should fail closed");
     auto wrong_version = encoded;
     wrong_version[0xcd4 + 4] = 5;
     require(!viper::decode_replay_file(wrong_version), "unsupported version should fail closed");
+
+    constexpr std::size_t header = 0xcd4;
+    const std::array<std::pair<std::size_t, std::uint32_t>, 6> bad_fields{{
+        {header, 0U},                 // cookie
+        {header + 16U, 576U},         // packet size
+        {header + 20U, 3646U},        // runtime word count
+        {header + 24U, 0x200001U},    // 2 MiB payload bound
+        {header + 12U, 0xffffffffU},  // negative frame count
+        {header + 12U, 3648U},        // frame count beyond word table
+    }};
+    for (const auto& [offset, value] : bad_fields) {
+        auto malformed = encoded;
+        write_u32(malformed, offset, value);
+        require(!viper::decode_replay_file(malformed),
+                "native header constraint should reject malformed replay");
+    }
+
+    auto extra_data = encoded;
+    extra_data.push_back(0);
+    require(!viper::decode_replay_file(extra_data),
+            "undeclared trailing bytes should fail closed");
+
+    auto invalid_encode = sample;
+    invalid_encode.frame_count = 3648;
+    require(viper::encode_replay_file(invalid_encode, error).empty() &&
+            !error.empty(), "encoder should reject frame count beyond table");
 
 #ifdef VIPER_BENCH_REPLAY_PATH
     const auto fixture_bytes = read_all(VIPER_BENCH_REPLAY_PATH);

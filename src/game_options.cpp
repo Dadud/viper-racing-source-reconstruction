@@ -4,6 +4,7 @@
 #include <string>
 #include <cctype>
 #include <fstream>
+#include <sstream>
 #include <algorithm>
 #include <iterator>
 #include <stdexcept>
@@ -132,7 +133,32 @@ std::optional<bool> GameOptions::boolean(
 
 void GameOptions::set_integer(std::string section, std::string key, const int value)
 {
-    entries_[lower(std::move(section))][lower(std::move(key))] = std::to_string(value);
+    set_string(std::move(section), std::move(key), std::to_string(value));
+}
+
+void GameOptions::set_string(
+    std::string section, std::string key, std::string value)
+{
+    entries_[lower(std::move(section))][lower(std::move(key))] = std::move(value);
+}
+
+std::string GameOptions::serialize() const
+{
+    std::ostringstream output;
+    for (const auto& [section, values] : entries_) {
+        output << '[' << section << "]\n";
+        for (const auto& [key, value] : values) output << key << ' ' << value << '\n';
+    }
+    return output.str();
+}
+
+void GameOptions::save(const std::filesystem::path& path) const
+{
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output) throw std::runtime_error("could not write options definition: " + path.string());
+    const auto contents = serialize();
+    output.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+    if (!output) throw std::runtime_error("failed while writing options definition: " + path.string());
 }
 
 } // namespace viper
