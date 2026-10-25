@@ -316,3 +316,23 @@ hooks. Compare same-object before/after bytes and annotate four wheel bases at
 `+0x554 + 0x1A4*i`. The probe is syntax-checked only and has not been run; it
 provides no live-state result yet. Internal field meanings, per-wheel force
 attribution, and a complete physics input mapping remain unverified.
+
+## Launcher retry for the wheel-history probe (2026-10-25)
+
+For a fresh retry, an external analysis staging directory was prepared with
+the official launcher, all 32 verified `Data` files, and `Config` assets. Its
+`race.bin` hash matched the official image. The staged launcher exited before
+an attached Frida session could be established. A second attempt created the
+official launcher with its primary thread suspended, attached the bounded
+launcher-child bridge, then resumed that thread (prior suspend count 1). Both
+bridge hooks reported ready, but the launcher session detached without a
+matching `CreateProcessA/W` race-child event. The retry did not produce a
+race-child PID or any simulation samples. A read-only module inventory of the
+pre-existing `Viper Racing.exe` process (PID 23908, title “Our Apologies”)
+found only the launcher and system modules; `race.bin` was not loaded, so that
+process cannot supply wheel-update evidence. It was left running and was not
+sent input or closed. The 32 staged `Data` hashes still match the official
+installation, and `Config/options.cfg` remains at SHA-256
+`7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`.
+The reason the fresh launcher attempts ended without a race child remains
+unknown; these attempts are startup diagnostics only, not gameplay evidence.
