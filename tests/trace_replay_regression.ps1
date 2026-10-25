@@ -8,8 +8,11 @@ New-Item -ItemType Directory -Path $root | Out-Null
 $capture = Join-Path $root 'capture.csv'
 $replay = Join-Path $root 'replay.csv'
 $repeat = Join-Path $root 'repeat.csv'
+$replayTicks = Join-Path $root 'replay-ticks.csv'
+$repeatTicks = Join-Path $root 'repeat-ticks.csv'
 $raceTrace = Join-Path $root 'race.csv'
 $raceOutput = Join-Path $root 'race-output.csv'
+$raceTicks = Join-Path $root 'race-ticks.csv'
 try {
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
         --smoke-frames 12 --record-trace $capture
@@ -29,10 +32,12 @@ try {
     [System.IO.File]::WriteAllLines($capture, $inputLines)
 
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --play-trace $capture --record-trace $replay
+        --play-trace $capture --record-trace $replay `
+        --record-tick-trace $replayTicks
     if ($LASTEXITCODE -ne 0) { throw "Trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --play-trace $capture --record-trace $repeat
+        --play-trace $capture --record-trace $repeat `
+        --record-tick-trace $repeatTicks
     if ($LASTEXITCODE -ne 0) { throw "Repeated trace replay exited with $LASTEXITCODE" }
 
     $replayedLines = [System.IO.File]::ReadAllLines($replay)
@@ -41,6 +46,58 @@ try {
     if ($inputLines.Count -ne $replayedLines.Count -or
         $replayedLines.Count -ne $repeatedLines.Count) {
         throw 'Trace row counts differ across input and replay runs'
+    }
+    $replayedTickLines = [System.IO.File]::ReadAllLines($replayTicks)
+    $repeatedTickLines = [System.IO.File]::ReadAllLines($repeatTicks)
+    if ($replayedTickLines.Count -lt 2 -or
+        $replayedTickLines.Count -ne $repeatedTickLines.Count -or
+        $replayedTickLines[0] -cne $repeatedTickLines[0]) {
+        throw 'Fixed-step trace is empty or has inconsistent replay row counts'
+    }
+    $tickHeader = $replayedTickLines[0].Split(',')
+    $tickIndexColumn = [Array]::IndexOf($tickHeader, 'tick_index')
+    $tickStepColumn = [Array]::IndexOf($tickHeader, 'scheduled_step_index')
+    $tickStepCountColumn = [Array]::IndexOf($tickHeader, 'scheduled_step_count')
+    $tickTimeColumn = [Array]::IndexOf($tickHeader, 'simulation_time')
+    $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
+    $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
+    if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
+        $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
+        $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0) {
+        throw 'Fixed-step trace header is missing required input/timing fields'
+    }
+    $expectedTick = 0
+    $previousOuterUpdate = -1L
+    $expectedStepIndex = 0
+    for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
+        if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
+            throw "Repeated fixed-step trace differs at CSV line $($index + 1)"
+        }
+        $fields = $replayedTickLines[$index].Split(',')
+        if ($fields.Count -ne $tickHeader.Count) {
+            throw "Fixed-step trace field count is invalid at line $($index + 1)"
+        }
+        $outerUpdate = [long]::Parse($fields[0], [cultureinfo]::InvariantCulture)
+        $stepIndex = [int]::Parse($fields[$tickStepColumn], [cultureinfo]::InvariantCulture)
+        $stepCount = [int]::Parse($fields[$tickStepCountColumn], [cultureinfo]::InvariantCulture)
+        $tickIndex = [int]::Parse($fields[$tickIndexColumn], [cultureinfo]::InvariantCulture)
+        $simTime = [single]::Parse($fields[$tickTimeColumn], [cultureinfo]::InvariantCulture)
+        if ($outerUpdate -ne $previousOuterUpdate) {
+            if ($stepIndex -ne 0) { throw 'First tick in an outer update did not start at step zero' }
+            $expectedStepIndex = 0
+            $previousOuterUpdate = $outerUpdate
+        } else {
+            ++$expectedStepIndex
+            if ($stepIndex -ne $expectedStepIndex) { throw 'Fixed-step rows are out of scheduler order' }
+        }
+        if ($stepCount -lt 1 -or $stepIndex -ge $stepCount -or
+            $tickIndex -ne $expectedTick -or
+            [Math]::Abs($simTime - ($tickIndex * 0.016)) -gt 0.00001 -or
+            $fields[$tickSourceColumn] -ne '1' -or
+            $fields[$tickInputColumn].Length -ne 512) {
+            throw "Fixed-step input/timing snapshot is invalid at line $($index + 1)"
+        }
+        ++$expectedTick
     }
     $observedThrottle = $false
     $observedSteering = $false
@@ -201,7 +258,8 @@ try {
     }
     [System.IO.File]::WriteAllLines($raceTrace, $raceLines)
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --play-trace $raceTrace --record-trace $raceOutput
+        --play-trace $raceTrace --record-trace $raceOutput `
+        --record-tick-trace $raceTicks
     if ($LASTEXITCODE -ne 0) { throw "Full race trace playback exited with $LASTEXITCODE" }
 
     $raceOutputLines = [System.IO.File]::ReadAllLines($raceOutput)
@@ -268,6 +326,32 @@ try {
     }
     if ($finishFrame -lt 0) { throw 'Player did not finish a complete Viper/Bemidji lap' }
     if ($finishElapsed -le 0) { throw 'Player finish time is not positive' }
+    $raceTickLines = [System.IO.File]::ReadAllLines($raceTicks)
+    if ($raceTickLines.Count -lt 2) { throw 'Full race produced no fixed-step trace rows' }
+    $raceTickHeader = $raceTickLines[0].Split(',')
+    $raceTickIndexColumn = [Array]::IndexOf($raceTickHeader, 'tick_index')
+    $raceTickTimeColumn = [Array]::IndexOf($raceTickHeader, 'simulation_time')
+    $raceTickThrottleColumn = [Array]::IndexOf($raceTickHeader, 'throttle')
+    if ($raceTickIndexColumn -lt 0 -or $raceTickTimeColumn -lt 0 -or
+        $raceTickThrottleColumn -lt 0) {
+        throw 'Full race fixed-step trace is missing required fields'
+    }
+    $raceTickThrottleObserved = $false
+    for ($index = 1; $index -lt $raceTickLines.Count; ++$index) {
+        $fields = $raceTickLines[$index].Split(',')
+        $tickIndex = [int]::Parse($fields[$raceTickIndexColumn], [cultureinfo]::InvariantCulture)
+        $simTime = [single]::Parse($fields[$raceTickTimeColumn], [cultureinfo]::InvariantCulture)
+        if ($tickIndex -ne ($index - 1) -or
+            [Math]::Abs($simTime - ($tickIndex * 0.016)) -gt 0.00001) {
+            throw "Full race fixed-step trace has a tick gap or timer mismatch at row $index"
+        }
+        if ([single]::Parse($fields[$raceTickThrottleColumn], [cultureinfo]::InvariantCulture) -gt 0) {
+            $raceTickThrottleObserved = $true
+        }
+    }
+    if (-not $raceTickThrottleObserved) {
+        throw 'Full race fixed-step trace never captured throttle input'
+    }
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         if (-not $wheelQueriesObserved[$wheel] -or -not $wheelSurfaceSamplesObserved[$wheel]) {
             throw "Wheel $wheel never produced a valid live terrain contact sample"
@@ -286,6 +370,7 @@ try {
     Write-Output "Viper/Bemidji route race finished in ${finishElapsed}s at frame $finishFrame; all seven provisional opponents finished."
 }
 finally {
-    Remove-Item -LiteralPath $capture, $replay, $repeat, $raceTrace, $raceOutput -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,
+        $repeatTicks, $raceTrace, $raceOutput, $raceTicks -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
 }

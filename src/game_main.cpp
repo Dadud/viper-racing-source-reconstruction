@@ -115,6 +115,7 @@ struct Options {
     bool audio_smoke{};
     std::optional<unsigned> smoke_frames;
     std::optional<std::filesystem::path> record_trace;
+    std::optional<std::filesystem::path> record_physics_tick_trace;
     std::optional<std::filesystem::path> play_trace;
 };
 
@@ -130,6 +131,7 @@ void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
         << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--software] [--help]\n"
+        << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
         << "Without either, searches the current and executable directories for common.res or GameData/common.res.\n";
 }
@@ -223,6 +225,9 @@ Options parse_options(const int argc, wchar_t** argv)
         } else if (arg == L"--record-trace") {
             if (++i >= argc) throw std::runtime_error("--record-trace requires a path");
             options.record_trace = std::filesystem::path(argv[i]);
+        } else if (arg == L"--record-tick-trace") {
+            if (++i >= argc) throw std::runtime_error("--record-tick-trace requires a path");
+            options.record_physics_tick_trace = std::filesystem::path(argv[i]);
         } else if (arg == L"--play-trace") {
             if (++i >= argc) throw std::runtime_error("--play-trace requires a path");
             options.play_trace = std::filesystem::path(argv[i]);
@@ -1596,6 +1601,7 @@ struct PlayerPhysicsTickContext {
     std::uint32_t tick_index{};
     std::uint32_t scheduled_step_index{};
     std::uint32_t scheduled_step_count{};
+    std::uint64_t outer_update_index{};
     float simulation_time_seconds{};
 };
 
@@ -1650,7 +1656,8 @@ struct WindowState {
     bool return_to_frontend{};
     viper::PhysicsStepAccumulator physics_step_accumulator{};
     viper::PhysicsStepSchedule last_physics_step_schedule{};
-    std::optional<PlayerPhysicsTickContext> last_player_physics_tick;
+    std::vector<PlayerPhysicsTickContext> player_physics_ticks_this_update;
+    std::uint64_t player_outer_update_count{};
     bool physics_step_clock_initialized{};
     std::uint32_t physics_step_count{};
     std::uint32_t pcar_callback_step_count{};
@@ -1661,6 +1668,7 @@ struct WindowState {
     // Win32 key events remain a fallback and support deterministic UI smokes.
     viper::DirectInputKeyboardService directinput_keyboard;
     std::array<std::uint8_t, 256> keyboard_button_states{};
+    std::array<std::uint8_t, 256> sampled_control_input_states{};
     std::array<std::uint8_t, 256> window_message_button_states{};
     bool directinput_keyboard_state_read{};
     bool directinput_up_pressed{};
@@ -2360,14 +2368,15 @@ struct WindowState {
         const auto schedule = viper::schedule_physics_steps(
             physics_step_accumulator, scheduler_input);
         last_physics_step_schedule = schedule;
-        last_player_physics_tick.reset();
+        player_physics_ticks_this_update.clear();
+        const auto outer_update_index = player_outer_update_count++;
         bool lap_completed = false;
         for (std::int32_t step = 0; step < schedule.steps; ++step) {
             PlayerPhysicsTickContext tick_context{};
             tick_context.input_provenance = playback_active
                 ? PhysicsTickInputProvenance::logical_trace_actions
                 : PhysicsTickInputProvenance::merged_live_keyboard;
-            tick_context.keyboard_snapshot = keyboard_button_states;
+            tick_context.keyboard_snapshot = sampled_control_input_states;
             tick_context.controls = control_update_state;
             tick_context.pcar_callback_globals = pcar_callback_globals;
             tick_context.scheduler_clock_milliseconds = scheduler_clock;
@@ -2376,10 +2385,11 @@ struct WindowState {
                 static_cast<std::uint32_t>(step);
             tick_context.scheduled_step_count =
                 static_cast<std::uint32_t>(schedule.steps);
+            tick_context.outer_update_index = outer_update_index;
             // Native dispatch consumes the current timer before incrementing it.
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
-            last_player_physics_tick = tick_context;
+            player_physics_ticks_this_update.push_back(tick_context);
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             auto candidate_motion = motion;
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
@@ -2494,6 +2504,7 @@ struct WindowState {
         } else {
             input.device_button_states = keyboard_button_states;
         }
+        sampled_control_input_states = input.device_button_states;
         observation.post_refresh_inputs = {input, input};
         last_control_update = viper::update_race_loop_43b290(
             control_update_state, observation);
@@ -3096,6 +3107,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
                const std::optional<std::filesystem::path>& record_trace,
+               const std::optional<std::filesystem::path>& record_physics_tick_trace,
                const std::vector<TraceInputFrame>* playback_trace,
                const bool hold_results_for_frontend,
                const std::size_t player_car_index,
@@ -3442,6 +3454,30 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     std::ofstream trace;
+    std::ofstream physics_tick_trace;
+    if (record_physics_tick_trace) {
+        physics_tick_trace.open(*record_physics_tick_trace,
+            std::ios::out | std::ios::trunc);
+        if (!physics_tick_trace) {
+            std::cerr << "Could not create physics tick trace: "
+                      << record_physics_tick_trace->string() << '\n';
+            DestroyWindow(hwnd);
+            return 1;
+        }
+        physics_tick_trace << "outer_update,scheduled_step_index,scheduled_step_count"
+            ",tick_index,scheduler_clock_ms,simulation_time,input_provenance"
+            ",steering,throttle,brake,control_value_5093b8,control_flag_5093f0"
+            ",control_value_5093c8,control_flag_5093cc,control_flag_5093f8"
+            ",control_flag_509360,control_difference_509344,control_flag_509420"
+            ",control_difference_509340,control_shift_latch_509354"
+            ",control_counter_5093bc,keyboard_snapshot_hex\n";
+        physics_tick_trace << std::setprecision(9);
+        if (!physics_tick_trace) {
+            std::cerr << "Could not write physics tick trace header.\n";
+            DestroyWindow(hwnd);
+            return 1;
+        }
+    }
     if (record_trace) {
         trace.open(*record_trace, std::ios::out | std::ios::trunc);
         if (!trace) {
@@ -3571,6 +3607,44 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 return 1;
             }
             state.last_tick = now;
+            if (record_physics_tick_trace) {
+                for (const auto& tick : state.player_physics_ticks_this_update) {
+                    const auto& controls = tick.controls.controls;
+                    physics_tick_trace << tick.outer_update_index << ','
+                        << tick.scheduled_step_index << ','
+                        << tick.scheduled_step_count << ','
+                        << tick.tick_index << ','
+                        << tick.scheduler_clock_milliseconds << ','
+                        << tick.simulation_time_seconds << ','
+                        << static_cast<unsigned>(tick.input_provenance) << ','
+                        << tick.controls.steering.value_0x509358 << ','
+                        << tick.controls.analog_0x5093f4.value << ','
+                        << tick.controls.analog_0x509320.value << ','
+                        << controls.value_0x5093b8 << ','
+                        << static_cast<unsigned>(controls.flag_0x5093f0) << ','
+                        << controls.value_0x5093c8 << ','
+                        << static_cast<unsigned>(controls.flag_0x5093cc) << ','
+                        << static_cast<unsigned>(controls.flag_0x5093f8) << ','
+                        << static_cast<unsigned>(controls.flag_0x509360) << ','
+                        << controls.difference_0x509344 << ','
+                        << static_cast<unsigned>(controls.flag_0x509420) << ','
+                        << controls.difference_0x509340 << ','
+                        << static_cast<unsigned>(controls.transition_latch_0x509354)
+                        << ',' << controls.counter_0x5093bc << ',';
+                    for (const auto key_state : tick.keyboard_snapshot) {
+                        physics_tick_trace << std::hex << std::setw(2)
+                            << std::setfill('0')
+                            << static_cast<unsigned>(key_state);
+                    }
+                    physics_tick_trace << std::dec << std::setfill(' ') << '\n';
+                    if (!physics_tick_trace) {
+                        std::cerr << "Could not write physics tick trace.\n";
+                        DestroyWindow(hwnd);
+                        return 1;
+                    }
+                }
+                physics_tick_trace.flush();
+            }
             if (record_trace) {
                 trace << trace_frame++ << ',' << state.motion.race.elapsed_seconds << ','
                       << delta_seconds << ',' << state.left << ',' << state.right << ','
@@ -3702,8 +3776,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.directinput_keyboard_state_read
                       << ',' << state.directinput_up_pressed
                       << ',' << state.paused;
-                if (state.last_player_physics_tick.has_value()) {
-                    const auto& tick = *state.last_player_physics_tick;
+                if (!state.player_physics_ticks_this_update.empty()) {
+                    const auto& tick = state.player_physics_ticks_this_update.back();
                     trace << ',' << static_cast<unsigned>(tick.input_provenance)
                           << ',' << tick.scheduler_clock_milliseconds
                           << ',' << tick.tick_index
@@ -3873,7 +3947,8 @@ int run_selected_race(const Options& options, const std::string_view track,
         }
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
-        options.record_trace, playback_trace, hold_results_for_frontend,
+        options.record_trace, options.record_physics_tick_trace,
+        playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,
         participant_names,
         configured_car_record_tags,
@@ -3917,7 +3992,8 @@ int wmain(int argc, wchar_t** argv)
             : configured_car_stem(data_directory, configured_options);
         const bool interactive_frontend = !options.validate_assets &&
             !options.track && !options.car && !options.smoke_frames &&
-            !options.audio_smoke && !options.record_trace;
+            !options.audio_smoke && !options.record_trace &&
+            !options.record_physics_tick_trace;
         auto selected_track = track;
         auto selected_car = car;
         auto selected_laps = static_cast<std::uint32_t>(std::clamp(

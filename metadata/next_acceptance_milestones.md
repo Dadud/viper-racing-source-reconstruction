@@ -27,8 +27,13 @@ including live-keyboard versus logical-replay provenance, recovered controls,
 callback globals, scheduler clock, and the pre-increment native tick time.
 This is a provenance boundary feeding the existing projections; it does not
 make their route-driven movement or route-derived terrain/contact samples
-physics-owned. Race-trace validation should next confirm fixed-step snapshots
-and deterministic replay before the complete body update is wired.
+physics-owned. The opt-in `--record-tick-trace PATH` writes every scheduled
+player tick, including the full 256-byte binding-input snapshot and its
+per-tick controls/timing. The trace replay regression checks contiguous tick
+ordering, pre-increment timer values, logical-input provenance, input snapshot
+size, and byte-identical repeated playback. This is input/timing evidence, not
+physics acceptance; next wire a complete observed body update and preserve
+per-tick physical state in paired original/reconstruction captures.
 The player now owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
 and persistent contact outputs. This closes object-state materialization only;
