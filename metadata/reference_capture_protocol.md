@@ -34,12 +34,22 @@ and `../../analysis/reference_captures/viper-quickrace-trace.json`; the trace
 contains drawing activity but no confirmed vehicle movement or accelerator
 response. Original binaries, ISO, and GameData hashes matched their baselines
 after cleanup. This establishes a controlled race-start observation under a
-host-specific video-memory override, not physical behavior or parity.
-The next useful probe is a bounded throttle hold and release (plus a short
-steering pulse) after the green start signal, recording timestamps, frames,
-and only state fields whose addresses and interpretation have already been
-established. Vehicle-control response and race progression remain unverified
-in the original capture, so no gameplay comparison is established.
+host-specific video-memory override, not physical behavior or parity. A later
+instrumented run captured the original task factory and callback order. A
+foregrounded 1.5-second throttle pulse still produced zero sampled throttle;
+then a bounded synthetic return-value intervention at the original DIK_UP
+key-read wrapper caused the original throttle global to ramp up and decay.
+This validates the binding/update path under the intervention but does not
+establish ordinary host-input delivery, clean motion causality, or parity. See
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md)
+and its private extract at
+`../../analysis/reference_captures/physics_dispatch_20261025/runtime_trace_selected.json`
+plus the bounded intervention extract at
+`../../analysis/reference_captures/physics_dispatch_20261025/synthetic_dik_ramp_capture.json`.
+The next comparison should replay the same timestamped throttle ramp against
+the reconstructed input-update path, then capture a short, repeatable
+input-to-motion interval on both clients. Race completion and parity remain
+unverified in the original capture.
 
 ## Pairing a scenario
 

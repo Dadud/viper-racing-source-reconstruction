@@ -583,6 +583,117 @@ int main()
                     !runtime_tasks.entries[2].stat.has_value(),
                 "semantic task runtime did not preserve order and unsupported active gates");
 
+        // Synthetic fixture for the captured factory order: seven ACAR cars,
+        // the player PCAR, then three CHKP objects. This verifies serialized
+        // semantics only; it does not model native allocation or dispatch.
+        std::array<std::vector<std::byte>, 7> acar_records;
+        for (auto& record : acar_records)
+            record = make_physics_record(0x41434152U, 0x1E4U);
+        auto pcar_record = make_physics_record(0x50434152U, 0x1E4U);
+        std::array<std::vector<std::byte>, 3> checkpoint_records;
+        constexpr std::array<std::array<float, 6>, 3> synthetic_checkpoint_endpoints{{
+            {{0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 10.0F}},
+            {{2.0F, 1.0F, -3.0F, 8.0F, 1.0F, -3.0F}},
+            {{-4.0F, 2.0F, 5.0F, -4.0F, 12.0F, 9.0F}},
+        }};
+        for (std::size_t checkpoint_index = 0U;
+             checkpoint_index < checkpoint_records.size(); ++checkpoint_index) {
+            auto& record = checkpoint_records[checkpoint_index];
+            record = make_physics_record(0x43484B50U, 0x20U);
+            for (std::size_t field = 0U; field < 6U; ++field) {
+                const auto value = std::bit_cast<std::uint32_t>(
+                    synthetic_checkpoint_endpoints[checkpoint_index][field]);
+                for (std::size_t byte = 0U; byte < 4U; ++byte)
+                    record[0x08U + field * 4U + byte] =
+                        static_cast<std::byte>((value >> (byte * 8U)) & 0xFFU);
+            }
+        }
+        std::array<viper::PhysicsTaskRecordInput, 11> captured_factory_inputs{};
+        for (std::size_t index = 0U; index < acar_records.size(); ++index)
+            captured_factory_inputs[index].record_bytes = acar_records[index];
+        captured_factory_inputs[7U].record_bytes = pcar_record;
+        for (std::size_t index = 0U; index < checkpoint_records.size(); ++index)
+            captured_factory_inputs[8U + index].record_bytes = checkpoint_records[index];
+
+        constexpr std::array<std::uint32_t, 11> captured_factory_cursors{
+            0x000U, 0x18CU, 0x318U, 0x4A4U, 0x630U, 0x7BCU,
+            0x948U, 0xAD4U, 0xC60U, 0xC94U, 0xCC8U};
+        const auto captured_factory_stream = viper::serialize_physics_task_records(
+            captured_factory_inputs);
+        const auto captured_factory_decoded = viper::read_physics_task_record_stream(
+            captured_factory_stream.bytes);
+        const auto captured_factory_inventory = viper::inventory_physics_task_objects(
+            captured_factory_decoded, captured_factory_stream.bytes);
+        const auto captured_factory_runtime =
+            viper::materialize_physics_task_runtime_collection(
+                captured_factory_decoded, captured_factory_stream.bytes, false);
+        constexpr std::array<std::uint32_t, 11> captured_factory_tags{
+            0x41434152U, 0x41434152U, 0x41434152U, 0x41434152U,
+            0x41434152U, 0x41434152U, 0x41434152U, 0x50434152U,
+            0x43484B50U, 0x43484B50U, 0x43484B50U};
+        require(captured_factory_stream.status ==
+                    viper::PhysicsTaskRecordSerializationStatus::complete &&
+                    captured_factory_decoded.status ==
+                        viper::PhysicsTaskRecordStreamReadStatus::complete &&
+                    captured_factory_stream.records.size() == captured_factory_tags.size() &&
+                    captured_factory_decoded.records.size() == captured_factory_tags.size() &&
+                    captured_factory_stream.final_cursor == 0xCFCU &&
+                    captured_factory_decoded.final_cursor == 0xCFCU,
+                "captured factory fixture did not serialize and decode all eleven records");
+        require(captured_factory_inventory.status ==
+                    viper::PhysicsTaskObjectInventoryStatus::complete &&
+                    captured_factory_inventory.entries.size() == captured_factory_tags.size() &&
+                    captured_factory_runtime.status ==
+                    viper::PhysicsTaskRuntimeCollectionStatus::complete &&
+                    captured_factory_runtime.entries.size() == captured_factory_tags.size(),
+                "captured factory fixture did not retain complete inventory and runtime collections");
+        for (std::size_t index = 0U; index < captured_factory_tags.size(); ++index) {
+            const auto& stream_record = captured_factory_decoded.records[index];
+            const auto& inventory_entry = captured_factory_inventory.entries[index];
+            const auto& runtime_entry = captured_factory_runtime.entries[index];
+            require(stream_record.record_tag == captured_factory_tags[index] &&
+                        stream_record.cursor_offset == captured_factory_cursors[index] &&
+                        inventory_entry.stream_record_index == index &&
+                        inventory_entry.record_tag == captured_factory_tags[index] &&
+                        inventory_entry.stream_cursor == captured_factory_cursors[index] &&
+                        runtime_entry.stream_record_index == index &&
+                        runtime_entry.record_tag == captured_factory_tags[index] &&
+                        runtime_entry.stream_cursor == captured_factory_cursors[index],
+                    "captured factory order or cursor diverged across stream, inventory, and runtime");
+            require(!inventory_entry.native_object_materialized &&
+                        !inventory_entry.fixed_step_callback_supported,
+                    "synthetic task inventory overclaimed native construction or callback support");
+            if (index < 8U) {
+                require(stream_record.record_size == 0x1E4U &&
+                            inventory_entry.record_size == 0x1E4U &&
+                            runtime_entry.status ==
+                                viper::PhysicsTaskRuntimeEntryStatus::
+                                    active_callback_unavailable &&
+                            !runtime_entry.checkpoint.has_value(),
+                        "ACAR or PCAR fixture must remain explicitly unavailable for active dispatch");
+            } else {
+                const auto checkpoint_index = index - 8U;
+                require(stream_record.record_size == 0x20U &&
+                            inventory_entry.record_size == 0x20U &&
+                            captured_factory_stream.records[index].cursor_advance == 0x34U &&
+                            runtime_entry.status ==
+                                viper::PhysicsTaskRuntimeEntryStatus::
+                                    inert_checkpoint_retained &&
+                            runtime_entry.checkpoint.has_value() &&
+                            !runtime_entry.checkpoint->active_gate &&
+                            runtime_entry.checkpoint->update_callback_is_noop,
+                        "CHKP fixture must retain inert geometry with the observed 0x34 cursor advance");
+                for (std::size_t field = 0U; field < 6U; ++field) {
+                    const auto& endpoint = field < 3U
+                        ? runtime_entry.checkpoint->first_vertex
+                        : runtime_entry.checkpoint->second_vertex;
+                    require(endpoint[field % 3U] ==
+                                synthetic_checkpoint_endpoints[checkpoint_index][field],
+                            "CHKP fixture endpoint geometry changed during runtime materialization");
+                }
+            }
+        }
+
         auto invalid_runtime_bytes = runtime_serialized.bytes;
         const auto write_nan_word = [&invalid_runtime_bytes](
             const std::size_t offset, const std::uint32_t value) {

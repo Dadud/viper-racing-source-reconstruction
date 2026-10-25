@@ -974,3 +974,19 @@ and `0x4C8674` `ev_6a6922e410e095ab8dc62faeea07b375ceaaf93d58a81fdb9d1241446ef89
 `ev_51f1c30c2b566839dc0bbb6d5daf4fb4fb1979a1310daa219a62d820c128e613`,
 `0x4331D0` `ev_919aa381a2fd748691c9e227f220bb203f904dc92207ba40bd8a8f1a95f28c67`,
 and `0x4331C0` `ev_e1a941070e681ef12c720233800a257ac80a5e38bfc00d10325b4d9361fb308d`.
+
+## Original runtime task-order spot-check
+
+The 2026-10-25 instrumented Viper/Bemidji Quick Race capture observed eleven
+task factory allocations in order: seven `ACAR`, one `PCAR`, then three
+`CHKP`. The post-load task-array snapshot matched the factory object pointers,
+vtables, and stream cursors. The PCAR callback and fixed-step dispatcher both
+reached sampled count 20,640; sampled calls to `0x431150` included all eight
+car-task object pointers and none of the three CHKP pointers. This validates
+the implemented ordered semantic task collection against the original's
+observed class order. `tests/physics_task_stream_regression.cpp` uses synthetic
+record bytes to lock that order and cursor progression; it does not validate
+live record-byte materialization from the capture or make the production race
+loop dispatch reconstructed task objects. Full per-object, cursor, callback,
+input, hash, and limitation details are in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
