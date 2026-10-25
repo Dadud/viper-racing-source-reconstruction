@@ -23,6 +23,7 @@
 #include "viper/career_file_store.hpp"
 #include "viper/pcar_control_update.hpp"
 #include "viper/setup_preferences.hpp"
+#include "viper/track_selection.hpp"
 #include "directinput_keyboard_service.h"
 
 #include <array>
@@ -40,6 +41,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -410,9 +412,6 @@ std::string configured_track_stem(const std::filesystem::path& data_dir,
         *table, static_cast<std::size_t>(index), 0);
     if (!stem || stem->empty())
         throw std::runtime_error("tracks.tab selected an empty track name");
-    if (*stem == "random")
-        throw std::runtime_error(
-            "options.def selects the random track; random track setup is not implemented");
     return std::string(*stem);
 }
 
@@ -434,7 +433,11 @@ std::vector<std::string> selectable_track_stems(
         std::transform(stem.begin(), stem.end(), stem.begin(), [](const char value) {
             return static_cast<char>(std::tolower(static_cast<unsigned char>(value)));
         });
-        if (stem == "random") continue;
+        if (stem == "random") {
+            if (std::find(tracks.begin(), tracks.end(), stem) == tracks.end())
+                tracks.push_back(std::move(stem));
+            continue;
+        }
         std::error_code error;
         if (!std::filesystem::is_regular_file(data_dir / (stem + ".trk"), error) || error)
             continue;
@@ -443,6 +446,24 @@ std::vector<std::string> selectable_track_stems(
     if (tracks.empty()) throw std::runtime_error(
         "tracks.tab contains no installed selectable track bundles");
     return tracks;
+}
+
+std::string resolve_random_track_choice(const std::vector<std::string>& tracks)
+{
+    const auto installed_count = static_cast<std::size_t>(std::count_if(
+        tracks.begin(), tracks.end(), [](const std::string& track) {
+            return track != "random";
+        }));
+    if (installed_count == 0U)
+        throw std::runtime_error("random track selection has no installed tracks");
+    std::random_device entropy;
+    std::mt19937 generator(entropy());
+    std::uniform_int_distribution<std::size_t> choose(0U, installed_count - 1U);
+    const auto selected = viper::resolve_track_choice_index(
+        tracks, "random", choose(generator));
+    if (!selected)
+        throw std::runtime_error("random track choice could not be resolved");
+    return tracks[*selected];
 }
 
 std::vector<std::string> selectable_car_stems(
@@ -675,6 +696,10 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                 state->opponent_strength = (state->opponent_strength + 1U) %
                     static_cast<std::uint32_t>(opponent_strength_names.size());
             else if (wparam == VK_RETURN && !state->tracks.empty() && !state->cars.empty()) {
+                if (state->tracks[state->track_index] == "random") {
+                    state->tracks[state->track_index] =
+                        resolve_random_track_choice(state->tracks);
+                }
                 state->accepted = true;
                 DestroyWindow(hwnd);
                 return 0;
@@ -4190,7 +4215,7 @@ int wmain(int argc, wchar_t** argv)
         std::error_code config_error;
         if (std::filesystem::is_regular_file(config_path, config_error) && !config_error)
             configured_options = viper::GameOptions::load(config_path);
-        const auto track = options.track
+        auto track = options.track
             ? *options.track
             : configured_track_stem(data_directory, configured_options);
         const auto car = options.car
@@ -4200,6 +4225,9 @@ int wmain(int argc, wchar_t** argv)
             !options.track && !options.car && !options.smoke_frames &&
             !options.audio_smoke && !options.record_trace &&
             !options.record_physics_tick_trace;
+        if (!interactive_frontend && track == "random")
+            track = resolve_random_track_choice(
+                selectable_track_stems(data_directory));
         auto selected_track = track;
         auto selected_car = car;
         auto selected_laps = static_cast<std::uint32_t>(std::clamp(

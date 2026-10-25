@@ -26,6 +26,7 @@ add_library(viper_frontend_model
     src/replay_screen.cpp
     src/startup_command_line.cpp
     src/setup_preferences.cpp
+    src/track_selection.cpp
 )
 target_include_directories(viper_frontend_model PUBLIC include)
 target_compile_features(viper_frontend_model PUBLIC cxx_std_20)

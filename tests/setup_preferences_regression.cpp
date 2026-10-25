@@ -1,4 +1,5 @@
 #include "viper/setup_preferences.hpp"
+#include "viper/track_selection.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -42,6 +43,17 @@ int main()
 
     const std::vector<std::string> tracks{"bemidji", "dundas"};
     const std::vector<std::string> cars{"viper", "sports"};
+    const std::vector<std::string> tracks_with_random{
+        "bemidji", "random", "dundas", "heaven"};
+    check(viper::resolve_track_choice_index(tracks_with_random, "random", 0U) == 0U &&
+        viper::resolve_track_choice_index(tracks_with_random, "random", 1U) == 2U &&
+        viper::resolve_track_choice_index(tracks_with_random, "random", 2U) == 3U,
+        "random selector resolves each ordinal only among installed tracks");
+    check(!viper::resolve_track_choice_index(
+        tracks_with_random, "random", 3U).has_value() &&
+        viper::resolve_track_choice_index(
+            tracks_with_random, "dundas", 0U) == 2U,
+        "random selector bounds-checks choices and preserves concrete selections");
     const auto resolved = viper::resolve_setup_selection_indices(
         tracks, cars, loaded.selection, "dundas", "viper");
     check(resolved.track == 0U && resolved.car == 1U,

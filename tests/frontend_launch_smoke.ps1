@@ -13,6 +13,7 @@ public delegate bool ViperEnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 public static class ViperFrontendWin32 {
     [DllImport("user32.dll")] public static extern bool EnumWindows(ViperEnumWindowsProc callback, IntPtr lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 }
@@ -136,7 +137,78 @@ try {
     if ($stdout -notmatch 'selected AIDR profile 1') {
         throw "Selected profile did not reach AI setup. stdout=$stdout stderr=$stderr"
     }
-    Write-Output 'Career slot actions, profile selection/persistence, profile-driven AI setup, setup-to-race loading, and clean exit passed.'
+
+    $randomConfigDir = Join-Path $configDir 'random-track'
+    [void](New-Item -ItemType Directory -Path $randomConfigDir)
+    $randomPreference = Join-Path $randomConfigDir 'viper-racing-setup.cfg'
+    [System.IO.File]::WriteAllText($randomPreference,
+        "VIPER-RACING-SETUP 3`ntrack=random`ncar=viper`nlaps=1`nopponent_strength=0`n")
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $GameExe
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$randomConfigDir`" --software"
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $process = [Diagnostics.Process]::Start($startInfo)
+    $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]13, [IntPtr]::Zero)) {
+        throw 'Could not accept the saved Random track selection'
+    }
+    $race = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 45
+    $randomTitle = [System.Text.StringBuilder]::new(256)
+    for ($attempt = 0; $attempt -lt 20 -and $randomTitle.ToString() -notmatch 'Lap 1/1'; ++$attempt) {
+        [void]$randomTitle.Clear()
+        [void][ViperFrontendWin32]::GetWindowText($race, $randomTitle, $randomTitle.Capacity)
+        if ($randomTitle.ToString() -notmatch 'Lap 1/1') { Start-Sleep -Milliseconds 50 }
+    }
+    $randomTrackMatch = [regex]::Match($randomTitle.ToString(),
+        'Viper Racing.*? ([A-Za-z]+)\s*&\s*viper.*?Lap 1/1')
+    $installedTracks = @('hastings', 'heaven', 'kenyon', 'limbo', 'nfield', 'uptown', 'dundas', 'bemidji')
+    if ($randomTitle.ToString() -notmatch 'Lap 1/1' -or
+        -not $randomTrackMatch.Success -or
+        $installedTracks -notcontains $randomTrackMatch.Groups[1].Value.ToLowerInvariant()) {
+        throw "Random selection did not start a race on an installed track: $($randomTitle.ToString())"
+    }
+    if (-not $process.WaitForExit(0)) {
+        [void][ViperFrontendWin32]::PostMessage($race, 0x0100, [IntPtr]27, [IntPtr]::Zero)
+        if (-not $process.WaitForExit(15000)) { throw 'Random-track race did not exit after Escape' }
+    }
+    $process.Refresh()
+    if ($process.ExitCode -ne 0) { throw "Random-track race exited with code $($process.ExitCode)" }
+    $realizedTrack = $randomTrackMatch.Groups[1].Value.ToLowerInvariant()
+    $savedRandomPreference = [System.IO.File]::ReadAllText($randomPreference)
+    if ($savedRandomPreference -notmatch "(?m)^track=$([regex]::Escape($realizedTrack))$" -or
+        $savedRandomPreference -match '(?m)^track=random$') {
+        throw "Random selection did not persist the realized concrete track: $savedRandomPreference"
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $GameExe
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$randomConfigDir`" --software"
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $process = [Diagnostics.Process]::Start($startInfo)
+    $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
+    [void][ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]13, [IntPtr]::Zero)
+    $restoredRace = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 45
+    $restoredTitle = [System.Text.StringBuilder]::new(256)
+    $restoredPattern = "Lap 1/1"
+    for ($attempt = 0; $attempt -lt 20 -and $restoredTitle.ToString() -notmatch $restoredPattern; ++$attempt) {
+        [void]$restoredTitle.Clear()
+        [void][ViperFrontendWin32]::GetWindowText($restoredRace, $restoredTitle, $restoredTitle.Capacity)
+        if ($restoredTitle.ToString() -notmatch $restoredPattern) { Start-Sleep -Milliseconds 50 }
+    }
+    $restoredTrackMatch = [regex]::Match($restoredTitle.ToString(),
+        'Viper Racing.*? ([A-Za-z]+)\s*&\s*viper.*?Lap 1/1')
+    if ($restoredTitle.ToString() -notmatch $restoredPattern -or
+        -not $restoredTrackMatch.Success -or
+        $restoredTrackMatch.Groups[1].Value.ToLowerInvariant() -ne $realizedTrack) {
+        throw "Relaunch did not restore the realized Random track: $($restoredTitle.ToString())"
+    }
+    [void][ViperFrontendWin32]::PostMessage($restoredRace, 0x0100, [IntPtr]27, [IntPtr]::Zero)
+    if (-not $process.WaitForExit(15000)) { throw 'Restored Random-track race did not exit after Escape' }
+    $process.Refresh()
+    if ($process.ExitCode -ne 0) { throw "Restored Random-track race exited with code $($process.ExitCode)" }
+    Write-Output 'Career slot actions, profile persistence, Random track selection, realized-track persistence/relaunch, setup-to-race loading, and clean exit passed.'
 } catch {
     throw
 } finally {
