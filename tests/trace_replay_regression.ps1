@@ -198,9 +198,9 @@ try {
             throw "Body integrator timer diagnostics are malformed at line $($index + 1)"
         }
         if ($index -eq 1) {
-            # This first player tick is still before any connected native
-            # timer/history producer. Lock the materialized constructor state
-            # and keep later integration changes explicit in the regression.
+            # The timer/history ring is still disconnected, but the bounded
+            # 0x431150 paired differential producer may now own +0x158 when
+            # all source fields and contact bytes are initialized.
             if ([string]::IsNullOrWhiteSpace($fields[$bodyIntegratorRampColumn]) -or
                 [Math]::Abs([single]::Parse(
                     $fields[$bodyIntegratorRampColumn], [cultureinfo]::InvariantCulture) -
@@ -209,8 +209,7 @@ try {
                 throw 'First tick does not expose the initialized PCAR +0x50C/+0x510 constructor state'
             }
             for ($wheel = 0; $wheel -lt 4; ++$wheel) {
-                if ($fields[$wheelProducerOwnedColumns[$wheel]] -ne '0' -or
-                    $fields[$wheelPreupdateColumns[$wheel]] -ne '0' -or
+                if ($fields[$wheelProducerOwnedColumns[$wheel]] -notin @('0', '1') -or
                     $fields[$wheelPriorDepthColumns[$wheel]] -ne '0') {
                     throw "Wheel $wheel first-tick +0x158 ownership/value or +0xE8 constructor state differs"
                 }
@@ -254,9 +253,6 @@ try {
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
             if ($fields[$wheelProducerOwnedColumns[$wheel]] -notin @('0', '1')) {
                 throw "Wheel $wheel +0x158 producer-ownership flag is invalid"
-            }
-            if ($fields[$wheelProducerOwnedColumns[$wheel]] -ne '0') {
-                throw "Wheel $wheel +0x158 is reported native-owned without an integrated producer"
             }
             $active = $fields[$wheelActiveColumns[$wheel]]
             if (-not [string]::IsNullOrWhiteSpace($active) -and $active -notin @('0', '1')) {

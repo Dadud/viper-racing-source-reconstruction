@@ -34,9 +34,11 @@ The full acceptance criteria and exact supporting evidence remain in the
 [completion ledger](completion_ledger.md). A successful launcher-owned capture
 on 2026-10-25 applied a bounded synthetic DIK_UP pulse and observed the
 original PCAR throttle/body response alongside eight throttle-gated integrators
-and 32 wheel updates. It records downstream suspension/tire stages, but does
-not source the actual wheel `+0x158` producer, upstream tire-response/query
-inputs, or a paired reconstruction baseline. Separate Frida Stalker attempts
+and 32 wheel updates. A later hardware watch identified the live paired
+differential writer for wheel `+0x158`, and the existing equation is now
+connected to byte-backed runtime state. That same-value hit does not establish
+changed-value parity or freshness of its six upstream fields. Tire-response/query
+inputs and a paired reconstruction baseline remain open. Separate Frida Stalker attempts
 crashed in `frida-agent.dll`; the new low-overhead capture did not use Stalker
 and does not diagnose those crashes. Details and limits are documented in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
@@ -46,15 +48,15 @@ and does not diagnose those crashes. Details and limits are documented in
 Treat one Viper/Bemidji single-player race as the release gate. Work in this
 order, and keep later systems out of the gate until this race is reliable:
 
-1. **Close the upstream wheel-input evidence gaps.** Use the successful
-   launcher-owned staged flow and low-overhead hooks. First identify the
-   actual runtime producer of each wheel's `+0x158` and the producers of the
-   pre-projection tire response/query values. Then capture timestamped
-   per-wheel rows together with `+0x24C/+0x258` accumulator deltas and body
-   state for throttle, steering, braking, and coast. Preserve fail-closed
-   behavior wherever a consumed field or callback remains unresolved; do not
-   treat the current synthetic input trace as normal keyboard delivery or as
-   a complete force law.
+1. **Close the remaining upstream wheel-input evidence gaps.** The direct
+   wheel `+0x158` writer is resolved and connected, with freshness of its six
+   body operands still unproven. Use the successful launcher-owned staged flow
+   and low-overhead hooks to identify pre-projection tire response/query
+   producers, then capture timestamped per-wheel rows with `+0x24C/+0x258`
+   accumulator deltas and body state for throttle, steering, braking, and
+   coast. Preserve fail-closed behavior wherever a consumed field or callback
+   remains unresolved; do not treat the current synthetic input trace as
+   normal keyboard delivery or as a complete force law.
 2. **Implement the smallest complete physical player step.** Connect contact
    observations, per-wheel force contributors and accumulator collection to
    the byte-backed PCAR state only when every consumed field and callback

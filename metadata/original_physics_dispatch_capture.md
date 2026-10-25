@@ -1007,3 +1007,11 @@ event that dispatches it is unresolved. Updating `+0xE44` each reconstructed
 tick could open the strict `<6.2` `0x433570` timer gate without the required
 event or ordinal-row inputs; leave it unchanged until the complete reset
 transition is supported.
+
+### Resolved live wheel `+0x158` producer (2026-10-25)
+
+A bounded six-second Frida hardware-watch probe armed write watchpoints on the four aligned wheel fields for the selected PCAR during callback `0x4384D0`. It stopped on a `single-step` exception with PC `0x4319BC`, immediately after the x86 store `FSTP [ESI+0x850]` at `0x4319B6`. The watched wheel-1 field at `PCAR+0x850` matched wheel subobject `PCAR+0x6F8` plus `+0x158`. Its bits were unchanged (`0x40239AFE` before and after), so this is a same-value write, not evidence of a changed suspension response. The watchpoint capture is `ev_56ff29dc0e25c8269a4850dd0d08e549f230ed529e923e302475e97451f97f27`.
+
+Static disassembly of the same `0x431150` body identifies all four stores: `0x4319D5` writes `PCAR+0x6AC`, `0x4319B6` writes `+0x850`, `0x431A10` writes `+0x9F4`, and `0x431A02` writes `+0xB98`. These are wheel subobject `+0x158` at bases `+0x554`, `+0x6F8`, `+0x89C`, and `+0xA40`. The already implemented `apply_ncar_integrator_wheel_pair_differentials` models the opposite-sign front/rear pair equations and contact gates. The Windows player callback now feeds it the six byte-backed body operands (`+0x63C`, `+0x7E0`, `+0xDD4`, `+0x984`, `+0xB28`, `+0xDD8`) and four initialized contact bytes, then stages and commits all four wheel writes together. Per-tick trace ownership is true only after that commit; absent or non-finite inputs leave existing bytes untouched. Supporting static evidence: disassembly `ev_2534fc83d0f6e0f4cea9397149195b61a7e7383fec5e886f81c33c3d9bc331f2`, pseudocode `ev_7a9e71a13e0b73abe7ddb371739a299361079bfb2ac0f0922555068ca2abdc3b`, and exact function resolution `ev_9b5a3813b67ec3075c3f43d23ae2eeac05178bc6ee1d6a62ec90a43a55009ad4`.
+
+This resolves the direct `+0x158` producer. It does not supply freshness for the six upstream body values, prove a changed-value native comparison, or connect suspension/tire forces to PCAR accumulators and body integration. The route-motion model therefore remains authoritative for rendered motion.

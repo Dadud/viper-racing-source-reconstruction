@@ -1958,9 +1958,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
     std::array<std::optional<float>, 4> wheel_preupdate_value_0x158_after_tick{};
-    // The sampled wheel +0x158 currently comes only from constructor/reset
-    // initialization. Keep the field visible for diagnostics, but do not let
-    // its presence imply that a per-frame suspension producer is connected.
+    // True only when this tick connected the recovered 0x431150 paired
+    // differential producer to the byte-backed wheel +0x158 lanes.
     std::array<bool, 4> wheel_0x158_native_producer_owned{};
     std::array<std::optional<float>, 4> wheel_previous_contact_depth_0xe8_after_tick{};
 };
@@ -2015,6 +2014,7 @@ struct WindowState {
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
+    std::array<bool, 4> player_wheel_0x158_native_producer_owned{};
     std::optional<std::array<float, 4>> player_simulated_pose;
     std::vector<std::optional<std::array<float, 4>>> opponent_simulated_poses;
     std::optional<viper::TrackPhysicsTaskManifest> physics_task_manifest;
@@ -2758,7 +2758,8 @@ struct WindowState {
                 tick.wheel_preupdate_value_0x158_after_tick[wheel] =
                     std::bit_cast<float>(*bits);
             }
-            tick.wheel_0x158_native_producer_owned[wheel] = false;
+            tick.wheel_0x158_native_producer_owned[wheel] =
+                player_wheel_0x158_native_producer_owned[wheel];
             if (const auto bits = viper::read_ncar_wheel_object_u32(
                     wheel_object, 0xe8U)) {
                 tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
@@ -3102,6 +3103,7 @@ struct WindowState {
     bool update_player_pcar_callback(
         const PlayerPhysicsTickContext& tick_context)
     {
+        player_wheel_0x158_native_producer_owned.fill(false);
         const auto body_word = [&](const std::uint32_t offset) {
             return viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, offset);
@@ -3269,6 +3271,74 @@ struct WindowState {
                     control_update_state.controls.counter_0x5093bc =
                         std::bit_cast<std::int32_t>(*branch_result.output_0x5093bc);
                 }
+            }
+        }
+
+        // 0x431150 writes the paired body differentials to the four wheel
+        // +0x158 lanes after its mode-specific force gate. The body-integrator
+        // inputs are still byte-backed observations; if any are unavailable,
+        // leave the constructor/reset values intact and report no ownership.
+        viper::NcarIntegratorWheelPairDifferentialInput wheel_pair_input{};
+        const auto read_finite_body_float = [&](const std::uint32_t offset)
+            -> std::optional<float> {
+            const auto bits = body_word(offset);
+            if (!bits) return std::nullopt;
+            const auto value = std::bit_cast<float>(*bits);
+            if (!std::isfinite(value)) return std::nullopt;
+            return value;
+        };
+        const std::array<std::uint32_t, 6> wheel_pair_offsets{
+            0x63cU, 0x7e0U, 0xdd4U, 0x984U, 0xb28U, 0xdd8U};
+        std::array<float, 6> wheel_pair_values{};
+        bool wheel_pair_inputs_ready = true;
+        for (std::size_t index = 0U; index < wheel_pair_offsets.size(); ++index) {
+            const auto value = read_finite_body_float(wheel_pair_offsets[index]);
+            if (!value) {
+                wheel_pair_inputs_ready = false;
+                break;
+            }
+            wheel_pair_values[index] = *value;
+        }
+        for (std::size_t wheel = 0U; wheel < wheel_pair_input.contact_bytes.size();
+             ++wheel) {
+            const auto contact = viper::read_ncar_wheel_object_u8(
+                player_runtime_state.wheel_objects[wheel], 0x168U);
+            if (!contact) {
+                wheel_pair_inputs_ready = false;
+                break;
+            }
+            wheel_pair_input.contact_bytes[wheel] = *contact;
+        }
+        if (wheel_pair_inputs_ready) {
+            wheel_pair_input.first_value_0x63c = wheel_pair_values[0];
+            wheel_pair_input.first_reference_0x7e0 = wheel_pair_values[1];
+            wheel_pair_input.first_scale_0xdd4 = wheel_pair_values[2];
+            wheel_pair_input.second_value_0x984 = wheel_pair_values[3];
+            wheel_pair_input.second_reference_0xb28 = wheel_pair_values[4];
+            wheel_pair_input.second_scale_0xdd8 = wheel_pair_values[5];
+            const auto differential =
+                viper::apply_ncar_integrator_wheel_pair_differentials(
+                    wheel_pair_input);
+            const std::array<float, 4> wheel_values{
+                differential.value_0x6ac, differential.value_0x850,
+                differential.value_0x9f4, differential.value_0xb98};
+            auto updated_wheels = player_runtime_state.wheel_objects;
+            for (std::size_t wheel = 0U; wheel < wheel_values.size(); ++wheel) {
+                const auto wheel_object_offset = static_cast<std::uint32_t>(
+                    0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+                const viper::NcarObjectFieldWrite write{
+                    wheel_object_offset + 0x158U, 4U,
+                    std::bit_cast<std::uint32_t>(wheel_values[wheel])};
+                if (!viper::apply_ncar_wheel_object_writes(
+                        updated_wheels[wheel], wheel_object_offset,
+                        std::span<const viper::NcarObjectFieldWrite>(&write, 1U))) {
+                    wheel_pair_inputs_ready = false;
+                    break;
+                }
+            }
+            if (wheel_pair_inputs_ready) {
+                player_runtime_state.wheel_objects = std::move(updated_wheels);
+                player_wheel_0x158_native_producer_owned.fill(true);
             }
         }
 
