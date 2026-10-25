@@ -80,6 +80,18 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25 continuation, status and first-race plan audit:** Replaced
+  `project_tracking.md`'s stale 61% reverse-engineering and 32% playable
+  foundation headlines, whose detailed tables described the earlier analysis
+  prototype, with a qualitative status grounded in this current ledger. The
+  historical score calculations and dated notes are retained in
+  `project_tracking_history_2026-10-24.md`. The plan prioritizes the first
+  Viper/Bemidji accepted race: capture timestamped original input/body state,
+  complete and connect physical player inputs before integrating the
+  integrator, materialize native-like AI state, compare a full race, then
+  broaden to the remaining subsystems. The new launcher-child probe failure is
+  explicitly documented above; it supplied no new runtime samples.
+
 - **2026-10-24, separate brake and reverse controls:** The route-motion adapter
   now treats brake as deceleration toward zero and consumes the separately
   recovered Reverse binding for backward route travel. Added model regression
