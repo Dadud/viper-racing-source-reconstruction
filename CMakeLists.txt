@@ -243,6 +243,14 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_directinput_keyboard_state_regression
+        tests/directinput_keyboard_state_regression.cpp)
+    target_include_directories(viper_directinput_keyboard_state_regression
+        PRIVATE include)
+    target_compile_features(viper_directinput_keyboard_state_regression
+        PRIVATE cxx_std_20)
+    add_test(NAME directinput_keyboard_state_regression
+        COMMAND viper_directinput_keyboard_state_regression)
     add_executable(viper_graphics_startup_regression
         tests/graphics_startup_regression.cpp)
     target_link_libraries(viper_graphics_startup_regression PRIVATE

@@ -3,8 +3,9 @@
 
 #include <Windows.h>
 
-#include <array>
 #include <memory>
+
+#include "viper/directinput_keyboard_state.hpp"
 
 namespace viper {
 
@@ -12,7 +13,7 @@ namespace viper {
 // unmodified 256-byte DirectInput keyboard state; callers decide how to map it.
 class DirectInputKeyboardService {
 public:
-    using KeyboardState = std::array<unsigned char, 256>;
+    using KeyboardState = DirectInputKeyboardState;
 
     DirectInputKeyboardService();
     ~DirectInputKeyboardService();

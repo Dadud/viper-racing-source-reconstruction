@@ -102,7 +102,14 @@ bool DirectInputKeyboardService::poll(KeyboardState& state) {
         (void)impl_->acquire();
         return false;
     }
-    return SUCCEEDED(result);
+    if (FAILED(result)) {
+        return false;
+    }
+
+    // The original poller exposes three combined-key selectors in the last
+    // bytes of its 256-byte state table.
+    refresh_original_keyboard_aliases(state);
+    return true;
 }
 
 void DirectInputKeyboardService::shutdown() noexcept {
