@@ -32,10 +32,11 @@ derived task time. This improves timing ownership only: the native task factory,
 interpolation ring, PCAR callback, and body-step integrator are not connected,
 and route kinematics still own player and opponent motion.
 
-The original-client attempt currently stops during graphics initialization;
-there is no paired gameplay baseline (`metadata/graphics_startup.md`,
-`metadata/reference_capture_protocol.md`). Therefore neither route traces nor
-smoke tests establish original-matched playability.
+The bounded video-memory override reached the original main menu, Quick Race
+setup, and a rendered race-start scene (`metadata/graphics_startup.md`). No
+input-driven vehicle movement, completed lap, or paired gameplay baseline has
+been captured (`metadata/reference_capture_protocol.md`). Therefore neither
+route traces nor smoke tests establish original-matched playability.
 
 ## Prioritized milestones
 
