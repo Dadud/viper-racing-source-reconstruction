@@ -170,6 +170,52 @@ PcarCallbackControlResult advance_pcar_callback_control_prefix(
     return {projection, request, multiplier};
 }
 
+PcarCallbackBranchResult advance_pcar_callback_branch(
+    PcarCallbackBranchFields& fields,
+    const PcarCallbackBranchObservation& observation) noexcept
+{
+    PcarCallbackBranchResult result{};
+    const auto& globals = observation.globals;
+    const bool call_4331e0 = globals.gate_0x5093f0 ||
+        (fields.value_0xec8 == 0U &&
+         (fields.value_0xec9 != 0U ||
+          std::bit_cast<std::int32_t>(fields.value_0xc7c) < 0x3f666666));
+    const bool call_433210 = !globals.gate_0x5093f0 && fields.value_0xec8 != 0U;
+    if ((call_4331e0 && !observation.copied_value_0xd64_from_0x4331e0) ||
+        (call_433210 && !observation.copied_value_0xd64_from_0x433210)) {
+        return result;
+    }
+
+    if (call_4331e0) {
+        fields.value_0xd64 = *observation.copied_value_0xd64_from_0x4331e0;
+        result.called_0x4331e0 = true;
+        if (globals.gate_0x5093f0) {
+            constexpr float constant_0x4c814c =
+                std::bit_cast<float>(std::uint32_t{0x3e99999aU});
+            fields.value_0x54 = globals.value_0x5093f4;
+            if (fields.value_0x54 < constant_0x4c814c) {
+                fields.value_0x54 = constant_0x4c814c;
+            }
+        }
+    } else if (call_433210) {
+        fields.value_0xd64 = *observation.copied_value_0xd64_from_0x433210;
+        result.called_0x433210 = true;
+    }
+    if (!globals.gate_0x5093f0 && fields.value_0xec8 == 0U) {
+        // The helper-free arm copies the current object +0xD64 to global 0x5093BC.
+        result.wrote_0x5093bc = true;
+        result.output_0x5093bc = fields.value_0xd64;
+    }
+    fields.scalars.value_0xdec = pcar_callback_value_0x43b950(
+        globals.value_0x5093c8);
+    result.called_0x433250 = globals.gate_0x5093cc;
+    fields.value_0x4 = pcar_status_flags_0x4385f0(
+        fields.scalars.value_0xde4, fields.value_0xc34);
+    result.status_flags = fields.value_0x4;
+    result.complete = true;
+    return result;
+}
+
 float pcar_global_scale_0x43b8c0(const float input,
                                  const float global_0x509358,
                                  const bool square_magnitude_0x5093fc) noexcept

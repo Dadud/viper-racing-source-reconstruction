@@ -171,6 +171,41 @@ struct PcarCallbackControlResult {
     PcarCallbackControlState& state,
     const PcarCallbackControlObservation& observation) noexcept;
 
+// State and helper-result observations for the 0x4384D0 branch at 0x438552.
+// Optional copied values represent the unresolved effects of 0x4331E0/0x433210.
+struct PcarCallbackBranchFields {
+    PcarScalarFields scalars{};
+    float value_0x54{};
+    std::uint8_t value_0xec8{};
+    std::uint8_t value_0xec9{};
+    float value_0xc7c{};
+    float value_0xd64{};
+    float value_0xc34{};
+    std::uint32_t value_0x4{};
+};
+
+struct PcarCallbackBranchObservation {
+    PcarCallbackGlobals globals{};
+    std::optional<float> copied_value_0xd64_from_0x4331e0;
+    std::optional<float> copied_value_0xd64_from_0x433210;
+};
+
+struct PcarCallbackBranchResult {
+    bool complete{};
+    bool called_0x4331e0{};
+    bool called_0x433210{};
+    bool wrote_0x5093bc{};
+    bool called_0x433250{};
+    std::uint32_t status_flags{};
+    std::optional<float> output_0x5093bc;
+};
+
+// Reconstructs the branch routing and direct stores only. Returns incomplete
+// without mutation if a selected unresolved helper's copied +0xD64 is unknown.
+[[nodiscard]] PcarCallbackBranchResult advance_pcar_callback_branch(
+    PcarCallbackBranchFields& fields,
+    const PcarCallbackBranchObservation& observation) noexcept;
+
 // Models 0x43B8C0, including its signed comparison of the input's raw bits.
 float pcar_global_scale_0x43b8c0(float input,
                                  float global_0x509358,
