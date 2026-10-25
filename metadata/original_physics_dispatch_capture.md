@@ -437,3 +437,21 @@ retained outside the source repository with the other capture artifacts. These
 retries provide launch-path diagnostics only; the runtime `+0x50C` producer,
 wheel `+0x158` pre-copy value, prior `+0xE8`, and their cadence remain
 unobserved.
+
+### Pre-resume probe-load retry (2026-10-25)
+
+To give probe installation more time, a separate bridge copy increased the
+launcher-owned suspended-child window to 120 seconds
+(SHA-256 `AF40DCB8D6A7655C7D7E1B5BE7EE29C23728442A788B6F5C4CB6816A269D1F40`).
+The hash-matched staged launcher (PID 8956) created child PID 39824 with
+`CREATE_SUSPENDED` in the expected staged `GameRoot\Data` directory. Frida
+attached to the child and loaded the bounded first-query video-memory override
+(`ev_5adb074f-af40-4f4b-af94-68826303f00a`); loading the history probe then
+failed because the child connection was already closed. The launcher bridge
+log had no `race_child_resumed` event, and a process inventory no longer found
+PID 39824. The parent launcher and both Frida sessions started for this
+attempt were then closed. Neither this run nor the preceding 30-second-window
+retry produced wheel-history samples; the exit cause remains unknown. The next
+run should verify the child session remains attached immediately after each
+script load and retrieve bridge events before changing the resume interval
+again.
