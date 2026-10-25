@@ -80,10 +80,10 @@ and the random-seeded table/call lifecycle for environment polarity. Static
 analysis now establishes common-startup initialization and the shared locked
 stream: each car update consumes four sequential wheel draws, and at least 16
 other resolved direct callers also advance it. The repo now models the seed
-wrapper's low-EAX signed remainder modulo 30,000 and native push order. The
-`0x419620` phase transition and `0x4193F0` scale/conversion are modeled, but
-table generation, live timer sampling, and the shared stream are not
-implemented or connected. See
+wrapper's low-EAX signed remainder modulo 30,000 and native push order, and
+the recovered 97-entry table recurrence and associated initializer constants.
+The table port has no native fixed-seed parity fixture; live timer sampling
+and the shared stream are not implemented or connected. See
 [`surface_polarity_initialization.md`](surface_polarity_initialization.md).
 Do not promote the initial
 constructor value of `+0x50C` to a per-frame value until the callback/sample
