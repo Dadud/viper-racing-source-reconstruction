@@ -16,14 +16,17 @@ const safe = fn => { try { return fn(); } catch (_) { return null; } };
 const readFloat = (pointer, offset = 0) => safe(() => pointer.add(offset).readFloat());
 const readU32 = (pointer, offset = 0) => safe(() => pointer.add(offset).readU32());
 // Keep a bounded evidence set without ending the capture after the first few
-// simulation ticks. The branch under study is reached only after a 6.2-second
-// elapsed-time gate, so an early-call row limit would prevent observing it.
+// simulation ticks. The native update branch is taken when elapsed < 6.2s;
+// sample the transition below that bound and periodically outside it.
 const maxRows = 48;
 const captureMs = 120000;
 const initialRowsToKeep = 4;
 const gateWindowStart = 5.6;
-const gateWindowEnd = 6.8;
+const gateThresholdSeconds = 6.2;
 const maxGateWindowRows = 16;
+const sparseSampleInterval = 256;
+const maxSparseRows = 8;
+const maxPairRows = 16;
 // If the first callback is not the player PCAR, set this to the observed body
 // pointer before loading the script. Null selects the first readable PCAR.
 const targetOverride = null;
@@ -31,6 +34,8 @@ let rows = [];
 let helperCalls = 0;
 let gateWindowRows = 0;
 let pairLookupRows = 0;
+let sparseRows = 0;
+let pairRowsRetained = 0;
 let finished = false;
 let finishTimer = null;
 const active = new Map();
@@ -58,6 +63,8 @@ function finish(reason) {
     helperCalls,
     gateWindowRows,
     pairLookupRows,
+    sparseRows,
+    pairRowsRetained,
     rows
   });
 }
@@ -86,6 +93,7 @@ listeners.push(Interceptor.attach(at(0x43358d), {
       ordinal_0x510: readU32(body, 0x510),
       elapsedAtEspPlus4: safe(() => this.context.esp.add(4).readFloat()),
       x87StatusAx: this.context.eax.toUInt32() & 0xffff,
+      nativeElapsedBranchEligible: null,
       pairLookupReached: false,
       pairRecord: null,
       pairComponent_0x4: null,
@@ -123,12 +131,19 @@ listeners.push(Interceptor.attach(at(0x433570), {
     row.rampValueAfter_0x50c = readFloat(ptr(row.body), 0x50c);
     active.delete(threadId());
     const elapsed = row.elapsedAtEspPlus4;
-    const inGateWindow = Number.isFinite(elapsed) &&
-      elapsed >= gateWindowStart && elapsed <= gateWindowEnd &&
+    const branchEligible = Number.isFinite(elapsed) &&
+      elapsed < gateThresholdSeconds;
+    row.nativeElapsedBranchEligible = branchEligible;
+    const inGateWindow = branchEligible && elapsed >= gateWindowStart &&
       gateWindowRows < maxGateWindowRows;
     if (inGateWindow) gateWindowRows++;
+    const retainPairRow = row.pairLookupReached && pairRowsRetained < maxPairRows;
+    if (retainPairRow) pairRowsRetained++;
+    const sparseSample = !branchEligible &&
+      row.call % sparseSampleInterval === 0 && sparseRows < maxSparseRows;
+    if (sparseSample) sparseRows++;
     if (rows.length < maxRows && (row.call <= initialRowsToKeep ||
-        row.pairLookupReached || inGateWindow)) {
+        retainPairRow || inGateWindow || sparseSample)) {
       rows.push(row);
     }
     if (rows.length >= maxRows) finish("sample_limit");
@@ -142,8 +157,12 @@ send({
   captureMs,
   maxRows,
   initialRowsToKeep,
-  gateWindowSeconds: [gateWindowStart, gateWindowEnd],
+  elapsedBranch: "elapsed < 6.2 seconds",
+  transitionWindowSeconds: [gateWindowStart, gateThresholdSeconds],
   maxGateWindowRows,
+  sparseSampleInterval,
+  maxSparseRows,
+  maxPairRows,
   targetOverride: targetOverride === null ? null : ptr(targetOverride).toString(),
   staticTarget: "race.bin SHA-256 f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56"
 });

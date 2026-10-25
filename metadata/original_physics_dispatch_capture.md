@@ -531,12 +531,16 @@ Added `tools/pcar_timer_branch_probe.js` to sample the computed elapsed value
 and x87 comparison status at `0x43358D`, then observe whether execution reaches
 the ordinal pair-row lookup at `0x4335E5`. It records the row pointer and the
 two consumed values only when the pointer is readable, along with body timer
-fields and the optional native tick global. The initial 16-call bound would
-end before the documented 6.2-second gate, so the probe now remains attached
-for up to 120 seconds and retains a bounded set: the first four calls, up to
-16 calls in the 5.6–6.8 second window, and any call reaching the pair lookup,
-with a 48-row total cap. It checks instruction addresses against the loaded
-image and performs no target writes. This is a capture tool, not gameplay code.
+fields and the optional native tick global. Static reinspection of
+`0x433570` confirms that its update branch requires elapsed `< 6.2` seconds;
+the pair-row lookup is inside that branch, and `+0xE44` advances only when the
+row exists and its two components pass the distance check. Ghidra Evidence ID:
+`ev_98635cd43aa39a1c3cd84a9f9cd488bca08e122c47540014cd16fec738b76d7c`. The
+probe remains attached for up to 120 seconds and retains a bounded set: the
+first four calls, up to 16 calls in the 5.6–6.2 second transition window, up
+to 16 pair-lookup calls, and up to eight sparse out-of-branch samples, with a
+48-row total cap. It checks instruction addresses against the loaded image
+and performs no target writes. This is a capture tool, not gameplay code.
 
 An initial inline attempt to hook these branch sites was loaded after the
 previous race had already accumulated a large number of fixed-step updates;

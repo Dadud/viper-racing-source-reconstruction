@@ -218,14 +218,15 @@ not establish why the helper's update branch is inactive. This narrows the
 instrumentation gap without changing the production gate above. Repair and
 capture provenance are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
-A bounded checked-in Frida probe now waits through the 6.2-second timer gate,
-retains a capped sample around that gate, and records the participant-pair
-lookup if reached. A recent suspended-child retry created the engine child,
-but its startup-memory override produced no query event and the child exited
-before recording a timer row. The successful original-client launch path is
-already established with the documented first-query video-memory override;
-use that path for the next timer capture instead of treating the retry as a
-startup blocker. Wheel `+0x158` write provenance remains unresolved.
+A bounded checked-in Frida probe now samples the native `elapsed < 6.2` branch,
+retains a capped transition-window and sparse out-of-branch sample, and records
+the participant-pair lookup if reached. A recent suspended-child retry created
+the engine child, but its startup-memory override produced no query event and
+the child exited before recording a timer row. The successful original-client
+launch path is already established with the documented first-query video-memory
+override; use that path for the next timer capture instead of treating the retry
+as a startup blocker. The transfer into wheel `+0x158` is known; the live body
+`+0x50C` timer value and callback order remain unresolved.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
