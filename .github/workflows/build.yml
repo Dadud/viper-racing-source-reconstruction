@@ -10,4 +10,12 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
       - name: Test without proprietary assets
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure --output-junit build/ctest-results.xml
+
+      - name: Upload CTest report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-ctest-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/ctest-results.xml
+          if-no-files-found: warn
