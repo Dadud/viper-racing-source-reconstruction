@@ -905,3 +905,105 @@ the analyzed path. It does not exclude writes through other dispatch paths,
 computed aliases, bulk copies, or cross-thread activity. The last dominating
 write remains unknown; do not enable the production suspension/force path on
 this evidence.
+
+### Reset plus bounded throttle pulse (2026-10-25)
+
+A follow-up intervention on the same hash-verified `race.bin` process used the
+DIK read wrapper at `0x413170`. It replaced only original zero returns for
+DIK_SPACE (`0x39`) during a 300 ms window and DIK_UP (`0xC8`) during a 1.6 s
+window; 11 Space reads and 58 of 133 Up reads were patched. The script detached
+seven seconds after loading. Frida Evidence IDs are
+`ev_b71e7e3b30a29823cfd98b9d711bc251af5a41820151fdd380ef35f389336d69`
+(load), `ev_d9e53e5fdc15593b51fa697a2a3d4f41353ee92187cc4878b88c00ebc3a94e7`
+(session status), and
+`ev_538e5dc9af56ff0bfb796f2c9f90106819c90ee59d044a58ed9077e1f052cbe4`
+(filtered state samples). The caller-authored probe SHA-256 is
+`559081A7B17E59F159DE02C40B61D78582A5D3A4560247ED9536570B9F4514A1`.
+
+The first retained PCAR sample before the throttle ramp had speed `0.021` and
+zero throttle. The next sample had throttle `1.0`, speed `4.41`, and position
+`(227.5003, 0.7632, -36.2106)`; the following sample recorded throttle
+`0.1025`, speed `11.329`, and position `(227.4597, 0.7362, -43.7852)`. Further
+callback-ordinal samples show continued forward travel and coasting. The
+samples are not individually timestamped against the DIK windows, the race
+was already running, and scene conditions were not controlled; this is a
+successful reset/key-read/update/body-motion co-observation, not a clean force
+law or numeric parity run.
+
+A post-pulse `PrintWindow` capture of the exact original game window showed
+Lap 1/3, Position 8/8, Lap Time 20:06.5, 1 MPH, and no reset prompt. The
+640x480 PNG is outside Git at
+`../../analysis/reference_captures/original_race_after_reset_throttle_20261025.png`
+(SHA-256
+`56F4493FC68FD3624835A332673AA884539FFE1FBDBA034B270C94797A2F5F3D`). A
+compact private observation record is at
+`../../analysis/reference_captures/bounded_reset_throttle_probe_20261025.json`
+(SHA-256
+`468C5FC9244B5DCCA42135F10D32B4F2626D9EB096ABE1469F8DBFC3ACB9819E`). No
+original assets, executable, or captures were added to the repository. Player
+motion is now observed on the original, but native wheel history, per-step
+force inputs, race completion, and paired reconstruction parity remain open.
+
+### Callback-entry timestamped reset/throttle co-observation (2026-10-25)
+
+A second bounded probe sampled the selected PCAR at callback entry (`0x4384D0`,
+x86 `ECX` object) and timestamped each retained sample relative to attach. It
+patched only zero DIK_SPACE (`0x39`) returns from 1000–1300 ms (10/243 reads)
+and zero DIK_UP (`0xC8`) returns from 2100–3700 ms (55/243 reads); both hooks
+detached after seven seconds. The probe SHA-256 is
+`71B7569AC5F34AC1212725D0BCF9EFEAC28BE7D01627DD323F476FDC09DDD332`, and the
+Frida capture is `ev_7810ddd9cf30a24a7ceffad20087ba25e93759cad7d2964f99e709d5ee18c1cc`.
+
+Fourteen PCAR samples were retained at roughly 0.5 s intervals. Before the
+Space window, samples at 456 and 932 ms recorded speeds 1.942 and 1.945 with
+zero throttle. At 1429 ms, after the reset window, position had changed from
+approximately `(-102.8, -3.4, -331.1)` to `(-142.5, 9.1, -377.0)`. At 3819 ms,
+119 ms after the DIK_UP window ended, the shared throttle global was still
+`0.6306` and speed was `5.975`; at 5247 ms throttle was zero and speed was
+3.969, and at 6696 ms speed was 3.465. This provides callback-entry
+input/control/body-state co-observation with a common elapsed-time basis. The
+sample cadence is too coarse to recover the full ramp shape, and Space changed
+the body pose during the run; terrain, AI traffic, and other race conditions
+were uncontrolled. Do not treat it as an isolated throttle-to-force law or a
+paired parity result.
+
+The follow-up 640x480 `PrintWindow` frame showed Lap 1/3, Position 8/8, Lap
+Time 25:32.7, and 17 MPH with the reset prompt cleared. It is external at
+`../../analysis/reference_captures/original_race_timestamped_throttle_20261025.png`
+(SHA-256
+`52EEECC32FD8C80E087B67EE187CFE1CE96B7C294A8C214B1EE8F9B193AF88A3`). The
+selected telemetry and capture manifest are in
+`../../analysis/reference_captures/timestamped_reset_throttle_probe_20261025.json`
+(SHA-256
+`759173B1EF7076D3E3689604FE495ECC2A8B6B7EC8DEA3400E81A538F6BD53DF`).
+
+### Re-audit of live wheel `+0x158` store candidates (2026-10-25)
+
+The hash-matched static disassembly was rechecked to distinguish same-offset
+stores across object types. `0x432B88` writes body `+0x50C` into a serialized
+snapshot row at row `+0x158` in `0x4329C0`; that routine later iterates live
+wheels through `0x444120`, whose `0x38`-byte summary stores do not write wheel
+`+0x158`. Evidence: `0x4329C0`
+`ev_1dc471e1a7284d6b467f8bbb7b2f9bbea2a982f18243ff4fd106f9f04f522540`, and
+`0x444120`
+`ev_9841f780fd22b6fe86b663dcb2f89fe3e3c11eca1459e3059c0140c189920d86`.
+Other direct matches resolve to wheel construction/reset (`0x441A0D`,
+`0x441BC5`), garage conversion (`0x45EA8F`), a pending-list count (`0x46DFA9`),
+and a resource handle (`0x48443D`); `0x45E8D0` is a read. Search evidence:
+full displacement `ev_6f51eb9b24a516c966853d58201a9d234f8d9defed352fc3fbdbc95af1e67732`,
+MOV-store matches `ev_1d24616d7f1fa9244f7211b35d801cbcdfaad9a8f0bd9607ad4b502cc9248016`,
+and immediate-zero stores
+`ev_bfa60d701e9a1cd1ee2a4212e09c48fe94d374fa8440a7c27e11b563d30f6131`.
+None is the live suspension-history producer. The next decisive query is a
+write-watch on each dynamic player wheel address during one selected
+`0x431150` call, including indirect and computed-base stores. Keep the
+production suspension/force path disconnected until that producer and its
+inputs are observed.
+
+The candidate `+0xE44` timestamp store at `0x433620` is likewise not a regular
+per-tick update: it runs during a body-pose rebuild that also clears velocity.
+The observed synthetic reset reaches that path, but the ordinary gameplay
+event that dispatches it is unresolved. Updating `+0xE44` each reconstructed
+tick could open the strict `<6.2` `0x433570` timer gate without the required
+event or ordinal-row inputs; leave it unchanged until the complete reset
+transition is supported.

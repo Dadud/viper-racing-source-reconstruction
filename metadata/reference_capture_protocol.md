@@ -200,3 +200,35 @@ last 30 input samples had zero steering, throttle, brake, DIK_UP, and DIK_SPACE.
 The screenshot and state samples do not share a per-frame timestamp. This is
 an idle-state observation only; it is not input-to-motion evidence, a controlled
 scenario, or a paired visual comparison.
+
+## Bounded reset and throttle reference (2026-10-25)
+
+The same original `race.bin` window was captured after a short process-local
+DIK_SPACE reset read and DIK_UP throttle read at the known `0x413170` key-read
+wrapper. Only zero returns for those two selectors were changed, for 300 ms
+and 1.6 s respectively; no system-wide keyboard event was sent. The wrapper
+logged 11 patched Space reads and 58 patched Up reads. Callback-ordinal PCAR
+samples recorded throttle rising to 1.0 and then decaying, while speed rose
+from near zero to 11.329 before coasting. The post-pulse target-window
+screenshot showed Lap 1/3, Position 8/8, 20:06.5, 1 MPH, and the reset prompt
+cleared. Raw screenshot and compact JSON record remain in the private capture
+directory, referenced from
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#reset-plus-bounded-throttle-pulse-2026-10-25).
+
+This is a controlled key-read intervention with co-observed PCAR motion; the
+race was already in progress and PCAR samples are not individually timestamped
+against each wrapper read. Do not use it to infer a force law or a parity
+tolerance. It does establish a repeatable path to clear the reset prompt and
+observe the original throttle update during a short bounded capture. The next
+useful capture should keep the race scenario fixed, timestamp each PCAR sample
+at the update boundary, and pair an identical control schedule with the
+reconstruction.
+
+That callback-entry capture is now retained: 14 PCAR samples carry elapsed
+milliseconds, position, velocity, throttle, and brake. A DIK_UP wrapper pulse
+ended at 3700 ms; the 3819 ms sample showed throttle `0.6306` and speed `5.975`,
+followed by zero throttle and speed `3.465` at 6696 ms. A private frame later
+showed 17 MPH. Because the race had already been moving and the same run first
+performed a synthetic Space reset, this remains co-observation with coarse
+sampling, not isolated throttle causality. Paths and hashes are in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#callback-entry-timestamped-resetthrottle-co-observation-2026-10-25).
