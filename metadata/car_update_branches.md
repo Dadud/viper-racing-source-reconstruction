@@ -244,6 +244,25 @@ dispatcher `ev_fe4426a5bcbb23c30fad316f8eaeef291572c55b46ff256eb471d7f73ab37065`
 ordered dispatcher `ev_fe23f6aa4f139a225258e4e3840980edb75f9054efbcb99f578d1c8659715581`,
 and time helper `ev_0a58326f5d24a379708f32a4362f904394176e74a0f11e0033471e13c34ec0bf`.
 
+A targeted constructor audit now covers PCAR-derived constructor `0x43DFB0`,
+base car constructor `0x42FF90`, body constructor `0x43E490`, and shared body
+initializer `0x4375C0`. Their analyzed direct stores contain no write to
+`+0xECC`. The base constructor's nearby `0x433AA0` initializer writes through
+`+0xEAC` and then resumes at other fields; it does not store `+0xECC` either.
+Setup initializer `0x433C00` also has no direct field reference in the
+`+0xEC0..+0xF00` range. This narrows the known direct-constructor writers, but
+does not prove that every transitive helper, allocator, or runtime path leaves
+the field untouched. In particular, whether the object allocation is
+zero-filled before construction remains unresolved. Keep `+0xECC` unknown in
+the live projection until allocator evidence or a controlled first-callback
+capture establishes its initial value. Evidence: `0x43DFB0`
+`ev_feefea8447a3a65f61cb349cdc59190de6a96f6d2c0652ff468fb93d826a7864`,
+`0x42FF90` `ev_a3e97a69dfdfc6c057b9d575b684e30323444ffb2eb38cfff8f6fc133e7bbec8`,
+`0x43E490` `ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`,
+`0x4375C0` `ev_1bd5688db76155c26f088bb709fc8bce8430eb03d9df862ba2786ca8ef1b6ae0`,
+`0x433AA0` `ev_756b10b890523555eb04d7c83fcf07710bdf17ae783af5d6f1d8d44e89e102df`,
+and `0x433C00` `ev_fbd640d5fbdc72a165c76c2dee2639411e71c3beaf9416d13c51fc2bd9d7ee93`.
+
 When byte `+0xC3D` is set and the signed dword at `+0xC7C` is below
 `0x3C23D70A`, `0x4402D0` is called with `this+0xBFC`; it sets subobject byte
 `+0x40` to 1 when subobject byte `+0x41` is nonzero, which writes parent byte
