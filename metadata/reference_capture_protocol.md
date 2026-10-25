@@ -53,6 +53,25 @@ input-to-motion interval on both clients. The current callback-ordered samples
 do not support a numeric ramp comparison. Race completion and parity remain
 unverified in the original capture.
 
+A second controlled launch through the extracted install's own launcher is
+recorded in the private manifest
+`../../analysis/reference_captures/original_quickrace_relaunch_20261025.manifest.json`.
+The capture preserves the launcher's `Data` working directory and changes
+only the first successful `GetAvailableVidMem` total from `0xFFFF0000` to
+`0x00200000`; all 32 staged external data files and the install's
+`options.cfg` match their recorded baselines. It reached the main menu, Quick
+Race setup, Bemidji grid and 3D race start with Dodge Viper, Easy AI, Arcade,
+Sprint/3 laps, damage enabled and seven AI cars. Private 640x480 frames are
+`../../analysis/reference_captures/original_main_menu_relaunch_20261025.png`,
+`../../analysis/reference_captures/original_race_start_relaunch_20261025.png`,
+`../../analysis/reference_captures/original_race_no_input_7s_20261025.png`,
+and `../../analysis/reference_captures/original_race_no_input_2m_20261025.png`.
+The no-input follow-up shows Lap Time 0:10.6, Position 8/8 and -1 MPH with the
+reset prompt; a later no-input frame at Lap Time 2:04.5 shows Position 8/8,
+-4 MPH and the same prompt. These are raw UI observations, not a controlled
+motion attribution. This is a startup and no-input baseline only; it does not
+verify input delivery, race completion, audio, or reconstruction parity.
+
 ## Pairing a scenario
 
 Run the original and reconstruction separately on the same Windows machine and
