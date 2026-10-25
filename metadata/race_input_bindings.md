@@ -105,14 +105,16 @@ callback now applies this initialization rule and passes the resulting gate to
 the reconstructed `0x43B8C0` scale; its state is included in race traces.
 
 This connects the recovered input update and its sensitivity controls to the
-live session. The route-motion adapter still thresholds steering, throttle,
-and braking outputs at 0.2 because it accepts digital controls; its pose
-remains non-physical. The separate Reverse binding now requests negative
-route speed, while braking reduces speed magnitude and cannot select reverse.
-This corrects the adapter's control meanings; it does not reproduce native
-gearbox or tire behavior. All 13 named `CONTROL` actions are mapped into their
-corresponding slots among the native 15 binding records. The two unnamed slots
-remain empty, and native DirectInput controller polling remains absent.
+live session. The route-motion adapter thresholds steering and preserves the
+native 0.2 activity gates for throttle and braking, while scaling its
+provisional drive/braking terms by the recovered ramped values at `0x5093F4`
+and `0x509320`. Its pose remains non-physical. The separate Reverse binding
+requests negative route speed, while braking reduces speed magnitude and
+cannot select reverse. This retains control ramp shape but does not reproduce
+native force magnitudes, gearbox, or tire behavior. All 13 named `CONTROL`
+actions are mapped into their corresponding slots among the native 15 binding
+records. The two unnamed slots remain empty, and native DirectInput controller
+polling remains absent.
 Evidence: `race_loop_update_43b290.evidence.json` (`0x43B290`,
 `ev_db358c27101404ca5eb5166ee5eab7df3a38f2a0eca453f836021a79b14d5b46`),
 `0x43B030` (`ev_9f472cb0b20c3269ba355274742e77b7b98756a1039d5d2a46f604a7fd8fa491`),

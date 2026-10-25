@@ -82,6 +82,53 @@ int main()
                 motion_result.finished && motion.race.elapsed_seconds > 0.0F,
             "the runtime route integrator must drive through the configured finish");
 
+        const std::vector<std::array<float, 2>> analog_route{
+            {0.0F, 0.0F}, {10000.0F, 0.0F}};
+        viper::RouteMotionState subthreshold_throttle{};
+        viper::RouteMotionState partial_throttle{};
+        viper::RouteMotionState full_throttle{};
+        viper::initialize_race_progression(subthreshold_throttle.race, 0U);
+        viper::initialize_race_progression(partial_throttle.race, 0U);
+        viper::initialize_race_progression(full_throttle.race, 0U);
+        (void)viper::advance_route_motion(subthreshold_throttle, analog_route,
+            false, false, 0.2F, 0.0F, 0.05F, 1U);
+        (void)viper::advance_route_motion(partial_throttle, analog_route,
+            false, false, 0.5F, 0.0F, 0.05F, 1U);
+        (void)viper::advance_route_motion(full_throttle, analog_route,
+            false, false, 1.0F, 0.0F, 0.05F, 1U);
+        require(subthreshold_throttle.speed == 0.0F &&
+                partial_throttle.speed > 0.0F &&
+                std::abs(partial_throttle.speed * 2.0F - full_throttle.speed) <
+                    1.0e-6F,
+            "route adapter must retain the native throttle activity gate and scale ramped throttle");
+
+        viper::RouteMotionState coast_motion{};
+        coast_motion.speed = partial_throttle.speed;
+        viper::initialize_race_progression(coast_motion.race, 0U);
+        (void)viper::advance_route_motion(coast_motion, analog_route,
+            false, false, 0.0F, 0.0F, 0.05F, 1U);
+        require(coast_motion.speed > 0.0F &&
+                coast_motion.speed < partial_throttle.speed,
+            "released throttle must coast through drag instead of preserving drive input");
+
+        viper::RouteMotionState no_brake_motion{};
+        viper::RouteMotionState partial_brake_motion{};
+        viper::RouteMotionState full_brake_motion{};
+        no_brake_motion.speed = partial_brake_motion.speed =
+            full_brake_motion.speed = 10.0F;
+        viper::initialize_race_progression(no_brake_motion.race, 0U);
+        viper::initialize_race_progression(partial_brake_motion.race, 0U);
+        viper::initialize_race_progression(full_brake_motion.race, 0U);
+        (void)viper::advance_route_motion(no_brake_motion, analog_route,
+            false, false, 0.0F, 0.0F, 0.05F, 1U);
+        (void)viper::advance_route_motion(partial_brake_motion, analog_route,
+            false, false, 0.0F, 0.5F, 0.05F, 1U);
+        (void)viper::advance_route_motion(full_brake_motion, analog_route,
+            false, false, 0.0F, 1.0F, 0.05F, 1U);
+        require(no_brake_motion.speed > partial_brake_motion.speed &&
+                partial_brake_motion.speed > full_brake_motion.speed,
+            "route adapter must scale braking by the recovered ramped brake value");
+
         viper::RouteMotionState braking_motion{};
         braking_motion.speed = 10.0F;
         viper::initialize_race_progression(braking_motion.race, 0U);

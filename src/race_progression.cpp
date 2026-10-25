@@ -40,8 +40,8 @@ RouteMotionResult advance_route_motion(
     const std::span<const std::array<float, 2>> route,
     const bool steer_left,
     const bool steer_right,
-    const bool accelerate,
-    const bool brake,
+    const float throttle,
+    const float brake,
     float delta_seconds,
     const std::uint32_t target_laps,
     const bool reverse) noexcept
@@ -76,17 +76,23 @@ RouteMotionResult advance_route_motion(
         steer_right,
     });
     state.steering = steering_state.value_0x509358;
-    // This adapter is not the native tire/body simulation. Keep the distinct
-    // input meanings intact at its boundary: braking reduces speed magnitude,
-    // while the separate Reverse binding requests negative drive.
-    if (brake) {
-        const float braking_delta = 24.0F * delta_seconds;
+    // This adapter is not the native tire/body simulation. Preserve the
+    // recovered ramped control levels at this boundary, including the native
+    // 0.2 activity gates. The route model's force magnitudes remain provisional.
+    // Braking reduces speed magnitude; Reverse independently requests negative
+    // drive when the brake gate is inactive.
+    const float throttle_level = std::isfinite(throttle)
+        ? std::clamp(throttle, 0.0F, 1.0F) : 0.0F;
+    const float brake_level = std::isfinite(brake)
+        ? std::clamp(brake, 0.0F, 1.0F) : 0.0F;
+    if (brake_level > 0.2F) {
+        const float braking_delta = 24.0F * brake_level * delta_seconds;
         if (state.speed > 0.0F)
             state.speed = std::max(0.0F, state.speed - braking_delta);
         else if (state.speed < 0.0F)
             state.speed = std::min(0.0F, state.speed + braking_delta);
     } else {
-        const float drive = static_cast<float>(accelerate) -
+        const float drive = (throttle_level > 0.2F ? throttle_level : 0.0F) -
             static_cast<float>(reverse);
         state.speed += drive * 14.0F * delta_seconds;
     }

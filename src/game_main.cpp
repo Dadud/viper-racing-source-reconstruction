@@ -2453,8 +2453,8 @@ struct WindowState {
             const auto route_result = viper::advance_route_motion(candidate_motion, route,
                 tick_context.controls.steering.value_0x509358 < -0.2F,
                 tick_context.controls.steering.value_0x509358 > 0.2F,
-                tick_context.controls.analog_0x5093f4.value > 0.2F,
-                tick_context.controls.analog_0x509320.value > 0.2F,
+                tick_context.controls.analog_0x5093f4.value,
+                tick_context.controls.analog_0x509320.value,
                 0.016F, target_laps,
                 tick_context.controls.controls.flag_0x5093f0 != 0U);
             if (!route_result.valid && !route_result.finished) return false;

@@ -59,8 +59,8 @@ void advance_race_clock(
     std::span<const std::array<float, 2>> route,
     bool steer_left,
     bool steer_right,
-    bool accelerate,
-    bool brake,
+    float throttle,
+    float brake,
     float delta_seconds,
     std::uint32_t target_laps,
     bool reverse = false) noexcept;
