@@ -98,6 +98,12 @@ int main()
         require(viper::read_ncar_body_object_u32(body_runtime_state, 0x234U) == 0U &&
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0x50cU),
             "body reads must expose initialized velocity but keep unwritten derived state unknown");
+        const std::array<viper::NcarObjectFieldWrite, 1> pcar_helper_byte{{
+            {0xd74U, 1U, 1U}}};
+        require(viper::apply_ncar_body_object_writes(
+                    body_runtime_state, pcar_helper_byte) &&
+                viper::read_ncar_body_object_u8(body_runtime_state, 0xd74U) == 1U,
+            "PCAR constructor helper result must persist in the byte-backed body at +0xD74");
         const auto constructor_subobjects =
             viper::plan_ncar_constructor_subobject_defaults();
         require(constructor_subobjects.constructor_tail_source_unknown &&

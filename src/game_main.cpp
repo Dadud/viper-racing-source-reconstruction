@@ -2140,12 +2140,13 @@ struct WindowState {
             player_runtime_state = {};
             return false;
         }
-        if (!player_pcar_constructor_controls.game_mode_0x4f4.has_value()) {
+        if (!player_pcar_constructor_controls.game_mode_0x4f4.has_value() ||
+            !player_pcar_constructor_controls.value_0xd74.has_value()) {
             player_runtime_car_record.clear();
             player_runtime_state = {};
             return false;
         }
-        const std::array<viper::NcarObjectFieldWrite, 5> pcar_control_writes{{
+        const std::array<viper::NcarObjectFieldWrite, 6> pcar_control_writes{{
             {0xec8U, 1U, static_cast<std::uint8_t>(
                 player_pcar_constructor_controls.auto_shifting)},
             {0xec9U, 1U, static_cast<std::uint8_t>(
@@ -2155,6 +2156,7 @@ struct WindowState {
             {0x4f4U, 4U, *player_pcar_constructor_controls.game_mode_0x4f4},
             {0x4f8U, 4U, std::bit_cast<std::uint32_t>(
                 player_pcar_constructor_controls.yaw_control)},
+            {0xd74U, 1U, *player_pcar_constructor_controls.value_0xd74},
         }};
         if (!viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object, pcar_control_writes)) {
@@ -3920,6 +3922,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_traction_control,pcar_abs_braking"
               << ",pcar_auto_shifting,pcar_auto_clutch,pcar_yaw_control"
               << ",pcar_body_0x4f4_entrant_count"
+              << ",pcar_body_0xd74"
               << ",pcar_body_0xde0,pcar_body_0xde4"
               << ",pcar_body_0xde8,pcar_body_0xdec"
               << ",pcar_velocity_projection,pcar_scaled_smoother_request"
@@ -4157,6 +4160,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << ',' << state.player_pcar_constructor_controls.yaw_control;
                 if (state.player_pcar_constructor_controls.game_mode_0x4f4.has_value())
                     trace << ',' << *state.player_pcar_constructor_controls.game_mode_0x4f4;
+                else
+                    trace << ',';
+                const auto constructor_helper_byte = viper::read_ncar_body_object_u8(
+                    state.player_runtime_state.body_object, 0xd74U);
+                if (constructor_helper_byte.has_value())
+                    trace << ',' << static_cast<unsigned>(*constructor_helper_byte);
                 else
                     trace << ',';
                 for (const auto offset : {0xde0U, 0xde4U, 0xde8U, 0xdecU}) {
