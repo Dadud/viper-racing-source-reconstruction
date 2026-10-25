@@ -111,6 +111,28 @@ try {
     $process = [Diagnostics.Process]::Start($startInfo)
 
     $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
+    # Exercise the live controls page before starting a race. Throttle is the
+    # third row; remap it to W, return to setup, and verify the Config write
+    # before the race lifecycle overwrites any other selection fields.
+    Press-Key $setup 75
+    Press-Key $setup 40
+    Press-Key $setup 40
+    Press-Key $setup 13
+    Press-Key $setup 87
+    Press-Key $setup 27
+    $preferencePath = Join-Path $config 'viper-racing-setup.cfg'
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while ($timer.Elapsed.TotalSeconds -lt 5 -and -not (Test-Path -LiteralPath $preferencePath)) {
+        Start-Sleep -Milliseconds 50
+    }
+    if (-not (Test-Path -LiteralPath $preferencePath)) {
+        throw 'Controls page did not create the Config preferences file'
+    }
+    $preference = [System.IO.File]::ReadAllText($preferencePath)
+    if ($preference -notmatch '(?m)^throttle=Key_W$') {
+        throw "Controls page did not persist the remapped throttle binding: $preference"
+    }
+
     # The shipped options.def begins at car_no 0 (Exotic), and Win32 bundle
     # enumeration orders the five installed choices with Viper at index 4.
     1..4 | ForEach-Object { Press-Key $setup 39 }
