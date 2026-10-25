@@ -98,3 +98,31 @@ control globals were zero. Their change is recorded in the private extract but
 is not attributed to the ordinary host-key pulse. The synthetic intervention
 does show the original throttle ramp, but clean input-to-motion attribution,
 race completion, and original-versus-reconstruction parity remain unverified.
+
+## Timestamped throttle and PCAR state sample
+
+A follow-up bounded Frida capture attached to the same running `race.bin`
+process (PID 25904; executable SHA-256 above). It overrode the return value of
+`0x413170` only for DIK_UP (`0xC8`) reads between 500 and 1500 ms after attach.
+Thirty-eight of 130 matching reads were overridden. The `0x43B290` update
+returned 130 times and the PCAR callback `0x4384D0` was entered 212 times.
+Samples taken after `0x43B290` returned recorded the shared throttle/brake
+globals and PCAR body position/linear velocity together at roughly 32 ms
+intervals. Evidence ID: `ev_7f4476f48b1c4b39a977284c3db68a040c1052e042635759a30fb7e4f9775524`.
+
+The throttle global `0x5093F4` rose from zero to one during the intervention
+and decayed to zero after it ended; brake `0x509320` stayed zero. In the same
+samples, the observed PCAR's Z velocity changed from approximately `-0.36` at
+531 ms to `-5.73` at 1495 ms, then reached `-7.97` at 1917 ms and was
+approximately `-6.59` at 3349 ms. Position and velocity continued changing
+before and after the throttle pulse, so this bounded run establishes a
+timestamped control-update/body-state co-observation, not a force law or clean
+input-to-motion causal comparison. The key byte itself remained zero; the
+intervention changed only the selected wrapper's return value. Do not infer
+throttle-to-force, engine, gearbox, or tire behavior from this capture alone.
+
+The complete private REA evidence bundle is
+`../../analysis/reference_captures/pcar_throttle_body_trace_20261025.evidence.json`
+(SHA-256 `8B6BA3F000B313AC5471C13C55525EA3DC3C2B931CDEA5C12A65C3F97F299EBC`).
+It contains 18 Evidence records; originals and captures remain outside the
+public repository.
