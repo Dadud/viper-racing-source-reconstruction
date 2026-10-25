@@ -2605,10 +2605,25 @@ struct WindowState {
             }
         }
 
+        // Preserve the native shared-global getter stores that precede the
+        // late callback tail: 0x43BA00 -> +0x4F0 (float), then 0x43BA20
+        // -> +0x4EC (byte). The earlier 0x434A80 and 0x43B880 effects are
+        // still unresolved and are not synthesized here.
+        const std::array<viper::NcarObjectFieldWrite, 2> callback_cache_writes{{
+            {0x4f0U, 4U, std::bit_cast<std::uint32_t>(
+                pcar_callback_globals.value_0x509344)},
+            {0x4ecU, 1U, static_cast<std::uint32_t>(
+                pcar_callback_globals.gate_0x509420)},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, callback_cache_writes)) {
+            return false;
+        }
+
         // These stores are the observed late PCAR callback tail. Timestamp
-        // handling and shared-global cache calls that precede it are not yet
-        // connected to the live session, so only apply the independently
-        // modeled offset writes with the currently observed body inputs.
+        // handling and the 0x434A80/0x43B880 calls before the cache stores are
+        // not yet connected, so only apply the modeled tail with currently
+        // observed body inputs.
         const auto tail_c3c = body_u8(0xc3cU);
         const auto tail_c3d = body_u8(0xc3dU);
         const auto tail_c7c = body_float(0xc7cU);
@@ -2617,41 +2632,42 @@ struct WindowState {
         const auto tail_de4 = body_float(0xde4U);
         const auto tail_be4 = body_u8(0xbe4U);
         const auto tail_508 = body_float(0x508U);
-        if (!tail_c3c || !tail_c3d || !tail_c7c || !tail_mode || !tail_de0 ||
-            !tail_de4 || !tail_be4 || !tail_508) return false;
-        viper::PcarCallbackTailFields tail{};
-        tail.value_0xc3c = *tail_c3c;
-        tail.gate_0xc3d = *tail_c3d;
-        tail.curve_gate_0x41 = *tail_c3d;
-        tail.value_0xc7c = *tail_c7c;
-        tail.mode_0x4fc = *tail_mode;
-        tail.value_0xde0 = *tail_de0;
-        tail.value_0xde4 = *tail_de4;
-        tail.mode_0xbe4 = *tail_be4 != 0U;
-        tail.value_0x508 = *tail_508;
-        const auto tail_result = viper::advance_pcar_callback_tail(
-            tail, pcar_callback_globals.value_0x509340);
-        std::array<viper::NcarObjectFieldWrite, 4> tail_writes{};
-        std::size_t tail_write_count = 0U;
-        if (tail_result.set_byte_0xc3c) {
-            tail_writes[tail_write_count++] = {0xc3cU, 1U, tail.value_0xc3c};
+        if (tail_c3c && tail_c3d && tail_c7c && tail_mode && tail_de0 &&
+            tail_de4 && tail_be4 && tail_508) {
+            viper::PcarCallbackTailFields tail{};
+            tail.value_0xc3c = *tail_c3c;
+            tail.gate_0xc3d = *tail_c3d;
+            tail.curve_gate_0x41 = *tail_c3d;
+            tail.value_0xc7c = *tail_c7c;
+            tail.mode_0x4fc = *tail_mode;
+            tail.value_0xde0 = *tail_de0;
+            tail.value_0xde4 = *tail_de4;
+            tail.mode_0xbe4 = *tail_be4 != 0U;
+            tail.value_0x508 = *tail_508;
+            const auto tail_result = viper::advance_pcar_callback_tail(
+                tail, pcar_callback_globals.value_0x509340);
+            std::array<viper::NcarObjectFieldWrite, 4> tail_writes{};
+            std::size_t tail_write_count = 0U;
+            if (tail_result.set_byte_0xc3c) {
+                tail_writes[tail_write_count++] = {0xc3cU, 1U, tail.value_0xc3c};
+            }
+            if (tail_result.reset_0xde0) {
+                tail_writes[tail_write_count++] = {0xde0U, 4U,
+                    std::bit_cast<std::uint32_t>(tail.value_0xde0)};
+            }
+            if (tail_result.floored_0xde4) {
+                tail_writes[tail_write_count++] = {0xde4U, 4U,
+                    std::bit_cast<std::uint32_t>(tail.value_0xde4)};
+            }
+            if (tail_result.called_value_helper_0x434b20) {
+                tail_writes[tail_write_count++] = {0x508U, 4U,
+                    std::bit_cast<std::uint32_t>(tail.value_0x508)};
+            }
+            if (tail_write_count != 0U && !viper::apply_ncar_body_object_writes(
+                    player_runtime_state.body_object,
+                    std::span<const viper::NcarObjectFieldWrite>(
+                        tail_writes.data(), tail_write_count))) return false;
         }
-        if (tail_result.reset_0xde0) {
-            tail_writes[tail_write_count++] = {0xde0U, 4U,
-                std::bit_cast<std::uint32_t>(tail.value_0xde0)};
-        }
-        if (tail_result.floored_0xde4) {
-            tail_writes[tail_write_count++] = {0xde4U, 4U,
-                std::bit_cast<std::uint32_t>(tail.value_0xde4)};
-        }
-        if (tail_result.called_value_helper_0x434b20) {
-            tail_writes[tail_write_count++] = {0x508U, 4U,
-                std::bit_cast<std::uint32_t>(tail.value_0x508)};
-        }
-        if (tail_write_count != 0U && !viper::apply_ncar_body_object_writes(
-                player_runtime_state.body_object,
-                std::span<const viper::NcarObjectFieldWrite>(
-                    tail_writes.data(), tail_write_count))) return false;
 
         // The current route motion model accepts digital inputs. Preserve the
         // recovered analog values in session state and trace; this threshold
@@ -3287,6 +3303,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << ",pcar_body_0x500,pcar_body_0xdcc,pcar_body_0xbe4"
               << ",pcar_body_0x630,pcar_body_0x7d4"
               << ",pcar_body_0x978,pcar_body_0xb1c"
+              << ",pcar_body_0x4f0,pcar_body_0x4ec"
               << ",pcar_gate_0x5093fc,pcar_0x40d270_multiplier"
               << ",physics_steps_scheduled,physics_step_count"
               << ",pcar_callback_step_count"
@@ -3454,6 +3471,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
                     else trace << ',';
                 }
+                const auto shared_float_cache = viper::read_ncar_body_object_u32(
+                    state.player_runtime_state.body_object, 0x4f0U);
+                if (shared_float_cache.has_value())
+                    trace << ',' << std::bit_cast<float>(*shared_float_cache);
+                else trace << ',';
+                const auto shared_byte_cache = viper::read_ncar_body_object_u8(
+                    state.player_runtime_state.body_object, 0x4ecU);
+                if (shared_byte_cache.has_value())
+                    trace << ',' << static_cast<unsigned>(*shared_byte_cache);
+                else trace << ',';
                 trace << ',' << state.pcar_callback_globals.gate_0x5093fc;
                 trace << ',' << state.player_pcar_callback_result
                     .callback_multiplier.value;

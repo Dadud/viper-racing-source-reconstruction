@@ -52,10 +52,16 @@ try {
     $physicsTickIndex = [Array]::IndexOf($header, 'physics_step_count')
     $pcarCallbackTickIndex = [Array]::IndexOf($header, 'pcar_callback_step_count')
     $physicsTimeIndex = [Array]::IndexOf($header, 'physics_simulation_time')
+    $sharedFloatSourceIndex = [Array]::IndexOf($header, 'control_0x509344')
+    $sharedByteSourceIndex = [Array]::IndexOf($header, 'control_0x509420')
+    $sharedFloatCacheIndex = [Array]::IndexOf($header, 'pcar_body_0x4f0')
+    $sharedByteCacheIndex = [Array]::IndexOf($header, 'pcar_body_0x4ec')
     if ($pcarPrefixStart -lt 0 -or $pcarBodyStart -lt 0 -or
         $pcarMultiplierIndex -lt 0 -or $physicsStepsIndex -lt 0 -or
         $physicsTickIndex -lt 0 -or $pcarCallbackTickIndex -lt 0 -or
-        $physicsTimeIndex -lt 0) {
+        $physicsTimeIndex -lt 0 -or $sharedFloatSourceIndex -lt 0 -or
+        $sharedByteSourceIndex -lt 0 -or $sharedFloatCacheIndex -lt 0 -or
+        $sharedByteCacheIndex -lt 0) {
         throw 'Trace is missing PCAR or fixed-step scheduler fields'
     }
     $observedPcarBodyState = $false
@@ -67,6 +73,18 @@ try {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
         }
         $fields = $replayedLines[$index].Split(',')
+        $sharedFloatSource = [single]::Parse(
+            $fields[$sharedFloatSourceIndex], [cultureinfo]::InvariantCulture)
+        $sharedFloatCache = [single]::Parse(
+            $fields[$sharedFloatCacheIndex], [cultureinfo]::InvariantCulture)
+        $sharedByteSource = [int]::Parse(
+            $fields[$sharedByteSourceIndex], [cultureinfo]::InvariantCulture)
+        $sharedByteCache = [int]::Parse(
+            $fields[$sharedByteCacheIndex], [cultureinfo]::InvariantCulture)
+        if ([Math]::Abs($sharedFloatSource - $sharedFloatCache) -gt 0.000001 -or
+            $sharedByteSource -ne $sharedByteCache) {
+            throw "PCAR shared-global cache stores differ from their getter values at frame $($index - 1)"
+        }
         $pcarMultiplier = [single]::Parse(
             $fields[$pcarMultiplierIndex], [cultureinfo]::InvariantCulture)
         if ([Math]::Abs($pcarMultiplier - 1.0) -gt 0.000001) {
