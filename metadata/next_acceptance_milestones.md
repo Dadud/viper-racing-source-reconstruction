@@ -16,11 +16,11 @@ Viper/Bemidji, Sports/Bemidji, and Sports/Dundas additionally exercise selector
 changes and saved-selection reload. `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
-body accumulators, collisions, or pose integration. Their terrain projection
-origin now comes from the initialized PCAR body's byte-backed basis and
-position, rather than the route pose. The body remains static in the live
-session, and the projection remains a terrain sample rather than the native
-collision-world query. This is explicitly
+body accumulators, collisions, or pose integration. The terrain projection
+uses the last committed route-pose position when available and keeps the
+initialized PCAR basis; it does not write route state into PCAR. The body
+remains static in the live session, and the projection remains a terrain sample
+rather than the native collision-world query. This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
 [`completion_ledger.md`](completion_ledger.md). Existing portable physics
 models are substantial but many still accept caller observations and are not

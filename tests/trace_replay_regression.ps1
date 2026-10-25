@@ -494,6 +494,8 @@ try {
     $raceHeader = $raceOutputLines[0].Split(',')
     $wheelQueryStart = 13 + 5 * 7
     $wheelQueriesObserved = [bool[]]::new(4)
+    $wheelFirstQueryOrigins = [object[]]::new(4)
+    $wheelQueryOriginsMoved = [bool[]]::new(4)
     $wheelOriginStart = $wheelQueryStart + 5 * 4
     $wheelSurfaceStart = $wheelOriginStart + 3 * 4
     $wheelSurfaceSamplesObserved = [bool[]]::new(4)
@@ -519,6 +521,17 @@ try {
                     if ([single]::IsNaN($origin[$component]) -or
                         [single]::IsInfinity($origin[$component])) {
                         throw "Wheel $wheel emitted a non-finite terrain query origin"
+                    }
+                }
+                if ($null -eq $wheelFirstQueryOrigins[$wheel]) {
+                    $wheelFirstQueryOrigins[$wheel] = [single[]]$origin.Clone()
+                } else {
+                    $firstOrigin = [single[]]$wheelFirstQueryOrigins[$wheel]
+                    $dx = $origin[0] - $firstOrigin[0]
+                    $dy = $origin[1] - $firstOrigin[1]
+                    $dz = $origin[2] - $firstOrigin[2]
+                    if (($dx * $dx + $dy * $dy + $dz * $dz) -gt 0.0001) {
+                        $wheelQueryOriginsMoved[$wheel] = $true
                     }
                 }
                 $sampleStart = $wheelSurfaceStart + 6 * $wheel
@@ -581,6 +594,9 @@ try {
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         if (-not $wheelQueriesObserved[$wheel] -or -not $wheelSurfaceSamplesObserved[$wheel]) {
             throw "Wheel $wheel never produced a valid live terrain contact sample"
+        }
+        if (-not $wheelQueryOriginsMoved[$wheel]) {
+            throw "Wheel $wheel terrain query origin did not follow the moving player route pose"
         }
     }
     $lastRaceFields = $raceOutputLines[-1].Split(',')
