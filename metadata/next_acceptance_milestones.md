@@ -495,14 +495,16 @@ suspension and tire projection fields. Static analysis maps the four varying
 differential operands to wheel `+0xE8`; four `0x442530` calls update those
 fields before the reads. The portable body-step now derives the paired
 `+0x158` results from the four wheel updates' newly finalized `+0xE8` values,
-in native order. This closes the model's internal handoff only. Its live inputs
-remain incomplete: native contact/query semantics, prior `+0x158` state, pair
-scales, suspension parameters, surface polarity, and tire response/query
-producers are not session-owned. Do not repeat a capture
-that only rereads the six pair operands. Capture the missing upstream inputs
-and timestamp-correlated wheel/accumulator/body samples for throttle, steering,
-braking, and coast. The captured `+0xF4` row is sampled after the
-current response calculation at the tire-force callsite, so it validates the
+in native order. When that pipeline is disabled, its explicit six scalar
+operands are now finite-gated; invalid operands mark the step incomplete and
+leave the paired outputs at their default values. This closes model
+correctness gaps only. Its live inputs remain incomplete: native contact/query
+semantics, prior `+0x158` state, pair scales, suspension parameters, surface
+polarity, and tire response/query producers are not session-owned. Do not
+repeat a capture that only rereads the six pair operands. Capture the missing
+upstream inputs and timestamp-correlated wheel/accumulator/body samples for
+throttle, steering, braking, and coast. The captured `+0xF4` row is sampled
+after the current response calculation at the tire-force callsite, so it validates the
 projection output and does not reveal the locals/curves/velocity inputs that
 formed it. Capture identity and limits are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
