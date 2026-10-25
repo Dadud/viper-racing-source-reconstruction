@@ -353,3 +353,14 @@ identical to the verified manifest and staged `Config/options.cfg` remains at
 SHA-256 `7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`.
 PID 23908 was left untouched. This repeat does not explain the launcher exit
 and does not replace original gameplay evidence.
+
+A follow-up used the installed official launcher executable at its verified
+SHA-256 with the same staged `GameRoot\Data` working directory. Its primary
+thread resumed with previous suspend count 1; the bridge again reported both
+creation hooks ready, but the launcher session detached without observing any
+race-child creation (Evidence `ev_72f831e1c9f303c2d56ded6da347677c7301cc2b924a4975ff8a1f315deeb7a9`).
+The `F:` volume remained labeled `VIPER` (`CDFS`), the 32 staged `Data` files
+matched the capture manifest, and staged `options.cfg` retained the recorded
+baseline hash. No new gameplay samples resulted. Using the installed launcher
+instead of the staged executable therefore did not resolve the no-child
+startup; the cause remains unknown.
