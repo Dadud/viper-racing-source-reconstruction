@@ -84,11 +84,28 @@ try {
         throw 'Could not post throttle key-up'
     }
     Start-Sleep -Milliseconds 300
-    # These keys come from the shipped options.def. The runtime must expose
-    # the reconstructed callback outputs even while their physical/camera/
-    # transmission effects remain incomplete.
+    # Braking must remove forward speed without becoming a reverse input.
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]0x28, [IntPtr]0)) {
+        throw 'Could not post brake key-down'
+    }
+    Start-Sleep -Milliseconds 700
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]0x28, [IntPtr]0)) {
+        throw 'Could not post brake key-up'
+    }
+    Start-Sleep -Milliseconds 150
+    # These keys come from the shipped options.def. The smoke checks their
+    # recovered callback outputs and only the limited route-motion mapping.
     Send-RaceKey $window 69 'e-brake'       # Key_E
     Send-RaceKey $window 82 'reverse'       # Key_R
+    # Hold Reverse long enough to cross zero after the braking phase.
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]82, [IntPtr]0)) {
+        throw 'Could not post reverse key-down'
+    }
+    Start-Sleep -Milliseconds 800
+    if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0101, [IntPtr]82, [IntPtr]0)) {
+        throw 'Could not post reverse key-up'
+    }
+    Start-Sleep -Milliseconds 150
     Send-RaceKey $window 67 'clutch'        # Key_C
     Send-RaceKey $window 32 'airlift'       # Key_SPACE
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]27, [IntPtr]0)) {
@@ -103,7 +120,12 @@ try {
     if ($rows.Count -lt 3) { throw 'Input trace did not capture enough race frames' }
     $header = $rows[0].Split(',')
     $nativeThrottleColumn = [Array]::IndexOf($header, 'control_0x5093f4')
+    $reverseColumn = [Array]::IndexOf($header, 'control_0x5093f0')
+    $speedColumn = [Array]::IndexOf($header, 'player_speed')
     if ($nativeThrottleColumn -lt 0) { throw 'Trace omitted the native throttle control output' }
+    if ($reverseColumn -lt 0 -or $speedColumn -lt 0) {
+        throw 'Trace omitted the reverse-control or route-speed output'
+    }
     $actionColumns = @{
         eBrake = [Array]::IndexOf($header, 'control_0x5093b8')
         reverse = [Array]::IndexOf($header, 'control_0x5093f0')
@@ -135,6 +157,28 @@ try {
         if ($nativeThrottle[$index] -eq 0.0) { $nativeReleased = $true; break }
     }
     if (-not $nativeReleased) { throw 'The native throttle response did not decay to zero after focus loss' }
+    $parsedRows = [System.Collections.Generic.List[object]]::new()
+    foreach ($line in $rows | Select-Object -Skip 1) {
+        [void]$parsedRows.Add($line.Split(','))
+    }
+    $brakeRows = @($parsedRows | Where-Object { $_[6] -eq '1' })
+    if ($brakeRows.Count -eq 0) { throw 'VK_DOWN never reached the route adapter as braking input' }
+    foreach ($row in $brakeRows) {
+        $speed = [single]::Parse($row[$speedColumn], [cultureinfo]::InvariantCulture)
+        if ($speed -lt -0.001) { throw 'Braking input selected reverse motion instead of slowing the car' }
+    }
+    $reverseMotionObserved = $false
+    foreach ($row in $parsedRows) {
+        $reverseValue = [single]::Parse($row[$reverseColumn], [cultureinfo]::InvariantCulture)
+        $speed = [single]::Parse($row[$speedColumn], [cultureinfo]::InvariantCulture)
+        if ($reverseValue -gt 0.0 -and $speed -lt -0.1) {
+            $reverseMotionObserved = $true
+            break
+        }
+    }
+    if (-not $reverseMotionObserved) {
+        throw 'The native Reverse binding did not produce backward route motion after braking'
+    }
     foreach ($action in $actionColumns.GetEnumerator()) {
         $observed = $false
         foreach ($row in $rows | Select-Object -Skip 1) {
@@ -143,7 +187,7 @@ try {
         }
         if (-not $observed) { throw "The shipped keyboard binding never reached the traced $($action.Key) output" }
     }
-    Write-Output 'VK_UP and the shipped e-brake, reverse, clutch, and airlift keys reached their reconstructed 0x43B290 trace outputs; throttle decayed after focus loss.'
+    Write-Output 'VK_UP throttle decayed after focus loss; VK_DOWN braked without reversing; Key_R produced backward route motion; configured action outputs remained traceable.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

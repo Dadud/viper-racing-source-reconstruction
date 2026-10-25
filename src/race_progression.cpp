@@ -43,7 +43,8 @@ RouteMotionResult advance_route_motion(
     const bool accelerate,
     const bool brake,
     float delta_seconds,
-    const std::uint32_t target_laps) noexcept
+    const std::uint32_t target_laps,
+    const bool reverse) noexcept
 {
     RouteMotionResult result{};
     if (route.size() < 2U || state.route_segment >= route.size() ||
@@ -75,8 +76,21 @@ RouteMotionResult advance_route_motion(
         steer_right,
     });
     state.steering = steering_state.value_0x509358;
-    const float drive = static_cast<float>(accelerate) - static_cast<float>(brake);
-    state.speed = std::clamp((state.speed + drive * 14.0F * delta_seconds) *
+    // This adapter is not the native tire/body simulation. Keep the distinct
+    // input meanings intact at its boundary: braking reduces speed magnitude,
+    // while the separate Reverse binding requests negative drive.
+    if (brake) {
+        const float braking_delta = 24.0F * delta_seconds;
+        if (state.speed > 0.0F)
+            state.speed = std::max(0.0F, state.speed - braking_delta);
+        else if (state.speed < 0.0F)
+            state.speed = std::min(0.0F, state.speed + braking_delta);
+    } else {
+        const float drive = static_cast<float>(accelerate) -
+            static_cast<float>(reverse);
+        state.speed += drive * 14.0F * delta_seconds;
+    }
+    state.speed = std::clamp(state.speed *
         std::pow(0.992F, delta_seconds * 60.0F), -8.0F, 38.0F);
     float distance = state.speed * delta_seconds;
     for (unsigned guard = 0U; std::abs(distance) > 1.0e-5F && guard < 128U; ++guard) {

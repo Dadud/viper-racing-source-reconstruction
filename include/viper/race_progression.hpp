@@ -62,7 +62,8 @@ void advance_race_clock(
     bool accelerate,
     bool brake,
     float delta_seconds,
-    std::uint32_t target_laps) noexcept;
+    std::uint32_t target_laps,
+    bool reverse = false) noexcept;
 
 // Commits a staged route update only after its runtime terrain query succeeds.
 // A failed query leaves lap time, route progress, steering, and speed untouched.

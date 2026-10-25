@@ -15,23 +15,31 @@ they do not constitute a gameplay comparison or replace the paired playable
 scenario below.
 
 A private original-client startup attempt is recorded at
-`../analysis/reference_captures/original_graphics_failure.json`. Its
+`../../analysis/reference_captures/original_graphics_failure.json`. Its
 `-no3dfx` argument is not valid evidence for a graphics workaround: the
 recovered command-line parser does not recognize that switch. A controlled
 retry with the documented `-1` primary-adapter switch is recorded at
-`../../analysis/reference_captures/original_primary_adapter_20261025T022451Z.json`,
-with a 408x149 dialog screenshot beside it. The unmodified launcher passed its
-data/CD checks, started `race.bin`, then stopped before gameplay and displayed
-`Our Apologies`: `Your video card returned an error. Are your video drivers up
-to date?` The run used a temporary `Data` junction backed by hard links to all
-32 inputs, with the original ISO mounted as `VIPER`; pre/post hashes matched
-for the executable, engine, ISO, and staged data files, and the temporary
-setup was removed afterward. This establishes a reproducible startup failure
-with a recognized adapter-selection switch, not a paired gameplay capture.
-The dialog alone does not identify which DirectDraw call failed. A 32-bit
-trace of `DirectDrawCreate`, `QueryInterface`, mode enumeration (especially
-640x480), and exclusive-mode setup is the next probe needed to localize it.
-Gameplay behavior remains unverified against the original.
+`../../analysis/reference_captures/original_primary_adapter_20261025T022451Z.json`.
+The subsequent DirectDraw traces in [graphics_startup.md](graphics_startup.md) establish
+that the generic startup dialog was caused by the engine's 32-bit video-memory
+classification: the host reported `0xFFFF0000`, addition wrapped the value,
+and the engine exited with code 5. In a private, process-only probe, changing
+only the first successful `GetAvailableVidMem` total to `0x00200000` selected
+memory class 4 and allowed DirectDraw surfaces to be created. With the same
+bounded override, controlled clicks reached Quick Race setup, the Bemidji
+grid, and the 640x480 3D race at Lap 1/3, Position 8/8, 0 MPH. Screenshots and
+the 55-second API trace are retained outside the repository at
+`../../analysis/reference_captures/viper-quickrace-frame_03_after_action_2.png`
+and `../../analysis/reference_captures/viper-quickrace-trace.json`; the trace
+contains drawing activity but no confirmed vehicle movement or accelerator
+response. Original binaries, ISO, and GameData hashes matched their baselines
+after cleanup. This establishes a controlled race-start observation under a
+host-specific video-memory override, not physical behavior or parity.
+The next useful probe is a bounded throttle hold and release (plus a short
+steering pulse) after the green start signal, recording timestamps, frames,
+and only state fields whose addresses and interpretation have already been
+established. Vehicle-control response and race progression remain unverified
+in the original capture, so no gameplay comparison is established.
 
 ## Pairing a scenario
 

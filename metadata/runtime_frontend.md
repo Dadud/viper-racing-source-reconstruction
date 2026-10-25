@@ -53,17 +53,21 @@ active driver or language key for a slot, standings use its numbered entrant
 fallback. This does not imply that the AIDR setups or native AI controller are
 connected to opponent motion.
 
-The four driving bindings now pass through the reconstructed type-1 binding
+The driving bindings pass through the reconstructed type-1 binding
 evaluator. The Win32 adapter converts configured virtual keys to DirectInput
 scan-code selectors and records key-down/key-up events in a 256-entry digital
 snapshot, then samples the configured `CONTROL.steer_left`, `steer_right`,
 `throttle`, and `braking` records through the model's native `> 0.2` active
 predicate. Empty options remain unbound. Focus loss and input cancellation
 clear the snapshot so a missed key-up cannot leave a driving control latched.
-This connects runtime keyboard state to the recovered binding logic; it does
-not implement DirectInput polling, controller support, control rebinding UI,
-or physical simulation. A Windows smoke test records throttle while Up is held
-and confirms the control clears when focus is lost.
+This connects runtime keyboard state to the recovered binding logic. In the
+route-motion prototype, the separate Reverse binding requests backward route
+motion; braking reduces speed magnitude and no longer drives the car backward.
+This control mapping remains provisional kinematics, not a gearbox or physical
+simulation. A Windows smoke test records throttle while Up is held, confirms
+the control clears when focus is lost, and checks that Down brakes while R
+produces backward route motion. DirectInput polling, controller support, and
+control rebinding UI remain open.
 
 Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to

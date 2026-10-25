@@ -82,6 +82,24 @@ int main()
                 motion_result.finished && motion.race.elapsed_seconds > 0.0F,
             "the runtime route integrator must drive through the configured finish");
 
+        viper::RouteMotionState braking_motion{};
+        braking_motion.speed = 10.0F;
+        viper::initialize_race_progression(braking_motion.race, 0U);
+        (void)viper::advance_route_motion(braking_motion, square_route,
+            false, false, false, true, 0.25F, 1U);
+        require(braking_motion.speed >= 0.0F && braking_motion.speed < 10.0F,
+            "the braking binding must slow a forward-moving car without selecting reverse");
+
+        viper::RouteMotionState reverse_motion{};
+        viper::initialize_race_progression(reverse_motion.race, 0U);
+        const auto reverse_result = viper::advance_route_motion(reverse_motion,
+            square_route, false, false, false, false, 0.25F, 1U, true);
+        require(reverse_result.valid && reverse_motion.speed < 0.0F &&
+                reverse_motion.route_segment == square_route.size() - 1U &&
+                reverse_motion.route_fraction < 1.0F &&
+                reverse_motion.race.completed_laps == 0U,
+            "the separate reverse binding must move backward without counting a lap");
+
         viper::RouteMotionState steering_motion{};
         viper::initialize_race_progression(steering_motion.race, 0U);
         const std::vector<std::array<float, 2>> straight_route{

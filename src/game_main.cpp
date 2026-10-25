@@ -2147,7 +2147,8 @@ struct WindowState {
         if (!update_native_control_state(delta_seconds)) return false;
         auto candidate_motion = motion;
         const auto route_result = viper::advance_route_motion(candidate_motion, route,
-            left, right, accelerate, brake, delta_seconds, target_laps);
+            left, right, accelerate, brake, delta_seconds, target_laps,
+            control_update_state.controls.flag_0x5093f0 != 0U);
         if (!route_result.valid && !route_result.finished) return false;
         std::optional<viper::TerrainSurfaceQueryResult> surface;
         if (route_result.valid) {
