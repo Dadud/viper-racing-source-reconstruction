@@ -2767,6 +2767,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_normal_z";
         }
         trace << ",control_0x509358,control_0x5093f4,control_0x509320"
+              << ",control_0x5093f0,control_0x5093c8,control_0x5093cc"
+              << ",control_0x5093f8,control_0x509360,control_0x509344"
+              << ",control_0x509420,control_0x509340"
+              << ",control_0x509354,control_0x5093bc"
               << ",pcar_prefix_0xde0,pcar_prefix_0xde4"
               << ",pcar_prefix_0xde8,pcar_prefix_0xdec"
               << ",pcar_traction_control,pcar_abs_braking"
@@ -2876,7 +2880,18 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 }
                 trace << ',' << state.control_update_state.steering.value_0x509358
                       << ',' << state.control_update_state.analog_0x5093f4.value
-                      << ',' << state.control_update_state.analog_0x509320.value
+                      << ',' << state.control_update_state.analog_0x509320.value;
+                const auto& live_controls = state.control_update_state.controls;
+                trace << ',' << static_cast<unsigned>(live_controls.flag_0x5093f0)
+                      << ',' << live_controls.value_0x5093c8
+                      << ',' << static_cast<unsigned>(live_controls.flag_0x5093cc)
+                      << ',' << static_cast<unsigned>(live_controls.flag_0x5093f8)
+                      << ',' << static_cast<unsigned>(live_controls.flag_0x509360)
+                      << ',' << live_controls.difference_0x509344
+                      << ',' << static_cast<unsigned>(live_controls.flag_0x509420)
+                      << ',' << live_controls.difference_0x509340
+                      << ',' << static_cast<unsigned>(live_controls.transition_latch_0x509354)
+                      << ',' << live_controls.counter_0x5093bc
                       << ',' << state.player_pcar_control_prefix.value_0xde0
                       << ',' << state.player_pcar_control_prefix.value_0xde4
                       << ',' << state.player_pcar_control_prefix.value_0xde8

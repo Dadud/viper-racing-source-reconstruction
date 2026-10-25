@@ -18,7 +18,9 @@ try {
     $inputLines = [System.IO.File]::ReadAllLines($capture)
     for ($frame = 1; $frame -lt $inputLines.Count; ++$frame) {
         $fields = $inputLines[$frame].Split(',')
-        $fields[3] = if ($frame -eq 4 -or $frame -eq 5) { '1' } else { '0' }
+        # The recovered type-1 steering path ramps at a frame-rate-dependent
+        # rate. Hold long enough to cross the route adapter's active threshold.
+        $fields[3] = if ($frame -ge 4 -and $frame -le 10) { '1' } else { '0' }
         $fields[4] = '0'
         $fields[5] = if ($frame -ge 2 -and $frame -le 7) { '1' } else { '0' }
         $fields[6] = if ($frame -ge 9 -and $frame -le 10) { '1' } else { '0' }

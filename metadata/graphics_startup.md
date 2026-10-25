@@ -78,3 +78,18 @@ original launcher. The launcher handoff is still untraced. Cleanup was
 verified: the process, temporary `Data` junction, staging directory, and ISO
 mount were removed, and hashes of the original launcher, engine, and ISO
 remained unchanged.
+
+### Launcher child-creation trace
+
+The private capture
+`../../analysis/reference_captures/launcher_handoff_frida_20261025T023744Z.json`
+instrumented the original launcher before resume. `CreateProcessA` succeeded
+with command line `Data\race.bin -1` and creation flags zero, but the hook
+could not read the returned `PROCESS_INFORMATION`; the child had already
+exited by the first host-side process query. This confirms the launcher's
+actual engine command line but captures neither the child PID/exit code nor a
+DirectDraw result. The failed API trace therefore remains unresolved. The next
+probe must suspend the created child at the `CreateProcessA` boundary (or use
+Frida child gating) before attaching and resuming it. The process, data
+junction/staging directory, Frida session, and ISO mount were cleaned up, and
+the launcher, engine, and ISO hashes remained unchanged.

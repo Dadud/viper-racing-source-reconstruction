@@ -66,6 +66,22 @@ in session state and appended to race traces. The existing keyboard smoke
 reaches throttle through VK-to-DIK mapping, the binding evaluator, and the
 reconstructed throttle ramp; after focus loss the output decays to zero.
 
+The other recovered `0x43B290` action outputs are also retained in the live
+session trace: e-brake flag `0x5093F0`, reverse ramp `0x5093C8`, clutch flag
+`0x5093CC`, airlift flag `0x5093F8`, look flags/difference `0x509360`,
+`0x509420`, and `0x509344`, shift-axis difference `0x509340`, edge latch
+`0x509354`, and current shift counter `0x5093BC`. These values are produced
+from the existing fifteen-binding evaluator and the native callback's direct
+copies, active predicates, ramp, differences, and press-edge logic. This makes
+configured actions observable in deterministic race traces; it does not yet
+connect them to physical handbrake/reverse/clutch behavior, camera movement,
+or an implemented transmission.
+
+`race_loop_control_actions_regression` checks these observed projections,
+reverse rise/decay and clamp, and one shift per press edge with re-arming after
+release. The end-to-end trace regression now holds steering through the native
+ramp long enough to cross the route adapter's `0.2` activity threshold.
+
 The `CONTROL nonlinear_steering` option maps to global `0x5093FC` through the
 registration at `0x43B030` (key pointer `0x4D5A40`). The native helper
 `0x43BA30` clears that option when `game_pad` is true or either steering

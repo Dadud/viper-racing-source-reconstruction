@@ -251,6 +251,12 @@ if(BUILD_TESTING)
         viper_race_progression)
     add_test(NAME race_progression_regression
         COMMAND viper_race_progression_regression)
+    add_executable(viper_race_loop_control_actions_regression
+        tests/race_loop_control_actions_regression.cpp)
+    target_link_libraries(viper_race_loop_control_actions_regression PRIVATE
+        viper_race_loop_model)
+    add_test(NAME race_loop_control_actions_regression
+        COMMAND viper_race_loop_control_actions_regression)
     add_executable(viper_physics_task_stream_regression
         tests/physics_task_stream_regression.cpp)
     target_link_libraries(viper_physics_task_stream_regression PRIVATE
