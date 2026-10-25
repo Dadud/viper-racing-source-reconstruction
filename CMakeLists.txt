@@ -327,7 +327,18 @@ if(BUILD_TESTING)
     add_test(NAME inspection_help COMMAND viper_reconstruction --help)
     if(WIN32)
         add_test(NAME game_help COMMAND viper_game --help)
-        set(VIPER_EXTERNAL_DATA_DIR "${CMAKE_SOURCE_DIR}/../game_install/GameData")
+        # Keep shipped game data external, but let local acceptance runs point
+        # at an explicitly configured installation instead of requiring one
+        # particular sibling directory beside the checkout.
+        if(DEFINED ENV{VIPER_DATA_DIR})
+            set(VIPER_EXTERNAL_DATA_DIR "$ENV{VIPER_DATA_DIR}")
+            if(NOT EXISTS "${VIPER_EXTERNAL_DATA_DIR}/common.res")
+                message(FATAL_ERROR
+                    "VIPER_DATA_DIR is set but does not contain common.res: ${VIPER_EXTERNAL_DATA_DIR}")
+            endif()
+        else()
+            set(VIPER_EXTERNAL_DATA_DIR "${CMAKE_SOURCE_DIR}/../game_install/GameData")
+        endif()
         if(EXISTS "${VIPER_EXTERNAL_DATA_DIR}/common.res")
             add_test(NAME game_asset_root_discovery
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File

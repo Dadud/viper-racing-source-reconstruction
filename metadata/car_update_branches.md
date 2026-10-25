@@ -100,6 +100,41 @@ quicksort path, including the null diagonal and ordinal selection. Production
 still does not collect and pass the descriptor rows, so this standalone
 algorithm is not yet exercised against live native rows and the timer remains
 disconnected from production physics.
+
+#### Production row-source audit (2026-10-25)
+
+The existing Windows session cannot yet form valid rows for
+`NcarIntegratorTimerInput::ordinal_rows`. A row requires descriptor ordinal
+registration plus body X/Z at `+0x5C/+0x64` and linear-velocity X/Z at
+`+0x234/+0x23C`. The persistent player `NcarBodyRuntimeObjectState` is the only
+runtime-owned PCAR body object; its byte-initialization mask can prove whether
+those offsets were initialized, but initialization is not evidence that the
+values track the race. `0x431150` body integration is not called in production,
+and the player pose remains route-owned. Consequently, reading the player's
+constructor/seeded body fields would provide stale or zero motion, not the
+current participant state required by `0x419E80`.
+
+Configured AI entrants and rendered opponent cars do not close this gap:
+`initialize_opponents` retains route segment/fraction and a synthetic route
+speed in `OpponentMotion`, then advances visible poses through the route
+adapter. It does not construct persistent PCAR body objects for those cars,
+does not own descriptor registration ordinals, and does not derive the native
+body position/velocity fields. Their route poses/speeds therefore must not be
+converted into timer rows. The single player object also cannot stand in for
+all registered descriptor slots: the native setup walks a registry of object
+pointers and leaves unregistered ordinal rows zero-filled.
+
+The next safe implementation boundary is to make body integration the
+production pose authority for the player and to create each participant's
+persistent body/registration record through the recovered vehicle setup path.
+Only then can the race session materialize rows in descriptor ordinal order
+from each registered body's initialized `+0x5C/+0x64/+0x234/+0x23C` fields,
+preserve unregistered slots as zero rows, and pass the complete span with the
+player's native `+0x510` ordinal. Until both live body ownership and ordinal
+registration exist, `ordinal_rows_resolved` must remain false; using route
+motion or constructor defaults here would make the timer appear wired while
+feeding it invented/stale participant physics.
+
 The portable resolver constructs and sorts only the requested row because
 the timer consumes one row entry; the native descriptor itself constructs all
 rows during setup. The timer API is allowed to propagate allocation failures
