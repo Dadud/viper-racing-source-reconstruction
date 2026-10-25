@@ -70,6 +70,19 @@ gap; do not infer runtime support from static analysis or file presence.
 
 ## Recent runtime evidence
 
+- **2026-10-25, original main-menu rendering under a bounded startup override:**
+  With hooks confirmed on the suspended original child, the probe changed only
+  the first successful `GetAvailableVidMem` total from `0xFFFF0000` to
+  `0x00200000`. The engine classified it as 4 and created both DirectDraw
+  surfaces. Over 30 seconds the surface hooks observed 12 successful blits,
+  24 successful locks, 24 unlocks (23 S_OK, one `0x887601C2`), and no Flip.
+  The retained 640×480 screenshot
+  `../../analysis/reference_captures/original_menu_render_20261025.png`
+  shows the title/main menu. This establishes original menu rendering in the
+  instrumented environment, not gameplay rendering or a playable race. The
+  event trace and cleanup/hash verification are recorded in
+  `metadata/graphics_startup.md`.
+
 - **2026-10-25, full Release validation after DirectDraw startup model:** The
   `build/full-check` Visual Studio 18 x64 Release build completed. The full
   CTest suite passed 57/57, including all eight track and five vehicle asset

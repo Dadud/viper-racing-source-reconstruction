@@ -161,10 +161,16 @@ before resume. It changed only the first successful query's total output from
 `0xFFFF0000` to `0x00200000`; the free output and later queries were left
 alone. The classifier returned class 4 and stored 4 at `0x509C2C`. Both
 DirectDraw `CreateSurface` calls returned S_OK, including the 640x480 surface
-with descriptor flags `0x47`. The child remained active with a visible
-`Viper Racing` window for the 30-second checkpoint, but no gameplay frame or
-screenshot was confirmed. The companion event trace is
-`../../analysis/reference_captures/vidmem_override_python_20261025T031736Z.json`.
-The probe is evidence for this particular instrumented environment, not a
-general-purpose fix. Cleanup is verified and hashes of the launcher, engine,
-ISO, and all 31 GameData files match their baselines.
+with descriptor flags `0x47`. A follow-up run with the same bounded override
+hooked DirectDraw surface `Blt`, `Flip`, `Lock`, and `Unlock` calls. It observed
+12 successful blits, 24 successful locks, 24 unlocks (23 S_OK and one
+`0x887601C2`), and no Flip calls during the 30-second observation. The retained
+640x480 screenshot
+`../../analysis/reference_captures/original_menu_render_20261025.png`
+(SHA-256 `DD27A87189FFD5673D1BFB87F4E97EEA76770CF2469062B5398A1AC7DB0667F2`)
+shows the rendered Viper Racing title/menu screen. Its event trace is
+`../../analysis/reference_captures/original_menu_render_20261025_events.json`.
+This confirms main-menu rendering after the process-only memory override; it
+does not confirm an in-race frame or general-purpose compatibility. Cleanup is
+verified and hashes of the launcher, engine, ISO, and all 31 GameData files
+match their baselines.
