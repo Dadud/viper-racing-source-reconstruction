@@ -2009,6 +2009,7 @@ struct PlayerPhysicsTickContext {
     std::array<std::uint32_t, 44> body_kinematics_missing_float_offsets{};
     bool body_integrator_timer_ramp_source_ready{};
     bool body_integrator_timer_known_fields_finite{};
+    std::optional<std::uint8_t> body_transform_matches_runtime_placement{};
     std::size_t body_integrator_timer_missing_count{};
     std::array<std::uint32_t, 3> body_integrator_timer_missing_offsets{};
     // Post-callback byte-backed body fields in this order: orientation basis,
@@ -2823,6 +2824,17 @@ struct WindowState {
                 break;
             }
             body_transform[lane] = *value;
+        }
+        if (body_transform_ready) {
+            const bool matches_runtime_placement = std::equal(
+                body_transform.begin(), body_transform.end(),
+                player_runtime_state.placement_transform.begin(),
+                [](const float body_value, const float placement_value) {
+                    return std::bit_cast<std::uint32_t>(body_value) ==
+                        std::bit_cast<std::uint32_t>(placement_value);
+                });
+            tick.body_transform_matches_runtime_placement =
+                static_cast<std::uint8_t>(matches_runtime_placement ? 1U : 0U);
         }
         const auto body_center_x = read_body_float(0x5cU);
         const auto body_center_y = read_body_float(0x60U);
@@ -4572,6 +4584,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         physics_tick_trace << ",body_integrator_timer_ramp_source_ready"
             ",body_integrator_timer_known_fields_finite"
             ",body_integrator_timer_missing_count"
+            ",body_transform_matches_runtime_placement"
             ",body_integrator_ramp_0x50c,body_vehicle_ordinal_0x510";
         for (std::size_t lane = 0U; lane < 3U; ++lane)
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
@@ -4833,6 +4846,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         << ',' << tick.body_integrator_timer_known_fields_finite
                         << ',' << tick.body_integrator_timer_missing_count
                         << ',';
+                    if (tick.body_transform_matches_runtime_placement) {
+                        physics_tick_trace << static_cast<unsigned>(
+                            *tick.body_transform_matches_runtime_placement);
+                    }
+                    physics_tick_trace << ',';
                     if (tick.body_integrator_ramp_0x50c_after_tick)
                         physics_tick_trace << *tick.body_integrator_ramp_0x50c_after_tick;
                     physics_tick_trace << ',';

@@ -26,6 +26,18 @@ the selected track `obj car` runtime-record transform also used by the renderer.
 change that body or rendered placement. The body remains static in the live
 session, and contact observations are not connected to collision response,
 suspension force, or pose integration.
+Shipped-binary Ghidra evidence confirms base initializer `0x4375C0` seeds an
+identity basis and zero position, while the PCAR derived initializer path
+`0x42FF90 -> 0x43E490 -> 0x4375C0` later invokes `0x433C00` to copy the chosen
+runtime-record transform to body `+0x38..+0x64`. The reconstructed tick trace
+now records a bit-exact comparison between the byte-backed body transform and
+the retained chosen placement transform; fixed-step replay requires this
+handoff on its first tick. Evidence IDs are
+`ev_90d828b93a96a2270637579b1a00c5178be7ac9923caef14f1d8f837fd25b350`,
+`ev_16211305309cb04932d13ad5a1d369ad4e4c7e92d881a1ec107054c31cc4ab19`, and
+`ev_1bd5688db76155c26f088bb709fc8bce8430eb03d9df862ba2786ca8ef1b6ae0`.
+This closes a constructor-to-query pose provenance question, not original
+grid-contact parity or dynamic body update behavior.
 An eight-fixed-tick reconstructed Viper/Bemidji baseline on 2026-10-26 found
 all 44 byte-backed kinematics floats initialized and finite, with all three
 integrator timer fields initialized and finite; position, linear/angular

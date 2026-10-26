@@ -74,6 +74,8 @@ try {
         $tickHeader, 'body_integrator_timer_known_fields_finite')
     $bodyIntegratorTimerMissingCountColumn = [Array]::IndexOf(
         $tickHeader, 'body_integrator_timer_missing_count')
+    $bodyPlacementTransformMatchesColumn = [Array]::IndexOf(
+        $tickHeader, 'body_transform_matches_runtime_placement')
     $bodyIntegratorRampColumn = [Array]::IndexOf(
         $tickHeader, 'body_integrator_ramp_0x50c')
     $bodyVehicleOrdinalColumn = [Array]::IndexOf(
@@ -166,6 +168,7 @@ try {
         $bodyIntegratorTimerReadyColumn -lt 0 -or
         $bodyIntegratorTimerFiniteColumn -lt 0 -or
         $bodyIntegratorTimerMissingCountColumn -lt 0 -or
+        $bodyPlacementTransformMatchesColumn -lt 0 -or
         $bodyIntegratorRampColumn -lt 0 -or $bodyVehicleOrdinalColumn -lt 0 -or
         @($bodyIntegratorTimerMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
@@ -241,7 +244,8 @@ try {
                 [Math]::Abs([single]::Parse(
                     $fields[$bodyIntegratorRampColumn], [cultureinfo]::InvariantCulture) -
                     1.0) -gt 0.00001 -or
-                $fields[$bodyVehicleOrdinalColumn] -ne '7') {
+                $fields[$bodyVehicleOrdinalColumn] -ne '7' -or
+                $fields[$bodyPlacementTransformMatchesColumn] -ne '1') {
                 throw 'First tick does not expose the initialized PCAR +0x50C/+0x510 constructor state'
             }
             for ($wheel = 0; $wheel -lt 4; ++$wheel) {
