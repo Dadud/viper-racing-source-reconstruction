@@ -11,20 +11,33 @@ $repeat = Join-Path $root 'repeat.csv'
 $replayTicks = Join-Path $root 'replay-ticks.csv'
 $repeatTicks = Join-Path $root 'repeat-ticks.csv'
 try {
-    & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only --smoke-frames 12 --record-trace $capture
-    if ($LASTEXITCODE -ne 0) { throw "Trace capture exited with $LASTEXITCODE" }
-
-    $inputLines = [System.IO.File]::ReadAllLines($capture)
-    for ($frame = 1; $frame -lt $inputLines.Count; ++$frame) {
-        $fields = $inputLines[$frame].Split(',')
-        # Keep gameplay actions neutral: this regression checks trace framing,
-        # deterministic playback, and fixed-step diagnostics, not route driving.
-        $fields[3] = '0'
-        $fields[4] = '0'
-        $fields[5] = '0'
-        $fields[6] = '0'
-        $inputLines[$frame] = $fields -join ','
+    # Author a repeatable fixed-step driver input fixture. Route motion is
+    # disabled below, so these actions exercise the real binding/PCAR control
+    # path without using the ideal line as a movement surrogate.
+    $inputLines = [System.Collections.Generic.List[string]]::new()
+    [void]$inputLines.Add('frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,phase')
+    $frameCount = 320
+    for ($frame = 0; $frame -lt $frameCount; ++$frame) {
+        $left = 0
+        $right = 0
+        $throttle = 0
+        $brake = 0
+        $phase = 'coast'
+        if ($frame -lt 96) {
+            $throttle = 1
+            $phase = 'throttle'
+        } elseif ($frame -ge 160 -and $frame -lt 208) {
+            $left = 1
+            $phase = 'steer-left'
+        } elseif ($frame -ge 240 -and $frame -lt 288) {
+            $brake = 1
+            $phase = 'brake'
+        }
+        $elapsed = [single]($frame * 0.016)
+        $row = '{0},{1},{2},{3},{4},{5},{6},{7}' -f $frame,
+            $elapsed.ToString('R', [cultureinfo]::InvariantCulture), '0.016',
+            $left, $right, $throttle, $brake, $phase
+        [void]$inputLines.Add($row)
     }
     [System.IO.File]::WriteAllLines($capture, $inputLines)
 
@@ -58,6 +71,9 @@ try {
     $tickTimeColumn = [Array]::IndexOf($tickHeader, 'simulation_time')
     $tickSourceColumn = [Array]::IndexOf($tickHeader, 'input_provenance')
     $tickInputColumn = [Array]::IndexOf($tickHeader, 'keyboard_snapshot_hex')
+    $tickSteeringInputColumn = [Array]::IndexOf($tickHeader, 'steering')
+    $tickThrottleInputColumn = [Array]::IndexOf($tickHeader, 'throttle')
+    $tickBrakeInputColumn = [Array]::IndexOf($tickHeader, 'brake')
     $bodyTimerColumn = [Array]::IndexOf($tickHeader, 'body_timer_0xe44')
     $bodyWheelPairScaleColumns = @(
         [Array]::IndexOf($tickHeader, 'body_wheel_pair_scale_0xdd4'),
@@ -159,6 +175,8 @@ try {
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
         $tickSourceColumn -lt 0 -or $tickInputColumn -lt 0 -or
+        $tickSteeringInputColumn -lt 0 -or $tickThrottleInputColumn -lt 0 -or
+        $tickBrakeInputColumn -lt 0 -or
         $bodyTimerColumn -lt 0 -or
         @($bodyWheelPairScaleColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         $bodyKinematicsReadyColumn -lt 0 -or
@@ -194,6 +212,9 @@ try {
     $previousOuterUpdate = -1L
     $expectedStepIndex = 0
     $wheelDepthObserved = [bool[]]::new(4)
+    $observedScheduledThrottle = $false
+    $observedScheduledSteering = $false
+    $observedScheduledBrake = $false
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
             throw "Repeated fixed-step trace differs at CSV line $($index + 1)"
@@ -203,6 +224,23 @@ try {
             throw "Fixed-step trace field count is invalid at line $($index + 1)"
         }
         $outerUpdate = [long]::Parse($fields[0], [cultureinfo]::InvariantCulture)
+        $tickSteering = [single]::Parse(
+            $fields[$tickSteeringInputColumn], [cultureinfo]::InvariantCulture)
+        $tickThrottle = [single]::Parse(
+            $fields[$tickThrottleInputColumn], [cultureinfo]::InvariantCulture)
+        $tickBrake = [single]::Parse(
+            $fields[$tickBrakeInputColumn], [cultureinfo]::InvariantCulture)
+        if ($outerUpdate -lt 96 -and $tickThrottle -gt 0.2) {
+            $observedScheduledThrottle = $true
+        }
+        if ($outerUpdate -ge 160 -and $outerUpdate -lt 208 -and
+            [Math]::Abs($tickSteering) -gt 0.2) {
+            $observedScheduledSteering = $true
+        }
+        if ($outerUpdate -ge 240 -and $outerUpdate -lt 288 -and
+            $tickBrake -gt 0.2) {
+            $observedScheduledBrake = $true
+        }
         $stepIndex = [int]::Parse($fields[$tickStepColumn], [cultureinfo]::InvariantCulture)
         $stepCount = [int]::Parse($fields[$tickStepCountColumn], [cultureinfo]::InvariantCulture)
         $tickIndex = [int]::Parse($fields[$tickIndexColumn], [cultureinfo]::InvariantCulture)
@@ -541,8 +579,12 @@ try {
     if (-not $observedPcarTimestamp) {
         throw 'Trace playback did not record the PCAR timestamp boundary on a callback step'
     }
+    if (-not $observedScheduledThrottle -or -not $observedScheduledSteering -or
+        -not $observedScheduledBrake) {
+        throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
+    }
 
-    Write-Output "Diagnostics-only fixed-step capture/playback reproduced $($replayedLines.Count - 1) frames exactly across two runs; the route-motion adapter ran zero steps."
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; PCAR control outputs were observed and route motion ran zero steps."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

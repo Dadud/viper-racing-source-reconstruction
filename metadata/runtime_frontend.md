@@ -65,11 +65,14 @@ exercise input/callback plumbing without treating ideal-line following as a
 driving surrogate. They still do not establish physical movement.
 
 `game_fixed_step_trace_replay_regression` checks deterministic short trace
-capture/playback and fixed-step/input trace consistency across repeated runs.
-It no longer creates a full-throttle route race or asserts route progress,
-opponent finishes, lap completion, or results. Route-motion model unit tests
-remain tests of that prototype adapter only; they are not game-playability
-evidence.
+capture/playback from a 320-frame authored throttle/coast/steer/brake/coast
+schedule and requires those inputs to reach the PCAR control outputs on their
+scheduled update windows. It replays twice with route motion disabled and
+requires identical frame and tick traces plus zero route-adapter steps. This
+validates deterministic input/control propagation, not vehicle movement. It
+does not assert route progress, opponent finishes, lap completion, or results.
+Route-motion model unit tests remain tests of that prototype adapter only; they
+are not game-playability evidence.
 Race standings display localized AI driver names from the selected
 `GAME.opponent_strength` profile in `english.lng`, aligned through the
 single-race entrant's modulo-7 driver slot. If the selected AIDR profile has no

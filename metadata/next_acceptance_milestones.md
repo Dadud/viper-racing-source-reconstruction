@@ -13,7 +13,8 @@ scene/HUD, keyboard bindings, route-progress state, route-driven opponent
 safe-follow policy, standings, and a return-to-setup path. The retired
 route-driven results scenarios are historical prototype evidence only; current
 Windows lifecycle checks cover startup, settings persistence, clean early exit,
-and reload, while fixed-step replay covers short deterministic traces.
+and reload, while fixed-step replay uses an authored, deterministic control
+schedule with route motion disabled.
 `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
@@ -96,7 +97,10 @@ original and reconstructed sequences by input window and callback/tick ordinal;
 do not steer either run using the ideal line.
 The runtime's `--diagnostics-only` mode now bypasses provisional player and AI
 route motion; keyboard-input and fixed-step replay regressions use it and assert
-that the route-motion adapter receives zero steps.
+that the route-motion adapter receives zero steps. The fixed-step fixture now
+replays 320 frames of throttle, coast, steering, braking, and coast and checks
+that each active phase reaches the corresponding PCAR control output. This is
+synthetic input-to-control evidence, not physical movement evidence.
 
 Existing original evidence provides an exploratory input trace, not a clean
 acceptance baseline: `../analysis/reference_captures/controlled_player_physics_20261025.json`
