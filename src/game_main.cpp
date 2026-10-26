@@ -2021,6 +2021,16 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_gate_passed_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_clamped_depth_after_tick{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_contact_query_succeeded{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_contact_projection_origins{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_query_contact_points{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_query_contact_normals{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_contact_directions{};
+    std::array<std::optional<float>, 4> wheel_contact_depth_limits{};
     std::array<std::optional<float>, 4> wheel_preupdate_value_0x158_after_tick{};
     // True only when this tick connected the recovered 0x431150 paired
     // differential producer to the byte-backed wheel +0x158 lanes.
@@ -2885,6 +2895,25 @@ struct WindowState {
                     player_wheel_contact_results[wheel].clamped_contact_depth;
             }
             const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
+            const auto& contact_observation =
+                player_wheel_contact_observations[wheel];
+            if (contact_observation.body_query_enabled) {
+                tick.wheel_contact_projection_origins[wheel] =
+                    contact_observation.contact_projection_origin;
+                tick.wheel_contact_directions[wheel] =
+                    contact_observation.contact_direction;
+                tick.wheel_contact_depth_limits[wheel] =
+                    contact_observation.wheel_depth_limit_0x44;
+                tick.wheel_contact_query_succeeded[wheel] =
+                    static_cast<std::uint8_t>(
+                        contact_observation.query_succeeded ? 1U : 0U);
+                if (contact_observation.query_succeeded) {
+                    tick.wheel_query_contact_points[wheel] =
+                        contact_observation.query_contact_point;
+                    tick.wheel_query_contact_normals[wheel] =
+                        contact_observation.query_contact_normal;
+                }
+            }
             const auto read_wheel_float = [&wheel_object](const std::uint32_t offset)
                 -> std::optional<float> {
                 const auto bits = viper::read_ncar_wheel_object_u32(
@@ -4542,7 +4571,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_base_suspension_response_0x178"
                 << ",wheel" << wheel << "_surface_polarity_result"
                 << ",wheel" << wheel << "_surface_motion_projection"
-                << ",wheel" << wheel << "_surface_adjusted_response_0x178";
+                << ",wheel" << wheel << "_surface_adjusted_response_0x178"
+                << ",wheel" << wheel << "_contact_query_succeeded"
+                << ",wheel" << wheel << "_contact_depth_limit_0x44";
+            for (const auto* vector_name : {"contact_origin", "query_contact_point",
+                     "query_contact_normal", "contact_direction"}) {
+                physics_tick_trace << ",wheel" << wheel << '_' << vector_name << "_x"
+                    << ",wheel" << wheel << '_' << vector_name << "_y"
+                    << ",wheel" << wheel << '_' << vector_name << "_z";
+            }
         }
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
@@ -4846,6 +4883,33 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace <<
                                 *tick.wheel_surface_adjusted_responses[wheel];
                         }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_contact_query_succeeded[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_contact_query_succeeded[wheel]);
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_contact_depth_limits[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_contact_depth_limits[wheel];
+                        }
+                        const auto write_vector = [&physics_tick_trace](
+                            const std::optional<viper::PhysicsVector3>& value) {
+                            for (const auto component : {'x', 'y', 'z'}) {
+                                physics_tick_trace << ',';
+                                if (!value) continue;
+                                switch (component) {
+                                case 'x': physics_tick_trace << value->x; break;
+                                case 'y': physics_tick_trace << value->y; break;
+                                case 'z': physics_tick_trace << value->z; break;
+                                default: break;
+                                }
+                            }
+                        };
+                        write_vector(tick.wheel_contact_projection_origins[wheel]);
+                        write_vector(tick.wheel_query_contact_points[wheel]);
+                        write_vector(tick.wheel_query_contact_normals[wheel]);
+                        write_vector(tick.wheel_contact_directions[wheel]);
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {

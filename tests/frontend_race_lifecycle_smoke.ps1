@@ -72,6 +72,20 @@ function Read-RaceTitle([IntPtr]$Window) {
     return $title.ToString()
 }
 
+function Wait-RaceTitle([Diagnostics.Process]$Process, [IntPtr]$Window, [int]$TimeoutSeconds) {
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while ($timer.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+        $Process.Refresh()
+        if ($Process.HasExited) { throw "viper_game exited before publishing the race title (code $($Process.ExitCode))" }
+        $title = Read-RaceTitle $Window
+        if ($title -match 'bemidji.*viper' -and $title -match 'Lap 1/2') {
+            return $title
+        }
+        Start-Sleep -Milliseconds 50
+    }
+    return (Read-RaceTitle $Window)
+}
+
 $process = $null
 try {
     [void](New-Item -ItemType Directory -Path $config)
@@ -95,7 +109,7 @@ try {
     Send-Key $setup 13 # start selected session
 
     $race = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 45
-    $title = Read-RaceTitle $race
+    $title = Wait-RaceTitle $process $race 5
     if ($title -notmatch 'bemidji.*viper' -or $title -notmatch 'Lap 1/2') {
         throw "Frontend selection did not start the expected Viper/Bemidji session: $title"
     }
@@ -117,7 +131,7 @@ try {
     $setup = Wait-ProcessWindow $process 'ViperRaceSetupFrontendWindow' 30
     Send-Key $setup 13
     $race = Wait-ProcessWindow $process 'ViperRacingRuntimeWindow' 45
-    $title = Read-RaceTitle $race
+    $title = Wait-RaceTitle $process $race 5
     if ($title -notmatch 'bemidji.*viper' -or $title -notmatch 'Lap 1/2') {
         throw "Relaunch did not restore the saved Viper/Bemidji setup: $title"
     }

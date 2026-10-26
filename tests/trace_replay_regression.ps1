@@ -111,21 +111,47 @@ try {
         [Array]::IndexOf($tickHeader, 'body_moment_y'),
         [Array]::IndexOf($tickHeader, 'body_moment_z'))
     $wheelActiveColumns = [int[]]::new(4)
+    $wheelGateColumns = [int[]]::new(4)
     $wheelDepthColumns = [int[]]::new(4)
+    $wheelClampedDepthColumns = [int[]]::new(4)
     $wheelPreupdateColumns = [int[]]::new(4)
     $wheelProducerOwnedColumns = [int[]]::new(4)
     $wheelPriorDepthColumns = [int[]]::new(4)
+    $wheelQuerySucceededColumns = [int[]]::new(4)
+    $wheelContactDepthLimitColumns = [int[]]::new(4)
+    $wheelContactGeometryColumns = @()
+    $contactGeometryNames = @(
+        'contact_origin', 'query_contact_point',
+        'query_contact_normal', 'contact_direction')
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         $wheelActiveColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_active")
+        $wheelGateColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_contact_gate_passed")
         $wheelDepthColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_projected_depth")
+        $wheelClampedDepthColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_clamped_contact_depth")
         $wheelPreupdateColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_observed_value_0x158")
         $wheelProducerOwnedColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_0x158_native_producer_owned")
         $wheelPriorDepthColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_previous_contact_depth_0xe8")
+        $wheelQuerySucceededColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_contact_query_succeeded")
+        $wheelContactDepthLimitColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_contact_depth_limit_0x44")
+        $geometryColumns = [int[]]::new(12)
+        $geometryColumn = 0
+        foreach ($geometryName in $contactGeometryNames) {
+            foreach ($axis in @('x', 'y', 'z')) {
+                $geometryColumns[$geometryColumn] = [Array]::IndexOf(
+                    $tickHeader, "wheel${wheel}_${geometryName}_${axis}")
+                ++$geometryColumn
+            }
+        }
+        $wheelContactGeometryColumns += ,$geometryColumns
     }
     if ($tickIndexColumn -lt 0 -or $tickStepColumn -lt 0 -or
         $tickStepCountColumn -lt 0 -or $tickTimeColumn -lt 0 -or
@@ -147,10 +173,17 @@ try {
         @($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($bodyMotionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelGateColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelClampedDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelPreupdateColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelProducerOwnedColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
-        @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
+        @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelContactGeometryColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0) {
         throw 'Fixed-step trace header is missing body or wheel state fields'
     }
     $expectedTick = 0
@@ -235,6 +268,49 @@ try {
             $value = [single]::Parse($fields[$column], [cultureinfo]::InvariantCulture)
             if ([single]::IsNaN($value) -or [single]::IsInfinity($value)) {
                 throw "Body position snapshot is non-finite at line $($index + 1)"
+            }
+        }
+        for ($wheel = 0; $wheel -lt 4; ++$wheel) {
+            if ($fields[$wheelQuerySucceededColumns[$wheel]] -ne '1') {
+                throw "Wheel $wheel terrain query did not return a sample at line $($index + 1)"
+            }
+            $depthLimit = [single]::Parse(
+                $fields[$wheelContactDepthLimitColumns[$wheel]],
+                [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($depthLimit) -or [single]::IsInfinity($depthLimit)) {
+                throw "Wheel $wheel depth limit is non-finite at line $($index + 1)"
+            }
+            $geometry = [single[]]::new(12)
+            for ($lane = 0; $lane -lt 12; ++$lane) {
+                $geometry[$lane] = [single]::Parse(
+                    $fields[$wheelContactGeometryColumns[$wheel][$lane]],
+                    [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($geometry[$lane]) -or
+                    [single]::IsInfinity($geometry[$lane])) {
+                    throw "Wheel $wheel contact geometry is non-finite at line $($index + 1)"
+                }
+            }
+            $recomputedDepth =
+                ($geometry[3] - $geometry[0]) * $geometry[9] +
+                ($geometry[4] - $geometry[1]) * $geometry[10] +
+                ($geometry[5] - $geometry[2]) * $geometry[11]
+            $measuredDepth = [single]::Parse(
+                $fields[$wheelDepthColumns[$wheel]],
+                [cultureinfo]::InvariantCulture)
+            if ([Math]::Abs($recomputedDepth - $measuredDepth) -gt 0.00001) {
+                throw "Wheel $wheel projected depth differs from its recorded query geometry at line $($index + 1)"
+            }
+            if ($measuredDepth -lt 0.0) {
+                $clampedDepth = [single]::Parse(
+                    $fields[$wheelClampedDepthColumns[$wheel]],
+                    [cultureinfo]::InvariantCulture)
+                if ($fields[$wheelActiveColumns[$wheel]] -ne '0' -or
+                    $clampedDepth -ne 0.0) {
+                    throw "Wheel $wheel negative projection did not remain inactive at line $($index + 1)"
+                }
+            } elseif ($fields[$wheelGateColumns[$wheel]] -eq '1' -and
+                $fields[$wheelActiveColumns[$wheel]] -ne '1') {
+                throw "Wheel $wheel valid nonnegative contact did not become active at line $($index + 1)"
             }
         }
         $bodyTimer = [single]::Parse(

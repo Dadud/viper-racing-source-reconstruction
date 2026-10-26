@@ -32,7 +32,15 @@ velocity, and force/moment accumulators remained unchanged across the sampled
 ticks. This isolates missing dynamic force production/application from missing
 constructor bytes. The trace is preserved outside the source repository at
 `../../analysis/reference_captures/reconstructed_bytebacked_body_baseline_20261026.csv`
-(SHA-256 `198A470C4F5F9E3B2D28444546221EB2EB0388AF2119735EE9D85ADBBEF14E4B`).
+(SHA-256 `D58DB8A69D0E4F052536CB9148F727CAC396EC0FF6AF058F1F0C55D9E4D07139`).
+The same trace now includes each wheel's query success, transformed origin,
+sampled plane point/normal, projection direction, and depth limit. All four
+queries succeed, but their signed depths are negative (about -0.101 m at the
+front pair and -0.107 m at the rear pair), leaving all contacts inactive. The
+trace regression recomputes those projections and verifies the inactive
+negative-depth branch. Resolve this startup contact geometry against a
+matched original grid-start capture before adding guessed offsets or
+integrating suspension forces.
 It is reconstructed-client diagnostic evidence, not an original-game
 comparison or proof that those fields are dynamically sourced correctly.
 This is explicitly
@@ -46,10 +54,13 @@ including live-keyboard versus logical-replay provenance, recovered controls,
 callback globals, scheduler clock, and the pre-increment native tick time.
 This is a provenance boundary feeding the existing projections; it does not
 make their route-driven movement or terrain/contact samples physics-owned.
-The race HUD now shows live position from each route adapter's signed travelled
-distance; repeated input traces retain and validate those distances and the rank.
-This is a route-prototype race indicator, not a physics-owned position or an
-original-match acceptance result.
+The race HUD and legacy trace schema still expose route-adapter distance and
+rank for prototype diagnostics. No test may use those route-derived values,
+ideal-line motion, lap completion, or results as evidence of driving or race
+fidelity. Current frontend checks stop at lifecycle/settings behavior and the
+fixed-step replay compares deterministic diagnostics; route-derived fields are
+only checked for well-formedness. Replace the prototype motion and HUD sources
+before adding gameplay acceptance scenarios.
 The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
 per-tick controls/timing plus post-callback byte-backed body orientation basis,
@@ -498,8 +509,9 @@ input, including acceleration, turn, braking, a controlled collision, and
 finish. Preserve per-fixed-step controls, body/wheel state, contacts, collision
 events, lap/checkpoint events, and results. Repeat from the same start and
 compare deterministic state traces. Drive manually through start, finish,
-results, return to setup, and a second race without stale state. The existing
-trace-driven route-only scenario is not sufficient evidence.
+results, return to setup, and a second race without stale state. Until physical
+state owns car motion and race progression, keep route-based scenarios out of
+acceptance; existing route adapter tests cover their prototype model only.
 
 **Immediate work:** Carry physical state through one complete update frame
 without observation-only substitution; then harden stability and scenario
