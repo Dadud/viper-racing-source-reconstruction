@@ -49,20 +49,18 @@ asset loading. It does not validate a real saved career, run a complete race,
 verify every selector row, persist changed choices, or establish parity with
 the original menus.
 
-`game_frontend_race_lifecycle_smoke` creates a deterministic two-lap throttle
-trace, launches through the real setup window, selects Viper and two laps, and
-completes Viper/Bemidji. It returns from standings to setup, changes the car to
-Sports, then completes Sports/Bemidji. It next wraps the installed track
-selector from Bemidji to Dundas and completes Sports/Dundas. The same
-trace-driven setup/result lifecycle now covers Hastings, Heaven, Kenyon, Limbo,
-Nfield, and Uptown with each selected through its isolated saved setup
-preference. Replay exhaustion keeps the results window open only when playback
-was started through the interactive frontend; explicit CLI replay still closes
-when the trace ends. The smoke relaunches against the same Config directory and
-verifies the Sports/Dundas pair and two-lap setting load into the race. This
-verifies all-track setup/race/result resource lifecycles for the route
-prototype, not physical simulation or original-game parity.
+`game_frontend_session_lifecycle_smoke` opens the setup and controls pages,
+remaps throttle, changes the selected car and lap count, starts a Viper/Bemidji
+session, and closes the runtime window. A second process verifies that the
+saved selection and binding reload. It intentionally does not drive around the
+ideal line, complete a lap, enter results, or claim gameplay behavior.
 
+`game_fixed_step_trace_replay_regression` checks deterministic short trace
+capture/playback and fixed-step/input trace consistency across repeated runs.
+It no longer creates a full-throttle route race or asserts route progress,
+opponent finishes, lap completion, or results. Route-motion model unit tests
+remain tests of that prototype adapter only; they are not game-playability
+evidence.
 Race standings display localized AI driver names from the selected
 `GAME.opponent_strength` profile in `english.lng`, aligned through the
 single-race entrant's modulo-7 driver slot. If the selected AIDR profile has no
@@ -77,17 +75,13 @@ snapshot, then samples the configured `CONTROL.steer_left`, `steer_right`,
 `throttle`, and `braking` records through the model's native `> 0.2` active
 predicate. Empty options remain unbound. Focus loss and input cancellation
 clear the snapshot so a missed key-up cannot leave a driving control latched.
-This connects runtime keyboard state to the recovered binding logic. In the
-route-motion prototype, the separate Reverse binding requests backward route
-motion; braking reduces speed magnitude and no longer drives the car backward.
-This control mapping remains provisional kinematics, not a gearbox or physical
-simulation. A Windows smoke test starts with temporary W/S Config remaps, records throttle while W is held,
-confirms the control clears when focus is lost, and checks that S brakes while R
-produces backward route motion. It also pauses while throttle is held and
-asserts that race time, player route state, opponent route state, and fixed-step
-count remain constant until resume. DirectInput polling and controller support
+This connects runtime keyboard state to the recovered binding logic. The route
+adapter remains provisional and does not establish a gearbox or physical
+simulation. The Windows input smoke checks configured W/S/R and other action
+signals in recorded input, focus-loss release, and pause/resume of simulation
+time and fixed-step dispatch. It does not assert route displacement, speed,
+reverse travel, or opponent motion. DirectInput polling and controller support
 remain open.
-
 Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to
 show slots 1–5 as empty/invalid or display the stored player-name bytes for a
@@ -103,12 +97,11 @@ hotkey is unavailable.
 
 ## Acceptance still open
 
-- Run a complete race from the setup window, inspect standings, return to
-  setup, choose another track/car, and start the next session. The lifecycle
-  smoke now reaches results for two-lap trace-driven prototype sessions on all
-  eight tracks, with selector changes, asset reloads, results returns, and
-  persisted track/car/lap settings on representative sessions. Manual gameplay
-  input, physical simulation, and original parity remain open.
+- Complete a physics-owned race from setup through standings and back to
+  setup. Current lifecycle and trace tests cover selection/settings persistence,
+  runtime startup/shutdown, and deterministic trace mechanics only. They do not
+  drive the ideal line, simulate lap completion, or serve as race evidence.
+  Manual gameplay, physical simulation, results, and original parity remain open.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
 - Implement and retain additional settings beyond quick-race lap count and

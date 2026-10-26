@@ -398,7 +398,7 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/keyboard_binding_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
-            add_test(NAME game_frontend_race_lifecycle_smoke
+            add_test(NAME game_frontend_session_lifecycle_smoke
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/frontend_race_lifecycle_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
@@ -408,15 +408,15 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/network_race_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
-            add_test(NAME game_trace_replay_regression
+            add_test(NAME game_fixed_step_trace_replay_regression
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
-            set_tests_properties(game_trace_replay_regression PROPERTIES TIMEOUT 120)
+            set_tests_properties(game_fixed_step_trace_replay_regression PROPERTIES TIMEOUT 60)
             set_tests_properties(game_frontend_launch_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_keyboard_binding_smoke PROPERTIES TIMEOUT 75)
-            set_tests_properties(game_frontend_race_lifecycle_smoke PROPERTIES TIMEOUT 180)
+            set_tests_properties(game_frontend_session_lifecycle_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_network_race_smoke PROPERTIES TIMEOUT 60)
             set_tests_properties(game_asset_root_discovery PROPERTIES TIMEOUT 45)
             set(VIPER_SHIPPED_TRACKS

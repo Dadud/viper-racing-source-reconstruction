@@ -91,7 +91,8 @@ try {
         throw 'Could not post throttle key-up'
     }
     Start-Sleep -Milliseconds 300
-    # Braking must remove forward speed without becoming a reverse input.
+    # Exercise the remapped brake input; do not infer vehicle motion from the
+    # route prototype.
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]83, [IntPtr]0)) {
         throw 'Could not post brake key-down'
     }
@@ -100,11 +101,11 @@ try {
         throw 'Could not post brake key-up'
     }
     Start-Sleep -Milliseconds 150
-    # These keys come from the shipped options.def. The smoke checks their
-    # recovered callback outputs and only the limited route-motion mapping.
+    # These keys come from the shipped options.def. Check that their recovered
+    # callback outputs are consumed, without asserting route-following motion.
     Send-RaceKey $window 69 'e-brake'       # Key_E
     Send-RaceKey $window 82 'reverse'       # Key_R
-    # Hold Reverse long enough to cross zero after the braking phase.
+    # Hold Reverse long enough for the input trace to observe the action.
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]82, [IntPtr]0)) {
         throw 'Could not post reverse key-down'
     }
@@ -116,8 +117,7 @@ try {
     Send-RaceKey $window 67 'clutch'        # Key_C
     Send-RaceKey $window 32 'airlift'       # Key_SPACE
     # Pause while throttle is held. Entering pause must clear the held input
-    # and freeze race time, player/opponent route state, and native fixed-step
-    # counts until P resumes the race.
+    # and freeze simulation time and fixed-step dispatch until P resumes.
     if (-not [ViperKeyboardSmokeWin32]::PostMessage($window, 0x0100, [IntPtr]0x26, [IntPtr]0)) {
         throw 'Could not post throttle key-down for the pause check'
     }
@@ -153,12 +153,7 @@ try {
     if ($rows.Count -lt 3) { throw 'Input trace did not capture enough race frames' }
     $header = $rows[0].Split(',')
     $nativeThrottleColumn = [Array]::IndexOf($header, 'control_0x5093f4')
-    $reverseColumn = [Array]::IndexOf($header, 'control_0x5093f0')
-    $speedColumn = [Array]::IndexOf($header, 'player_speed')
     if ($nativeThrottleColumn -lt 0) { throw 'Trace omitted the native throttle control output' }
-    if ($reverseColumn -lt 0 -or $speedColumn -lt 0) {
-        throw 'Trace omitted the reverse-control or route-speed output'
-    }
     $actionColumns = @{
         eBrake = [Array]::IndexOf($header, 'control_0x5093b8')
         reverse = [Array]::IndexOf($header, 'control_0x5093f0')
@@ -195,23 +190,7 @@ try {
         [void]$parsedRows.Add($line.Split(','))
     }
     $brakeRows = @($parsedRows | Where-Object { $_[6] -eq '1' })
-    if ($brakeRows.Count -eq 0) { throw 'Remapped S never reached the route adapter as braking input' }
-    foreach ($row in $brakeRows) {
-        $speed = [single]::Parse($row[$speedColumn], [cultureinfo]::InvariantCulture)
-        if ($speed -lt -0.001) { throw 'Braking input selected reverse motion instead of slowing the car' }
-    }
-    $reverseMotionObserved = $false
-    foreach ($row in $parsedRows) {
-        $reverseValue = [single]::Parse($row[$reverseColumn], [cultureinfo]::InvariantCulture)
-        $speed = [single]::Parse($row[$speedColumn], [cultureinfo]::InvariantCulture)
-        if ($reverseValue -gt 0.0 -and $speed -lt -0.1) {
-            $reverseMotionObserved = $true
-            break
-        }
-    }
-    if (-not $reverseMotionObserved) {
-        throw 'The native Reverse binding did not produce backward route motion after braking'
-    }
+    if ($brakeRows.Count -eq 0) { throw 'Remapped S never reached the runtime as braking input' }
     foreach ($action in $actionColumns.GetEnumerator()) {
         $observed = $false
         foreach ($row in $rows | Select-Object -Skip 1) {
@@ -223,13 +202,10 @@ try {
 
     $pausedColumn = [Array]::IndexOf($header, 'paused')
     $elapsedColumn = [Array]::IndexOf($header, 'elapsed_seconds')
-    $segmentColumn = [Array]::IndexOf($header, 'player_segment')
-    $fractionColumn = [Array]::IndexOf($header, 'player_fraction')
-    $speedColumn = [Array]::IndexOf($header, 'player_speed')
     $stepColumn = [Array]::IndexOf($header, 'physics_step_count')
     $callbackColumn = [Array]::IndexOf($header, 'pcar_callback_step_count')
     $dispatchColumn = [Array]::IndexOf($header, 'pcar_task_projection_dispatch_steps')
-    if (@($pausedColumn, $elapsedColumn, $segmentColumn, $fractionColumn, $speedColumn, $stepColumn, $callbackColumn, $dispatchColumn) -contains -1) {
+    if (@($pausedColumn, $elapsedColumn, $stepColumn, $callbackColumn, $dispatchColumn) -contains -1) {
         throw 'Runtime trace omitted fields needed to verify pause/resume'
     }
     $traceRows = [System.Collections.Generic.List[object]]::new()
@@ -238,8 +214,7 @@ try {
     }
     $pausedRows = @($traceRows | Where-Object { $_[$pausedColumn] -eq '1' })
     if ($pausedRows.Count -lt 3) { throw 'Trace did not capture a sustained paused interval' }
-    $frozenColumns = @($elapsedColumn, $segmentColumn, $fractionColumn, $speedColumn,
-        $stepColumn, $callbackColumn, $dispatchColumn)
+    $frozenColumns = @($elapsedColumn, $stepColumn, $callbackColumn, $dispatchColumn)
     foreach ($pausedRow in $pausedRows) {
         foreach ($column in $frozenColumns) {
             if ($pausedRow[$column] -ne $pausedRows[0][$column]) {
@@ -247,12 +222,6 @@ try {
             }
         }
         if ($pausedRow[5] -eq '1') { throw 'Throttle remained active after pause cleared held controls' }
-        for ($column = 13; $column -lt $header.Count; ++$column) {
-            if ($header[$column] -match '^car\d+_' -and
-                $pausedRow[$column] -ne $pausedRows[0][$column]) {
-                throw "Opponent state column '$($header[$column])' changed while paused"
-            }
-        }
     }
     $lastPausedIndex = -1
     for ($index = 0; $index -lt $traceRows.Count; ++$index) {
@@ -269,7 +238,7 @@ try {
     }
     if (-not $resumedSteps) { throw 'Fixed-step simulation did not resume after P was pressed again' }
 
-    Write-Output 'Configured controls, focus-loss release, braking/reverse, and P pause/resume passed; race state froze while paused and fixed-step simulation resumed.'
+    Write-Output 'Configured control signals, focus-loss release, and P pause/resume passed; simulation time and fixed-step dispatch froze while paused. No route-motion behavior is asserted.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

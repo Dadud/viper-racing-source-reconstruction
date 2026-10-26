@@ -1356,3 +1356,19 @@ Only then should these updates be composed into a body frame. The existing
 wheel-pair differential model already accepts the ordered four wheel updates,
 explicit scale inputs, and contact gates; its unresolved caller inputs should
 not be filled with constructor defaults or values guessed from this run.
+### Contact-depth interpretation correction (2026-10-26)
+
+A source-level recheck of the shipped `0x442530` pseudocode corrects an
+initial interpretation from the controlled follow-up: the raw signed point
+projection (`fVar6`) is not the spring-travel input. The callback first
+computes a normal-alignment scale, clamps that scale to `[0,1]`, multiplies it
+by the nonnegative projection, and caps the result at wheel `+0x44 + 3` into
+`local_f0`. The spring block then computes `(local_f0 - prior +0xE8) * 62.5`.
+Accordingly, `WheelContactResult::projected_depth` preserves the raw projection
+for inspection, `clamped_contact_depth` is the scaled/capped native value, and
+the existing suspension pipeline correctly consumes the latter. No production
+change is warranted by the controlled capture. Evidence is the bounded
+`0x442530` pseudocode in `wheel_update_value_e0.evidence.json` (shipped
+`race.bin` SHA-256 recorded there); the model and composition are in
+`src/vehicle_setup.cpp` at `update_wheel_contact` and
+`advance_wheel_update_pipeline`.
