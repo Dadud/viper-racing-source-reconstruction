@@ -25,6 +25,16 @@ constructor wheel geometry; route pose no longer supplies their origin. The
 body remains static in the live session, so these queries do not use a
 physics-updated wheel/body transform and their results are still not connected
 to collision response, suspension force, or pose integration.
+An eight-fixed-tick reconstructed Viper/Bemidji baseline on 2026-10-26 found
+all 44 byte-backed kinematics floats initialized and finite, with all three
+integrator timer fields initialized and finite; position, linear/angular
+velocity, and force/moment accumulators remained unchanged across the sampled
+ticks. This isolates missing dynamic force production/application from missing
+constructor bytes. The trace is preserved outside the source repository at
+`../../analysis/reference_captures/reconstructed_bytebacked_body_baseline_20261026.csv`
+(SHA-256 `198A470C4F5F9E3B2D28444546221EB2EB0388AF2119735EE9D85ADBBEF14E4B`).
+It is reconstructed-client diagnostic evidence, not an original-game
+comparison or proof that those fields are dynamically sourced correctly.
 This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
 [`completion_ledger.md`](completion_ledger.md). Existing portable physics

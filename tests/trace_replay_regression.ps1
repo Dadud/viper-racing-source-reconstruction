@@ -194,10 +194,10 @@ try {
             $reportedMissingOffsets.Count -ne 0) {
             throw "Body kinematics diagnostics differ at line $($index + 1): ready=$($fields[$bodyKinematicsReadyColumn]), nonfinite=$($fields[$bodyKinematicsNonFiniteColumn]), missingCount=$($fields[$bodyKinematicsMissingCountColumn]), offsets=$($reportedMissingOffsets -join ';')"
         }
-        if ($fields[$bodyIntegratorTimerReadyColumn] -notin @('0', '1') -or
-            $fields[$bodyIntegratorTimerFiniteColumn] -notin @('0', '1') -or
-            $fields[$bodyIntegratorTimerMissingCountColumn] -notmatch '^[0-3]$') {
-            throw "Body integrator timer diagnostics are malformed at line $($index + 1)"
+        if ($fields[$bodyIntegratorTimerReadyColumn] -ne '1' -or
+            $fields[$bodyIntegratorTimerFiniteColumn] -ne '1' -or
+            $fields[$bodyIntegratorTimerMissingCountColumn] -ne '0') {
+            throw "Viper/Bemidji body integrator constructor lanes are not complete and finite at line $($index + 1)"
         }
         if ($index -eq 1) {
             # The timer/history ring is still disconnected, but the bounded
