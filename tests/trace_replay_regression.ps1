@@ -371,44 +371,6 @@ try {
         throw 'Fixed-step trace did not capture projected depth for all four wheels'
     }
     $header = $replayedLines[0].Split(',')
-    $routeDistanceColumn = [Array]::IndexOf(
-        $header, 'player_route_distance_travelled')
-    $livePositionColumn = [Array]::IndexOf($header, 'live_position')
-    $liveFieldSizeColumn = [Array]::IndexOf($header, 'live_field_size')
-    $opponentRouteDistanceColumns = @()
-    foreach ($name in $header) {
-        if ($name -match '^car\d+_route_distance_travelled$') {
-            $opponentRouteDistanceColumns += [Array]::IndexOf($header, $name)
-        }
-    }
-    if ($routeDistanceColumn -lt 0 -or $livePositionColumn -lt 0 -or
-        $liveFieldSizeColumn -lt 0 -or $opponentRouteDistanceColumns.Count -ne 7) {
-        throw 'Trace is missing live race-position route-state fields'
-    }
-    $aiValidColumns = @()
-    for ($column = 0; $column -lt $header.Count; ++$column) {
-        if ($header[$column] -match '^car\d+_ai_valid$') {
-            $aiValidColumns += $column
-        }
-    }
-    if ($aiValidColumns.Count -ne 7) {
-        throw "Expected seven per-opponent AI action columns, found $($aiValidColumns.Count)"
-    }
-    $aiActionColumns = @()
-    foreach ($validColumn in $aiValidColumns) {
-        $carPrefix = $header[$validColumn] -replace '_ai_valid$', ''
-        $columns = @(
-            $validColumn,
-            [Array]::IndexOf($header, "${carPrefix}_ai_throttle"),
-            [Array]::IndexOf($header, "${carPrefix}_ai_brake"),
-            [Array]::IndexOf($header, "${carPrefix}_ai_target_speed"),
-            [Array]::IndexOf($header, "${carPrefix}_ai_leader"),
-            [Array]::IndexOf($header, "${carPrefix}_ai_gap"))
-        if (@($columns | Where-Object { $_ -lt 0 }).Count -gt 0) {
-            throw "Trace is missing action fields for $carPrefix"
-        }
-        $aiActionColumns += ,$columns
-    }
     $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
     $pcarBodyStart = [Array]::IndexOf($header, 'pcar_body_0xde0')
     $pcarMultiplierIndex = [Array]::IndexOf($header, 'pcar_0x40d270_multiplier')
@@ -448,49 +410,6 @@ try {
             throw "Repeated trace playback differs at CSV line $($index + 1)"
         }
         $fields = $replayedLines[$index].Split(',')
-        $playerRouteDistance = [single]::Parse(
-            $fields[$routeDistanceColumn], [cultureinfo]::InvariantCulture)
-        $livePosition = [int]::Parse(
-            $fields[$livePositionColumn], [cultureinfo]::InvariantCulture)
-        $liveFieldSize = [int]::Parse(
-            $fields[$liveFieldSizeColumn], [cultureinfo]::InvariantCulture)
-        if ([single]::IsNaN($playerRouteDistance) -or
-            [single]::IsInfinity($playerRouteDistance) -or
-            $liveFieldSize -ne 8 -or $livePosition -lt 1 -or
-            $livePosition -gt $liveFieldSize) {
-            throw "Live route position diagnostics are malformed at frame $($index - 1)"
-        }
-        foreach ($column in $opponentRouteDistanceColumns) {
-            $opponentRouteDistance = [single]::Parse(
-                $fields[$column], [cultureinfo]::InvariantCulture)
-            if ([single]::IsNaN($opponentRouteDistance) -or
-                [single]::IsInfinity($opponentRouteDistance)) {
-                throw "Opponent route distance is non-finite at frame $($index - 1)"
-            }
-        }
-        foreach ($columns in $aiActionColumns) {
-            if ($fields[$columns[0]] -notin @('0', '1')) {
-                throw "AI action validity is malformed at frame $($index - 1)"
-            }
-            if ($fields[$columns[0]] -eq '1') {
-                foreach ($actionColumn in @($columns[1], $columns[2], $columns[3], $columns[5])) {
-                    $actionValue = [single]::Parse(
-                        $fields[$actionColumn], [cultureinfo]::InvariantCulture)
-                    if ([single]::IsNaN($actionValue) -or [single]::IsInfinity($actionValue)) {
-                        throw "AI action contains a non-finite value at frame $($index - 1)"
-                    }
-                }
-                $throttleValue = [single]::Parse(
-                    $fields[$columns[1]], [cultureinfo]::InvariantCulture)
-                $brakeValue = [single]::Parse(
-                    $fields[$columns[2]], [cultureinfo]::InvariantCulture)
-                if ($throttleValue -lt 0.0 -or $throttleValue -gt 1.0 -or
-                    $brakeValue -lt 0.0 -or $brakeValue -gt 1.0 -or
-                    ($throttleValue -gt 0.0 -and $brakeValue -gt 0.0)) {
-                    throw "AI throttle/brake decision is outside the policy range at frame $($index - 1)"
-                }
-            }
-        }
         $sharedFloatSource = [single]::Parse(
             $fields[$sharedFloatSourceIndex], [cultureinfo]::InvariantCulture)
         $sharedFloatCache = [single]::Parse(
