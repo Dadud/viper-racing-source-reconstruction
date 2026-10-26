@@ -784,6 +784,38 @@ int main()
         require(viper::project_body_point_velocity_0x442530(
                     {10.0F, 20.0F, 30.0F}, projection_transform) == 140.0F,
             "wheel surface projection must preserve native +0x50/+0x58/+0x54 operand order");
+        const viper::WheelSuspensionSurfaceInput surface_input{
+            100.0F, 0.5F, 2.0F, 4.0F, 1.0F, 3, false};
+        const auto neutral_surface = viper::adjust_wheel_suspension_for_surface(
+            {surface_input.suspension_response,
+             surface_input.signed_motion_projection,
+             surface_input.coefficient_0xa0,
+             surface_input.coefficient_0x9c,
+             surface_input.environment_sign, 0, false});
+        const auto ordinary_surface = viper::adjust_wheel_suspension_for_surface(
+            surface_input);
+        const auto special_surface = viper::adjust_wheel_suspension_for_surface(
+            {surface_input.suspension_response,
+             surface_input.signed_motion_projection,
+             surface_input.coefficient_0xa0,
+             surface_input.coefficient_0x9c,
+             surface_input.environment_sign, 10, false});
+        const auto disabled_special_surface =
+            viper::adjust_wheel_suspension_for_surface(
+                {surface_input.suspension_response,
+                 surface_input.signed_motion_projection,
+                 surface_input.coefficient_0xa0,
+                 surface_input.coefficient_0x9c,
+                 surface_input.environment_sign, 10, true});
+        require(neutral_surface.feature_scaled_adjustment == 0.0F &&
+                neutral_surface.adjusted_response == 100.0F &&
+                ordinary_surface.feature_scaled_adjustment == 300.0F &&
+                ordinary_surface.adjusted_response == 190.0F &&
+                special_surface.feature_scaled_adjustment == 900.0F &&
+                special_surface.adjusted_response == 370.0F &&
+                disabled_special_surface.feature_scaled_adjustment == 300.0F &&
+                disabled_special_surface.adjusted_response == 190.0F,
+            "wheel surface adjustment must apply native feature 0/3/9 scaling and the disable flag");
         viper::FourWheelBodyStepInput body_step_input{};
         body_step_input.wheel_contact_pipeline_enabled = true;
         body_step_input.integrator_prefix_input.state_0x4fc = 1U;
