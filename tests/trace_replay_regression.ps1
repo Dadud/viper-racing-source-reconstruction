@@ -12,7 +12,7 @@ $replayTicks = Join-Path $root 'replay-ticks.csv'
 $repeatTicks = Join-Path $root 'repeat-ticks.csv'
 try {
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --smoke-frames 12 --record-trace $capture
+        --diagnostics-only --smoke-frames 12 --record-trace $capture
     if ($LASTEXITCODE -ne 0) { throw "Trace capture exited with $LASTEXITCODE" }
 
     $inputLines = [System.IO.File]::ReadAllLines($capture)
@@ -29,11 +29,11 @@ try {
     [System.IO.File]::WriteAllLines($capture, $inputLines)
 
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --play-trace $capture --record-trace $replay `
+        --diagnostics-only --play-trace $capture --record-trace $replay `
         --record-tick-trace $replayTicks
     if ($LASTEXITCODE -ne 0) { throw "Trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --play-trace $capture --record-trace $repeat `
+        --diagnostics-only --play-trace $capture --record-trace $repeat `
         --record-tick-trace $repeatTicks
     if ($LASTEXITCODE -ne 0) { throw "Repeated trace replay exited with $LASTEXITCODE" }
 
@@ -400,6 +400,21 @@ try {
         throw 'Fixed-step trace did not capture projected depth for all four wheels'
     }
     $header = $replayedLines[0].Split(',')
+    $diagnosticsOnlyColumn = [Array]::IndexOf($header, 'diagnostics_only')
+    $routeMotionStepColumn = [Array]::IndexOf($header, 'route_motion_step_count')
+    if ($diagnosticsOnlyColumn -lt 0 -or $routeMotionStepColumn -lt 0) {
+        throw 'Trace omitted fields needed to prove diagnostics-only mode'
+    }
+    foreach ($line in $replayedLines | Select-Object -Skip 1) {
+        $fields = $line.Split(',')
+        if ($fields[$diagnosticsOnlyColumn] -ne '1') {
+            throw "Trace row $($fields[0]) diagnostics-only marker is '$($fields[$diagnosticsOnlyColumn])'"
+        }
+        if ([uint32]::Parse($fields[$routeMotionStepColumn],
+                [cultureinfo]::InvariantCulture) -ne 0) {
+            throw 'Diagnostics-only replay called the ideal-line route motion adapter'
+        }
+    }
     $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
     $pcarBodyStart = [Array]::IndexOf($header, 'pcar_body_0xde0')
     $pcarMultiplierIndex = [Array]::IndexOf($header, 'pcar_0x40d270_multiplier')
@@ -527,7 +542,7 @@ try {
         throw 'Trace playback did not record the PCAR timestamp boundary on a callback step'
     }
 
-    Write-Output "Fixed-step trace capture/playback reproduced $($replayedLines.Count - 1) frames exactly across two runs; no route progress, lap completion, opponent finish, or gameplay fidelity is asserted."
+    Write-Output "Diagnostics-only fixed-step capture/playback reproduced $($replayedLines.Count - 1) frames exactly across two runs; the route-motion adapter ran zero steps."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

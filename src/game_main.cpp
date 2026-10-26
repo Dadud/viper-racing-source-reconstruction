@@ -181,6 +181,7 @@ struct Options {
     bool software{};
     bool grid_mode{};
     bool audio_smoke{};
+    bool diagnostics_only{};
     std::optional<unsigned> smoke_frames;
     std::optional<std::filesystem::path> record_trace;
     std::optional<std::filesystem::path> record_physics_tick_trace;
@@ -204,11 +205,12 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--load-replay PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--load-replay PATH] [--software] [--help]\n"
         << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges route-race snapshots.\n"
         << "  --network-slot N selects a zero-based local player grid slot for multiplayer.\n"
         << "  --load-replay PATH validates and retains a native replay container for the race session; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
+        << "  --diagnostics-only runs input/callback diagnostics without prototype route motion.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
         << "Without either, searches the current and executable directories for common.res, Data/common.res, or GameData/common.res.\n";
 }
@@ -329,6 +331,8 @@ Options parse_options(const int argc, wchar_t** argv)
             options.grid_mode = true;
         } else if (arg == L"--smoke-audio") {
             options.audio_smoke = true;
+        } else if (arg == L"--diagnostics-only") {
+            options.diagnostics_only = true;
         } else if (arg == L"--record-trace") {
             if (++i >= argc) throw std::runtime_error("--record-trace requires a path");
             options.record_trace = std::filesystem::path(argv[i]);
@@ -2114,6 +2118,7 @@ struct WindowState {
     bool left{};
     bool right{};
     bool playback_active{};
+    bool diagnostics_only{};
     bool paused{};
     bool return_to_frontend{};
     bool camera_follow_player{true};
@@ -2127,6 +2132,7 @@ struct WindowState {
     bool physics_step_clock_initialized{};
     std::uint32_t physics_step_count{};
     std::uint32_t pcar_callback_step_count{};
+    std::uint32_t route_motion_step_count{};
     bool pcar_timestamp_backend_callback_requested{};
     std::uint32_t playback_clock_milliseconds{};
     // The native binding evaluator consumes a post-poll device snapshot. The
@@ -3227,57 +3233,60 @@ struct WindowState {
             update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
-            auto candidate_motion = motion;
-            const auto route_result = viper::advance_route_motion(candidate_motion, route,
-                tick_context.controls.steering.value_0x509358 < -0.2F,
-                tick_context.controls.steering.value_0x509358 > 0.2F,
-                tick_context.controls.analog_0x5093f4.value,
-                tick_context.controls.analog_0x509320.value,
-                0.016F, target_laps,
-                tick_context.controls.controls.flag_0x5093f0 != 0U);
-            if (!route_result.valid && !route_result.finished) return false;
-            if (route_result.valid) {
-                const auto surface = viper::sample_terrain_resource(
-                    *terrain, {route_result.x, 1000.0f, route_result.z}, true);
-                if (!surface.query_succeeded) return true;
-                if (!viper::commit_route_motion_after_terrain_query(
-                        motion, candidate_motion, surface.query_succeeded)) return true;
-                player_simulated_pose = std::array<float, 4>{route_result.x,
-                    surface.sampled_position[1], route_result.z, route_result.yaw};
-            } else if (route_result.finished) {
-                motion = candidate_motion;
-            }
-            lap_completed = lap_completed || route_result.lap_completed;
-
-            for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
-                if (car == player_car_index) continue;
-                auto& ai = opponent_motions[car];
-                const bool remote_controlled = network_session != nullptr &&
-                    remote_player_car_index.has_value() &&
-                    car == *remote_player_car_index;
-                if (remote_controlled) {
-                    // This entrant is owned by the connected peer. Its route,
-                    // lap, clock, and finish state arrive as complete snapshots;
-                    // never advance it from a locally replayed control sample.
-                    continue;
+            if (!this->diagnostics_only) {
+                ++route_motion_step_count;
+                auto candidate_motion = motion;
+                const auto route_result = viper::advance_route_motion(candidate_motion, route,
+                    tick_context.controls.steering.value_0x509358 < -0.2F,
+                    tick_context.controls.steering.value_0x509358 > 0.2F,
+                    tick_context.controls.analog_0x5093f4.value,
+                    tick_context.controls.analog_0x509320.value,
+                    0.016F, target_laps,
+                    tick_context.controls.controls.flag_0x5093f0 != 0U);
+                if (!route_result.valid && !route_result.finished) return false;
+                if (route_result.valid) {
+                    const auto surface = viper::sample_terrain_resource(
+                        *terrain, {route_result.x, 1000.0f, route_result.z}, true);
+                    if (!surface.query_succeeded) return true;
+                    if (!viper::commit_route_motion_after_terrain_query(
+                            motion, candidate_motion, surface.query_succeeded)) return true;
+                    player_simulated_pose = std::array<float, 4>{route_result.x,
+                        surface.sampled_position[1], route_result.z, route_result.yaw};
+                } else if (route_result.finished) {
+                    motion = candidate_motion;
                 }
-                const auto decision = viper::decide_route_opponent_action(
-                    opponent_ai_states[car], route, route_participant_snapshot, car);
-                if (!decision.valid) continue;
-                auto candidate_ai = ai;
-                const auto ai_result = viper::advance_route_motion(candidate_ai, route,
-                    decision.steer_left, decision.steer_right,
-                    decision.throttle, decision.brake, 0.016F, target_laps);
-                if (!ai_result.valid) continue;
-                const auto ai_surface = viper::sample_terrain_resource(
-                    *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
-                if (!ai_surface.query_succeeded ||
-                    !viper::commit_route_motion_after_terrain_query(
-                        ai, candidate_ai, ai_surface.query_succeeded)) continue;
-                opponent_ai_states[car] = decision.next_state;
-                last_opponent_ai_decisions[car] = decision;
-                opponent_simulated_poses[car] = std::array<float, 4>{ai_result.x,
-                    ai_surface.sampled_position[1], ai_result.z, ai_result.yaw};
+                lap_completed = lap_completed || route_result.lap_completed;
+
+                for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
+                    if (car == player_car_index) continue;
+                    auto& ai = opponent_motions[car];
+                    const bool remote_controlled = network_session != nullptr &&
+                        remote_player_car_index.has_value() &&
+                        car == *remote_player_car_index;
+                    if (remote_controlled) {
+                        // This entrant is owned by the connected peer. Its route,
+                        // lap, clock, and finish state arrive as complete snapshots;
+                        // never advance it from a locally replayed control sample.
+                        continue;
+                    }
+                    const auto decision = viper::decide_route_opponent_action(
+                        opponent_ai_states[car], route, route_participant_snapshot, car);
+                    if (!decision.valid) continue;
+                    auto candidate_ai = ai;
+                    const auto ai_result = viper::advance_route_motion(candidate_ai, route,
+                        decision.steer_left, decision.steer_right,
+                        decision.throttle, decision.brake, 0.016F, target_laps);
+                    if (!ai_result.valid) continue;
+                    const auto ai_surface = viper::sample_terrain_resource(
+                        *terrain, {ai_result.x, 1000.0f, ai_result.z}, true);
+                    if (!ai_surface.query_succeeded ||
+                        !viper::commit_route_motion_after_terrain_query(
+                            ai, candidate_ai, ai_surface.query_succeeded)) continue;
+                    opponent_ai_states[car] = decision.next_state;
+                    last_opponent_ai_decisions[car] = decision;
+                    opponent_simulated_poses[car] = std::array<float, 4>{ai_result.x,
+                        ai_surface.sampled_position[1], ai_result.z, ai_result.yaw};
+                }
             }
             ++physics_step_count;
         }
@@ -4041,6 +4050,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
+               const bool diagnostics_only,
                const std::optional<std::filesystem::path>& record_trace,
                const std::optional<std::filesystem::path>& record_physics_tick_trace,
                const std::vector<TraceInputFrame>* playback_trace,
@@ -4082,6 +4092,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     WindowState state;
+    state.diagnostics_only = diagnostics_only;
+    if (state.diagnostics_only)
+        std::cout << "Diagnostics-only mode: route motion disabled.\n";
     state.network_session = network_session;
     state.remote_player_car_index = remote_player_car_index;
     if (loaded_replay) {
@@ -4629,7 +4642,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             DestroyWindow(hwnd);
             return 1;
         }
-        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,player_segment,player_fraction,player_speed,player_steering,completed_laps,finished";
+        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,diagnostics_only,route_motion_step_count,player_segment,player_fraction,player_speed,player_steering,completed_laps,finished";
         for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             trace << ",car" << car << "_segment,car" << car
@@ -4964,6 +4977,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 trace << trace_frame++ << ',' << state.motion.race.elapsed_seconds << ','
                       << delta_seconds << ',' << state.left << ',' << state.right << ','
                       << state.accelerate << ',' << state.brake << ','
+                      << state.diagnostics_only << ','
+                      << state.route_motion_step_count << ','
                       << state.motion.route_segment << ',' << state.motion.route_fraction << ','
                       << state.motion.speed << ',' << state.motion.steering << ','
                       << state.motion.race.completed_laps << ','
@@ -5383,6 +5398,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         std::cout << "Reconstructed clients agreed on race setup; replicating route-race state.\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
+        options.diagnostics_only,
         options.record_trace, options.record_physics_tick_trace,
         playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,

@@ -59,7 +59,7 @@ try {
     $startInfo.FileName = $GameExe
     # Omit explicit track/car flags so startup loads the frontend selection
     # and its Config-owned keyboard overrides before entering the race.
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software --record-trace `"$trace`""
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software --diagnostics-only --record-trace `"$trace`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)
@@ -152,6 +152,19 @@ try {
     $rows = [System.IO.File]::ReadAllLines($trace)
     if ($rows.Count -lt 3) { throw 'Input trace did not capture enough race frames' }
     $header = $rows[0].Split(',')
+    $diagnosticsOnlyColumn = [Array]::IndexOf($header, 'diagnostics_only')
+    $routeMotionStepColumn = [Array]::IndexOf($header, 'route_motion_step_count')
+    if ($diagnosticsOnlyColumn -lt 0 -or $routeMotionStepColumn -lt 0) {
+        throw 'Trace omitted diagnostics-only route-motion markers'
+    }
+    foreach ($line in $rows | Select-Object -Skip 1) {
+        $fields = $line.Split(',')
+        if ($fields[$diagnosticsOnlyColumn] -ne '1' -or
+            [uint32]::Parse($fields[$routeMotionStepColumn],
+                [cultureinfo]::InvariantCulture) -ne 0) {
+            throw 'Keyboard smoke executed the provisional route-motion adapter'
+        }
+    }
     $nativeThrottleColumn = [Array]::IndexOf($header, 'control_0x5093f4')
     if ($nativeThrottleColumn -lt 0) { throw 'Trace omitted the native throttle control output' }
     $actionColumns = @{
@@ -238,7 +251,7 @@ try {
     }
     if (-not $resumedSteps) { throw 'Fixed-step simulation did not resume after P was pressed again' }
 
-    Write-Output 'Configured control signals, focus-loss release, and P pause/resume passed; simulation time and fixed-step dispatch froze while paused. No route-motion behavior is asserted.'
+    Write-Output 'Configured control signals, focus-loss release, and P pause/resume passed in diagnostics-only mode; ideal-line route motion was disabled.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

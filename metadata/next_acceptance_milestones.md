@@ -94,6 +94,9 @@ then coast) from a recorded grid slot. Record sampled controls, body position,
 orientation, velocity, contacts/forces, and track surface. Compare equivalent
 original and reconstructed sequences by input window and callback/tick ordinal;
 do not steer either run using the ideal line.
+The runtime's `--diagnostics-only` mode now bypasses provisional player and AI
+route motion; keyboard-input and fixed-step replay regressions use it and assert
+that the route-motion adapter receives zero steps.
 
 Existing original evidence provides an exploratory input trace, not a clean
 acceptance baseline: `../analysis/reference_captures/controlled_player_physics_20261025.json`

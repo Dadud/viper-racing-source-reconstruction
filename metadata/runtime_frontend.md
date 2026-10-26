@@ -55,6 +55,15 @@ session, and closes the runtime window. A second process verifies that the
 saved selection and binding reload. It intentionally does not drive around the
 ideal line, complete a lap, enter results, or claim gameplay behavior.
 
+The `--diagnostics-only` runtime mode bypasses the provisional player and AI
+route-motion updates while preserving keyboard sampling, recovered PCAR control
+projection, fixed-step scheduling, contact observations, rendering and trace
+capture. `game_keyboard_binding_smoke` and
+`game_fixed_step_trace_replay_regression` use this mode; the latter records and
+checks in its frame trace that the route-motion adapter ran zero steps. These checks therefore
+exercise input/callback plumbing without treating ideal-line following as a
+driving surrogate. They still do not establish physical movement.
+
 `game_fixed_step_trace_replay_regression` checks deterministic short trace
 capture/playback and fixed-step/input trace consistency across repeated runs.
 It no longer creates a full-throttle route race or asserts route progress,
