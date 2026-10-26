@@ -82,6 +82,30 @@ fidelity. Current frontend checks stop at lifecycle/settings behavior and the
 fixed-step replay compares deterministic diagnostics; route-derived fields are
 only checked for well-formedness. Replace the prototype motion and HUD sources
 before adding gameplay acceptance scenarios.
+
+**Testing rule:** Do not use ideal-line following as a player, opponent, or
+race test driver, and do not accept route distance, route-derived speed, lap
+completion, standings, or results as evidence that driving works. Keep the
+ideal line available only as parsed track data or a visual/reference overlay.
+Until a physics-owned pose drives rendering, test input plumbing and fixed-step
+provenance only. Once physics owns the live pose, make the first driving fixture
+a fixed-duration human-input sequence (throttle, a steering pulse, braking,
+then coast) from a recorded grid slot. Record sampled controls, body position,
+orientation, velocity, contacts/forces, and track surface. Compare equivalent
+original and reconstructed sequences by input window and callback/tick ordinal;
+do not steer either run using the ideal line.
+
+Existing original evidence provides an exploratory input trace, not a clean
+acceptance baseline: `../analysis/reference_captures/controlled_player_physics_20261025.json`
+records Space reset at 750–1050 ms, Up/throttle at 1800–3300 ms, Left/steering
+at 4000–5000 ms, and Down/braking at 5400–6500 ms. Its metadata explicitly
+notes that the run was not reset to a reproducible start and only supports
+input/state correlation. `timestamped_reset_throttle_probe_20261025.json`
+contains a separate Space reset then Up/throttle run with callback-entry
+position/speed samples, also under uncontrolled starting conditions. Use these
+captures to guide field selection and probe validation; acquire a clean,
+repeatable human-input baseline before claiming original/reconstruction driving
+parity.
 The opt-in `--record-tick-trace PATH` writes every scheduled
 player tick, including the full 256-byte binding-input snapshot and its
 per-tick controls/timing plus post-callback byte-backed body orientation basis,
@@ -223,13 +247,15 @@ as the authority for player pose; route data may remain for grid placement or
 track queries. Do not fill unmodeled native inputs with guessed constants
 without labeling and isolating them as unresolved evidence.
 
-**Acceptance evidence:** A live Viper/Bemidji window with input playback moves
-the physics-owned car across terrain; frame traces show controls entering the
+**Acceptance evidence:** A live Viper/Bemidji window with fixed-duration human
+input playback moves the physics-owned car across terrain; frame traces show controls entering the
 same session-owned state, wheel forces reaching body integration, finite
 changing position/orientation/velocity, and the renderer consuming that pose.
 Include a reproducible throttle, steering, braking, coast, and terrain-contact
 scenario. Add focused regressions for any new deterministic state transition.
-No race-completion claim is made by this milestone.
+Do not use ideal-line following to drive this scenario or measure its outcome;
+do not use route progress or lap completion as a pass condition. No
+race-completion claim is made by this milestone.
 
 **Immediate work:** Identify the narrowest missing state/argument seams between
 `initialize_ncar_four_wheel_core`, `initialize_tire_response_object`, the

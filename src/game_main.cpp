@@ -3219,8 +3219,12 @@ struct WindowState {
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
-            update_player_wheel_contacts_from_body();
+            // The native PCAR callback prefix stores control-derived body
+            // scalars before entering the shared integrator's four wheel
+            // callbacks. Keep the reconstructed observation stages in that
+            // order even though the wheel results are not yet force inputs.
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
+            update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
             auto candidate_motion = motion;
