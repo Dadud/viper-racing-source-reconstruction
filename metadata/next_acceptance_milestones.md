@@ -10,10 +10,11 @@ requirements and final gates remain in [`completion_ledger.md`](completion_ledge
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
-safe-follow policy, standings, and a return-to-setup path. The trace-driven frontend
-lifecycle now reaches results on all eight tracks through the route prototype;
-Viper/Bemidji, Sports/Bemidji, and Sports/Dundas additionally exercise selector
-changes and saved-selection reload. `src/game_main.cpp`
+safe-follow policy, standings, and a return-to-setup path. The retired
+route-driven results scenarios are historical prototype evidence only; current
+Windows lifecycle checks cover startup, settings persistence, clean early exit,
+and reload, while fixed-step replay covers short deterministic traces.
+`src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
 body accumulators, collisions, or pose integration. The terrain plane sampler
@@ -57,11 +58,11 @@ state captures against the original.
 Four wheel contact projections now transform constructor wheel anchors through
 the initialized byte-backed PCAR body basis and position and project along its
 up axis. Route-renderer pose no longer substitutes for that body transform.
-`trace_replay_regression.ps1` confirms the supported terrain query
-samples remain valid through a deterministic full Viper/Bemidji race. This
-does not advance body pose, use a physics-updated native wheel/body query
-origin, produce native forces, or transfer pose authority from the route
-prototype.
+The retired long trace confirmed supported terrain query samples through a
+route-driven full Viper/Bemidji prototype run; it was not a race acceptance
+check. Current trace regression does not advance the car through a lap. This
+does not advance body pose, produce native forces, or transfer pose authority
+from the route prototype.
 The native wheel-query origin producer is now pinned to the exact inputs at
 `0x442530`: wheel local position `+0x04..+0x0C` plus the referenced point at
 `+0x10`, transformed by all twelve body floats `+0x38..+0x64` through

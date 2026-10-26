@@ -58,10 +58,10 @@ shipped track and car, plus a WARP rendering smoke for each selected track/car.
 `--load-replay PATH` validates a native v6 replay container and retains its
 decoded fixed record, frame table, and opaque payload for the race session;
 this is a container inspection path and does not enable native replay playback.
-The Windows frontend lifecycle smoke also uses a deterministic full-lap trace
-to verify Viper/Bemidji results return, selection of Sports, a second race
-session, another results return, and clean shutdown. This is acceptance evidence
-for the route-kinematic lifecycle, not physical-race or original-game parity.
+The Windows frontend lifecycle smoke verifies control remapping and persistence,
+selected-session startup, clean early exit, and saved-selection reload. It does
+not drive a lap, produce results, or claim race playability. The fixed-step
+trace regression checks deterministic short capture/playback only.
 
 Public CI runs without original assets. Runtime checks use an external data
 directory, also configurable through `VIPER_DATA_DIR`. If neither is provided,
