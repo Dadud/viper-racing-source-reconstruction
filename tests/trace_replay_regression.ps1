@@ -122,7 +122,8 @@ try {
     $wheelContactGeometryColumns = @()
     $contactGeometryNames = @(
         'contact_origin', 'query_contact_point',
-        'query_contact_normal', 'contact_direction')
+        'query_contact_normal', 'contact_direction',
+        'selected_model_vertex', 'position_relative_to_vertex')
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         $wheelActiveColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_active")
@@ -142,7 +143,7 @@ try {
             $tickHeader, "wheel${wheel}_contact_query_succeeded")
         $wheelContactDepthLimitColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_depth_limit_0x44")
-        $geometryColumns = [int[]]::new(12)
+        $geometryColumns = [int[]]::new(18)
         $geometryColumn = 0
         foreach ($geometryName in $contactGeometryNames) {
             foreach ($axis in @('x', 'y', 'z')) {
@@ -280,8 +281,8 @@ try {
             if ([single]::IsNaN($depthLimit) -or [single]::IsInfinity($depthLimit)) {
                 throw "Wheel $wheel depth limit is non-finite at line $($index + 1)"
             }
-            $geometry = [single[]]::new(12)
-            for ($lane = 0; $lane -lt 12; ++$lane) {
+            $geometry = [single[]]::new(18)
+            for ($lane = 0; $lane -lt 18; ++$lane) {
                 $geometry[$lane] = [single]::Parse(
                     $fields[$wheelContactGeometryColumns[$wheel][$lane]],
                     [cultureinfo]::InvariantCulture)
@@ -299,6 +300,30 @@ try {
                 [cultureinfo]::InvariantCulture)
             if ([Math]::Abs($recomputedDepth - $measuredDepth) -gt 0.00001) {
                 throw "Wheel $wheel projected depth differs from its recorded query geometry at line $($index + 1)"
+            }
+            $localAnchor = [single[]]::new(3)
+            for ($axis = 0; $axis -lt 3; ++$axis) {
+                $localAnchor[$axis] = $geometry[12 + $axis] + $geometry[15 + $axis]
+            }
+            $bodyPosition = [single[]]::new(3)
+            for ($axis = 0; $axis -lt 3; ++$axis) {
+                $bodyPosition[$axis] = [single]::Parse(
+                    $fields[$bodyPositionColumns[$axis]],
+                    [cultureinfo]::InvariantCulture)
+            }
+            $expectedOrigin = [single[]]::new(3)
+            for ($axis = 0; $axis -lt 3; ++$axis) {
+                $expectedOrigin[$axis] = $bodyPosition[$axis]
+                for ($localAxis = 0; $localAxis -lt 3; ++$localAxis) {
+                    $expectedOrigin[$axis] += [single]::Parse(
+                        $fields[$bodyBasisColumns[$localAxis * 3 + $axis]],
+                        [cultureinfo]::InvariantCulture) * $localAnchor[$localAxis]
+                }
+            }
+            for ($axis = 0; $axis -lt 3; ++$axis) {
+                if ([Math]::Abs($expectedOrigin[$axis] - $geometry[$axis]) -gt 0.00002) {
+                    throw "Wheel $wheel contact origin differs from constructor anchor transformed by byte-backed body pose at line $($index + 1)"
+                }
             }
             if ($measuredDepth -lt 0.0) {
                 $clampedDepth = [single]::Parse(

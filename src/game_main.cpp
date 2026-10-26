@@ -2025,6 +2025,10 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_contact_projection_origins{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_selected_model_vertices{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_positions_relative_to_vertices{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_query_contact_points{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_query_contact_normals{};
@@ -2727,7 +2731,6 @@ struct WindowState {
                 player_wheel_contact_states[wheel].contact_active_0x168 = 0U;
                 continue;
             }
-
             // The selected vertex is subtracted by native 0x441C10 when it
             // stores +0x04..+0x0C, then added back by 0x437BA0. Combine those
             // terms to recover the local anchor before applying the initialized
@@ -2881,6 +2884,18 @@ struct WindowState {
                 player_runtime_state.body_object, 0x510U);
         for (std::size_t wheel = 0U; wheel < player_wheel_contact_states.size();
              ++wheel) {
+            if (player_wheel_core_initialization &&
+                player_wheel_core_initialization->wheels[wheel]) {
+                const auto& core = *player_wheel_core_initialization->wheels[wheel];
+                tick.wheel_selected_model_vertices[wheel] = viper::PhysicsVector3{
+                    core.selected_model_vertex[0], core.selected_model_vertex[1],
+                    core.selected_model_vertex[2]};
+                tick.wheel_positions_relative_to_vertices[wheel] =
+                    viper::PhysicsVector3{
+                        core.position_relative_to_selected_vertex[0],
+                        core.position_relative_to_selected_vertex[1],
+                        core.position_relative_to_selected_vertex[2]};
+            }
             tick.wheel_contact_active_after_tick[wheel] =
                 player_wheel_contact_states[wheel].contact_active_0x168;
             tick.wheel_surface_polarity_results[wheel] =
@@ -4575,7 +4590,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_contact_query_succeeded"
                 << ",wheel" << wheel << "_contact_depth_limit_0x44";
             for (const auto* vector_name : {"contact_origin", "query_contact_point",
-                     "query_contact_normal", "contact_direction"}) {
+                     "query_contact_normal", "contact_direction",
+                     "selected_model_vertex", "position_relative_to_vertex"}) {
                 physics_tick_trace << ",wheel" << wheel << '_' << vector_name << "_x"
                     << ",wheel" << wheel << '_' << vector_name << "_y"
                     << ",wheel" << wheel << '_' << vector_name << "_z";
@@ -4910,6 +4926,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         write_vector(tick.wheel_query_contact_points[wheel]);
                         write_vector(tick.wheel_query_contact_normals[wheel]);
                         write_vector(tick.wheel_contact_directions[wheel]);
+                        write_vector(tick.wheel_selected_model_vertices[wheel]);
+                        write_vector(tick.wheel_positions_relative_to_vertices[wheel]);
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {

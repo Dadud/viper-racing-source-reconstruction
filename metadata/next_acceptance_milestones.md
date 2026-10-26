@@ -18,13 +18,14 @@ and reload, while fixed-step replay covers short deterministic traces.
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,
 body accumulators, collisions, or pose integration. The terrain plane sampler
-matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result,
-but the live query origin previously used the last committed route-pose position
-when available. Contact queries now use only byte-backed PCAR position/basis and
-constructor wheel geometry; route pose no longer supplies their origin. The
-body remains static in the live session, so these queries do not use a
-physics-updated wheel/body transform and their results are still not connected
-to collision response, suspension force, or pose integration.
+matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
+Contact queries use byte-backed PCAR position/basis and constructor wheel
+geometry; route pose does not supply their origin. Startup body transform matches
+the selected track `obj car` runtime-record transform also used by the renderer.
+`place_on_route` only seeds the provisional route progress adapter and does not
+change that body or rendered placement. The body remains static in the live
+session, and contact observations are not connected to collision response,
+suspension force, or pose integration.
 An eight-fixed-tick reconstructed Viper/Bemidji baseline on 2026-10-26 found
 all 44 byte-backed kinematics floats initialized and finite, with all three
 integrator timer fields initialized and finite; position, linear/angular
@@ -38,9 +39,17 @@ sampled plane point/normal, projection direction, and depth limit. All four
 queries succeed, but their signed depths are negative (about -0.101 m at the
 front pair and -0.107 m at the rear pair), leaving all contacts inactive. The
 trace regression recomputes those projections and verifies the inactive
-negative-depth branch. Resolve this startup contact geometry against a
-matched original grid-start capture before adding guessed offsets or
-integrating suspension forces.
+negative-depth branch. Resolve this startup contact geometry against a matched
+original grid-start capture before adding guessed offsets or integrating
+suspension forces. Capture the selected original PCAR at the first integrator
+entry before any wheel callback, and capture the corresponding reconstructed
+pre-callback row. Match the body transform (`+0x38..+0x64`), each wheel anchor
+(`+0x04..+0x0C` and referenced point `+0x10..+0x1C`), transformed query origin
+(`+0xC8..+0xD0`), query point/normal/feature, direction, depth limit, raw
+projection, and clamped depth. Use identical selected grid row, track, car,
+physics options, and clean startup; retain hashes and exact frame/callback
+order. Any transform mismatch must be resolved at its producer before testing
+suspension integration.
 It is reconstructed-client diagnostic evidence, not an original-game
 comparison or proof that those fields are dynamically sourced correctly.
 This is explicitly
