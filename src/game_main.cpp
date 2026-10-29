@@ -209,7 +209,7 @@ void usage(std::ostream& out)
         << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--route-motion-prototype] [--load-replay PATH] [--software] [--help]\n"
         << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges route-race snapshots.\n"
         << "  --network-slot N selects a zero-based local player grid slot for multiplayer.\n"
-        << "  --load-replay PATH validates and retains a native replay container for the race session; frame payload remains opaque.\n"
+        << "  --load-replay PATH validates the v6 container and fixed engine-record header, then retains it; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "  --diagnostics-only runs input/callback diagnostics without prototype route motion.\n"
         << "  --route-motion-prototype explicitly enables the non-physical ideal-line follower.\n"

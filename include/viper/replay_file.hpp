@@ -26,6 +26,13 @@ struct ReplayFileResult {
     [[nodiscard]] explicit operator bool() const noexcept { return error.empty(); }
 };
 
+// Validates the fixed replay engine record used by the native replay loader.
+// This is separate from the lossless container codec so arbitrary records can
+// still be preserved and inspected without claiming they are playable.
+[[nodiscard]] bool validate_replay_engine_record(
+    std::span<const std::uint8_t> engine_record,
+    std::string& error);
+
 [[nodiscard]] ReplayFileResult decode_replay_file(std::span<const std::uint8_t> bytes);
 [[nodiscard]] std::vector<std::uint8_t> encode_replay_file(const ReplayFile& replay,
                                                            std::string& error);

@@ -15,6 +15,7 @@ constexpr std::uint32_t kVersion = 6;
 constexpr std::uint32_t kExpectedWordCount = 3647;
 constexpr std::uint32_t kExpectedPacketSize = 575;
 constexpr std::uint32_t kMaxPayloadBytes = 0x200000;
+constexpr std::uint32_t kExpectedRecordType = 3;
 
 std::uint32_t read_u32(const std::span<const std::uint8_t> data,
                        const std::size_t offset)
@@ -41,6 +42,23 @@ ReplayFileResult failure(std::string message)
 }
 
 } // namespace
+
+bool validate_replay_engine_record(
+    const std::span<const std::uint8_t> engine_record,
+    std::string& error)
+{
+    error.clear();
+    if (engine_record.size() != kRecordBytes) {
+        error = "replay engine record has an incompatible size";
+        return false;
+    }
+    if (read_u32(engine_record, 0U) != kExpectedRecordType ||
+        read_u32(engine_record, 4U) != kRecordBytes) {
+        error = "replay engine record has an incompatible type or size";
+        return false;
+    }
+    return true;
+}
 
 ReplayFileResult decode_replay_file(const std::span<const std::uint8_t> bytes)
 {
@@ -125,11 +143,16 @@ ReplayFileResult read_replay_file(const std::filesystem::path& path)
     input.seekg(0);
     if (!bytes.empty() && !input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
         return failure("cannot read replay file");
-    return decode_replay_file(bytes);
+    auto result = decode_replay_file(bytes);
+    if (!result) return result;
+    if (!validate_replay_engine_record(result.replay.engine_record, result.error))
+        result.replay = {};
+    return result;
 }
 
 bool write_replay_file(const std::filesystem::path& path, const ReplayFile& replay, std::string& error)
 {
+    if (!validate_replay_engine_record(replay.engine_record, error)) return false;
     const auto bytes = encode_replay_file(replay, error);
     if (!error.empty()) return false;
     std::ofstream output(path, std::ios::binary | std::ios::trunc);

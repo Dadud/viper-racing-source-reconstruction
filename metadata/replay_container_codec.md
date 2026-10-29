@@ -25,8 +25,14 @@ packet-size comparison, and table-then-payload reads. The serializer model in
 and opaque tail writes. The codec enforces these observed constraints and
 requires exact section lengths; it does not attempt to recover truncated data.
 
-The regression uses the installed `bench.rpl` when external game data is
-available and verifies byte-for-byte decode/encode equality. A synthetic
+The structural codec preserves the fixed record even when it is not a native
+replay record. The filesystem load/save boundary additionally validates the
+native engine-record header: little-endian DWORD 0 must be type `3`, and DWORD 1
+must equal `0xCD4` bytes. This matches the original `0x45C590` validator
+(Evidence `ev_e3d3c78769120b97028c7a93eaaae51f552a9adcf7865d8cdb76691f84cfe535`).
+The installed `bench.rpl` contains type `3` and size `0xCD4`. Regression covers
+valid and invalid records at the native file boundary while retaining
+byte-for-byte codec round-trip behavior for non-native records. A synthetic
 round-trip and malformed-header checks also run without external data. The
 checks cover the cookie, version, packet size, runtime word count, payload cap,
 negative and out-of-range frame counts, truncated or extra bytes, and signed

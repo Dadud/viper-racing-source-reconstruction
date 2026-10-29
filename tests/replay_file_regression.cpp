@@ -36,6 +36,9 @@ void write_u32(std::vector<std::uint8_t>& bytes, const std::size_t offset,
 int main()
 try {
     viper::ReplayFile sample;
+    sample.engine_record[0] = 3U;
+    sample.engine_record[4] = 0xd4U;
+    sample.engine_record[5] = 0x0cU;
     sample.timestamp_or_index = 17;
     sample.frame_count = 2;
     sample.frame_words.resize(3647);
@@ -54,11 +57,40 @@ try {
     require(viper::encode_replay_file(decoded.replay, error) == encoded,
             "replay encoding should be byte stable");
 
+    auto non_native_record = sample.engine_record;
+    non_native_record[0] = 4U;
+    require(!viper::validate_replay_engine_record(non_native_record, error) &&
+            !error.empty(), "native record validator should reject wrong record type");
+    non_native_record = sample.engine_record;
+    non_native_record[4] = 0xd3U;
+    require(!viper::validate_replay_engine_record(non_native_record, error) &&
+            !error.empty(), "native record validator should reject wrong record size");
+    require(viper::validate_replay_engine_record(sample.engine_record, error) &&
+            error.empty(), "native record validator should accept type 3 and size 0xCD4");
+
+    // The structural codec remains lossless for records that the native
+    // replay loader would refuse to install.
+    auto non_native_container = encoded;
+    non_native_container[0] = 4U;
+    const auto decoded_non_native = viper::decode_replay_file(non_native_container);
+    require(static_cast<bool>(decoded_non_native) &&
+            viper::encode_replay_file(decoded_non_native.replay, error) ==
+                non_native_container,
+            "container codec should preserve a non-native fixed record losslessly");
+
     // Exercise the actual save/reload path as well as the in-memory codec.
     // Distinct bytes in the opaque fixed record make accidental omission or
     // reinitialization visible in the file round-trip.
     for (std::size_t i = 0; i < sample.engine_record.size(); ++i)
         sample.engine_record[i] = static_cast<std::uint8_t>(i * 37U + 11U);
+    sample.engine_record[0] = 3U;
+    sample.engine_record[1] = 0U;
+    sample.engine_record[2] = 0U;
+    sample.engine_record[3] = 0U;
+    sample.engine_record[4] = 0xd4U;
+    sample.engine_record[5] = 0x0cU;
+    sample.engine_record[6] = 0U;
+    sample.engine_record[7] = 0U;
     const auto file_path = std::filesystem::temp_directory_path() /
         "viper_replay_file_regression.rpl";
     require(viper::write_replay_file(file_path, sample, error),
@@ -73,6 +105,26 @@ try {
             reloaded.replay.frame_words == sample.frame_words &&
             reloaded.replay.payload == sample.payload,
             "save/reload should preserve the complete native container");
+
+    auto invalid_native_save = sample;
+    invalid_native_save.engine_record[0] = 4U;
+    const auto invalid_file_path = std::filesystem::temp_directory_path() /
+        "viper_replay_file_invalid_record_regression.rpl";
+    require(!viper::write_replay_file(invalid_file_path, invalid_native_save, error) &&
+            !error.empty() && !std::filesystem::exists(invalid_file_path),
+            "native save should reject an invalid fixed record before creating a file");
+    {
+        std::ofstream invalid_output(invalid_file_path, std::ios::binary);
+        invalid_output.write(reinterpret_cast<const char*>(
+            non_native_container.data()),
+            static_cast<std::streamsize>(non_native_container.size()));
+    }
+    const auto invalid_native_load = viper::read_replay_file(invalid_file_path);
+    std::filesystem::remove(invalid_file_path, remove_error);
+    require(!invalid_native_load &&
+            invalid_native_load.error.find("incompatible type or size") !=
+                std::string::npos,
+            "native load should reject a structurally valid replay with a bad fixed record");
 
     auto signed_header = sample;
     signed_header.timestamp_or_index = -1;
@@ -120,6 +172,9 @@ try {
     require(!fixture_bytes.empty(), "bench.rpl fixture should be readable");
     const auto fixture = viper::decode_replay_file(fixture_bytes);
     require(static_cast<bool>(fixture), "shipped bench.rpl should decode");
+    require(viper::validate_replay_engine_record(
+                fixture.replay.engine_record, error),
+            "shipped bench.rpl should pass native fixed-record validation");
     require(viper::encode_replay_file(fixture.replay, error) == fixture_bytes,
             "shipped bench.rpl should round-trip losslessly");
 #endif
