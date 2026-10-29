@@ -565,7 +565,10 @@ events, lap/checkpoint events, and results. Repeat from the same start and
 compare deterministic state traces. Drive manually through start, finish,
 results, return to setup, and a second race without stale state. Until physical
 state owns car motion and race progression, keep route-based scenarios out of
-acceptance; existing route adapter tests cover their prototype model only.
+acceptance. Runtime CTests now use diagnostics-only mode; the progression
+regression no longer advances a synthetic car along a route and instead checks
+state transitions and fixed-snapshot projection. Route-opponent policy tests
+remain isolated prototype-model checks.
 
 **Immediate work:** Carry physical state through one complete update frame
 without observation-only substitution; then harden stability and scenario

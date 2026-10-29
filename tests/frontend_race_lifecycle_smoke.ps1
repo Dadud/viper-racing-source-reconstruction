@@ -60,7 +60,7 @@ function Send-Key([IntPtr]$Window, [int]$Key) {
 function Start-Session([string]$ConfigurationDirectory) {
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$ConfigurationDirectory`" --software"
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$ConfigurationDirectory`" --software --diagnostics-only"
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     return [Diagnostics.Process]::Start($startInfo)

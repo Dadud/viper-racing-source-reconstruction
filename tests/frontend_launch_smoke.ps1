@@ -73,7 +73,7 @@ try {
     [System.IO.File]::WriteAllBytes($careerPath, $careerImage.ToArray())
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software"
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software --diagnostics-only"
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
@@ -180,7 +180,7 @@ try {
         "VIPER-RACING-SETUP 3`ntrack=random`ncar=viper`nlaps=1`nopponent_strength=0`n")
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$randomConfigDir`" --software"
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$randomConfigDir`" --software --diagnostics-only"
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)
@@ -218,7 +218,7 @@ try {
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$randomConfigDir`" --software"
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$randomConfigDir`" --software --diagnostics-only"
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)

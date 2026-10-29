@@ -1,5 +1,24 @@
 # Original physics task order and dispatch capture
 
+## 2026-10-29 launcher retry stopped before race startup
+
+Mounted the external original ISO as `F:\` with volume label `VIPER` and
+launched the extracted official `GameRoot\Viper Racing.exe` from its expected
+`GameRoot\Data` working directory. The launcher SHA-256 remained
+`D75B38228D4B68B2C5EF39252B95E43A9DE16976005C26FAB4491D05CE3D32D4`; the
+`Data\race.bin` SHA-256 remained
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`. The
+current `Config\options.cfg` matched its saved pre-capture copy
+(`7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`).
+
+The launcher bridge attached and reported ready hooks for both
+`CreateProcessA` and `CreateProcessW`, but observed no `race.bin` child. The
+launcher displayed the native “Your video card returned an error” dialog and
+exited. No game-state samples were collected and no settings or game data were
+changed. Treat this as a failed startup attempt, not a simulation capture. A
+new matched grid-contact capture still requires getting the official client
+past this graphics initialization barrier.
+
 This is a bounded runtime observation from the shipped original client, not a
 reconstruction gameplay comparison. The private capture is outside the source
 repository at

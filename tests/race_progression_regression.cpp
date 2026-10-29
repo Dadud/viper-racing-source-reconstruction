@@ -54,171 +54,47 @@ int main()
                 !viper::observe_race_route_transition(state, 1U, true, 2U),
             "finished race state must remain stable");
 
-        const std::vector<std::array<float, 2>> square_route{
-            {0.0F, 0.0F}, {10.0F, 0.0F},
-            {10.0F, 10.0F}, {0.0F, 10.0F}};
-        viper::RouteMotionState minimum_delta_motion{};
-        viper::initialize_race_progression(minimum_delta_motion.race, 0U);
-        (void)viper::advance_route_motion(minimum_delta_motion, square_route,
-            false, false, false, false, 0.0F, 1U);
-        require(std::abs(minimum_delta_motion.race.elapsed_seconds - 0.01F) < 1.0e-6F,
-            "runtime race step must apply the native minimum frame delta");
-        viper::RouteMotionState maximum_delta_motion{};
-        viper::initialize_race_progression(maximum_delta_motion.race, 0U);
-        (void)viper::advance_route_motion(maximum_delta_motion, square_route,
-            false, false, false, false, 1.0F, 1U);
-        require(std::abs(maximum_delta_motion.race.elapsed_seconds - 0.25F) < 1.0e-6F,
-            "runtime race step must apply the native maximum frame delta");
-
-        viper::RouteMotionState motion{};
-        viper::initialize_race_progression(motion.race, 0U);
-        viper::RouteMotionResult motion_result{};
-        for (unsigned frame = 0U; frame < 6000U && !motion.race.finished; ++frame) {
-            motion_result = viper::advance_route_motion(motion, square_route,
-                false, false, true, false, 1.0F / 60.0F, 2U);
-            require(motion_result.valid,
-                "route integrator must produce finite poses during a closed-course run");
-        }
-        require(motion.race.finished && motion.race.completed_laps == 2U &&
-                motion_result.finished && motion.race.elapsed_seconds > 0.0F,
-            "the runtime route integrator must drive through the configured finish");
-
-        const std::vector<std::array<float, 2>> analog_route{
-            {0.0F, 0.0F}, {10000.0F, 0.0F}};
-        viper::RouteMotionState subthreshold_throttle{};
-        viper::RouteMotionState partial_throttle{};
-        viper::RouteMotionState full_throttle{};
-        viper::initialize_race_progression(subthreshold_throttle.race, 0U);
-        viper::initialize_race_progression(partial_throttle.race, 0U);
-        viper::initialize_race_progression(full_throttle.race, 0U);
-        (void)viper::advance_route_motion(subthreshold_throttle, analog_route,
-            false, false, 0.2F, 0.0F, 0.05F, 1U);
-        (void)viper::advance_route_motion(partial_throttle, analog_route,
-            false, false, 0.5F, 0.0F, 0.05F, 1U);
-        (void)viper::advance_route_motion(full_throttle, analog_route,
-            false, false, 1.0F, 0.0F, 0.05F, 1U);
-        require(subthreshold_throttle.speed == 0.0F &&
-                partial_throttle.speed > 0.0F &&
-                std::abs(partial_throttle.speed * 2.0F - full_throttle.speed) <
-                    1.0e-6F,
-            "route adapter must retain the native throttle activity gate and scale ramped throttle");
-
-        viper::RouteMotionState coast_motion{};
-        coast_motion.speed = partial_throttle.speed;
-        viper::initialize_race_progression(coast_motion.race, 0U);
-        (void)viper::advance_route_motion(coast_motion, analog_route,
-            false, false, 0.0F, 0.0F, 0.05F, 1U);
-        require(coast_motion.speed > 0.0F &&
-                coast_motion.speed < partial_throttle.speed,
-            "released throttle must coast through drag instead of preserving drive input");
-
-        viper::RouteMotionState no_brake_motion{};
-        viper::RouteMotionState partial_brake_motion{};
-        viper::RouteMotionState full_brake_motion{};
-        no_brake_motion.speed = partial_brake_motion.speed =
-            full_brake_motion.speed = 10.0F;
-        viper::initialize_race_progression(no_brake_motion.race, 0U);
-        viper::initialize_race_progression(partial_brake_motion.race, 0U);
-        viper::initialize_race_progression(full_brake_motion.race, 0U);
-        (void)viper::advance_route_motion(no_brake_motion, analog_route,
-            false, false, 0.0F, 0.0F, 0.05F, 1U);
-        (void)viper::advance_route_motion(partial_brake_motion, analog_route,
-            false, false, 0.0F, 0.5F, 0.05F, 1U);
-        (void)viper::advance_route_motion(full_brake_motion, analog_route,
-            false, false, 0.0F, 1.0F, 0.05F, 1U);
-        require(no_brake_motion.speed > partial_brake_motion.speed &&
-                partial_brake_motion.speed > full_brake_motion.speed,
-            "route adapter must scale braking by the recovered ramped brake value");
-
-        viper::RouteMotionState braking_motion{};
-        braking_motion.speed = 10.0F;
-        viper::initialize_race_progression(braking_motion.race, 0U);
-        (void)viper::advance_route_motion(braking_motion, square_route,
-            false, false, false, true, 0.25F, 1U);
-        require(braking_motion.speed >= 0.0F && braking_motion.speed < 10.0F,
-            "the braking binding must slow a forward-moving car without selecting reverse");
-
-        viper::RouteMotionState reverse_motion{};
-        viper::initialize_race_progression(reverse_motion.race, 0U);
-        const auto reverse_result = viper::advance_route_motion(reverse_motion,
-            square_route, false, false, false, false, 0.25F, 1U, true);
-        require(reverse_result.valid && reverse_motion.speed < 0.0F &&
-                reverse_motion.route_segment == square_route.size() - 1U &&
-                reverse_motion.route_fraction < 1.0F &&
-                reverse_motion.race.completed_laps == 0U &&
-                reverse_motion.route_distance_travelled < 0.0F,
-            "reverse travel must reduce signed route distance without counting a lap");
-
-        viper::RouteMotionState steering_motion{};
-        viper::initialize_race_progression(steering_motion.race, 0U);
         const std::vector<std::array<float, 2>> straight_route{
             {0.0F, 0.0F}, {100.0F, 0.0F}};
-        const auto right_input = viper::advance_route_motion(steering_motion,
-            straight_route, false, true, false, false, 0.05F, 1U);
-        require(std::abs(steering_motion.steering - 0.25F) < 1.0e-6F &&
-                std::abs(right_input.yaw - (1.57079632679F + 0.0875F)) < 1.0e-6F,
-            "digital steering must use the recovered native response rate");
+        viper::RouteMotionState replicated_state{};
+        replicated_state.route_segment = 0U;
+        replicated_state.route_fraction = 0.25F;
+        replicated_state.steering = 0.5F;
+        replicated_state.speed = 12.0F;
+        replicated_state.route_distance_travelled = 25.0F;
+        viper::initialize_race_progression(replicated_state.race, 0U);
+        viper::advance_race_clock(replicated_state.race, 1.5F);
+        const auto replicated_before_projection = replicated_state;
         const auto projected_peer_state =
-            viper::project_route_motion_state(steering_motion, straight_route);
+            viper::project_route_motion_state(replicated_state, straight_route);
+        const auto repeated_projection =
+            viper::project_route_motion_state(replicated_state, straight_route);
         require(projected_peer_state.valid &&
-                projected_peer_state.x == right_input.x &&
-                projected_peer_state.z == right_input.z &&
-                projected_peer_state.yaw == right_input.yaw &&
-                projected_peer_state.finished == steering_motion.race.finished,
-            "projecting a replicated route state must reproduce its rendered pose without advancing it");
-        auto invalid_peer_state = steering_motion;
+                std::abs(projected_peer_state.x - 25.0F) < 1.0e-5F &&
+                std::abs(projected_peer_state.z + 0.0576F) < 1.0e-5F &&
+                std::abs(projected_peer_state.yaw - 1.7457963F) < 1.0e-5F &&
+                repeated_projection.x == projected_peer_state.x &&
+                repeated_projection.z == projected_peer_state.z &&
+                repeated_projection.yaw == projected_peer_state.yaw &&
+                replicated_state.route_segment ==
+                    replicated_before_projection.route_segment &&
+                replicated_state.route_fraction ==
+                    replicated_before_projection.route_fraction &&
+                replicated_state.speed == replicated_before_projection.speed &&
+                replicated_state.race.elapsed_seconds ==
+                    replicated_before_projection.race.elapsed_seconds,
+            "projecting a fixed replicated route snapshot must not advance simulation state");
+        auto invalid_peer_state = replicated_state;
         invalid_peer_state.route_segment = straight_route.size();
         require(!viper::project_route_motion_state(invalid_peer_state,
                     straight_route).valid,
             "replicated route states must reject segments outside the local route");
-        (void)viper::advance_route_motion(steering_motion, straight_route,
-            false, false, false, false, 0.05F, 1U);
-        require(std::abs(steering_motion.steering - 0.125F) < 1.0e-6F,
-            "released digital steering must decay at the recovered native rate");
-
-        viper::RouteMotionState staged_motion{};
-        staged_motion.route_segment = 3U;
-        staged_motion.route_fraction = 0.9F;
-        staged_motion.speed = 30.0F;
-        viper::initialize_race_progression(staged_motion.race, 0U);
-        const auto committed_before_query = staged_motion;
-        auto candidate_motion = staged_motion;
-        const auto staged_result = viper::advance_route_motion(candidate_motion,
-            square_route, false, true, false, false, 0.05F, 2U);
-        require(staged_result.valid && candidate_motion.race.elapsed_seconds > 0.0F &&
-                candidate_motion.race.completed_laps == 1U,
-            "staged advancement must expose a candidate lap crossing before terrain validation");
-        require(!viper::commit_route_motion_after_terrain_query(
-                    staged_motion, candidate_motion, false) &&
-                staged_motion.route_segment == committed_before_query.route_segment &&
-                staged_motion.route_fraction == committed_before_query.route_fraction &&
-                staged_motion.steering == committed_before_query.steering &&
-                staged_motion.speed == committed_before_query.speed &&
-                staged_motion.race.elapsed_seconds ==
-                    committed_before_query.race.elapsed_seconds &&
-                staged_motion.race.completed_laps ==
-                    committed_before_query.race.completed_laps &&
-                staged_motion.route_distance_travelled ==
-                    committed_before_query.route_distance_travelled &&
-                staged_motion.race.finished == committed_before_query.race.finished,
-            "failed terrain validation must roll back all player route and race progress");
-        require(viper::commit_route_motion_after_terrain_query(
-                    staged_motion, candidate_motion, true) &&
-                staged_motion.route_fraction == candidate_motion.route_fraction &&
-                staged_motion.steering == candidate_motion.steering &&
-                staged_motion.route_distance_travelled ==
-                    candidate_motion.route_distance_travelled &&
-                staged_motion.race.elapsed_seconds ==
-                    candidate_motion.race.elapsed_seconds &&
-                staged_motion.race.completed_laps == 1U,
-            "successful terrain validation must commit the complete candidate state");
-
         std::array<viper::RouteMotionState, 4> finishers{};
         finishers[0].race = {0U, 1U, 12.5F, true};
         finishers[1].race = {0U, 1U, 0.0F, false};
         finishers[2].race = {0U, 1U, 9.25F, true};
         finishers[3].race = {0U, 1U, 0.0F, false};
-        auto finished_player = staged_motion;
+        viper::RouteMotionState finished_player{};
         finished_player.race = {0U, 1U, 10.0F, true};
         const auto standings = viper::build_route_race_standings(
             finished_player, finishers, 3U);

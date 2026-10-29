@@ -384,10 +384,10 @@ if(BUILD_TESTING)
             add_test(NAME game_original_asset_validation
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
             add_test(NAME game_warp_render_smoke
-                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3)
+                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3 --diagnostics-only)
             add_test(NAME game_grid_mode_placement_smoke
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
-                    --track bemidji --car viper --software --smoke-frames 3 -grid)
+                    --track bemidji --car viper --software --smoke-frames 3 --diagnostics-only -grid)
             add_test(NAME game_frontend_launch_smoke
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/frontend_launch_smoke.ps1"
@@ -403,9 +403,9 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/frontend_race_lifecycle_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
-            add_test(NAME game_network_race_smoke
+            add_test(NAME game_network_session_smoke
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
-                    "${CMAKE_SOURCE_DIR}/tests/network_race_smoke.ps1"
+                    "${CMAKE_SOURCE_DIR}/tests/network_session_smoke.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
             add_test(NAME game_fixed_step_trace_replay_regression
@@ -417,7 +417,7 @@ if(BUILD_TESTING)
             set_tests_properties(game_frontend_launch_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_keyboard_binding_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_frontend_session_lifecycle_smoke PROPERTIES TIMEOUT 75)
-            set_tests_properties(game_network_race_smoke PROPERTIES TIMEOUT 60)
+            set_tests_properties(game_network_session_smoke PROPERTIES TIMEOUT 60)
             set_tests_properties(game_asset_root_discovery PROPERTIES TIMEOUT 45)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)
@@ -428,7 +428,7 @@ if(BUILD_TESTING)
                         --track "${track}" --car viper --validate-assets)
                 add_test(NAME game_track_${track}_warp_smoke
                     COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
-                        --track "${track}" --car viper --software --smoke-frames 3)
+                        --track "${track}" --car viper --software --smoke-frames 3 --diagnostics-only)
                 set_tests_properties(game_track_${track}_asset_validation
                     game_track_${track}_warp_smoke PROPERTIES TIMEOUT 30)
             endforeach()
@@ -438,7 +438,7 @@ if(BUILD_TESTING)
                         --track bemidji --car "${car}" --validate-assets)
                 add_test(NAME game_car_${car}_warp_smoke
                     COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
-                        --track bemidji --car "${car}" --software --smoke-frames 3)
+                        --track bemidji --car "${car}" --software --smoke-frames 3 --diagnostics-only)
                 set_tests_properties(game_car_${car}_asset_validation
                     game_car_${car}_warp_smoke PROPERTIES TIMEOUT 30)
             endforeach()

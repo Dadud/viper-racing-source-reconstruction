@@ -65,8 +65,9 @@ configuration bounds, distinct compatible player slots, and tick/state
 progression including repeated-tick equivalence and wraparound.
 `race_progression_regression` verifies that projecting
 a replicated route state reproduces its pose without advancing it. With
-external game assets installed, `game_network_race_smoke` verifies mismatched
+external game assets installed, `game_network_session_smoke` verifies mismatched
 setup rejection and connects two matching Viper/Bemidji clients through the
-snapshot exchange and bounded route-runtime lifecycle. It does not verify
+snapshot exchange with route motion disabled; matching-client traces assert
+zero route-motion steps. It does not verify
 sustained interactive play, peer pose convergence under unequal frame rates,
 disconnect behavior, or physical parity.
