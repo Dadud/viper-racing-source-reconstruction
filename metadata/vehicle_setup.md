@@ -269,6 +269,15 @@ Evidence: `0x433C00` pseudocode and body range
 `0x00433C00..0x00434A51`, dossier
 `ev_f2bb786a74070a51b02f0626e35bf0593a3b38ab0f124dd60bb1a06abe4d65dd`.
 
+In the standard frontend session the anchor gate is explicitly zero, so the
+constructor passes the shared three-float zero vector to `0x441C10`. The wheel
+stores that pointer at `+0x10` and copies its values into `+0x14..+0x1C`;
+therefore the runtime's `position_relative_to_selected_vertex +
+selected_model_vertex` reconstruction reduces to the constructor candidate,
+as required for that path. This is not a missing runtime point input and must
+not be enabled to try to repair inactive contact depths. Nonstandard session
+modes can set the physics-options gate and need separate evidence.
+
 `initialize_ncar_wheel_core` reconstructs the bounded, deterministic wheel
 constructor outputs that follow anchor selection: axle and side classification,
 the model-space wheel candidate and offset relative to the selected FNIM vertex,

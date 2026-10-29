@@ -124,7 +124,12 @@ original and reconstructed sequences by input window and callback/tick ordinal;
 do not steer either run using the ideal line.
 The runtime's `--diagnostics-only` mode now bypasses provisional player and AI
 route motion; keyboard-input and fixed-step replay regressions use it and assert
-that the route-motion adapter receives zero steps. The fixed-step fixture now
+that diagnostics leave route progression uninitialized and the route-motion
+adapter receives zero steps. The live keyboard smoke preserves the selected
+track placement and its contact diagnostics can query terrain; it verifies
+input plumbing only and is not an ideal-line-free
+physics fixture. Portable physics regressions use explicit world-space input
+values and do not read ideal-line data. The fixed-step fixture now
 replays 320 frames of throttle, coast, steering, braking, and coast and checks
 that each active phase reaches the corresponding PCAR control output. This is
 synthetic input-to-control evidence, not physical movement evidence.

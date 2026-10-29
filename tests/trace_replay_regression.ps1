@@ -640,7 +640,7 @@ try {
         throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
     }
 
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; PCAR control outputs were observed and route motion ran zero steps."
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; PCAR control outputs were observed and route motion ran zero steps. This checks input-to-callback determinism, not vehicle dynamics or driving."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

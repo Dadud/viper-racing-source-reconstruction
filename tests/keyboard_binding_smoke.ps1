@@ -251,7 +251,7 @@ try {
     }
     if (-not $resumedSteps) { throw 'Fixed-step simulation did not resume after P was pressed again' }
 
-    Write-Output 'Configured control signals, focus-loss release, and P pause/resume passed in diagnostics-only mode; ideal-line route motion was disabled.'
+    Write-Output 'Configured control signals, focus-loss release, and P pause/resume passed in diagnostics-only mode; ideal-line route motion was disabled. This verifies input plumbing only, not physics or driving.'
 } finally {
     if ($process -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue

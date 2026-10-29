@@ -54,10 +54,13 @@ the value is stored with the reconstruction's track/car selection. Explicit
 trace-recording commands bypass the selector. `--play-trace` without explicit
 track/car overrides opens setup and keeps the replayed results available for
 return to setup. Input and fixed-step diagnostics accept `--diagnostics-only`
-to bypass the provisional player/opponent ideal-line motion while retaining
+to bypass provisional route motion and route-state initialization while retaining
 input evaluation, PCAR callback projection, contact/suspension-history
-diagnostics and trace
-capture. The runtime can load and validate the eight
+diagnostics and trace capture. This mode still uses the selected grid placement
+as the body constructor pose and may parse/draw the ideal line; its terrain
+query and wheel-contact results are diagnostic plumbing, not an ideal-line-free
+physics fixture or driving evidence. Portable physics regressions use explicit
+world-space inputs independent of track route data. The runtime can load and validate the eight
 shipped track bundles and five shipped car bundles. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each
 shipped track and car, plus a WARP rendering smoke for each selected track/car.

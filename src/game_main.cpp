@@ -2154,6 +2154,7 @@ struct WindowState {
     std::uint32_t physics_step_count{};
     std::uint32_t pcar_callback_step_count{};
     std::uint32_t route_motion_step_count{};
+    bool route_state_initialized{};
     bool pcar_timestamp_backend_callback_requested{};
     std::uint32_t playback_clock_milliseconds{};
     // The native binding evaluator consumes a post-poll device snapshot. The
@@ -2574,8 +2575,10 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
-            // 0x441C10 stores wheel position relative to its selected vertex;
-            // the parent transform then maps the reconstructed local point.
+            // 0x433C00 disables FNIM vertex anchors in the standard frontend
+            // physics options, so 0x441C10 receives the native shared-zero
+            // reference vector. The wheel constructor candidate is therefore
+            // already the local point; do not add selected_model_vertex here.
             const std::array<float, 3> local{
                 core->position_relative_to_selected_vertex[0] +
                     core->selected_model_vertex[0],
@@ -2707,6 +2710,7 @@ struct WindowState {
         if (!surface.query_succeeded) return false;
         motion.route_distance_travelled = 0.0F;
         viper::initialize_race_progression(motion.race, motion.route_segment);
+        route_state_initialized = true;
         refresh_title(true);
         return true;
     }
@@ -3307,7 +3311,8 @@ struct WindowState {
 
     bool initialize_opponents()
     {
-        if (route.size() < 2U || terrain == nullptr) return false;
+        if (terrain == nullptr || (!diagnostics_only && route.size() < 2U))
+            return false;
         player_integrator_wheel_scalars = {};
         player_integrator_wheel_scalars_applied = false;
         physics_step_accumulator = {};
@@ -3324,6 +3329,9 @@ struct WindowState {
         std::fill(opponent_simulated_poses.begin(), opponent_simulated_poses.end(),
             std::nullopt);
         pose_buffer.resize(graphics.car_count());
+        // Diagnostics preserve the constructor's grid poses and never project
+        // player or opponent state onto the ideal line.
+        if (diagnostics_only) return true;
         for (std::size_t car = 0; car < graphics.car_count(); ++car) {
             if (car == player_car_index) continue;
             const auto spawn = graphics.car_position(car);
@@ -3405,7 +3413,8 @@ struct WindowState {
                  const bool update_graphics = true,
                  const bool simulation_enabled = true)
     {
-        if (route.size() < 2U || terrain == nullptr) return false;
+        if (terrain == nullptr || (!diagnostics_only && route.size() < 2U))
+            return false;
         if (!simulation_enabled) {
             audio.set_paused(true);
             refresh_title();
@@ -4802,11 +4811,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         return 1;
     }
     if (playback_trace != nullptr) state.graphics.set_vsync(false);
-    const auto spawn = state.graphics.car_position(player_car_index);
-    if (!state.place_on_route(spawn[0], spawn[1])) {
-        std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
-        DestroyWindow(hwnd);
-        return 1;
+    if (!state.diagnostics_only) {
+        const auto spawn = state.graphics.car_position(player_car_index);
+        if (!state.place_on_route(spawn[0], spawn[1])) {
+            std::cerr << "Could not align the grid start with the ideal line and terrain.\n";
+            DestroyWindow(hwnd);
+            return 1;
+        }
+    } else {
+        std::cout << "Diagnostics startup preserves grid placement; route state is uninitialized.\n";
     }
     if (!state.initialize_opponents()) {
         std::cerr << "Could not initialize provisional opponent route states.\n";
@@ -4896,7 +4909,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             DestroyWindow(hwnd);
             return 1;
         }
-        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,diagnostics_only,route_motion_step_count,player_segment,player_fraction,player_speed,player_steering,completed_laps,finished";
+        trace << "frame,elapsed_seconds,delta_seconds,steer_left,steer_right,throttle,brake,diagnostics_only,route_motion_step_count,route_state_initialized,player_segment,player_fraction,player_speed,player_steering,completed_laps,finished";
         for (std::size_t car = 0; car < state.opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             trace << ",car" << car << "_segment,car" << car
@@ -5263,6 +5276,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << state.accelerate << ',' << state.brake << ','
                       << state.diagnostics_only << ','
                       << state.route_motion_step_count << ','
+                      << state.route_state_initialized << ','
                       << state.motion.route_segment << ',' << state.motion.route_fraction << ','
                       << state.motion.speed << ',' << state.motion.steering << ','
                       << state.motion.race.completed_laps << ','
