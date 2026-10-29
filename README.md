@@ -55,7 +55,8 @@ trace-recording commands bypass the selector. `--play-trace` without explicit
 track/car overrides opens setup and keeps the replayed results available for
 return to setup. Input and fixed-step diagnostics accept `--diagnostics-only`
 to bypass the provisional player/opponent ideal-line motion while retaining
-input evaluation, PCAR callback projection, contact observations and trace
+input evaluation, PCAR callback projection, contact/suspension-history
+diagnostics and trace
 capture. The runtime can load and validate the eight
 shipped track bundles and five shipped car bundles. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each

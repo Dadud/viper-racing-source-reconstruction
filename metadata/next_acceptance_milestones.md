@@ -192,10 +192,11 @@ each decision and repeated playback checks it. This authored policy improves
 the current route prototype only. Native ACAR decisions, physical opponent
 state, and original comparison remain open
 ([`route_opponent_ai.md`](route_opponent_ai.md)).
-The player now owns four byte-backed wheel objects containing resolved wheel
+The player owns four byte-backed wheel objects containing resolved wheel
 constructor defaults, all modeled `0x441C10` geometry/spring/steering outputs,
-and persistent contact outputs. This closes object-state materialization only;
-the live loop still does not consume those bytes as suspension inputs.
+and persistent contact outputs. The live fixed-step consumes those contact
+outputs in the suspension/history adapter and invokes the paired `+0x158`
+producer. Tire-force collection and body integration remain disconnected.
 The PCAR body owner now receives the exact initial pose copy performed by
 `0x433C00`: the twelve runtime-record floats at `+0x18..+0x44` go to body
 `+0x38..+0x64`. A focused regression checks exact bit ordering, and the
@@ -317,11 +318,11 @@ the pair differential are now mapped to the four wheel `+0xE8` history fields.
 `0x431150` calls `0x442530` once per wheel before reading those values;
 `0x442530` consumes prior `+0xE8` and stores the next history value. The
 producer order is resolved, but the session's constructor-pose contact query
-is not a physics-updated body/query state. Native contact/query, spring,
-surface, and tire inputs are not yet owned by the production session, so these
-updates remain disconnected. The live producer of the actual wheel object's
-per-step `+0x158` is identified inside the integrator but remains disconnected
-until all earlier wheel-update inputs and state are staged. The random-seeded table/call lifecycle
+is not a physics-updated body/query state. The current session feeds its
+byte-backed query results through suspension/history and paired `+0x158`
+updates, but these values are not validated against a clean matched original
+grid start. Tire, timer, and remaining integrator inputs are not yet owned by
+the session. The random-seeded table/call lifecycle
 for environment polarity. A separate frame-context row receives body
 `+0x50C` at `+0x158`, but that is not the actual wheel object's same-offset
 field. Static analysis establishes common-startup initialization and the
@@ -548,8 +549,9 @@ integrator's four car-owned wheel objects are passed directly to `0x442530`;
 the actual wheel-object `+0x158` writer is now confirmed as the paired
 differential block in `0x431150`, distinct from this context row. The pure
 arithmetic and a byte-backed four-wheel writer are modeled and covered by a
-focused regression, but the runtime still lacks sourced full wheel-update
-state to call it safely. The gated `0x433570` branch is a candidate body timer
+focused regression. The live session now calls that writer after its current
+four-wheel suspension/history projection; this is not the complete native
+wheel update. The gated `0x433570` branch is a candidate body timer
 producer, but the capture did not observe its ramp advancing, so its live
 inputs and callback ordering remain unresolved. The GCAR GhostBegin ring is
 separate and must not be used as a substitute for PCAR callback state. Only
@@ -612,8 +614,8 @@ operands are now finite-gated; invalid operands mark the step incomplete and
 leave the paired outputs at their default values. This closes model
 correctness gaps only. The native TPPB v2 `track.bpp` plane/tree is parsed and
 the runtime queries it from byte-backed PCAR pose and wheel constructor
-geometry; those contact observations are not yet fed into the composed wheel
-force/body step. Constructor helper `0x433C00` writes the paired wheel scales
+geometry; those results feed suspension/history and paired `+0x158` updates,
+but not the composed tire-force/body step. Constructor helper `0x433C00` writes the paired wheel scales
 from runtime-record `+0xE4/+0xE8`, and the Windows byte-backed PCAR now retains
 them at body `+0xDD4/+0xDD8` and in its tick trace. A controlled original-process schedule now co-observes
 throttle/brake/steering globals, wheel state, body response, and tire force

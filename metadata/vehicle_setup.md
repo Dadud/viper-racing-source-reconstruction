@@ -694,11 +694,11 @@ byte-backed wheel owner. It reads prior depth only when all four bytes at
 `+0xE8` are initialized, overrides the caller's duplicate history value with
 that stored value, runs the existing scalar/surface/finalization sequence, and
 persists the finalized next depth back to `+0xE8`. An uninitialized lane fails
-closed without changing the wheel. This is a stateful model adapter only: the
-wheel reset at `0x441B90` explicitly clears `+0xE8`, and `0x442530` consumes
-the prior depth and later produces its next value, but the live race session
-does not call this adapter. Other suspension inputs remain explicit; the
-adapter does not create live physical motion. Evidence: `0x441B90`
+closed without changing the wheel. This stateful adapter is called by the live
+race session after terrain contact updates: the wheel reset at `0x441B90`
+explicitly clears `+0xE8`, and `0x442530` consumes the prior depth and later
+produces its next value. Other suspension inputs remain explicit; this adapter
+does not create body motion. Evidence: `0x441B90`
 `ev_4a2b61d33988864abf28dc3967396235c19b9e10`; `0x442530` dossier
 `ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`.
 
@@ -713,8 +713,9 @@ signs to wheel 0/1 `+0x158`. It similarly computes
 signs to wheels 2/3. Disassembly identifies the four stores at `0x4319B6`,
 `0x4319D5`, `0x431A02`, and `0x431A10`; a passive address-filtered trace
 observed wheel 0 and wheel 2 stores. This source and byte-backed state
-transition are now modeled; integrating it after a complete live wheel update
-and resolving body timer inputs and callback ordering remain open.
+transition are modeled and the live session writes the paired values after its
+four current suspension/history updates. The larger composed body step, its
+remaining force inputs, timer inputs, and callback ordering remain open.
 ### Live PCAR wheel-stage sample (2026-10-29)
 
 A bounded read-only Frida probe against the active original `race.bin` hooked
@@ -745,9 +746,10 @@ The arithmetic, gates, and stores are now modeled in
 `apply_ncar_integrator_wheel_pair_differentials` and the new byte-backed
 `apply_ncar_integrator_wheel_pair_differentials_to_wheels` helper. Regression
 coverage checks all four native-order writes and atomic rejection of
-non-finite output. The live session still does not call the writer because its
-complete native per-wheel update and callback inputs are not session-owned;
-controlled per-input parity remains open.
+non-finite output. The live session calls the writer after its current
+four-wheel suspension/history updates. This partial projection does not yet
+include tire force, timer, helper, or full body-step inputs; controlled
+per-input parity remains open.
 These per-frame effects are modeled, and the
 runtime now stores the known shared-constructor body bytes, PCAR vtable/initial
 `+0x50C`, settings-derived shift/clutch/yaw bytes, and per-wheel traction/ABS
