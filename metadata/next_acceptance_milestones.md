@@ -42,8 +42,11 @@ clean-start or input-controlled and supplies no golden numeric response. See
 `src/game_main.cpp` retains an explicit route-motion prototype, but diagnostics
 and acceptance tests keep it disabled. Four-wheel terrain contact now feeds the
 reconstructed suspension/history stages and paired `+0x158` differential
-producer. Tire-force collection, body accumulators, collisions, and pose
-integration remain unimplemented. The terrain plane sampler
+producer. The live wheel callback now also stores its resolved `+0xA8` product
+and `+0xAC` increment/wrap prefix from initialized byte-backed fields; the
+unresolved global distance/damage gate remains disabled, and both outputs are
+present in the physics tick CSV. Tire-force collection, body accumulators,
+collisions, and pose integration remain unimplemented. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches

@@ -36,6 +36,40 @@ int main()
 {
     try {
         {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 3> source_fields{{
+                {wheel_base + 0x124U, 4U,
+                    std::bit_cast<std::uint32_t>(10.0F)},
+                {wheel_base + 0x05cU, 4U,
+                    std::bit_cast<std::uint32_t>(1.0F)},
+                {wheel_base + 0x0acU, 4U,
+                    std::bit_cast<std::uint32_t>(6.27F)},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, source_fields),
+                "wheel callback prefix source fields must materialize");
+            const auto prefix = viper::advance_ncar_wheel_update_prefix_in_object(
+                wheel, wheel_base);
+            require(prefix.has_value() && prefix->value_0xa8 == 10.0F &&
+                    prefix->angle_0xac > 0.06F && prefix->angle_0xac < 0.08F &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x0a8U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            prefix->value_0xa8)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x0acU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            prefix->angle_0xac)},
+                "wheel callback prefix must persist +0xA8 and wrapped +0xAC");
+
+            viper::NcarWheelRuntimeObjectState unresolved{};
+            const auto unresolved_before = unresolved;
+            require(!viper::advance_ncar_wheel_update_prefix_in_object(
+                        unresolved, wheel_base) &&
+                    unresolved.bytes == unresolved_before.bytes &&
+                    unresolved.initialized_bytes == unresolved_before.initialized_bytes,
+                "wheel callback prefix must preserve unknown source bytes");
+        }
+        {
             std::vector<std::byte> runtime_record(0xecU);
             write_u32_le(runtime_record, 0xe4U,
                 std::bit_cast<std::uint32_t>(200.0F));

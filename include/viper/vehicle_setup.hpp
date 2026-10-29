@@ -686,6 +686,19 @@ struct WheelUpdatePrefixResult {
 [[nodiscard]] WheelUpdatePrefixResult advance_wheel_update_prefix(
     const WheelUpdatePrefixInput& input) noexcept;
 
+// Advances only the sourced +0xA8/+0xAC entry-prefix fields in an initialized
+// byte-backed wheel object. The native global distance/damage gate is left
+// unresolved and is not inferred by this helper.
+struct NcarWheelResolvedPrefixValues {
+    float value_0xa8{};
+    float angle_0xac{};
+};
+
+[[nodiscard]] std::optional<NcarWheelResolvedPrefixValues>
+advance_ncar_wheel_update_prefix_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset) noexcept;
+
 struct WheelRateBlendInput {
     float rate_0x124{};
     float rate_magnitude_0x124{};

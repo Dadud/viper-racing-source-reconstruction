@@ -681,6 +681,16 @@ point and runtime constants are caller-provided. Evidence: the same
 `0x442530` dossier and assembly `0x0044254C..0x00442609`; `0x425870` is
 `mov al,[0x50878C]; ret` at `0x00425870..0x00425875`.
 
+The live player session now persists only the resolved prefix outputs from its
+initialized byte-backed wheel state: `+0xA8 = +0x124 * +0x5C`, then the
+single-step `+0xAC` angle increment and native signed/unsigned wrap tests.
+`advance_ncar_wheel_update_prefix_in_object` leaves the unresolved
+`0x50878C`-controlled distance/damage gate untouched. The physics tick CSV now
+records both stored outputs per wheel. This is a partial callback prefix; it
+does not imply contact parity, force accumulation, body integration, or a
+physics-owned rendered pose. Evidence: `0x442530` dossier
+`ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`.
+
 The later conditional `+0x124` blend block (`0x00442805..0x0044286D`) is
 modeled by `adjust_wheel_rate_blend` in `vehicle_setup.cpp`. Below the signed
 raw-bit gate of 16, it caps a coefficient product at one, scales the signed

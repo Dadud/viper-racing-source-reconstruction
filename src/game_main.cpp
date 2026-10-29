@@ -2027,6 +2027,8 @@ struct PlayerPhysicsTickContext {
     std::optional<float> body_integrator_ramp_0x50c_after_tick;
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
+    std::array<std::optional<float>, 4> wheel_value_0xa8_after_tick{};
+    std::array<std::optional<float>, 4> wheel_angle_0xac_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_gate_passed_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_clamped_depth_after_tick{};
@@ -2774,6 +2776,16 @@ struct WindowState {
                 player_wheel_contact_states[wheel].contact_active_0x168 = 0U;
                 continue;
             }
+            const auto wheel_object_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+            // Reproduce only the source-backed 0x442530 entry prefix. The
+            // native global distance/damage gate is still unresolved.
+            if (!viper::advance_ncar_wheel_update_prefix_in_object(
+                    player_runtime_state.wheel_objects[wheel],
+                    wheel_object_offset)) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
             // The selected vertex is subtracted by native 0x441C10 when it
             // stores +0x04..+0x0C, then added back by 0x437BA0. Combine those
             // terms to recover the local anchor before applying the initialized
@@ -2821,8 +2833,6 @@ struct WindowState {
             player_wheel_surface_polarity_results[wheel] =
                 g_ncar_surface_polarity_stream.next();
 
-            const auto wheel_object_offset = static_cast<std::uint32_t>(
-                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
             std::array<viper::NcarObjectFieldWrite, 5> writes{};
             std::size_t write_count = 0U;
             const auto& contact_state = player_wheel_contact_states[wheel];
@@ -3144,6 +3154,8 @@ struct WindowState {
                 if (!bits) return std::nullopt;
                 return std::bit_cast<float>(*bits);
             };
+            tick.wheel_value_0xa8_after_tick[wheel] = read_wheel_float(0x0a8U);
+            tick.wheel_angle_0xac_after_tick[wheel] = read_wheel_float(0x0acU);
             if (const auto bits = viper::read_ncar_wheel_object_u32(
                     wheel_object, 0x158U)) {
                 tick.wheel_preupdate_value_0x158_after_tick[wheel] =
@@ -4802,6 +4814,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
+                << ",wheel" << wheel << "_value_0xa8"
+                << ",wheel" << wheel << "_angle_0xac"
                 << ",wheel" << wheel << "_contact_gate_passed"
                 << ",wheel" << wheel << "_projected_depth"
                 << ",wheel" << wheel << "_clamped_contact_depth"
@@ -5083,6 +5097,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace << static_cast<unsigned>(
                                 *tick.wheel_contact_active_after_tick[wheel]);
                         }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_value_0xa8_after_tick[wheel])
+                            physics_tick_trace << *tick.wheel_value_0xa8_after_tick[wheel];
+                        physics_tick_trace << ',';
+                        if (tick.wheel_angle_0xac_after_tick[wheel])
+                            physics_tick_trace << *tick.wheel_angle_0xac_after_tick[wheel];
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_gate_passed_after_tick[wheel]) {
                             physics_tick_trace << static_cast<unsigned>(

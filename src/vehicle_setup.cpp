@@ -592,6 +592,46 @@ WheelUpdatePrefixResult advance_wheel_update_prefix(
     return result;
 }
 
+std::optional<NcarWheelResolvedPrefixValues>
+advance_ncar_wheel_update_prefix_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset) noexcept
+{
+    const auto rate_bits = read_ncar_wheel_object_u32(wheel, 0x124U);
+    const auto scalar_bits = read_ncar_wheel_object_u32(wheel, 0x05cU);
+    const auto angle_bits = read_ncar_wheel_object_u32(wheel, 0x0acU);
+    if (!rate_bits || !scalar_bits || !angle_bits) return std::nullopt;
+
+    const auto rate = std::bit_cast<float>(*rate_bits);
+    const auto wheel_scalar = std::bit_cast<float>(*scalar_bits);
+    const auto angle = std::bit_cast<float>(*angle_bits);
+    // 0x442530 multiplies the rate by 0.008 and wraps the angle at +/- 2*pi.
+    if (!std::isfinite(rate) || !std::isfinite(wheel_scalar) ||
+        !std::isfinite(angle)) {
+        return std::nullopt;
+    }
+
+    NcarWheelResolvedPrefixValues result{};
+    result.value_0xa8 = static_cast<float>(
+        static_cast<long double>(rate) * wheel_scalar);
+    const auto wrap_delta = std::bit_cast<float>(0x40c90fdbU);
+    result.angle_0xac = advance_wheel_angle_accumulator({
+        angle, rate, 0.008F, wrap_delta, wrap_delta,
+        std::bit_cast<float>(0xc0c90fdbU)});
+    if (!std::isfinite(result.value_0xa8) || !std::isfinite(result.angle_0xac))
+        return std::nullopt;
+
+    const std::array<NcarObjectFieldWrite, 2> writes{{
+        {wheel_object_offset + 0x0a8U, 4U,
+            std::bit_cast<std::uint32_t>(result.value_0xa8)},
+        {wheel_object_offset + 0x0acU, 4U,
+            std::bit_cast<std::uint32_t>(result.angle_0xac)},
+    }};
+    if (!apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes))
+        return std::nullopt;
+    return result;
+}
+
 WheelRateBlendResult adjust_wheel_rate_blend(
     const WheelRateBlendInput& input) noexcept
 {
