@@ -17,13 +17,21 @@ and a direct asset-backed Viper/Bemidji smoke confirmed default startup reports
 route motion disabled. An eight-frame explicit-prototype trace reported zero
 route-motion steps at frame 0 and one step per subsequent frame. The focused
 `race_progression_regression`, `game_keyboard_binding_smoke`, and
-`game_fixed_step_trace_replay_regression` checks passed (3/3). These verify the
-prototype boundary and diagnostics only; they do not add physics ownership or
-driving acceptance. The retired
+`game_fixed_step_trace_replay_regression` checks passed (3/3). The new
+`game_route_motion_policy_smoke` regression also verifies that default startup
+records zero route-motion steps and the explicit prototype flag enables the
+adapter. These checks verify the prototype boundary and diagnostics only; they
+do not add physics ownership or driving acceptance. The retired
 route-driven results scenarios are historical prototype evidence only; current
 Windows lifecycle checks cover startup, settings persistence, clean early exit,
 and reload, while fixed-step replay uses an authored, deterministic control
 schedule with route motion disabled.
+The complete configured Release suite, including all external-asset checks,
+passed 66/66 on 2026-10-29. A controlled original-client retry using the
+recovered `-1` switch did create the official child, but Frida child injection
+failed with `VirtualAllocEx` access denied and startup stopped at the video
+error dialog; no original physics data was collected. See
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
 four-wheel contact updates are observations and do not feed suspension forces,

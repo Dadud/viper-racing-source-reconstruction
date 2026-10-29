@@ -413,7 +413,13 @@ if(BUILD_TESTING)
                     "${CMAKE_SOURCE_DIR}/tests/trace_replay_regression.ps1"
                     -GameExe "$<TARGET_FILE:viper_game>"
                     -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
+            add_test(NAME game_route_motion_policy_smoke
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${CMAKE_SOURCE_DIR}/tests/route_motion_policy_smoke.ps1"
+                    -GameExe "$<TARGET_FILE:viper_game>"
+                    -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
             set_tests_properties(game_fixed_step_trace_replay_regression PROPERTIES TIMEOUT 60)
+            set_tests_properties(game_route_motion_policy_smoke PROPERTIES TIMEOUT 45)
             set_tests_properties(game_frontend_launch_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_keyboard_binding_smoke PROPERTIES TIMEOUT 75)
             set_tests_properties(game_frontend_session_lifecycle_smoke PROPERTIES TIMEOUT 75)

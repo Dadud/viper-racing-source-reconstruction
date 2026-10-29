@@ -66,7 +66,11 @@ this is a container inspection path and does not enable native replay playback.
 The Windows frontend lifecycle smoke verifies control remapping and persistence,
 selected-session startup, clean early exit, and saved-selection reload. It does
 not drive a lap, produce results, or claim race playability. The fixed-step
-trace regression checks deterministic short capture/playback only.
+trace regression checks deterministic short capture/playback only. With
+external game data, `game_route_motion_policy_smoke` confirms default startup
+leaves the ideal-line adapter disabled and the explicit
+`--route-motion-prototype` flag enables it; the test does not score route
+progress or race outcomes.
 
 Public CI runs without original assets. Runtime checks use an external data
 directory, also configurable through `VIPER_DATA_DIR`. If neither is provided,

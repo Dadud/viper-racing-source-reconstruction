@@ -1,23 +1,35 @@
 # Original physics task order and dispatch capture
 
-## 2026-10-29 launcher retry stopped before race startup
+## 2026-10-29 launcher attempts stopped before race startup
 
-Mounted the external original ISO as `F:\` with volume label `VIPER` and
-launched the extracted official `GameRoot\Viper Racing.exe` from its expected
-`GameRoot\Data` working directory. The launcher SHA-256 remained
-`D75B38228D4B68B2C5EF39252B95E43A9DE16976005C26FAB4491D05CE3D32D4`; the
-`Data\race.bin` SHA-256 remained
-`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`. The
-current `Config\options.cfg` matched its saved pre-capture copy
-(`7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`).
+The first attempt mounted the external original ISO as `F:\` (volume label
+`VIPER`) and launched the official `GameRoot\Viper Racing.exe` from its
+expected `GameRoot\Data` working directory with `-no3dfx`. That switch is not
+recognized by the recovered launcher parser, so the attempt did not test a
+graphics bypass. Hooks on `CreateProcessA/W` saw no `race.bin` child; the
+launcher displayed the native “Your video card returned an error” dialog.
 
-The launcher bridge attached and reported ready hooks for both
-`CreateProcessA` and `CreateProcessW`, but observed no `race.bin` child. The
-launcher displayed the native “Your video card returned an error” dialog and
-exited. No game-state samples were collected and no settings or game data were
-changed. Treat this as a failed startup attempt, not a simulation capture. A
-new matched grid-contact capture still requires getting the official client
-past this graphics initialization barrier.
+A second attempt used the recovered `-1` switch and suspended the official
+launcher before resuming it with both child-creation hooks installed. The
+launcher SHA-256 remained
+`D75B38228D4B68B2C5EF39252B95E43A9DE16976005C26FAB4491D05CE3D32D4`, the
+staged `Data\race.bin` SHA-256 remained
+`F9D6BD3EE1B9E8A7E101BF4CC3C4712969176255111BCF76A85D82568096DA56`, and
+`Config\options.cfg` matched its pre-capture copy
+(`7731E8E0B54A801BFEF307EC8EEE68BDDA92FE9D4A7B4821EE277FD316EA7297`). The
+bridge observed `Data\\race.bin -1` with the expected `GameRoot\\Data` CWD
+and suspended child PID 35300. Frida could not attach its child agent:
+`VirtualAllocEx` returned access denied (`0x00000005`). After the bridge's
+30-second window, it resumed the child; the launcher then showed the same
+graphics error dialog. No simulation samples were collected. The observed
+launcher/child creation and resume are retained in REA Evidence
+`ev_180f4dea4b1763bc6bf22842a67473f70bd9c266764e8c79eb495c82a0eebb5a` and
+`ev_9aa8c355eff53b0e1d1faa25530bc1327d099b14fb059b96b102632f87c920bf`.
+The launcher, child, ISO mount, and temporary `Data` junction were
+closed/removed; the saved `options.cfg` hash was unchanged. Treat both attempts
+as startup failures, not simulation captures. A matched grid-contact capture
+still requires resolving the graphics initialization barrier and
+child-instrumentation access.
 
 This is a bounded runtime observation from the shipped original client, not a
 reconstruction gameplay comparison. The private capture is outside the source
