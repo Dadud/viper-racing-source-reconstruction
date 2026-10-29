@@ -1214,6 +1214,11 @@ names to feature codes or response scalars.
 
 Evidence: `0x442530` Ghidra pseudocode
 `ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7`.
+The Windows player session now applies this profile after each suspension
+history update, persists `+0x120/+0x121`, and performs the conditional clear of
+`+0xEC/+0xF0/+0x11C`. The diagnostics regression currently verifies the
+inactive-contact clear branch only; tire-force collection and body integration
+remain disconnected.
 Evidence for the trigonometric evaluator: `0x435780` pseudocode
 `ev_f50c5fd32adf872f989a5e5484245372b1e8f2bf7d9a371a736267dcda8c5f1a` and
 instruction listing `ev_aa8c029e1574d2f94e9b741fbe691b0fde26183f0541b70d819e9917dc01e6f6`.

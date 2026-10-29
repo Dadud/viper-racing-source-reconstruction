@@ -2059,6 +2059,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::int64_t>, 4> wheel_surface_polarity_results{};
     std::array<std::optional<float>, 4> wheel_surface_motion_projections{};
     std::array<std::optional<float>, 4> wheel_surface_adjusted_responses{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_animation_flags_0x120{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_animation_mode_0x121{};
 };
 
 struct WindowState {
@@ -2931,16 +2933,36 @@ struct WindowState {
             }
             update.contact.active = player_wheel_contact_states[wheel]
                 .contact_active_0x168 != 0U;
-            const std::array<viper::NcarObjectFieldWrite, 2> wheel_state_writes{{
+            const auto response_gate_0x11c = read_wheel_float(0x11cU);
+            if (!response_gate_0x11c || !std::isfinite(*response_gate_0x11c)) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            update.feature_profile = viper::classify_wheel_contact_feature({
+                player_wheel_contact_states[wheel].contact_feature_0x19c,
+                *response_gate_0x11c,
+                suspension->finalized.reset_contact,
+                update.contact.active});
+            const std::array<viper::NcarObjectFieldWrite, 7> wheel_state_writes{{
                 {wheel_object_offset + 0x168U, 1U,
                     player_wheel_contact_states[wheel].contact_active_0x168},
                 {wheel_object_offset + 0x178U, 4U,
                     std::bit_cast<std::uint32_t>(
                         suspension->finalized.applied_response)},
+                {wheel_object_offset + 0x120U, 1U,
+                    update.feature_profile.animation_flags_0x120},
+                {wheel_object_offset + 0x121U, 1U,
+                    update.feature_profile.animation_mode_0x121},
+                {wheel_object_offset + 0x0ecU, 4U, 0U},
+                {wheel_object_offset + 0x0f0U, 4U, 0U},
+                {wheel_object_offset + 0x11cU, 4U, 0U},
             }};
+            const auto wheel_state_write_count = update.feature_profile
+                .clear_fields_0xec_0xf0_0x11c ? wheel_state_writes.size() : 4U;
             if (!viper::apply_ncar_wheel_object_writes(
                     player_runtime_state.wheel_objects[wheel], wheel_object_offset,
-                    wheel_state_writes)) {
+                    std::span<const viper::NcarObjectFieldWrite>(
+                        wheel_state_writes.data(), wheel_state_write_count))) {
                 player_constructor_inputs_ready = false;
                 return;
             }
@@ -3134,6 +3156,10 @@ struct WindowState {
                 tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
                     std::bit_cast<float>(*bits);
             }
+            tick.wheel_animation_flags_0x120[wheel] =
+                viper::read_ncar_wheel_object_u8(wheel_object, 0x120U);
+            tick.wheel_animation_mode_0x121[wheel] =
+                viper::read_ncar_wheel_object_u8(wheel_object, 0x121U);
             if (player_wheel_core_initialization &&
                 player_wheel_core_initialization->wheels[wheel] &&
                 tick.wheel_contact_clamped_depth_after_tick[wheel] &&
@@ -4786,6 +4812,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_surface_polarity_result"
                 << ",wheel" << wheel << "_surface_motion_projection"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
+                << ",wheel" << wheel << "_animation_flags_0x120"
+                << ",wheel" << wheel << "_animation_mode_0x121"
                 << ",wheel" << wheel << "_contact_query_succeeded"
                 << ",wheel" << wheel << "_contact_depth_limit_0x44";
             for (const auto* vector_name : {"contact_origin", "query_contact_point",
@@ -5102,6 +5130,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_surface_adjusted_responses[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_surface_adjusted_responses[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_animation_flags_0x120[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_animation_flags_0x120[wheel]);
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_animation_mode_0x121[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_animation_mode_0x121[wheel]);
                         }
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_query_succeeded[wheel]) {

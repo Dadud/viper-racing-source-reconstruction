@@ -135,6 +135,8 @@ try {
     $wheelPreupdateColumns = [int[]]::new(4)
     $wheelProducerOwnedColumns = [int[]]::new(4)
     $wheelPriorDepthColumns = [int[]]::new(4)
+    $wheelAnimationFlagsColumns = [int[]]::new(4)
+    $wheelAnimationModeColumns = [int[]]::new(4)
     $wheelQuerySucceededColumns = [int[]]::new(4)
     $wheelContactDepthLimitColumns = [int[]]::new(4)
     $wheelContactGeometryColumns = @()
@@ -157,6 +159,10 @@ try {
             $tickHeader, "wheel${wheel}_0x158_native_producer_owned")
         $wheelPriorDepthColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_previous_contact_depth_0xe8")
+        $wheelAnimationFlagsColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_animation_flags_0x120")
+        $wheelAnimationModeColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_animation_mode_0x121")
         $wheelQuerySucceededColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_query_succeeded")
         $wheelContactDepthLimitColumns[$wheel] = [Array]::IndexOf(
@@ -201,6 +207,8 @@ try {
         @($wheelPreupdateColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelProducerOwnedColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelAnimationFlagsColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelAnimationModeColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactGeometryColumns | ForEach-Object {
@@ -292,7 +300,9 @@ try {
                     [string]::IsNullOrWhiteSpace($pairHistory) -or
                     [Math]::Abs([single]::Parse(
                         $pairHistory, [cultureinfo]::InvariantCulture)) -gt 0.00001 -or
-                    $fields[$wheelPriorDepthColumns[$wheel]] -ne '0') {
+                    $fields[$wheelPriorDepthColumns[$wheel]] -ne '0' -or
+                    $fields[$wheelAnimationFlagsColumns[$wheel]] -ne '0' -or
+                    $fields[$wheelAnimationModeColumns[$wheel]] -ne '0') {
                     throw "Wheel $wheel first-tick producer output, inactive contact history, or +0xE8 state differs"
                 }
             }
@@ -416,6 +426,11 @@ try {
             $active = $fields[$wheelActiveColumns[$wheel]]
             if (-not [string]::IsNullOrWhiteSpace($active) -and $active -notin @('0', '1')) {
                 throw "Wheel $wheel contact-active value is invalid at line $($index + 1)"
+            }
+            if ($active -eq '0' -and
+                ($fields[$wheelAnimationFlagsColumns[$wheel]] -ne '0' -or
+                 $fields[$wheelAnimationModeColumns[$wheel]] -ne '0')) {
+                throw "Wheel $wheel inactive-contact feature outputs were not cleared at line $($index + 1)"
             }
             $depth = $fields[$wheelDepthColumns[$wheel]]
             if (-not [string]::IsNullOrWhiteSpace($depth)) {
