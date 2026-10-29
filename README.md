@@ -13,17 +13,17 @@ human setup, the track bundle's AI default setup, the selected car's level-0
 indexed mesh, and Viper's AI mesh, and draws them in a top-down Direct3D
 development view. It loads the selected track's `track.obt` placement table
 and renders the selected model at the human grid slot and the native Viper
-model at other valid `obj car` start positions. The human and opponents follow
-the normalized ideal-line route with provisional kinematic motion. Keyboard
-bindings can come from `options.def`; route crossings count laps, and the race
-shows an in-scene standings overlay after all entrants finish. A Win32 setup
-screen selects installed tracks and cars, and the results screen returns to
-setup. Trace capture/playback, WARP rendering smoke cases, and parser
-regressions support repeatable development checks. This remains a playable
-route-motion prototype, not a complete reconstruction: native AI, physical
-vehicle dynamics, original-matched frontend flow, career progression,
-original-compatible replays, and multiplayer remain open. See the feature
-ledger for current evidence and acceptance criteria.
+model at other valid `obj car` start positions. Normal startup keeps the
+recorded grid poses fixed while input and callback diagnostics run; the live
+session does not yet own a physical pose update. The ideal-line route follower
+is retained only as an explicit prototype via `--route-motion-prototype` and
+must not be used as a driving or race test oracle. Keyboard bindings can come
+from `options.def`. A Win32 setup screen selects installed tracks and cars.
+Trace capture/playback, WARP rendering smoke cases, and parser regressions
+support repeatable development checks. Physical vehicle dynamics, native AI,
+original-matched frontend flow, career progression, original-compatible
+replays, and multiplayer remain open. See the feature ledger for current
+evidence and acceptance criteria.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell
@@ -33,6 +33,8 @@ ctest --test-dir build -C Release --output-on-failure
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --validate-assets
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --track dundas --car sports
+# Optional non-physical route-motion prototype (not gameplay evidence):
+./build/Release/viper_game.exe --data-dir ../game_install/GameData --route-motion-prototype
 # Force native track-basis grid placement instead of spline placement:
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData -grid
 # Bounded graphics initialization/presentation check using software rendering:

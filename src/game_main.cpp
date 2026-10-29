@@ -182,6 +182,7 @@ struct Options {
     bool grid_mode{};
     bool audio_smoke{};
     bool diagnostics_only{};
+    bool route_motion_prototype{};
     std::optional<unsigned> smoke_frames;
     std::optional<std::filesystem::path> record_trace;
     std::optional<std::filesystem::path> record_physics_tick_trace;
@@ -205,12 +206,13 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--load-replay PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--route-motion-prototype] [--load-replay PATH] [--software] [--help]\n"
         << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges route-race snapshots.\n"
         << "  --network-slot N selects a zero-based local player grid slot for multiplayer.\n"
         << "  --load-replay PATH validates and retains a native replay container for the race session; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "  --diagnostics-only runs input/callback diagnostics without prototype route motion.\n"
+        << "  --route-motion-prototype explicitly enables the non-physical ideal-line follower.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
         << "Without either, searches the current and executable directories for common.res, Data/common.res, or GameData/common.res.\n";
 }
@@ -333,6 +335,8 @@ Options parse_options(const int argc, wchar_t** argv)
             options.audio_smoke = true;
         } else if (arg == L"--diagnostics-only") {
             options.diagnostics_only = true;
+        } else if (arg == L"--route-motion-prototype") {
+            options.route_motion_prototype = true;
         } else if (arg == L"--record-trace") {
             if (++i >= argc) throw std::runtime_error("--record-trace requires a path");
             options.record_trace = std::filesystem::path(argv[i]);
@@ -5398,7 +5402,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         std::cout << "Reconstructed clients agreed on race setup; replicating route-race state.\n";
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
-        options.diagnostics_only,
+        options.diagnostics_only || !options.route_motion_prototype,
         options.record_trace, options.record_physics_tick_trace,
         playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,
