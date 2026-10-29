@@ -2110,6 +2110,11 @@ struct WindowState {
     std::array<viper::WheelContactState, 4> player_wheel_contact_states{};
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
+    std::array<viper::WheelUpdatePipelineResult, 4> player_wheel_update_results{};
+    bool player_wheel_pair_differential_producer_applied{};
+    viper::NcarIntegratorWheelPairDifferentialResult
+        player_wheel_pair_differentials{};
+    bool player_wheel_pair_history_derived_from_updates{};
     std::array<std::optional<std::int64_t>, 4>
         player_wheel_surface_polarity_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
@@ -2694,9 +2699,12 @@ struct WindowState {
 
     void update_player_wheel_contacts_from_body()
     {
+        player_wheel_pair_differential_producer_applied = false;
+        player_wheel_pair_history_derived_from_updates = false;
         player_wheel_terrain_queries_succeeded.fill(false);
         player_wheel_contact_observations = {};
         player_wheel_contact_results = {};
+        player_wheel_update_results = {};
         player_wheel_surface_polarity_results = {};
         if (terrain == nullptr || !player_constructor_inputs_ready ||
             !player_wheel_core_initialization.has_value()) {
@@ -2704,6 +2712,7 @@ struct WindowState {
                 state.contact_active_0x168 = 0U;
             return;
         }
+        const auto previous_contact_states = player_wheel_contact_states;
         const auto read_body_float = [this](const std::uint32_t offset)
             -> std::optional<float> {
             const auto bits = viper::read_ncar_body_object_u32(
@@ -2731,6 +2740,27 @@ struct WindowState {
             return;
         }
         const viper::PhysicsVector3 body_position{*body_x, *body_y, *body_z};
+        std::array<float, 12> body_transform{};
+        std::copy(body_basis.begin(), body_basis.end(), body_transform.begin());
+        body_transform[9] = *body_x;
+        body_transform[10] = *body_y;
+        body_transform[11] = *body_z;
+        const auto body_velocity_x = read_body_float(0x234U);
+        const auto body_velocity_y = read_body_float(0x238U);
+        const auto body_velocity_z = read_body_float(0x23cU);
+        const auto body_angular_x = read_body_float(0x240U);
+        const auto body_angular_y = read_body_float(0x244U);
+        const auto body_angular_z = read_body_float(0x248U);
+        if (!body_velocity_x || !body_velocity_y || !body_velocity_z ||
+            !body_angular_x || !body_angular_y || !body_angular_z) {
+            for (auto& state : player_wheel_contact_states)
+                state.contact_active_0x168 = 0U;
+            return;
+        }
+        const viper::PhysicsVector3 body_linear_velocity{
+            *body_velocity_x, *body_velocity_y, *body_velocity_z};
+        const viper::PhysicsVector3 body_angular_velocity{
+            *body_angular_x, *body_angular_y, *body_angular_z};
         const auto body_up = viper::PhysicsVector3{
             body_basis[3], body_basis[4], body_basis[5]};
         // Contact queries use the session-owned PCAR transform and wheel
@@ -2757,8 +2787,9 @@ struct WindowState {
                 local_anchor, body_basis, body_position});
 
             // This terrain query starts from the PCAR's byte-backed pose and
-            // full basis. It models the native wheel query but does not yet
-            // feed suspension forces, collision response, or body integration.
+            // full basis. Its result feeds the recovered suspension/history
+            // stages below; tire force collection and body integration remain
+            // separate session seams.
             viper::WheelContactObservation observation{};
             observation.body_query_enabled = true;
             observation.reset_feature_hook_active = false;
@@ -2813,6 +2844,139 @@ struct WindowState {
                 return;
             }
         }
+
+        // The four wheel callbacks run before 0x431150 writes the paired
+        // +0x158 histories. Keep the surface projection on the prior contact
+        // point, then persist each finalized +0xE8 before deriving that pair.
+        for (std::size_t wheel = 0U; wheel < player_wheel_contact_states.size(); ++wheel) {
+            const auto& core = player_wheel_core_initialization->wheels[wheel];
+            const auto wheel_object_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+            const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
+            const auto read_wheel_float = [&wheel_object](const std::uint32_t offset)
+                -> std::optional<float> {
+                const auto bits = viper::read_ncar_wheel_object_u32(
+                    wheel_object, offset);
+                if (!bits) return std::nullopt;
+                return std::bit_cast<float>(*bits);
+            };
+            if (!core.has_value()) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            const auto suspension_base = read_wheel_float(0x158U);
+            const auto previous_depth_bits = viper::read_ncar_wheel_object_u32(
+                wheel_object, 0xe8U);
+            const auto damage = viper::read_ncar_wheel_object_u8(
+                wheel_object, 0x20U);
+            const auto special_surface_scaling_disabled =
+                viper::read_ncar_wheel_object_u8(wheel_object, 0x1a0U);
+            const auto coefficient_0x9c = read_wheel_float(0x9cU);
+            const auto coefficient_0xa0 = read_wheel_float(0xa0U);
+            const auto polarity = player_wheel_surface_polarity_results[wheel];
+            if (!suspension_base || !previous_depth_bits || !damage ||
+                !special_surface_scaling_disabled || !coefficient_0x9c ||
+                !coefficient_0xa0 || !polarity) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            const viper::BodyPointVelocityInput point_velocity_input{
+                body_position,
+                previous_contact_states[wheel].contact_point_0x130,
+                body_linear_velocity,
+                body_angular_velocity};
+            const auto point_velocity = viper::derive_body_point_velocity_0x43e9b0(
+                point_velocity_input);
+            const float motion_projection =
+                viper::project_body_point_velocity_0x442530(
+                    point_velocity, body_transform);
+            const auto& contact = player_wheel_contact_results[wheel];
+            const auto& observation = player_wheel_contact_observations[wheel];
+            viper::WheelSuspensionPipelineInput suspension_input{};
+            suspension_input.base.piecewise_terms = core->suspension_piecewise_terms;
+            suspension_input.base.contact_depth = contact.clamped_contact_depth;
+            suspension_input.base.previous_contact_depth_0xe8 =
+                std::bit_cast<float>(*previous_depth_bits);
+            suspension_input.base.wheel_depth_limit_0x44 = core->value_0x44;
+            suspension_input.base.spring_scale_0x3c = core->value_0x3c;
+            suspension_input.base.spring_base_0x40 = core->value_0x40;
+            suspension_input.base.suspension_base_0x158 = *suspension_base;
+            suspension_input.base.suspension_threshold_0x4c = core->value_0x4c;
+            suspension_input.base.subtract_damage_adjustment_0x20 = *damage != 0U;
+            suspension_input.surface.signed_motion_projection = motion_projection;
+            suspension_input.surface.coefficient_0x9c = *coefficient_0x9c;
+            suspension_input.surface.coefficient_0xa0 = *coefficient_0xa0;
+            suspension_input.surface.environment_sign = *polarity == 0 ? -1.0F : 1.0F;
+            suspension_input.surface.contact_feature_0x19c =
+                player_wheel_contact_states[wheel].contact_feature_0x19c;
+            suspension_input.surface.special_surface_scaling_disabled_0x1a0 =
+                *special_surface_scaling_disabled != 0U;
+            suspension_input.contact_direction = observation.contact_direction;
+            suspension_input.contact_active = contact.active;
+            const auto suspension =
+                viper::advance_ncar_wheel_suspension_with_history(
+                    player_runtime_state.wheel_objects[wheel], suspension_input);
+            if (!suspension ||
+                !std::isfinite(suspension->finalized.next_contact_depth_0xe8) ||
+                !std::isfinite(suspension->finalized.applied_response)) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            auto& update = player_wheel_update_results[wheel];
+            update.contact = contact;
+            update.suspension = *suspension;
+            if (suspension->finalized.reset_contact) {
+                player_wheel_contact_states[wheel].contact_active_0x168 = 0U;
+                player_wheel_contact_results[wheel].active = false;
+            }
+            update.contact.active = player_wheel_contact_states[wheel]
+                .contact_active_0x168 != 0U;
+            const std::array<viper::NcarObjectFieldWrite, 2> wheel_state_writes{{
+                {wheel_object_offset + 0x168U, 1U,
+                    player_wheel_contact_states[wheel].contact_active_0x168},
+                {wheel_object_offset + 0x178U, 4U,
+                    std::bit_cast<std::uint32_t>(
+                        suspension->finalized.applied_response)},
+            }};
+            if (!viper::apply_ncar_wheel_object_writes(
+                    player_runtime_state.wheel_objects[wheel], wheel_object_offset,
+                    wheel_state_writes)) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+        }
+
+        const auto first_scale_bits = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object, 0xdd4U);
+        const auto second_scale_bits = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object, 0xdd8U);
+        if (!first_scale_bits || !second_scale_bits) {
+            player_constructor_inputs_ready = false;
+            return;
+        }
+        std::array<std::uint8_t, 4> contact_bytes{};
+        for (std::size_t wheel = 0U; wheel < contact_bytes.size(); ++wheel)
+            contact_bytes[wheel] = player_wheel_contact_states[wheel]
+                .contact_active_0x168;
+        const auto pair_input =
+            viper::make_ncar_integrator_wheel_pair_differential_input_from_updates(
+                player_wheel_update_results,
+                std::bit_cast<float>(*first_scale_bits),
+                std::bit_cast<float>(*second_scale_bits), contact_bytes);
+        if (!pair_input) {
+            player_constructor_inputs_ready = false;
+            return;
+        }
+        player_wheel_pair_differentials =
+            viper::apply_ncar_integrator_wheel_pair_differentials(*pair_input);
+        if (!viper::apply_ncar_integrator_wheel_pair_differentials_to_wheels(
+                player_runtime_state.wheel_objects, 0x554U,
+                player_wheel_pair_differentials)) {
+            player_constructor_inputs_ready = false;
+            return;
+        }
+        player_wheel_pair_history_derived_from_updates = true;
+        player_wheel_pair_differential_producer_applied = true;
     }
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
@@ -2963,7 +3127,8 @@ struct WindowState {
                 tick.wheel_preupdate_value_0x158_after_tick[wheel] =
                     std::bit_cast<float>(*bits);
             }
-            tick.wheel_0x158_native_producer_owned[wheel] = false;
+            tick.wheel_0x158_native_producer_owned[wheel] =
+                player_wheel_pair_differential_producer_applied;
             if (const auto bits = viper::read_ncar_wheel_object_u32(
                     wheel_object, 0xe8U)) {
                 tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
@@ -3231,8 +3396,8 @@ struct WindowState {
             player_physics_ticks_this_update.push_back(tick_context);
             // The native PCAR callback prefix stores control-derived body
             // scalars before entering the shared integrator's four wheel
-            // callbacks. Keep the reconstructed observation stages in that
-            // order even though the wheel results are not yet force inputs.
+            // callbacks. Keep the wheel suspension/pair-history projection
+            // after that prefix; tire/body force accumulation is still open.
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(

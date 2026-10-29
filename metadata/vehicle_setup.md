@@ -1632,8 +1632,9 @@ live `sample_terrain_surface` call uses the reconstructed terrain-query
 algorithm. Its remaining limitation is the missing dynamic body transform and
 downstream response: the runtime derives the origin from byte-backed PCAR
 position/basis plus constructor wheel geometry, not route pose. The body is
-not yet evolving, and query output does not feed the live suspension/force/body
-step. Ghidra Evidence for the wrapper and
+not yet evolving. Query output now feeds the live suspension/history stages and
+paired wheel differential producer; tire-force collection, force accumulation,
+and body integration remain open. Ghidra Evidence for the wrapper and
 sampler: `0x45F760` `ev_4acbfe6d2397810fe55e429197e8f54269e4440fad4631decd123f188e3a5652`;
 `0x4672B0` `ev_02a12b56b8da3a7c9bbd70acea0ae1696edd55d1a9b5d5edc3fa23baaf6dc868`.
 

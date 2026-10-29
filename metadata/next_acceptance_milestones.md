@@ -32,24 +32,25 @@ integrator calls with four ordered wheel callback entry/return rows each (32
 total). `+0xE8` changes inside each callback; wheel `+0x158` remains stable
 inside a callback and changes between integrator calls. Static disassembly
 subsequently identified its paired-differential producer in `0x431150`; the
-byte-backed writer is modeled and regression-covered but not called by the
-runtime. Evidence
+runtime now calls the byte-backed producer after four wheel suspension/history
+updates. This is an internal integration step, with no tire-force collection or
+body integration. Evidence
 `ev_3d97fe4c71bcd56533c8e0fd71c29e7c5276016e9acf0392b77ed241ab5d65ae` is
 retained in `metadata/original_physics_dispatch_capture.md`. The run was not
 clean-start or input-controlled and supplies no golden numeric response. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
-`src/game_main.cpp`
-still advances the player and opponents with `advance_route_motion`; its
-four-wheel contact updates are observations and do not feed suspension forces,
-body accumulators, collisions, or pose integration. The terrain plane sampler
+`src/game_main.cpp` retains an explicit route-motion prototype, but diagnostics
+and acceptance tests keep it disabled. Four-wheel terrain contact now feeds the
+reconstructed suspension/history stages and paired `+0x158` differential
+producer. Tire-force collection, body accumulators, collisions, and pose
+integration remain unimplemented. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches
 the selected track `obj car` runtime-record transform also used by the renderer.
 `place_on_route` only seeds the provisional route progress adapter and does not
 change that body or rendered placement. The body remains static in the live
-session, and contact observations are not connected to collision response,
-suspension force, or pose integration.
+session.
 Shipped-binary Ghidra evidence confirms base initializer `0x4375C0` seeds an
 identity basis and zero position, while the PCAR derived initializer path
 `0x42FF90 -> 0x43E490 -> 0x4375C0` later invokes `0x433C00` to copy the chosen

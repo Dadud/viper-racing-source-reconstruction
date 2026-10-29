@@ -287,9 +287,13 @@ try {
                 throw 'First tick does not expose the initialized PCAR +0x50C/+0x510 constructor state'
             }
             for ($wheel = 0; $wheel -lt 4; ++$wheel) {
-                if ($fields[$wheelProducerOwnedColumns[$wheel]] -notin @('0', '1') -or
+                $pairHistory = $fields[$wheelPreupdateColumns[$wheel]]
+                if ($fields[$wheelProducerOwnedColumns[$wheel]] -ne '1' -or
+                    [string]::IsNullOrWhiteSpace($pairHistory) -or
+                    [Math]::Abs([single]::Parse(
+                        $pairHistory, [cultureinfo]::InvariantCulture)) -gt 0.00001 -or
                     $fields[$wheelPriorDepthColumns[$wheel]] -ne '0') {
-                    throw "Wheel $wheel first-tick +0x158 ownership/value or +0xE8 constructor state differs"
+                    throw "Wheel $wheel first-tick producer output, inactive contact history, or +0xE8 state differs"
                 }
             }
         }
