@@ -39,6 +39,10 @@ body integration. Evidence
 retained in `metadata/original_physics_dispatch_capture.md`. The run was not
 clean-start or input-controlled and supplies no golden numeric response. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
+The later 2026-10-29 passive probe retry retained 8 integrator calls and 32
+wheel rows, but had no input schedule/native tick and an invalid `0x43E6F0`
+argument decoder; exclude its force-writer values. Its evidence id and limits
+are recorded in `original_physics_dispatch_capture.md`.
 `src/game_main.cpp` retains an explicit route-motion prototype, but diagnostics
 and acceptance tests keep it disabled. Four-wheel terrain contact now feeds the
 reconstructed suspension/history stages and paired `+0x158` differential
@@ -676,12 +680,24 @@ while `+0xE8` and response fields changed. All sampled controls were zero, so
 this is only an uncontrolled coast ordering observation. Capture the body
 after the full integrator and repeat the bounded four-control schedule before
 using these rows to wire or validate the production body step.
+The 2026-10-29 live probe retry is weaker and must not be combined with the
+controlled capture: it had no input schedule or native tick, and its
+`0x43E6F0` argument decoder produced invalid force/point values. Exclude those
+writer rows entirely. The retry confirms only bounded callback-stage
+availability; details and its REA evidence id are in
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#live-wheel-response-probe-retry-2026-10-29).
 The trace now carries contact-gate status, raw and clamped depth, byte-backed
 prior `+0xE8` and pre-update `+0x158`, the finite-checked base suspension
 response, and the trace-only surface polarity/projection/adjustment stage.
-Finalization, force accumulation, and body integration remain disconnected.
-This operand/result row is intended to support the next controlled original
-capture without substituting invented forces.
+The fixed-step CSV now also records initialized wheel response scales
+`+0x90/+0x94/+0x98`, surface coefficients `+0x9C/+0xA0`, response scalar
+`+0x7C`, response vectors `+0xF4/+0x100`, and the source-derived point velocity
+at `+0x130`. These are diagnostic values only; tire finalization, force
+accumulation, and body integration remain disconnected. Full Release build and
+all 66 configured CTests passed 2026-10-29; this verifies build and replay
+determinism, not tire-force behavior. The operand/result row is intended to
+support the next controlled original capture without substituting invented
+forces.
 
 ### 3. Complete and compare the first original-compatible single-player race
 

@@ -1477,3 +1477,27 @@ as a numeric acceptance fixture. Evidence
 contains this sample plus an earlier failed read attempt; discard the earlier
 all-null sample and use only the subsequent `passive_integrator_state` row.
 The hook was unloaded and its Frida session closed after capture.
+
+### Live wheel-response probe retry (2026-10-29)
+
+The checked-in bounded read-only `tools/pcar_wheel_response_input_probe.js`
+was attached to the already-running x86 `race.bin` (PID 1540, start time
+2026-10-29 15:50:49 local) after confirming SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`.
+The module loaded at `0x400000` with size `0x1c2000`; the selected object was
+`0x4c720cc`. The probe observed 8 integrator calls, 32 wheel callbacks, 128
+force-writer rows, and 192 stage rows. The callbacks retained the same four
+wheel objects and the known suspension-force, tire-force, and wheel-history
+stages. `+0x158` remained unchanged within each sampled callback; contact and
+suspension fields were readable at the callsite.
+
+This was uncontrolled live-process evidence: there was no clean-start
+baseline, input schedule, native tick value, entrant identity, or matched
+reconstruction. The reported `0x43E6F0` writer force/point rows have an x86
+argument-decoding error and are excluded; the capture does not establish
+accumulator deltas or force attribution. Read-only hooks were unloaded and
+the Frida session closed. REA evidence id:
+`ev_5f0aea2d5891040ce6f410ec0f04d2eafbc24609edb867624195b1df854ef455`;
+the script SHA-256 matches the checked-in probe recorded above. Treat the
+capture as callback-stage inventory only, never a numeric fixture or
+acceptance result.

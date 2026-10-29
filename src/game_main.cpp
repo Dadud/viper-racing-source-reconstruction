@@ -2067,6 +2067,21 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::int64_t>, 4> wheel_surface_polarity_results{};
     std::array<std::optional<float>, 4> wheel_surface_motion_projections{};
     std::array<std::optional<float>, 4> wheel_surface_adjusted_responses{};
+    // Source-owned wheel response operands captured after the reconstructed
+    // suspension/contact prefix. These are diagnostics only; no force is
+    // accumulated from them yet.
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_body_point_velocities_0x130{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_response_vectors_0xf4{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_corrected_response_vectors_0x100{};
+    std::array<std::optional<float>, 4> wheel_response_scalar_0x7c{};
+    std::array<std::optional<float>, 4> wheel_curve_scale_0x90{};
+    std::array<std::optional<float>, 4> wheel_curve_scale_0x94{};
+    std::array<std::optional<float>, 4> wheel_curve_scale_0x98{};
+    std::array<std::optional<float>, 4> wheel_surface_coefficient_0x9c{};
+    std::array<std::optional<float>, 4> wheel_surface_coefficient_0xa0{};
     std::array<std::optional<std::uint8_t>, 4> wheel_animation_flags_0x120{};
     std::array<std::optional<std::uint8_t>, 4> wheel_animation_mode_0x121{};
 };
@@ -3140,6 +3155,7 @@ struct WindowState {
                 player_runtime_state.body_object, 0x510U);
         for (std::size_t wheel = 0U; wheel < player_wheel_contact_states.size();
              ++wheel) {
+            const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
             if (player_wheel_core_initialization &&
                 player_wheel_core_initialization->wheels[wheel]) {
                 const auto& core = *player_wheel_core_initialization->wheels[wheel];
@@ -3156,6 +3172,41 @@ struct WindowState {
                 player_wheel_contact_states[wheel].contact_active_0x168;
             tick.wheel_surface_polarity_results[wheel] =
                 player_wheel_surface_polarity_results[wheel];
+            const auto read_response_float = [&wheel_object](const std::uint32_t offset)
+                -> std::optional<float> {
+                const auto bits = viper::read_ncar_wheel_object_u32(
+                    wheel_object, offset);
+                if (!bits) return std::nullopt;
+                const auto value = std::bit_cast<float>(*bits);
+                return std::isfinite(value) ? std::optional<float>(value)
+                                            : std::nullopt;
+            };
+            tick.wheel_curve_scale_0x90[wheel] = read_response_float(0x90U);
+            tick.wheel_curve_scale_0x94[wheel] = read_response_float(0x94U);
+            tick.wheel_curve_scale_0x98[wheel] = read_response_float(0x98U);
+            tick.wheel_surface_coefficient_0x9c[wheel] =
+                read_response_float(0x9cU);
+            tick.wheel_surface_coefficient_0xa0[wheel] =
+                read_response_float(0xa0U);
+            if (const auto response_scalar = read_response_float(0x7cU))
+                tick.wheel_response_scalar_0x7c[wheel] = response_scalar;
+            const auto read_response_vector = [&wheel_object](
+                const std::uint32_t offset) -> std::optional<viper::PhysicsVector3> {
+                const auto x = viper::read_ncar_wheel_object_u32(wheel_object, offset);
+                const auto y = viper::read_ncar_wheel_object_u32(wheel_object, offset + 4U);
+                const auto z = viper::read_ncar_wheel_object_u32(wheel_object, offset + 8U);
+                if (!x || !y || !z) return std::nullopt;
+                const viper::PhysicsVector3 value{
+                    std::bit_cast<float>(*x), std::bit_cast<float>(*y),
+                    std::bit_cast<float>(*z)};
+                return std::isfinite(value.x) && std::isfinite(value.y) &&
+                        std::isfinite(value.z)
+                    ? std::optional<viper::PhysicsVector3>(value) : std::nullopt;
+            };
+            tick.wheel_response_vectors_0xf4[wheel] =
+                read_response_vector(0xf4U);
+            tick.wheel_corrected_response_vectors_0x100[wheel] =
+                read_response_vector(0x100U);
             tick.wheel_contact_gate_passed_after_tick[wheel] =
                 static_cast<std::uint8_t>(
                     player_wheel_contact_results[wheel].contact_gate_passed ? 1 : 0);
@@ -3165,7 +3216,6 @@ struct WindowState {
                 tick.wheel_contact_clamped_depth_after_tick[wheel] =
                     player_wheel_contact_results[wheel].clamped_contact_depth;
             }
-            const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
             const auto& contact_observation =
                 player_wheel_contact_observations[wheel];
             if (contact_observation.body_query_enabled) {
@@ -3280,6 +3330,12 @@ struct WindowState {
                             const auto point_velocity =
                                 viper::derive_body_point_velocity_0x43e9b0(
                                     point_velocity_input);
+                            if (std::isfinite(point_velocity.x) &&
+                                std::isfinite(point_velocity.y) &&
+                                std::isfinite(point_velocity.z)) {
+                                tick.wheel_body_point_velocities_0x130[wheel] =
+                                    point_velocity;
+                            }
                             const auto motion_projection =
                                 viper::project_body_point_velocity_0x442530(
                                     point_velocity, body_transform);
@@ -4888,6 +4944,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_surface_polarity_result"
                 << ",wheel" << wheel << "_surface_motion_projection"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
+                << ",wheel" << wheel << "_response_scalar_0x7c"
+                << ",wheel" << wheel << "_curve_scale_0x90"
+                << ",wheel" << wheel << "_curve_scale_0x94"
+                << ",wheel" << wheel << "_curve_scale_0x98"
+                << ",wheel" << wheel << "_surface_coefficient_0x9c"
+                << ",wheel" << wheel << "_surface_coefficient_0xa0"
                 << ",wheel" << wheel << "_animation_flags_0x120"
                 << ",wheel" << wheel << "_animation_mode_0x121"
                 << ",wheel" << wheel << "_contact_query_succeeded"
@@ -4895,6 +4957,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             for (const auto* vector_name : {"contact_origin", "query_contact_point",
                      "query_contact_normal", "contact_direction",
                      "selected_model_vertex", "position_relative_to_vertex"}) {
+                physics_tick_trace << ",wheel" << wheel << '_' << vector_name << "_x"
+                    << ",wheel" << wheel << '_' << vector_name << "_y"
+                    << ",wheel" << wheel << '_' << vector_name << "_z";
+            }
+            for (const auto* vector_name : {"body_point_velocity_0x130",
+                     "response_vector_0xf4", "corrected_response_vector_0x100"}) {
                 physics_tick_trace << ",wheel" << wheel << '_' << vector_name << "_x"
                     << ",wheel" << wheel << '_' << vector_name << "_y"
                     << ",wheel" << wheel << '_' << vector_name << "_z";
@@ -5227,6 +5295,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace <<
                                 *tick.wheel_surface_adjusted_responses[wheel];
                         }
+                        for (const auto value : {
+                                tick.wheel_response_scalar_0x7c[wheel],
+                                tick.wheel_curve_scale_0x90[wheel],
+                                tick.wheel_curve_scale_0x94[wheel],
+                                tick.wheel_curve_scale_0x98[wheel],
+                                tick.wheel_surface_coefficient_0x9c[wheel],
+                                tick.wheel_surface_coefficient_0xa0[wheel]}) {
+                            physics_tick_trace << ',';
+                            if (value) physics_tick_trace << *value;
+                        }
                         physics_tick_trace << ',';
                         if (tick.wheel_animation_flags_0x120[wheel]) {
                             physics_tick_trace << static_cast<unsigned>(
@@ -5266,6 +5344,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         write_vector(tick.wheel_contact_directions[wheel]);
                         write_vector(tick.wheel_selected_model_vertices[wheel]);
                         write_vector(tick.wheel_positions_relative_to_vertices[wheel]);
+                        write_vector(tick.wheel_body_point_velocities_0x130[wheel]);
+                        write_vector(tick.wheel_response_vectors_0xf4[wheel]);
+                        write_vector(tick.wheel_corrected_response_vectors_0x100[wheel]);
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {
