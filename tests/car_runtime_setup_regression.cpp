@@ -859,6 +859,19 @@ int main()
                 materialized_front_wheel.initialized_bytes[0x03cU] != 0U &&
                 materialized_front_wheel.initialized_bytes[0x0a0U + 3U] != 0U,
             "live wheel bytes must retain exact constructor geometry and spring fields");
+        require(viper::materialize_ncar_wheel_reference_vector(
+                    materialized_front_wheel, front_wheel_base,
+                    viper::ncar_shared_zero_wheel_reference_address_0x508e80,
+                    {0.0F, 0.0F, 0.0F}) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x10U) ==
+                    viper::ncar_shared_zero_wheel_reference_address_0x508e80 &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x14U) ==
+                    std::bit_cast<std::uint32_t>(0.0F) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x18U) ==
+                    std::bit_cast<std::uint32_t>(0.0F) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x1cU) ==
+                    std::bit_cast<std::uint32_t>(0.0F),
+            "standard 0x441C10 shared-zero source must persist its pointer and copied vector");
         const std::array<float, 12> projection_transform{
             0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
             1.0F, 3.0F, 2.0F, 0.0F, 0.0F, 0.0F};

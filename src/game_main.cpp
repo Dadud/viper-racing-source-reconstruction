@@ -2481,6 +2481,16 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
+            if (player_wheel_core_initialization->anchors.sources[wheel] ==
+                    viper::NcarWheelAnchorSource::shared_zero_vector &&
+                !viper::materialize_ncar_wheel_reference_vector(
+                    player_runtime_state.wheel_objects[wheel], wheel_offset,
+                    viper::ncar_shared_zero_wheel_reference_address_0x508e80,
+                    {0.0F, 0.0F, 0.0F})) {
+                player_runtime_car_record.clear();
+                player_runtime_state = {};
+                return false;
+            }
             const std::array<viper::NcarObjectFieldWrite, 3> pcar_wheel_control_writes{{
                 {wheel_offset + 0x160U, 1U,
                     *player_pcar_constructor_controls.wheel_helper_value_0x6b4},
@@ -2575,23 +2585,35 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
-            // 0x433C00 disables FNIM vertex anchors in the standard frontend
-            // physics options, so 0x441C10 receives the native shared-zero
-            // reference vector. The wheel constructor candidate is therefore
-            // already the local point; do not add selected_model_vertex here.
-            const std::array<float, 3> local{
-                core->position_relative_to_selected_vertex[0] +
-                    core->selected_model_vertex[0],
-                core->position_relative_to_selected_vertex[1] +
-                    core->selected_model_vertex[1],
-                core->position_relative_to_selected_vertex[2] +
-                    core->selected_model_vertex[2]};
-            const auto& t = player_runtime_state.placement_transform;
+            const auto& wheel_bytes = player_runtime_state.wheel_objects[wheel];
+            const auto x = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x04U);
+            const auto y = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x08U);
+            const auto z = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x0cU);
+            const auto rx = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x14U);
+            const auto ry = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x18U);
+            const auto rz = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x1cU);
+            if (!x || !y || !z || !rx || !ry || !rz) {
+                player_runtime_state = {};
+                return false;
+            }
+            viper::WheelPointTransformInput point_input{};
+            point_input.wheel_position_0x04_0x0c = {
+                std::bit_cast<float>(*x), std::bit_cast<float>(*y),
+                std::bit_cast<float>(*z)};
+            point_input.referenced_point_0x10 = {
+                std::bit_cast<float>(*rx), std::bit_cast<float>(*ry),
+                std::bit_cast<float>(*rz)};
+            point_input.body_transform_0x38_to_0x64 =
+                player_runtime_state.placement_transform;
+            const auto world_point = viper::transform_wheel_point_0xc8(point_input);
             auto& world = player_runtime_state.initial_wheel_world_positions[wheel];
-            world = {
-                t[0] * local[0] + t[3] * local[1] + t[6] * local[2] + t[9],
-                t[1] * local[0] + t[4] * local[1] + t[7] * local[2] + t[10],
-                t[2] * local[0] + t[5] * local[1] + t[8] * local[2] + t[11]};
+            world = {world_point.x, world_point.y, world_point.z};
             if (!std::all_of(world.begin(), world.end(),
                     [](const float value) { return std::isfinite(value); })) {
                 player_runtime_state = {};
@@ -2812,19 +2834,33 @@ struct WindowState {
                 player_constructor_inputs_ready = false;
                 return;
             }
-            // The selected vertex is subtracted by native 0x441C10 when it
-            // stores +0x04..+0x0C, then added back by 0x437BA0. Combine those
-            // terms to recover the local anchor before applying the initialized
-            // body basis and position.
-            const viper::PhysicsVector3 local_anchor{
-                core->position_relative_to_selected_vertex[0] +
-                    core->selected_model_vertex[0],
-                core->position_relative_to_selected_vertex[1] +
-                    core->selected_model_vertex[1],
-                core->position_relative_to_selected_vertex[2] +
-                    core->selected_model_vertex[2]};
-            const auto wheel_world_point = viper::transform_body_local_point({
-                local_anchor, body_basis, body_position});
+            const auto& wheel_bytes = player_runtime_state.wheel_objects[wheel];
+            const auto wheel_x = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x04U);
+            const auto wheel_y = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x08U);
+            const auto wheel_z = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x0cU);
+            const auto ref_x = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x14U);
+            const auto ref_y = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x18U);
+            const auto ref_z = viper::read_ncar_wheel_object_u32(wheel_bytes,
+                0x1cU);
+            if (!wheel_x || !wheel_y || !wheel_z || !ref_x || !ref_y || !ref_z) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            viper::WheelPointTransformInput point_input{};
+            point_input.wheel_position_0x04_0x0c = {
+                std::bit_cast<float>(*wheel_x), std::bit_cast<float>(*wheel_y),
+                std::bit_cast<float>(*wheel_z)};
+            point_input.referenced_point_0x10 = {
+                std::bit_cast<float>(*ref_x), std::bit_cast<float>(*ref_y),
+                std::bit_cast<float>(*ref_z)};
+            point_input.body_transform_0x38_to_0x64 = body_transform;
+            const auto wheel_world_point =
+                viper::transform_wheel_point_0xc8(point_input);
 
             // This terrain query starts from the PCAR's byte-backed pose and
             // full basis. Its result feeds the recovered suspension/history
@@ -4624,7 +4660,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 wheel_plan) ||
                             !viper::apply_ncar_wheel_core_initialization(
                                 body_state.wheel_objects[wheel], wheel_offset,
-                                *core)) {
+                                *core) ||
+                            (body_state.wheel_core_initialization->anchors.sources[wheel] ==
+                                    viper::NcarWheelAnchorSource::shared_zero_vector &&
+                             !viper::materialize_ncar_wheel_reference_vector(
+                                body_state.wheel_objects[wheel], wheel_offset,
+                                viper::ncar_shared_zero_wheel_reference_address_0x508e80,
+                                {0.0F, 0.0F, 0.0F}))) {
                             stream_ok = false;
                             break;
                         }

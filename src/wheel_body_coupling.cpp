@@ -685,6 +685,28 @@ NcarFourWheelCoreInitialization initialize_ncar_four_wheel_core(
     return result;
 }
 
+bool materialize_ncar_wheel_reference_vector(
+    NcarWheelRuntimeObjectState& destination,
+    const std::uint32_t wheel_object_offset,
+    const std::uint32_t guest_pointer,
+    const PhysicsVector3 copied_value) noexcept
+{
+    if (guest_pointer == 0U || !std::isfinite(copied_value.x) ||
+        !std::isfinite(copied_value.y) || !std::isfinite(copied_value.z)) {
+        return false;
+    }
+    const std::array<NcarObjectFieldWrite, 4> writes{{
+        {wheel_object_offset + 0x10U, 4U, guest_pointer},
+        {wheel_object_offset + 0x14U, 4U,
+            std::bit_cast<std::uint32_t>(copied_value.x)},
+        {wheel_object_offset + 0x18U, 4U,
+            std::bit_cast<std::uint32_t>(copied_value.y)},
+        {wheel_object_offset + 0x1cU, 4U,
+            std::bit_cast<std::uint32_t>(copied_value.z)},
+    }};
+    return apply_ncar_wheel_object_writes(destination, wheel_object_offset, writes);
+}
+
 bool apply_ncar_wheel_core_initialization(
     NcarWheelRuntimeObjectState& destination,
     const std::uint32_t wheel_object_offset,

@@ -13,6 +13,16 @@
 
 namespace viper {
 
+inline constexpr std::uint32_t ncar_shared_zero_wheel_reference_address_0x508e80 =
+    0x00508e80U;
+
+// Materializes the 0x441C10 reference-vector pointer and its copied payload.
+[[nodiscard]] bool materialize_ncar_wheel_reference_vector(
+    NcarWheelRuntimeObjectState& destination,
+    std::uint32_t wheel_object_offset,
+    std::uint32_t guest_pointer,
+    PhysicsVector3 copied_value) noexcept;
+
 struct NcarIntegratorWheelPairDifferentialInput {
     float first_value_0x63c{};
     float first_reference_0x7e0{};
