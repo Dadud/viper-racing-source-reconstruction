@@ -1040,14 +1040,16 @@ int main()
             {1U, 1U, 1U, 1U};
         explicit_pair_step_input.integrator_timer_state.record_time_0xe44 =
             -100.0F;
-        const auto complete_explicit_pair_step =
+        const auto finite_explicit_pair_step =
             viper::advance_four_wheel_body_step(explicit_pair_step_input);
-        require(complete_explicit_pair_step.input_complete &&
-                complete_explicit_pair_step.wheel_pair_differentials.value_0x850 ==
+        require(!finite_explicit_pair_step.input_complete &&
+                finite_explicit_pair_step.missing_input_groups ==
+                    viper::four_wheel_body_step_core_input_groups &&
+                finite_explicit_pair_step.wheel_pair_differentials.value_0x850 ==
                     -2.0F &&
-                complete_explicit_pair_step.wheel_pair_differentials.value_0xb98 ==
+                finite_explicit_pair_step.wheel_pair_differentials.value_0xb98 ==
                     -3.0F,
-            "four-wheel fallback must accept finite explicit history operands");
+            "finite pair-history math must remain usable without claiming unresolved body-step inputs");
         auto invalid_explicit_pair_scale = explicit_pair_step_input;
         invalid_explicit_pair_scale.wheel_pair_differential_input.first_scale_0xdd4 =
             std::numeric_limits<float>::quiet_NaN();

@@ -427,6 +427,15 @@ now known, but the gameplay event that replaces `+0xE44 = -100` and the
 in-window `+0x50C` ramp/participant-row behavior remain unresolved.
 
 The model `advance_four_wheel_body_step` currently has no production call site.
+Its `input_complete` result now requires callers to declare all unconditional
+input groups (wheel runtime state, contact/surface state, integrator callback
+state, body force context, and body integration state), plus any enabled
+embedded-record, virtual-record, or attached-object groups. Unmarked/defaulted
+groups remain visible in `missing_input_groups`; finite pair-history math may
+still be inspected without describing the entire composed step as complete.
+These group marks are caller attestations based on resolved source state, not
+automatic proof that the marked values are correct. No production caller marks
+them yet, so the model does not establish live physics completeness.
 The local player is dispatched as PCAR: per-step task dispatch `0x421050`
 checks the physics object's virtual `+0x2C` gate and calls virtual `+8`, which
 resolves through PCAR vtable `0x4C8188` to callback `0x4384D0`. Once that

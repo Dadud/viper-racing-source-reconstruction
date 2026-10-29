@@ -1976,7 +1976,23 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         kinematics_at_step_start.angular_velocity.y);
     result.integrator_wheel_scalars = advance_ncar_integrator_wheel_scalars(
         wheel_scalar_input);
-    result.input_complete = result.integrator_timer.input_complete;
+    result.required_input_groups = four_wheel_body_step_core_input_groups;
+    if (input.embedded_record_count_0x7b != 0U) {
+        result.required_input_groups |= four_wheel_body_step_group_bit(
+            FourWheelBodyStepInputGroup::embedded_record_state);
+    }
+    if (!input.packed_virtual_records.empty()) {
+        result.required_input_groups |= four_wheel_body_step_group_bit(
+            FourWheelBodyStepInputGroup::virtual_record_state);
+    }
+    if (input.attached_object_force_gate_0xbe4) {
+        result.required_input_groups |= four_wheel_body_step_group_bit(
+            FourWheelBodyStepInputGroup::attached_object_state);
+    }
+    result.missing_input_groups = result.required_input_groups &
+        ~input.resolved_input_groups;
+    result.input_complete = result.integrator_timer.input_complete &&
+        result.missing_input_groups == 0U;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;
     result.wheel_collisions.wheel_damage_flags = input.wheel_damage_flags_0x20;

@@ -812,7 +812,35 @@ advance_ncar_integrator_child_control_step(
     const NcarIntegratorChildControlStepInput& input,
     std::uint32_t car_value_0xde0_bits);
 
+enum class FourWheelBodyStepInputGroup : std::uint32_t {
+    wheel_runtime_state = 1U << 0U,
+    contact_and_surface_state = 1U << 1U,
+    integrator_callback_state = 1U << 2U,
+    body_force_context = 1U << 3U,
+    body_integration_state = 1U << 4U,
+    embedded_record_state = 1U << 5U,
+    virtual_record_state = 1U << 6U,
+    attached_object_state = 1U << 7U,
+};
+
+[[nodiscard]] constexpr std::uint32_t four_wheel_body_step_group_bit(
+    const FourWheelBodyStepInputGroup group) noexcept
+{
+    return static_cast<std::uint32_t>(group);
+}
+
+inline constexpr std::uint32_t four_wheel_body_step_core_input_groups =
+    four_wheel_body_step_group_bit(FourWheelBodyStepInputGroup::wheel_runtime_state) |
+    four_wheel_body_step_group_bit(FourWheelBodyStepInputGroup::contact_and_surface_state) |
+    four_wheel_body_step_group_bit(FourWheelBodyStepInputGroup::integrator_callback_state) |
+    four_wheel_body_step_group_bit(FourWheelBodyStepInputGroup::body_force_context) |
+    four_wheel_body_step_group_bit(FourWheelBodyStepInputGroup::body_integration_state);
+
 struct FourWheelBodyStepInput {
+    // Mark a group only when its values have been resolved from current,
+    // evidence-backed caller state. Default-zero aggregate initialization is
+    // intentionally not treated as proof that a native input was resolved.
+    std::uint32_t resolved_input_groups{};
     std::array<std::uint8_t, 4> wheel_damage_flags_0x20{};
     bool wheel_update_prefix_enabled{};
     std::array<WheelUpdatePrefixInput, 4> wheel_update_prefix_inputs{};
@@ -948,6 +976,8 @@ struct FourWheelBodyStepResult {
     NcarForceMomentAccumulator force_moment_state{};
     float energy_accumulator_0xe40{};
     bool input_complete{true};
+    std::uint32_t required_input_groups{};
+    std::uint32_t missing_input_groups{};
 };
 
 // Composes the 0x42F100 solve, conditional wheel damage-byte store, and
