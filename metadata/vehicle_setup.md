@@ -697,24 +697,57 @@ persists the finalized next depth back to `+0xE8`. An uninitialized lane fails
 closed without changing the wheel. This is a stateful model adapter only: the
 wheel reset at `0x441B90` explicitly clears `+0xE8`, and `0x442530` consumes
 the prior depth and later produces its next value, but the live race session
-does not call this adapter. Other suspension inputs remain explicit, including
-the unresolved source for wheel `+0x158`; the adapter does not provide that
-input or create live physical motion. Evidence: `0x441B90`
+does not call this adapter. Other suspension inputs remain explicit; the
+adapter does not create live physical motion. Evidence: `0x441B90`
 `ev_4a2b61d33988864abf28dc3967396235c19b9e10`; `0x442530` dossier
 `ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`.
 
 The frame-context builder at `0x4329C0` copies body `+0x50C` into a separate
-context row at `+0x158`, then calls `0x444120` to populate that row. This does
-not establish a write to the actual wheel object's `+0x158`: PCAR integrator
-`0x431150` passes the four car-owned wheel objects directly to `0x442530`, and
-no call from that path to `0x4329C0` is present in its recovered body. The PCAR
-derived constructor `0x42FF90` sets body `+0x50C = 1.0`, which is constructor
-state only. The shared integrator path contains a ramp/reset writer at
-`0x433570`; NCAR callback `0x439200` has additional gated decrement/assignment
-paths. The record-driven `0x432420` writer belongs to the separate GCAR
-GhostBegin playback ring and is not the player's live ring. The actual wheel
-`+0x158` writer and its relationship, if any, to the `0x4329C0` context row
-remain unresolved, as do the live body timer inputs and callback ordering.
+context row at `+0x158`, then calls `0x444120` to populate that row. This row
+is not the wheel object's same-offset field. The actual wheel `+0x158` producer
+is identified in shared integrator `0x431150`, after its four `0x442530`
+wheel calls. It computes the first pair's `(+0x63C - +0x7E0) * +0xDD4`, gates
+the result on either wheel contact byte `+0x6BC/+0x860`, and stores opposite
+signs to wheel 0/1 `+0x158`. It similarly computes
+`(+0x984 - +0xB28) * +0xDD8`, gates on `+0xA04/+0xBA8`, and stores opposite
+signs to wheels 2/3. Disassembly identifies the four stores at `0x4319B6`,
+`0x4319D5`, `0x431A02`, and `0x431A10`; a passive address-filtered trace
+observed wheel 0 and wheel 2 stores. This source and byte-backed state
+transition are now modeled; integrating it after a complete live wheel update
+and resolving body timer inputs and callback ordering remain open.
+### Live PCAR wheel-stage sample (2026-10-29)
+
+A bounded read-only Frida probe against the active original `race.bin` hooked
+the selected PCAR's `0x431150` integrator and the four `0x442530` wheel calls.
+It retained eight consecutive integrator calls and all four wheel entry/return
+states for each (32 wheel rows total). The ordered wheel objects were
+`0x4C72620`, `0x4C727C4`, `0x4C72968`, and `0x4C72B0C`; each had contact byte
+1. The prior-depth `+0xE8` changed in each wheel callback, while `+0x158`
+remained bit-identical within the callback. Its value changed between later
+integrator calls. Static analysis below identifies the shared integrator as
+the producer; the hook itself supplies stage-change evidence only and does not
+justify substituting the separate `0x4329C0` context-row field. The hook also retained the full 0x1A4
+wheel bytes and `+0xF4/+0x100` vectors before and after each callback.
+
+REA Evidence `ev_3d97fe4c71bcd56533c8e0fd71c29e7c5276016e9acf0392b77ed241ab5d65ae`
+contains the bounded stage sample. Disassembly of `0x431150` is retained as
+`ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5` and
+its instruction listing as
+`ev_7621aa7734668191779fc342ada85c300b30375fa6b59cd72664d11fd58cffc9`. The
+filtered write-address trace is `ev_3e1e2a61a806cee844f577d46fc9ab19c218897d2399a39e8586c59b9f8bc7ae`.
+The session was already running and the
+probe did not control/reset vehicle state; it is provenance and field-change
+evidence only. No numeric row is a physics golden value. A bug in the prior
+probe script caused Frida `expected a pointer` errors when its duplicate
+`wheel` object key replaced the pointer string with raw bytes; this corrected
+probe stores the pointer separately and reports no such errors for its rows.
+The arithmetic, gates, and stores are now modeled in
+`apply_ncar_integrator_wheel_pair_differentials` and the new byte-backed
+`apply_ncar_integrator_wheel_pair_differentials_to_wheels` helper. Regression
+coverage checks all four native-order writes and atomic rejection of
+non-finite output. The live session still does not call the writer because its
+complete native per-wheel update and callback inputs are not session-owned;
+controlled per-input parity remains open.
 These per-frame effects are modeled, and the
 runtime now stores the known shared-constructor body bytes, PCAR vtable/initial
 `+0x50C`, settings-derived shift/clutch/yaw bytes, and per-wheel traction/ABS

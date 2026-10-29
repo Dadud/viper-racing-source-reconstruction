@@ -1451,6 +1451,38 @@ apply_ncar_integrator_wheel_pair_differentials(
         second_applied};
 }
 
+bool apply_ncar_integrator_wheel_pair_differentials_to_wheels(
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    const std::uint32_t first_wheel_object_offset,
+    const NcarIntegratorWheelPairDifferentialResult& result) noexcept
+{
+    constexpr std::uint32_t wheel_stride = 0x1a4U;
+    constexpr std::uint32_t history_offset = 0x158U;
+    const std::array<float, 4> values{
+        result.value_0x6ac, result.value_0x850,
+        result.value_0x9f4, result.value_0xb98};
+    auto updated = wheel_objects;
+    for (std::size_t wheel = 0U; wheel < updated.size(); ++wheel) {
+        const auto object_offset = static_cast<std::uint64_t>(
+            first_wheel_object_offset) + wheel_stride * wheel;
+        const auto field_offset = object_offset + history_offset;
+        if (field_offset > std::numeric_limits<std::uint32_t>::max() ||
+            !std::isfinite(values[wheel])) {
+            return false;
+        }
+        const NcarObjectFieldWrite write{
+            static_cast<std::uint32_t>(field_offset), 4U,
+            std::bit_cast<std::uint32_t>(values[wheel])};
+        if (!apply_ncar_wheel_object_writes(updated[wheel],
+                static_cast<std::uint32_t>(object_offset),
+                std::span<const NcarObjectFieldWrite>(&write, 1U))) {
+            return false;
+        }
+    }
+    wheel_objects = std::move(updated);
+    return true;
+}
+
 std::optional<NcarIntegratorWheelPairDifferentialInput>
 make_ncar_integrator_wheel_pair_differential_input_from_updates(
     const std::array<WheelUpdatePipelineResult, 4>& wheel_updates,

@@ -45,6 +45,14 @@ make_ncar_integrator_wheel_pair_differential_input_from_updates(
 apply_ncar_integrator_wheel_pair_differentials(
     const NcarIntegratorWheelPairDifferentialInput& input) noexcept;
 
+// Persists the shared integrator's four signed pair outputs to the byte-backed
+// wheel +0x158 lanes. The array is committed atomically if all bounded writes
+// are valid; callers still own the provenance/completeness of the inputs.
+[[nodiscard]] bool apply_ncar_integrator_wheel_pair_differentials_to_wheels(
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    std::uint32_t first_wheel_object_offset,
+    const NcarIntegratorWheelPairDifferentialResult& result) noexcept;
+
 struct NcarIntegratorCommonForceInput {
     std::array<std::uint8_t, 4> contact_bytes{};
     PhysicsVector3 velocity_delta_0x234_0xdfc{};

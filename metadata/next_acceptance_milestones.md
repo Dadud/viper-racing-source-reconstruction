@@ -14,14 +14,11 @@ safe-follow policy, standings, and a return-to-setup path. Normal startup now
 disables that route-motion adapter; `--route-motion-prototype` is an explicit
 opt-in for the non-physical demo. On 2026-10-29, the Release build succeeded,
 and a direct asset-backed Viper/Bemidji smoke confirmed default startup reports
-route motion disabled. An eight-frame explicit-prototype trace reported zero
-route-motion steps at frame 0 and one step per subsequent frame. The focused
-`race_progression_regression`, `game_keyboard_binding_smoke`, and
-`game_fixed_step_trace_replay_regression` checks passed (3/3). The new
-`game_route_motion_policy_smoke` regression also verifies that default startup
-records zero route-motion steps and the explicit prototype flag enables the
-adapter. These checks verify the prototype boundary and diagnostics only; they
-do not add physics ownership or driving acceptance. The retired
+route motion disabled. The route policy CTest now runs only with
+`--diagnostics-only` and requires zero route-motion steps; it no longer opts
+into the route follower. The complete configured Release suite passed 66/66.
+These checks verify diagnostics and startup only; they do not add physics
+ownership or driving acceptance. The retired
 route-driven results scenarios are historical prototype evidence only; current
 Windows lifecycle checks cover startup, settings persistence, clean early exit,
 and reload, while fixed-step replay uses an authored, deterministic control
@@ -30,7 +27,14 @@ The complete configured Release suite, including all external-asset checks,
 passed 66/66 on 2026-10-29. A controlled original-client retry using the
 recovered `-1` switch did create the official child, but Frida child injection
 failed with `VirtualAllocEx` access denied and startup stopped at the video
-error dialog; no original physics data was collected. See
+error dialog. A later read-only probe captured eight consecutive selected-PCAR
+integrator calls with four ordered wheel callback entry/return rows each (32
+total). `+0xE8` changes inside each callback; wheel `+0x158` remains stable
+inside a callback and changes between integrator calls. This confirms a
+persistent upstream input but not its writer. Evidence
+`ev_3d97fe4c71bcd56533c8e0fd71c29e7c5276016e9acf0392b77ed241ab5d65ae` is
+retained in `metadata/original_physics_dispatch_capture.md`. The run was not
+clean-start or input-controlled and supplies no golden numeric response. See
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
 `src/game_main.cpp`
 still advances the player and opponents with `advance_route_motion`; its
@@ -538,9 +542,11 @@ PCAR callback/force state and establish tick/fraction and callback ordering.
 `0x4329C0` is a separate context-row producer: its row `+0x158` receives body
 `+0x50C`, but the routine calls `0x444120` to populate that row. The PCAR
 integrator's four car-owned wheel objects are passed directly to `0x442530`;
-the actual wheel-object `+0x158` writer is the paired differential block in
-`0x431150`, distinct from this context row, but its runtime integration remains
-blocked on internal operand timing. The gated `0x433570` branch is a candidate body timer
+the actual wheel-object `+0x158` writer is now confirmed as the paired
+differential block in `0x431150`, distinct from this context row. The pure
+arithmetic and a byte-backed four-wheel writer are modeled and covered by a
+focused regression, but the runtime still lacks sourced full wheel-update
+state to call it safely. The gated `0x433570` branch is a candidate body timer
 producer, but the capture did not observe its ramp advancing, so its live
 inputs and callback ordering remain unresolved. The GCAR GhostBegin ring is
 separate and must not be used as a substitute for PCAR callback state. Only

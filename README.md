@@ -67,10 +67,10 @@ The Windows frontend lifecycle smoke verifies control remapping and persistence,
 selected-session startup, clean early exit, and saved-selection reload. It does
 not drive a lap, produce results, or claim race playability. The fixed-step
 trace regression checks deterministic short capture/playback only. With
-external game data, `game_route_motion_policy_smoke` confirms default startup
-leaves the ideal-line adapter disabled and the explicit
-`--route-motion-prototype` flag enables it; the test does not score route
-progress or race outcomes.
+external game data, `game_route_motion_policy_smoke` runs only in
+diagnostics-only mode and confirms ideal-line motion takes zero steps. Tests
+do not enable or score the route follower. Original-client input/wheel captures
+are observed references, not clean parity fixtures or force-law truth.
 
 Public CI runs without original assets. Runtime checks use an external data
 directory, also configurable through `VIPER_DATA_DIR`. If neither is provided,

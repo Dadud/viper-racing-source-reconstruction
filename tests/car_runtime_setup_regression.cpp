@@ -870,6 +870,32 @@ int main()
                 paired_history_step.wheel_pair_differentials.value_0xb98 == 3.0F &&
                 paired_history_step.wheel_pair_differentials.value_0x9f4 == -3.0F,
             "four-wheel composition must derive paired +0x158 writes from the just-updated +0xE8 values in native order");
+        std::array<viper::NcarWheelRuntimeObjectState, 4> pair_history_wheels{};
+        require(viper::apply_ncar_integrator_wheel_pair_differentials_to_wheels(
+                    pair_history_wheels, 0x554U,
+                    paired_history_step.wheel_pair_differentials),
+            "native paired differential outputs must persist to all four wheel objects");
+        const std::array<float, 4> expected_pair_history{-2.0F, 2.0F, -3.0F, 3.0F};
+        for (std::size_t wheel = 0U; wheel < pair_history_wheels.size(); ++wheel) {
+            const auto value = viper::read_ncar_wheel_object_u32(
+                pair_history_wheels[wheel], 0x158U);
+            require(value.has_value() && std::bit_cast<float>(*value) ==
+                    expected_pair_history[wheel],
+                "paired differential outputs must be stored in native wheel order at +0x158");
+        }
+        const auto pair_history_before_invalid = pair_history_wheels;
+        auto invalid_pair_history_output = paired_history_step.wheel_pair_differentials;
+        invalid_pair_history_output.value_0xb98 =
+            std::numeric_limits<float>::infinity();
+        require(!viper::apply_ncar_integrator_wheel_pair_differentials_to_wheels(
+                    pair_history_wheels, 0x554U, invalid_pair_history_output) &&
+                std::equal(pair_history_wheels.begin(), pair_history_wheels.end(),
+                    pair_history_before_invalid.begin(), [](const auto& first,
+                        const auto& second) {
+                        return first.bytes == second.bytes &&
+                            first.initialized_bytes == second.initialized_bytes;
+                    }),
+            "invalid pair output must leave all four byte-backed wheels unchanged");
         auto invalid_pair_updates =
             paired_history_step.wheel_contact_pipeline_results;
         invalid_pair_updates[2].suspension.finalized.next_contact_depth_0xe8 =

@@ -1403,3 +1403,60 @@ change is warranted by the controlled capture. Evidence is the bounded
 `race.bin` SHA-256 recorded there); the model and composition are in
 `src/vehicle_setup.cpp` at `update_wheel_contact` and
 `advance_wheel_update_pipeline`.
+
+### Live selected-PCAR wheel-stage sample (2026-10-29)
+
+The continued instrumented `race.bin` session (PID 1540) remained in the
+Viper/Bemidji race. A corrected, five-second passive Frida probe filtered
+integrator `0x431150` to the selected PCAR (`0x4C720CC`) and sampled wheel
+callback `0x442530` at entry and return. It retained eight consecutive PCAR
+integrator calls, each with four wheel callbacks in order
+(`0x4C72620`, `0x4C727C4`, `0x4C72968`, `0x4C72B0C`), for 32 paired rows. All
+four contact bytes were 1. The `+0xE8` depth history changed within every
+callback. The `+0x158` value was stable through each callback and differed
+between integrator calls, establishing its role here as an input that changes
+upstream of the wheel callback. `+0xF4` and `+0x100` vectors and the complete
+0x1A4-byte wheel records were captured before and after each call.
+
+The filtered rows are retained in REA Evidence
+`ev_3d97fe4c71bcd56533c8e0fd71c29e7c5276016e9acf0392b77ed241ab5d65ae`;
+script-load Evidence is `ev_5719285895c33f6ffb72f9fe19ea49f496ff113ca0237f3d35271b5c8e45fb28`.
+This was not a clean-start or controlled-input run. By itself, it does not
+validate a force law or provide numeric reconstruction expectations. The
+earlier failed player-wheel probe emitted `expected a
+pointer` errors because a duplicate JavaScript object key replaced the wheel
+pointer string with the raw byte record; its rows are discarded. The corrected
+probe separates the pointer and byte fields.
+
+### Shared-integrator producer for wheel `+0x158` (2026-10-29)
+
+Static disassembly of `0x431150` closes the live wheel-field producer question.
+After the four wheel calls, the function calculates the first paired output as
+`(wheel0 +0xE8 - wheel1 +0xE8) * body +0xDD4`; the native contact gates are
+wheel 0 `+0x168` (`body +0x6BC`) and wheel 1 `+0x168` (`body +0x860`). It
+writes that output to wheel 0 `+0x158` and its negation to wheel 1 `+0x158`.
+The second output is `(wheel2 +0xE8 - wheel3 +0xE8) * body +0xDD8`, gated by
+wheel 2/3 contact bytes at `body +0xA04/+0xBA8`, then written with opposite
+signs to wheels 2/3. When both contact bytes for a pair are zero, the output
+is zero. The four destination instructions are `0x4319D5` (wheel 0),
+`0x4319B6` (wheel 1), `0x431A10` (wheel 2), and `0x431A02` (wheel 3).
+
+A 1.2-second passive Stalker filter on the live simulation thread observed 70
+stores into the selected wheel-history lanes, including the wheel-0 and
+wheel-2 destinations at `0x4319D5` and `0x431A10`; its filter did not report
+the x87 `FSTP` instructions used for wheels 1 and 3, which are established by
+the static instruction listing. Runtime-watch Evidence
+`ev_3e1e2a61a806cee844f577d46fc9ab19c218897d2399a39e8586c59b9f8bc7ae`,
+shared-integrator dossier `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`,
+and instruction listing `ev_7621aa7734668191779fc342ada85c300b30375fa6b59cd72664d11fd58cffc9`
+retain the evidence. This distinguishes the live wheel-field producer from
+the unrelated frame-context `+0x158` copy in `0x4329C0`.
+
+The source already models this pair arithmetic in
+`apply_ncar_integrator_wheel_pair_differentials`. It now also has a bounded
+byte-backed writer, `apply_ncar_integrator_wheel_pair_differentials_to_wheels`,
+with a regression for native wheel order, offsets, and atomic failure on
+non-finite values. This helper is not yet called by `WindowState`: the live
+runtime still lacks the complete four-wheel callback's sourced inputs and
+state transition, so this closes the producer and persistence model, not
+production physics or driving acceptance.

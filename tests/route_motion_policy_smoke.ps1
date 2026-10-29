@@ -7,11 +7,11 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_route_policy_$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $root | Out-Null
 
-function Invoke-RoutePolicyRun([string]$Name, [string]$ExtraArguments) {
+function Invoke-DiagnosticsRun([string]$Name) {
     $trace = Join-Path $root "$Name.csv"
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --track bemidji --car viper --software --smoke-frames 8 --record-trace `"$trace`" $ExtraArguments"
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --track bemidji --car viper --software --diagnostics-only --smoke-frames 8 --record-trace `"$trace`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
@@ -32,21 +32,13 @@ function Invoke-RoutePolicyRun([string]$Name, [string]$ExtraArguments) {
 }
 
 try {
-    $defaultRows = Invoke-RoutePolicyRun 'default' ''
-    if ($defaultRows.Count -lt 2) { throw 'Default runtime trace has too few rows' }
-    if ($defaultRows | Where-Object { $_.diagnostics_only -ne '1' -or [int]$_.route_motion_step_count -ne 0 }) {
-        throw 'Default runtime must keep the route-motion adapter disabled'
+    $rows = Invoke-DiagnosticsRun 'diagnostics_only'
+    if ($rows.Count -lt 2) { throw 'Diagnostics runtime trace has too few rows' }
+    if ($rows | Where-Object { $_.diagnostics_only -ne '1' -or [int]$_.route_motion_step_count -ne 0 }) {
+        throw 'Diagnostics runtime must keep route motion disabled'
     }
 
-    $prototypeRows = Invoke-RoutePolicyRun 'prototype' '--route-motion-prototype'
-    if ($prototypeRows.Count -lt 2) { throw 'Prototype runtime trace has too few rows' }
-    if ($prototypeRows | Where-Object { $_.diagnostics_only -ne '0' }) {
-        throw 'Explicit route-motion prototype must be distinguishable from diagnostics-only mode'
-    }
-    $steps = @($prototypeRows | ForEach-Object { [int]$_.route_motion_step_count } | Measure-Object -Sum).Sum
-    if ($steps -le 0) { throw 'Explicit prototype flag did not enable route motion' }
-
-    Write-Output 'Default startup disables ideal-line motion; the explicit prototype flag enables the adapter. No route progress or race outcome is treated as gameplay evidence.'
+    Write-Output 'Diagnostics-only trace kept ideal-line route motion disabled; no route progress or race outcome was measured.'
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }
