@@ -716,6 +716,22 @@ determinism, not tire-force behavior. The operand/result row is intended to
 support the next controlled original capture without substituting invented
 forces.
 
+A corrected passive probe retained eight integrator calls and 32 wheel calls
+from a hidden pre-existing original process; all contact bytes were active,
+but there was no controlled input or matched start state. A new bounded
+synthetic DIK_UP capture then observed 439 player callbacks and 192 sampled
+wheel calls, but the key-read wrapper had zero reads and zero patched returns.
+The original process had no main window, so that attempt did not apply throttle
+and is not driving evidence. The reconstruction's separate 320-tick
+route-disabled grid replay also remained at its constructor pose: every terrain
+query passed, but contact depths were about -1.49 and all four active bytes
+stayed zero. These runs do not share coordinates or start conditions. Start a
+visible original race, verify the input wrapper is reached, capture a fresh
+grid state, then run an equivalent route-disabled reconstruction schedule
+before comparing wheel/contact state. See
+[`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md)
+for files, hashes, and Evidence IDs.
+
 ### 3. Complete and compare the first original-compatible single-player race
 
 **Outcome:** One supported Viper/Bemidji single-player race has a usable

@@ -530,6 +530,67 @@ records, no unknowns). Staged game files and original captures remain outside
 Git. The capture is an observed original-client sample, not a gameplay parity
 acceptance result.
 
+### Passive wheel snapshots with corrected pointer retention (2026-10-29)
+
+A separate corrected copy of `original_grid_contact_probe.js` retained Frida
+`NativePointer` values across each wheel callback instead of converting them to
+strings and reparsing them in `onLeave`. On the already-running `race.bin` PID
+1540, it recorded eight selected PCAR integrator calls and all 32 ordered wheel
+callbacks with no probe errors. All 32 wheel contact-active bytes were `1`.
+For the first sampled integrator the body center was approximately
+`(218.977, -0.667, 65.947)`; wheel query-origin Y values were about `-1.175`,
+contact-point Y values about `-1.124`, and stored contact-depth `+0xE8` values
+about `0.051–0.053`. This is passive, uncontrolled state from a process whose
+entrant and race-start state were not established. It is not a clean-start or
+reconstruction comparison, and its force values are not causal evidence.
+
+The corrected probe is
+`../../analysis/reference_captures/physics_dispatch_20261025/original_grid_contact_probe_corrected_20261029.js`
+(SHA-256 `1fef52c055fb493b1b115b2413093b29e82a575dc087e46e289111e8f1a71c36`).
+The compact canonical REA observation is
+`../../analysis/reference_captures/physics_dispatch_20261025/passive_original_wheel_callbacks_20261029.json`
+(SHA-256 `3AAC950A4E47C0825B8B293A2147DE42371122D0D0475FE3992F9D8E79AFAC9A`),
+Evidence `ev_27ad135d16ffbd1960fe776fad4fb17006b31a713bf03766a7598de548cfbe67`.
+
+### Scheduled DIK_UP input did not reach the original client (2026-10-29)
+
+The new bounded probe `tools/original_pcar_controlled_wheel_capture.js` was
+attached to the same PID. It sampled 48 player integrators across coast,
+throttle-window, and coast phases, with four wheel callbacks per sample (192
+wheel rows). The intended 1.5-second synthetic DIK_UP interval used the
+`0x413170` wrapper and selector `0xC8`; its counters were `reads=0` and
+`patched=0`. Therefore this run did not apply throttle and is not a controlled
+driving capture. Static analysis shows `0x413170` reads the high bit of
+`DAT_004EF200[selector]` (Evidence `ev_b9306522b3be005782bba4f9c3937d6c50a318d693aedc521d77a60d3836b011`),
+but the selected-key wrapper was not called in this process during the bounded
+run. Windows process inspection also found `MainWindowHandle=0`, and the app
+inventory had no visible Viper Racing window. The correct next capture must
+start a visible original race and verify the input path before attempting a
+numeric comparison. Status Evidence `ev_a357907012bbcde1ce8116b16515e2731f53e776bc35335d4e958dd3b992266c`;
+the instrument source hash is `ef6816719d7ba132fb79550df5f7448f2b906075d2166cce1a55130a08308900`.
+Hooks were detached and the Frida session closed. The complete retained REA
+bundle is external at
+`../../analysis/reference_captures/physics_dispatch_20261025/rea-evidence-full-export-20261029.json`
+(42,266,396 bytes, 103 records, 0 unknowns); the two compact status records
+are in `../../analysis/reference_captures/physics_dispatch_20261025/original_contact_control_observations_20261029.json`
+(SHA-256 `561D0BB233AC94E6258FD608475B2993B1F47690F52AD2324030A3890E5C03C7`).
+
+### Route-disabled reconstruction grid contact trace (2026-10-29)
+
+The reconstructed client replayed a 320-frame, 16-ms input schedule with
+throttle on frames 0–95, left steering on 160–207, brake on 240–287, and coast
+otherwise, using `--diagnostics-only -grid`. It produced 320 fixed-step rows
+with route motion disabled. The player body remained at `(204.299, 2.094,
+-122.034)` throughout. All four terrain queries and contact-direction gates
+passed, but each first-tick wheel origin was around Y `1.584`, the sampled
+surface was around Y `0.093`, and projected depth was `-1.489` to `-1.493`;
+all four contact bytes stayed inactive for all 320 ticks. The trace is
+reproducible input/contact diagnostic evidence only. It is not comparable to
+the passive original sample above because world position, start state, and
+input provenance differ, and the reconstructed body has no production
+integration call site yet. Generated files are under ignored `build/` as
+`contact-grid-input.csv` and `contact-grid-ticks.csv`.
+
 ### Same-offset state-row cross-check (2026-10-25)
 
 Follow-up Ghidra pseudocode for `0x4329C0` shows a separate frame/state row

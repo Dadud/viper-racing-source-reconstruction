@@ -63,6 +63,12 @@ order, and keep later systems out of the gate until this race is reliable:
    braking, and coast. Preserve fail-closed behavior wherever a consumed field
    or callback remains unresolved; do not treat the current synthetic input
    trace as normal keyboard delivery or as a complete force law.
+   Do not use the ideal line to drive or score gameplay tests. In physics and
+   original-parity cases, use fixed recorded controls and compare the
+   simulation-owned body pose/contact state; keep route-following only in an
+   explicitly named development demonstration, never as a physics acceptance
+   path. Diagnostics-only tests should continue to assert zero route-motion
+   steps.
 2. **Implement the smallest complete physical player step.** Connect contact
    observations, per-wheel force contributors and accumulator collection to
    the byte-backed PCAR state only when every consumed field and callback
@@ -89,14 +95,14 @@ order, and keep later systems out of the gate until this race is reliable:
 
 ### Immediate next task
 
-Resolve the Frida-agent crash boundary before another wheel-producer capture.
-The verified original launcher flow already supports suspending `race.bin`,
-installing bounded hooks, resuming the child, and capturing the synthetic
-throttle response. Do not repeat the earlier resume-flow investigation. First
-validate an available native debugger or a lower-overhead probe on a bounded
-run; then capture the per-wheel contributor inputs alongside
-`+0x24C/+0x258` and body kinematics. Until those producers are identified and
-session-owned, leave live body integration disconnected.
+Obtain a visible, controlled original race before attempting another
+input-to-motion comparison. Hidden pre-existing `race.bin` processes do not
+provide a usable key path or a matched grid state. Once the visible original
+input wrapper is confirmed, capture per-wheel contributor inputs alongside
+`+0x24C/+0x258` and body kinematics under recorded throttle, steering, braking,
+and coast controls. In parallel, source the same fields into persistent
+reconstruction state. Until every force input and callback result is
+identified and session-owned, leave live body integration disconnected.
 
 ## Completion rule
 
