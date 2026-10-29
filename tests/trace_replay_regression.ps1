@@ -96,6 +96,16 @@ try {
         $tickHeader, 'body_integrator_ramp_0x50c')
     $bodyVehicleOrdinalColumn = [Array]::IndexOf(
         $tickHeader, 'body_vehicle_ordinal_0x510')
+    $integratorWheelScalarReachedColumn = [Array]::IndexOf(
+        $tickHeader, 'integrator_wheel_scalar_callback_reached')
+    $integratorWheelScalarSelectorColumn = [Array]::IndexOf(
+        $tickHeader, 'integrator_wheel_scalar_selector_nonzero')
+    $integratorWheelScalarResponseGateColumn = [Array]::IndexOf(
+        $tickHeader, 'integrator_wheel_scalar_response_gate_passed')
+    $integratorWheelScalarNegativePairColumn = [Array]::IndexOf(
+        $tickHeader, 'integrator_wheel_scalar_negative_pair_gate_passed')
+    $integratorWheelScalarTargetColumn = [Array]::IndexOf(
+        $tickHeader, 'integrator_wheel_scalar_target_response')
     $bodyIntegratorTimerMissingOffsets = [int[]]::new(3)
     for ($lane = 0; $lane -lt 3; ++$lane) {
         $bodyIntegratorTimerMissingOffsets[$lane] = [Array]::IndexOf(
@@ -137,6 +147,7 @@ try {
     $wheelPriorDepthColumns = [int[]]::new(4)
     $wheelAnimationFlagsColumns = [int[]]::new(4)
     $wheelAnimationModeColumns = [int[]]::new(4)
+    $wheelScalarColumns = [int[]]::new(4)
     $wheelQuerySucceededColumns = [int[]]::new(4)
     $wheelContactDepthLimitColumns = [int[]]::new(4)
     $wheelContactGeometryColumns = @()
@@ -163,6 +174,8 @@ try {
             $tickHeader, "wheel${wheel}_animation_flags_0x120")
         $wheelAnimationModeColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_animation_mode_0x121")
+        $wheelScalarColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_value_0xe0")
         $wheelQuerySucceededColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_query_succeeded")
         $wheelContactDepthLimitColumns[$wheel] = [Array]::IndexOf(
@@ -194,6 +207,11 @@ try {
         $bodyIntegratorTimerMissingCountColumn -lt 0 -or
         $bodyPlacementTransformMatchesColumn -lt 0 -or
         $bodyIntegratorRampColumn -lt 0 -or $bodyVehicleOrdinalColumn -lt 0 -or
+        $integratorWheelScalarReachedColumn -lt 0 -or
+        $integratorWheelScalarSelectorColumn -lt 0 -or
+        $integratorWheelScalarResponseGateColumn -lt 0 -or
+        $integratorWheelScalarNegativePairColumn -lt 0 -or
+        $integratorWheelScalarTargetColumn -lt 0 -or
         @($bodyIntegratorTimerMissingOffsets | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
@@ -209,6 +227,7 @@ try {
         @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelAnimationFlagsColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelAnimationModeColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactGeometryColumns | ForEach-Object {
@@ -267,6 +286,24 @@ try {
             $fields[$tickSourceColumn] -ne '1' -or
             $fields[$tickInputColumn].Length -ne 512) {
             throw "Fixed-step input/timing snapshot is invalid at line $($index + 1)"
+        }
+        if ($fields[$integratorWheelScalarReachedColumn] -ne '1' -or
+            $fields[$integratorWheelScalarSelectorColumn] -notin @('0', '1') -or
+            $fields[$integratorWheelScalarResponseGateColumn] -notin @('0', '1') -or
+            $fields[$integratorWheelScalarNegativePairColumn] -notin @('0', '1')) {
+            throw "Shared integrator +0x4C callback result is missing at line $($index + 1)"
+        }
+        $targetResponse = [single]::Parse(
+            $fields[$integratorWheelScalarTargetColumn], [cultureinfo]::InvariantCulture)
+        if ([single]::IsNaN($targetResponse) -or [single]::IsInfinity($targetResponse)) {
+            throw "Shared integrator +0x4C target response is non-finite at line $($index + 1)"
+        }
+        foreach ($wheel in 0..3) {
+            $wheelScalar = [single]::Parse(
+                $fields[$wheelScalarColumns[$wheel]], [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($wheelScalar) -or [single]::IsInfinity($wheelScalar)) {
+                throw "Wheel $wheel +0xE0 callback output is non-finite at line $($index + 1)"
+            }
         }
         $reportedMissingOffsets = @($bodyKinematicsMissingOffsets | Where-Object {
             -not [string]::IsNullOrWhiteSpace($fields[$_])

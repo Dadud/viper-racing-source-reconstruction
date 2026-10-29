@@ -359,17 +359,21 @@ Evidence is retained at
 `0x433C00`).
 
 The source-backed byte adapter `advance_ncar_integrator_wheel_scalars_from_body`
-now reads the callback operands from initialized body fields, stages the four
-strided `+0xE0` wheel writes, and commits only if every input/output is finite
-and every destination fits. A regression covers the selected response lane,
-all four byte-backed outputs, and preservation of wheel state when body inputs
-are unknown. The adapter remains a standalone model: the live Windows session
-does not call it because its current PCAR constructor does not own all shared
-integrator inputs (notably `+0xD84`, `+0xD90`, `+0xDE4`, and `+0xDE8`) at this
-callback point. The live callback trace columns remain blank until the full
-native input seam is established. In the PCAR path, `+0x500` is the value after
-the `0x4330F0` smoother immediately before `0x431150`; the similarly named
+reads its operands from initialized body bytes, stages the four strided `+0xE0`
+wheel writes, and commits only if every input/output is finite and every
+destination fits. The live PCAR constructor now persists `+0xD84/+0xD90` from
+the mapped runtime record via the observed `0x433C00` formulas; the PCAR
+callback updates `+0xDE4/+0xDE8`, and the callback smoother updates `+0x500`
+before `0x431150`. `WindowState` now invokes this adapter after that PCAR
+callback prefix and before its per-wheel update projection. The fixed-step CSV
+records callback gates/target plus all four `+0xE0` values, and trace replay
+requires the callback and finite outputs. A byte-backed regression covers
+selected response lanes, all four stores, and preservation when inputs are
+unknown. The PCAR `+0x500` value comes from `0x4330F0`; the similarly named
 interpolated `0x432420` source belongs to the separate GCAR/GhostBegin path.
+This closes only the virtual `+0x4C` callback seam, not the rest of
+`0x431150`, tire-force production, or body integration. Exact x87 tangent and
+division rounding remain approximate.
 
 Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x431150`), `ev_561bda702abc7970b5b820be76dc22cedb78968c7da2d82ede95809777fcf6c1`

@@ -2026,7 +2026,13 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 27> body_state_after_tick{};
     std::optional<float> body_integrator_ramp_0x50c_after_tick;
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
+    std::optional<std::uint8_t> integrator_wheel_scalar_callback_reached;
+    std::optional<std::uint8_t> integrator_wheel_scalar_selector_nonzero;
+    std::optional<std::uint8_t> integrator_wheel_scalar_response_gate_passed;
+    std::optional<std::uint8_t> integrator_wheel_scalar_negative_pair_gate_passed;
+    std::optional<float> integrator_wheel_scalar_target_response;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
+    std::array<std::optional<float>, 4> wheel_value_0xe0_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xa8_after_tick{};
     std::array<std::optional<float>, 4> wheel_angle_0xac_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_gate_passed_after_tick{};
@@ -2115,6 +2121,8 @@ struct WindowState {
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
     std::array<viper::WheelUpdatePipelineResult, 4> player_wheel_update_results{};
+    viper::NcarIntegratorWheelScalarResult player_integrator_wheel_scalars{};
+    bool player_integrator_wheel_scalars_applied{};
     bool player_wheel_pair_differential_producer_applied{};
     viper::NcarIntegratorWheelPairDifferentialResult
         player_wheel_pair_differentials{};
@@ -2300,11 +2308,13 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
-        // 0x433AA0 initializes the smoother accumulator; 0x433C00 derives
-        // +0xDCC from the mapped runtime record; the PCAR constructor defaults
-        // +0xBE4 to zero. These are the inputs consumed by 0x4330F0.
-        const std::array<viper::NcarObjectFieldWrite, 3> callback_control_defaults{{
+        // 0x433C00 derives the shared integrator's +0xD84/+0xD90/+0xDCC
+        // geometry from this mapped runtime record. 0x433AA0 initializes the
+        // smoother accumulator, and the PCAR constructor defaults +0xBE4.
+        const std::array<viper::NcarObjectFieldWrite, 5> callback_control_defaults{{
             {0x500U, 4U, 0U},
+            {0xd84U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd84)},
+            {0xd90U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd90)},
             {0xdccU, 4U, std::bit_cast<std::uint32_t>(callback_setup->angle_0xdcc)},
             {0xbe4U, 1U, 0U},
         }};
@@ -2701,6 +2711,18 @@ struct WindowState {
         return true;
     }
 
+    bool update_player_integrator_wheel_scalars()
+    {
+        player_integrator_wheel_scalars_applied = false;
+        const auto result = viper::advance_ncar_integrator_wheel_scalars_from_body(
+            player_runtime_state.body_object,
+            player_runtime_state.wheel_objects, 0x554U);
+        if (!result.has_value()) return false;
+        player_integrator_wheel_scalars = *result;
+        player_integrator_wheel_scalars_applied = true;
+        return true;
+    }
+
     void update_player_wheel_contacts_from_body()
     {
         player_wheel_pair_differential_producer_applied = false;
@@ -3013,6 +3035,18 @@ struct WindowState {
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
+        if (player_integrator_wheel_scalars_applied) {
+            tick.integrator_wheel_scalar_callback_reached = static_cast<std::uint8_t>(
+                player_integrator_wheel_scalars.callback_0x4c_reached ? 1U : 0U);
+            tick.integrator_wheel_scalar_selector_nonzero = static_cast<std::uint8_t>(
+                player_integrator_wheel_scalars.callback_selector_nonzero ? 1U : 0U);
+            tick.integrator_wheel_scalar_response_gate_passed = static_cast<std::uint8_t>(
+                player_integrator_wheel_scalars.response_gate_passed ? 1U : 0U);
+            tick.integrator_wheel_scalar_negative_pair_gate_passed = static_cast<std::uint8_t>(
+                player_integrator_wheel_scalars.negative_pair_gate_passed ? 1U : 0U);
+            tick.integrator_wheel_scalar_target_response =
+                player_integrator_wheel_scalars.target_response;
+        }
         const auto read_body_float = [this](const std::uint32_t offset)
             -> std::optional<float> {
             const auto bits = viper::read_ncar_body_object_u32(
@@ -3154,6 +3188,7 @@ struct WindowState {
                 if (!bits) return std::nullopt;
                 return std::bit_cast<float>(*bits);
             };
+            tick.wheel_value_0xe0_after_tick[wheel] = read_wheel_float(0x0e0U);
             tick.wheel_value_0xa8_after_tick[wheel] = read_wheel_float(0x0a8U);
             tick.wheel_angle_0xac_after_tick[wheel] = read_wheel_float(0x0acU);
             if (const auto bits = viper::read_ncar_wheel_object_u32(
@@ -3273,6 +3308,8 @@ struct WindowState {
     bool initialize_opponents()
     {
         if (route.size() < 2U || terrain == nullptr) return false;
+        player_integrator_wheel_scalars = {};
+        player_integrator_wheel_scalars_applied = false;
         physics_step_accumulator = {};
         last_physics_step_schedule = {};
         physics_step_clock_initialized = false;
@@ -3432,10 +3469,11 @@ struct WindowState {
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
-            // The PCAR callback prefix stores control-derived body scalars.
-            // The shared integrator's +0x4C callback remains a standalone
-            // model until every source operand is owned by this session.
+            // The PCAR callback prefix stores control-derived body scalars;
+            // the shared integrator's +0x4C callback then writes the four
+            // wheel +0xE0 values before the per-wheel update pass.
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
+            if (!update_player_integrator_wheel_scalars()) return false;
             update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
@@ -4808,11 +4846,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",body_integrator_timer_known_fields_finite"
             ",body_integrator_timer_missing_count"
             ",body_transform_matches_runtime_placement"
-            ",body_integrator_ramp_0x50c,body_vehicle_ordinal_0x510";
+            ",body_integrator_ramp_0x50c,body_vehicle_ordinal_0x510"
+            ",integrator_wheel_scalar_callback_reached"
+            ",integrator_wheel_scalar_selector_nonzero"
+            ",integrator_wheel_scalar_response_gate_passed"
+            ",integrator_wheel_scalar_negative_pair_gate_passed"
+            ",integrator_wheel_scalar_target_response";
         for (std::size_t lane = 0U; lane < 3U; ++lane)
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
+                << ",wheel" << wheel << "_value_0xe0"
                 << ",wheel" << wheel << "_value_0xa8"
                 << ",wheel" << wheel << "_angle_0xac"
                 << ",wheel" << wheel << "_contact_gate_passed"
@@ -5083,6 +5127,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     physics_tick_trace << ',';
                     if (tick.body_vehicle_ordinal_0x510_after_tick)
                         physics_tick_trace << *tick.body_vehicle_ordinal_0x510_after_tick;
+                    for (const auto value : {
+                            tick.integrator_wheel_scalar_callback_reached,
+                            tick.integrator_wheel_scalar_selector_nonzero,
+                            tick.integrator_wheel_scalar_response_gate_passed,
+                            tick.integrator_wheel_scalar_negative_pair_gate_passed}) {
+                        physics_tick_trace << ',';
+                        if (value) physics_tick_trace << static_cast<unsigned>(*value);
+                    }
+                    physics_tick_trace << ',';
+                    if (tick.integrator_wheel_scalar_target_response)
+                        physics_tick_trace << *tick.integrator_wheel_scalar_target_response;
                     for (std::size_t lane = 0U; lane < 3U; ++lane) {
                         physics_tick_trace << ',';
                         if (lane < tick.body_integrator_timer_missing_count)
@@ -5096,6 +5151,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace << static_cast<unsigned>(
                                 *tick.wheel_contact_active_after_tick[wheel]);
                         }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_value_0xe0_after_tick[wheel])
+                            physics_tick_trace << *tick.wheel_value_0xe0_after_tick[wheel];
                         physics_tick_trace << ',';
                         if (tick.wheel_value_0xa8_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_value_0xa8_after_tick[wheel];
