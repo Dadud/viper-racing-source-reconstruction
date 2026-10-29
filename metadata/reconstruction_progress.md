@@ -1,5 +1,16 @@
 # Reconstruction progress
 
+- **2026-10-29, persistent wheel application points:** The player runtime now
+  rebuilds wheel `+0xC8..+0xD0` from initialized wheel `+0x04..+0x0C`, copied
+  reference-vector `+0x14..+0x1C`, and the byte-backed body transform using the
+  recovered `0x437BA0` affine transform, then writes the result back to the
+  persistent wheel object before terrain sampling. Constructor initialization
+  materializes the same fields from the selected placement transform. The
+  `car_runtime_setup_regression`, fixed-step trace replay, and route-motion
+  policy smoke pass; ideal-line route motion remains disabled in these tests.
+  This persists the force application point but does not advance body pose or
+  connect tire forces to the body accumulator.
+
 - **2026-10-25, filtered live PCAR wheel/accumulator sample:** A read-only
   Frida hook retained eight `0x442530` rows for the original PCAR vtable,
   covering two ordered four-wheel calls. In this uncontrolled coast window,

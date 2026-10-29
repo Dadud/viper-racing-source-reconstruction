@@ -887,6 +887,18 @@ int main()
                 transformed_wheel_point.y == 22.0F &&
                 transformed_wheel_point.z == 34.0F,
             "wheel application-point transform must preserve native body matrix axes and translation");
+        const auto materialized_application_point =
+            viper::update_ncar_wheel_application_point_0xc8(
+                materialized_front_wheel, front_wheel_base,
+                wheel_point_transform.body_transform_0x38_to_0x64);
+        require(materialized_application_point.has_value() &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xc8U) ==
+                    std::bit_cast<std::uint32_t>(materialized_application_point->x) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xccU) ==
+                    std::bit_cast<std::uint32_t>(materialized_application_point->y) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xd0U) ==
+                    std::bit_cast<std::uint32_t>(materialized_application_point->z),
+            "live wheel point transform must persist native +0xC8..+0xD0 bytes");
         require(viper::project_body_point_velocity_0x442530(
                     {10.0F, 20.0F, 30.0F}, projection_transform) == 140.0F,
             "wheel surface projection must preserve native +0x50/+0x58/+0x54 operand order");

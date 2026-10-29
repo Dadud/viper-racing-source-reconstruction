@@ -749,6 +749,14 @@ struct WheelPointTransformInput {
 [[nodiscard]] PhysicsVector3 transform_wheel_point_0xc8(
     const WheelPointTransformInput& input) noexcept;
 
+// Rebuilds wheel +0xC8..+0xD0 from initialized wheel/body bytes and persists
+// the native affine-transform output. Missing or non-finite inputs fail closed.
+[[nodiscard]] std::optional<PhysicsVector3>
+update_ncar_wheel_application_point_0xc8(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset,
+    const std::array<float, 12>& body_transform_0x38_to_0x64) noexcept;
+
 struct WheelContactState {
     PhysicsVector3 contact_point_0x130{};
     std::int32_t contact_feature_0x19c{};

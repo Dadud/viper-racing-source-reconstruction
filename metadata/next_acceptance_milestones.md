@@ -51,6 +51,11 @@ matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches
 the selected track `obj car` runtime-record transform also used by the renderer.
+The session also persists the transformed wheel application point at `+0xC8..+0xD0`
+using initialized wheel bytes and the byte-backed PCAR transform before querying
+terrain. This matches the recovered `0x437BA0` output location and makes the
+point available to later force collection; it remains a constructor-pose point
+because the body transform does not advance yet.
 `place_on_route` only seeds the provisional route progress adapter and does not
 change that body or rendered placement. The body remains static in the live
 session.

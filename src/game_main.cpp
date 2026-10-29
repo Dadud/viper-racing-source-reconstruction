@@ -2580,40 +2580,22 @@ struct WindowState {
             std::bit_cast<float>(e44_initializer->value_bits);
         for (std::size_t wheel = 0; wheel < player_runtime_state
                 .initial_wheel_world_positions.size(); ++wheel) {
+            const auto wheel_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
             const auto& core = player_wheel_core_initialization->wheels[wheel];
             if (!core.has_value()) {
                 player_runtime_state = {};
                 return false;
             }
-            const auto& wheel_bytes = player_runtime_state.wheel_objects[wheel];
-            const auto x = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x04U);
-            const auto y = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x08U);
-            const auto z = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x0cU);
-            const auto rx = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x14U);
-            const auto ry = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x18U);
-            const auto rz = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x1cU);
-            if (!x || !y || !z || !rx || !ry || !rz) {
+            const auto world_point = viper::update_ncar_wheel_application_point_0xc8(
+                player_runtime_state.wheel_objects[wheel], wheel_offset,
+                player_runtime_state.placement_transform);
+            if (!world_point) {
                 player_runtime_state = {};
                 return false;
             }
-            viper::WheelPointTransformInput point_input{};
-            point_input.wheel_position_0x04_0x0c = {
-                std::bit_cast<float>(*x), std::bit_cast<float>(*y),
-                std::bit_cast<float>(*z)};
-            point_input.referenced_point_0x10 = {
-                std::bit_cast<float>(*rx), std::bit_cast<float>(*ry),
-                std::bit_cast<float>(*rz)};
-            point_input.body_transform_0x38_to_0x64 =
-                player_runtime_state.placement_transform;
-            const auto world_point = viper::transform_wheel_point_0xc8(point_input);
             auto& world = player_runtime_state.initial_wheel_world_positions[wheel];
-            world = {world_point.x, world_point.y, world_point.z};
+            world = {world_point->x, world_point->y, world_point->z};
             if (!std::all_of(world.begin(), world.end(),
                     [](const float value) { return std::isfinite(value); })) {
                 player_runtime_state = {};
@@ -2834,33 +2816,14 @@ struct WindowState {
                 player_constructor_inputs_ready = false;
                 return;
             }
-            const auto& wheel_bytes = player_runtime_state.wheel_objects[wheel];
-            const auto wheel_x = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x04U);
-            const auto wheel_y = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x08U);
-            const auto wheel_z = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x0cU);
-            const auto ref_x = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x14U);
-            const auto ref_y = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x18U);
-            const auto ref_z = viper::read_ncar_wheel_object_u32(wheel_bytes,
-                0x1cU);
-            if (!wheel_x || !wheel_y || !wheel_z || !ref_x || !ref_y || !ref_z) {
+            const auto wheel_world_point =
+                viper::update_ncar_wheel_application_point_0xc8(
+                    player_runtime_state.wheel_objects[wheel],
+                    wheel_object_offset, body_transform);
+            if (!wheel_world_point) {
                 player_constructor_inputs_ready = false;
                 return;
             }
-            viper::WheelPointTransformInput point_input{};
-            point_input.wheel_position_0x04_0x0c = {
-                std::bit_cast<float>(*wheel_x), std::bit_cast<float>(*wheel_y),
-                std::bit_cast<float>(*wheel_z)};
-            point_input.referenced_point_0x10 = {
-                std::bit_cast<float>(*ref_x), std::bit_cast<float>(*ref_y),
-                std::bit_cast<float>(*ref_z)};
-            point_input.body_transform_0x38_to_0x64 = body_transform;
-            const auto wheel_world_point =
-                viper::transform_wheel_point_0xc8(point_input);
 
             // This terrain query starts from the PCAR's byte-backed pose and
             // full basis. Its result feeds the recovered suspension/history
@@ -2869,13 +2832,14 @@ struct WindowState {
             viper::WheelContactObservation observation{};
             observation.body_query_enabled = true;
             observation.reset_feature_hook_active = false;
-            observation.contact_projection_origin = wheel_world_point;
+            observation.contact_projection_origin = *wheel_world_point;
             observation.contact_direction = body_up;
             observation.wheel_depth_limit_0x44 = core->value_0x44;
             const auto query = viper::sample_terrain_surface(
                 viper::make_terrain_surface_query_input(
                     *terrain,
-                    {wheel_world_point.x, wheel_world_point.y, wheel_world_point.z},
+                    {wheel_world_point->x, wheel_world_point->y,
+                     wheel_world_point->z},
                     true));
             player_wheel_terrain_queries_succeeded[wheel] = query.query_succeeded;
             observation.query_succeeded = query.query_succeeded;

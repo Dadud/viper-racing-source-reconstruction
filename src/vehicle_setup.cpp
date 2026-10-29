@@ -710,6 +710,56 @@ PhysicsVector3 transform_wheel_point_0xc8(
         static_cast<float>(static_cast<long double>(m[11]) + transformed_z)};
 }
 
+std::optional<PhysicsVector3> update_ncar_wheel_application_point_0xc8(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const std::array<float, 12>& body_transform_0x38_to_0x64) noexcept
+{
+    WheelPointTransformInput input{};
+    const auto read_float = [&wheel](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        if (!std::isfinite(value)) return std::nullopt;
+        return value;
+    };
+    std::array<float, 6> wheel_values{};
+    constexpr std::array<std::uint32_t, 6> offsets{
+        0x04U, 0x08U, 0x0cU, 0x14U, 0x18U, 0x1cU};
+    for (std::size_t index = 0U; index < offsets.size(); ++index) {
+        const auto value = read_float(offsets[index]);
+        if (!value) return std::nullopt;
+        wheel_values[index] = *value;
+    }
+    if (!std::all_of(body_transform_0x38_to_0x64.begin(),
+            body_transform_0x38_to_0x64.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+    input.wheel_position_0x04_0x0c = {
+        wheel_values[0], wheel_values[1], wheel_values[2]};
+    input.referenced_point_0x10 = {
+        wheel_values[3], wheel_values[4], wheel_values[5]};
+    input.body_transform_0x38_to_0x64 = body_transform_0x38_to_0x64;
+    const auto point = transform_wheel_point_0xc8(input);
+    if (!std::isfinite(point.x) || !std::isfinite(point.y) ||
+        !std::isfinite(point.z)) {
+        return std::nullopt;
+    }
+    const std::array<NcarObjectFieldWrite, 3> writes{{
+        {wheel_object_offset + 0xc8U, 4U,
+            std::bit_cast<std::uint32_t>(point.x)},
+        {wheel_object_offset + 0xccU, 4U,
+            std::bit_cast<std::uint32_t>(point.y)},
+        {wheel_object_offset + 0xd0U, 4U,
+            std::bit_cast<std::uint32_t>(point.z)},
+    }};
+    if (!apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes))
+        return std::nullopt;
+    return point;
+}
+
 WheelAnimationBasisState advance_wheel_animation_basis(
     const WheelAnimationBasisInput& input) noexcept
 {
