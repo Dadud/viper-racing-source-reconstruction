@@ -42,11 +42,11 @@ try {
     [System.IO.File]::WriteAllLines($capture, $inputLines)
 
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only --play-trace $capture --record-trace $replay `
+        --diagnostics-only -grid --play-trace $capture --record-trace $replay `
         --record-tick-trace $replayTicks
     if ($LASTEXITCODE -ne 0) { throw "Trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only --play-trace $capture --record-trace $repeat `
+        --diagnostics-only -grid --play-trace $capture --record-trace $repeat `
         --record-tick-trace $repeatTicks
     if ($LASTEXITCODE -ne 0) { throw "Repeated trace replay exited with $LASTEXITCODE" }
 

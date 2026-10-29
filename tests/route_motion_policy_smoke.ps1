@@ -11,7 +11,7 @@ function Invoke-DiagnosticsRun([string]$Name) {
     $trace = Join-Path $root "$Name.csv"
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $GameExe
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --track bemidji --car viper --software --diagnostics-only --smoke-frames 8 --record-trace `"$trace`""
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --track bemidji --car viper --software --diagnostics-only -grid --smoke-frames 8 --record-trace `"$trace`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true

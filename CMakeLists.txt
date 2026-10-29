@@ -384,7 +384,7 @@ if(BUILD_TESTING)
             add_test(NAME game_original_asset_validation
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --validate-assets)
             add_test(NAME game_warp_render_smoke
-                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3 --diagnostics-only)
+                COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}" --software --smoke-frames 3 --diagnostics-only -grid)
             add_test(NAME game_grid_mode_placement_smoke
                 COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
                     --track bemidji --car viper --software --smoke-frames 3 --diagnostics-only -grid)
@@ -434,7 +434,7 @@ if(BUILD_TESTING)
                         --track "${track}" --car viper --validate-assets)
                 add_test(NAME game_track_${track}_warp_smoke
                     COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
-                        --track "${track}" --car viper --software --smoke-frames 3 --diagnostics-only)
+                        --track "${track}" --car viper --software --smoke-frames 3 --diagnostics-only -grid)
                 set_tests_properties(game_track_${track}_asset_validation
                     game_track_${track}_warp_smoke PROPERTIES TIMEOUT 30)
             endforeach()
@@ -444,7 +444,7 @@ if(BUILD_TESTING)
                         --track bemidji --car "${car}" --validate-assets)
                 add_test(NAME game_car_${car}_warp_smoke
                     COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"
-                        --track bemidji --car "${car}" --software --smoke-frames 3 --diagnostics-only)
+                        --track bemidji --car "${car}" --software --smoke-frames 3 --diagnostics-only -grid)
                 set_tests_properties(game_car_${car}_asset_validation
                     game_car_${car}_warp_smoke PROPERTIES TIMEOUT 30)
             endforeach()

@@ -9,7 +9,7 @@ $joinProcess = $null
 $traceDirectory = Join-Path ([System.IO.Path]::GetTempPath()) `
     ("viper-network-session-smoke-" + [Guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $traceDirectory)
-$common = "--data-dir `"$DataDir`" --track bemidji --car viper --software --smoke-frames 8 --diagnostics-only"
+$common = "--data-dir `"$DataDir`" --track bemidji --car viper --software --smoke-frames 8 --diagnostics-only -grid"
 
 function New-RaceProcessStartInfo([string]$Arguments) {
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -65,7 +65,7 @@ try {
     $mismatchListener.Stop()
     $hostProcess = Start-RaceProcess "$common --host $mismatchPort"
     Start-Sleep -Milliseconds 300
-    $joinProcess = Start-RaceProcess "--data-dir `"$DataDir`" --track dundas --car viper --software --smoke-frames 8 --diagnostics-only --join 127.0.0.1 $mismatchPort"
+    $joinProcess = Start-RaceProcess "--data-dir `"$DataDir`" --track dundas --car viper --software --smoke-frames 8 --diagnostics-only -grid --join 127.0.0.1 $mismatchPort"
     $mismatchDeadline = [DateTime]::UtcNow.AddSeconds(15)
     while ([DateTime]::UtcNow -lt $mismatchDeadline) {
         $hostProcess.Refresh()

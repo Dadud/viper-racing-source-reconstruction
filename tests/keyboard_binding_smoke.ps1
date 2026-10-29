@@ -59,7 +59,7 @@ try {
     $startInfo.FileName = $GameExe
     # Omit explicit track/car flags so startup loads the frontend selection
     # and its Config-owned keyboard overrides before entering the race.
-    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software --diagnostics-only --record-trace `"$trace`""
+    $startInfo.Arguments = "--data-dir `"$DataDir`" --config-dir `"$configDir`" --software --diagnostics-only -grid --record-trace `"$trace`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($startInfo)
