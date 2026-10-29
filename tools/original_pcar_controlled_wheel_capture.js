@@ -43,6 +43,8 @@ let selectedPcar = null;
 let callbackCount = 0;
 let integratorCount = 0;
 let wheelRows = 0;
+let sampledThrottleMinimum = Number.POSITIVE_INFINITY;
+let sampledThrottleMaximum = Number.NEGATIVE_INFINITY;
 const keyStats = { selector: 0xc8, reads: 0, patched: 0 };
 const controls = {
   steering: at(0x509358),
@@ -103,6 +105,11 @@ const integratorListener = Interceptor.attach(at(0x431150), {
       before: snapshotBody(body),
       wheels: [],
     };
+    const sampledThrottle = this.sample.controls.throttle;
+    if (Number.isFinite(sampledThrottle)) {
+      sampledThrottleMinimum = Math.min(sampledThrottleMinimum, sampledThrottle);
+      sampledThrottleMaximum = Math.max(sampledThrottleMaximum, sampledThrottle);
+    }
     active.set(thread(), { body, sample: this.sample, nextWheel: 0 });
   },
   onLeave() {
@@ -158,14 +165,28 @@ setTimeout(() => {
   callbackListener.detach();
   integratorListener.detach();
   wheelListener.detach();
+  const phaseCoverage = Object.values(phaseSamples).every(count => count >= 4);
+  const inputObserved = keyStats.reads > 0 && keyStats.patched > 0 &&
+    sampledThrottleMaximum > sampledThrottleMinimum + 1.0e-4;
+  const captureValid = phaseCoverage && inputObserved && wheelRows >= 12;
   send({
     event: "controlled_pcar_capture_done",
+    captureValid,
+    invalidReasons: [
+      ...(keyStats.reads === 0 ? ["selected_key_wrapper_not_reached"] : []),
+      ...(keyStats.reads > 0 && keyStats.patched === 0 ? ["no_key_return_patched"] : []),
+      ...(sampledThrottleMaximum <= sampledThrottleMinimum + 1.0e-4 ? ["throttle_response_not_observed"] : []),
+      ...(!phaseCoverage ? ["insufficient_phase_sample_coverage"] : []),
+      ...(wheelRows < 12 ? ["insufficient_wheel_rows"] : []),
+    ],
     elapsed_ms: now() - t0,
     pcarCallbacks: callbackCount,
     pcarIntegrators: integratorCount,
     sampledIntegratorsByPhase: phaseSamples,
     capturedWheelRows: wheelRows,
     keyStats,
+    sampledThrottleRange: Number.isFinite(sampledThrottleMinimum)
+      ? [sampledThrottleMinimum, sampledThrottleMaximum] : null,
     inputWindowMs: [inputStart - t0, inputEnd - t0],
   });
 }, stopAt - t0);
