@@ -1460,3 +1460,20 @@ non-finite values. This helper is not yet called by `WindowState`: the live
 runtime still lacks the complete four-wheel callback's sourced inputs and
 state transition, so this closes the producer and persistence model, not
 production physics or driving acceptance.
+
+### Passive live integrator state sample (2026-10-29)
+
+A later read-only hook on the already-running `race.bin` PID 1540 sampled one
+`0x431150` integrator entry/return pair. The `ECX` body was `0x4C47604`; its
+12-float transform at `+0x38..+0x64` changed across the call, as did linear
+velocity at `+0x234`. The four ordered wheel objects at body offsets
+`+0x554/+0x6F8/+0x89C/+0xA40` all had contact-active byte `+0x168 = 1` and
+finite `+0xE8` and `+0x158` values. This confirms native body and wheel state
+are being updated together in this observed integrator call. The hook did not
+identify the entrant or establish a clean grid-start condition, controlled
+input, force attribution, or reconstructed-client parity. It must not be used
+as a numeric acceptance fixture. Evidence
+`ev_510c01f3e399d700ac39345460370efcf82fab20b706d26473935e8633ae8e0e`
+contains this sample plus an earlier failed read attempt; discard the earlier
+all-null sample and use only the subsequent `passive_integrator_state` row.
+The hook was unloaded and its Frida session closed after capture.

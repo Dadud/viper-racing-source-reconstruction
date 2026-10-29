@@ -30,8 +30,10 @@ failed with `VirtualAllocEx` access denied and startup stopped at the video
 error dialog. A later read-only probe captured eight consecutive selected-PCAR
 integrator calls with four ordered wheel callback entry/return rows each (32
 total). `+0xE8` changes inside each callback; wheel `+0x158` remains stable
-inside a callback and changes between integrator calls. This confirms a
-persistent upstream input but not its writer. Evidence
+inside a callback and changes between integrator calls. Static disassembly
+subsequently identified its paired-differential producer in `0x431150`; the
+byte-backed writer is modeled and regression-covered but not called by the
+runtime. Evidence
 `ev_3d97fe4c71bcd56533c8e0fd71c29e7c5276016e9acf0392b77ed241ab5d65ae` is
 retained in `metadata/original_physics_dispatch_capture.md`. The run was not
 clean-start or input-controlled and supplies no golden numeric response. See
@@ -712,13 +714,14 @@ gameplay comparison or as timer-branch evidence.
 
 ### Immediate physics evidence milestone (2026-10-25)
 
-The compact controlled capture is now documented in
+This historical note predates the 2026-10-29 producer analysis below. The
+compact controlled capture is documented in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md).
-It improves input-to-wheel/body evidence but does not cross the source seam:
-wheel `+0x158` is stable within each callback, its producer is not known, and
-suspension/tire inputs for `+0xE8/+0xF4` remain unowned by the reconstructed
-session. Next, recover those producers and inputs; then compose the existing
-wheel updates, pair differential, force accumulation, and body integration in
-a single frame with traceable source-owned inputs. Keep constructor defaults
-out of the live update. After integration, compare identical clean-start
-original and reconstructed schedules to measure drift and refine tolerances.
+It improves input-to-wheel/body evidence, but `+0x158` producer identification
+only closes a model seam: complete callback inputs, force accumulation, and
+body integration remain unowned by the reconstructed session. Recover the
+remaining inputs and compose the existing wheel updates, pair differential,
+force accumulation, and body integration in one frame with traceable
+source-owned inputs. Keep constructor defaults out of the live update. After
+integration, compare identical clean-start original and reconstructed
+schedules to measure drift and refine tolerances.
