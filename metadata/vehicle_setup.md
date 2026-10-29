@@ -1103,8 +1103,11 @@ projection. Its corrected
 wheel-rate update keeps its evolved `local_90` as a separate explicit input;
 the tire-basis `+0x7C` result does not feed it. The tire-curve portion
 of the factors is now evaluated from the `TireResponseCurveSet`, including the
-signed/clamped forward slip correction, and call-site scales. The two
-wheel-relative ratios are computed through `derive_wheel_kinematic_ratios`;
+signed/clamped forward slip correction, and call-site scales. With contact
+composition enabled, the wheel contact-feature profile supplies native
+`local_f0` to both the ten-times low-speed cutoff and the forward/lateral tire
+curve multipliers. The two wheel-relative ratios are computed through
+`derive_wheel_kinematic_ratios`;
 their mathematical mapping to the recovered forward/lateral factor labels
 remains provisional. The same stage reproduces the projection floor at ten
 times the mode scale and its low-speed weight. It also derives the bounded
@@ -1113,7 +1116,7 @@ forward response when the divisor is nonzero. The curve input itself is
 computed from the three suspension-response plus stored-wheel-vector terms
 projected on the contact normal, floored at `1.0`, and divided by wheel
 `+0x90`. The component terms, contact normal, wheel scalar, velocity
-projections, tire curves, and remaining mode scales stay explicit observations.
+projections, tire curves, and slip-sign status remain explicit observations.
 
 The factors correspond to the post-dynamics locals in `0x442530`: local `0xE4`
 is the `0x435780` trigonometric result; `0x74/0x9C` are forward/lateral ratios;

@@ -937,6 +937,8 @@ struct FourWheelBodyStepResult {
     std::array<WheelBodyForceSequenceResult, 4> wheel_body_forces{};
     std::array<WheelTireDynamicsResult, 4> wheel_tire_dynamics_results{};
     std::array<WheelTireDynamicsState, 4> wheel_tire_dynamics_states{};
+    std::array<TireWheelCurveFactorInput, 4>
+        wheel_tire_curve_factor_inputs_applied{};
     std::array<WheelTireAccumulatorResult, 4> wheel_tire_accumulator_results{};
     std::array<WheelTireAccumulatorState, 4> wheel_tire_accumulator_states{};
     std::array<TireResponseCurveSet, 4> wheel_tire_curves{};

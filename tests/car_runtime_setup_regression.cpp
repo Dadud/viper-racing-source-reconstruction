@@ -358,6 +358,39 @@ int main()
                 tire_object.words[15] == 11.0F,
             "0x435BF0 must populate all sixteen tire-object DWORD slots");
 
+        viper::TireWheelCurveFactorInput ordinary_tire_factor_input{};
+        ordinary_tire_factor_input.curves = tire_curves;
+        ordinary_tire_factor_input.wheel_scalar_0x90 = 1.0F;
+        ordinary_tire_factor_input.longitudinal_velocity = 2.0F;
+        ordinary_tire_factor_input.lateral_velocity = 1.0F;
+        ordinary_tire_factor_input.rolling_surface_speed = 2.2F;
+        ordinary_tire_factor_input.slip_curve_input = 0.2F;
+        ordinary_tire_factor_input.tire_scale_0x98 = 1.0F;
+        ordinary_tire_factor_input.wheel_scale_0x94 = 1.0F;
+        ordinary_tire_factor_input.mode_scale_0xf0 = 1.0F;
+        ordinary_tire_factor_input.reference_speed_scale_0x1c = 1.0F;
+        ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
+        const auto ordinary_tire_response = viper::derive_tire_wheel_response(
+            {}, ordinary_tire_factor_input);
+        const auto scaled_profile = viper::classify_wheel_contact_feature(
+            {10, 0.0F, false, true});
+        auto scaled_tire_factor_input = ordinary_tire_factor_input;
+        scaled_tire_factor_input.mode_scale_0xf0 = scaled_profile.response_scale;
+        scaled_tire_factor_input.reference_speed_scale_0x1c =
+            scaled_profile.response_scale;
+        const auto scaled_tire_response = viper::derive_tire_wheel_response(
+            {}, scaled_tire_factor_input);
+        require(scaled_profile.response_scale == 0.8F &&
+                ordinary_tire_response.dynamics_division_valid &&
+                scaled_tire_response.dynamics_division_valid &&
+                std::fabs(scaled_tire_response.factors.forward_curve_value -
+                    ordinary_tire_response.factors.forward_curve_value * 0.8F) <
+                    1.0e-5F &&
+                std::fabs(scaled_tire_response.factors.lateral_curve_value -
+                    ordinary_tire_response.factors.lateral_curve_value * 0.8F) <
+                    1.0e-5F,
+            "native contact-feature mode scale must apply to both tire curve paths");
+
         viper::CarFileResourcePayloads resources{};
         viper::CarFilePayload car_file{};
         car_file.resource_version = viper::CarFilePayload::supported_resource_version;
@@ -1015,6 +1048,12 @@ int main()
         const auto paired_history_step =
             viper::advance_four_wheel_body_step(paired_history_step_input);
         require(paired_history_step.wheel_pair_history_derived_from_updates &&
+                paired_history_step.wheel_contact_pipeline_results[0]
+                    .feature_profile.response_scale == 0.9F &&
+                paired_history_step.wheel_tire_curve_factor_inputs_applied[0]
+                    .reference_speed_scale_0x1c == 0.9F &&
+                paired_history_step.wheel_tire_curve_factor_inputs_applied[0]
+                    .mode_scale_0xf0 == 0.9F &&
                 paired_history_step.wheel_pair_differentials.value_0x850 == 2.0F &&
                 paired_history_step.wheel_pair_differentials.value_0x6ac == -2.0F &&
                 paired_history_step.wheel_pair_differentials.value_0xb98 == 3.0F &&

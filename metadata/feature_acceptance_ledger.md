@@ -60,10 +60,14 @@ The native contact query is now statically traced through a coordinate
 quantizer, binary plane selector, plane equation, and signed-short surface code.
 The matching `track.bpp` TPPB v2 loader/parser and PCAR-based runtime query
 already exist. The native wheel callback now has a trace-only model of its
-surface polarity draw and `0 -> -1`, nonzero `-> +1` adjustment. The immediate
-data gap is fixed-seed/shared-stream parity, mapping surface codes into tire
-and suspension response, and sourcing every remaining wheel input into runtime
-session. The immediate behavioral gap is a controlled per-wheel/body capture
+surface polarity draw and `0 -> -1`, nonzero `-> +1` adjustment. The portable
+four-wheel tire-factor composition now propagates its terrain-feature-derived
+mode scale to both the low-speed cutoff and forward/lateral tire-curve
+multipliers; regression covers a feature-code result of `0.9`. This does not
+connect tire forces to the Windows runtime. The remaining data gap is
+fixed-seed/shared-stream parity and sourcing every frame-dependent wheel input
+into the runtime session. The immediate behavioral gap is a controlled
+per-wheel/body capture
 including `+0x24C/+0x258` accumulator deltas under coast, throttle, steering,
 and braking. The bounded original capture documents synthetic key reads, not
 normal keyboard delivery or a force law.

@@ -2144,6 +2144,11 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             curve_factor_input.reference_speed_scale_0x1c =
                 update.feature_profile.response_scale;
             curve_factor_input.use_reference_speed_scale_0x1c = true;
+            // The native 0x442530 feature switch selects one local_f0 value
+            // for both the low-speed cutoff and the forward/lateral curve
+            // multipliers. Keep the portable composition on that same value.
+            curve_factor_input.mode_scale_0xf0 =
+                update.feature_profile.response_scale;
             if (update.contact.reached_query) {
                 if (wheel_update_input.contact.query_succeeded) {
                     collision_input.contact_normal =
@@ -2232,6 +2237,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         result.wheel_application_points_applied_0xc8[wheel] = wheel_application_point;
         const auto response_derivation = derive_tire_wheel_response(
             response_vector_input.factors, curve_factor_input);
+        result.wheel_tire_curve_factor_inputs_applied[wheel] =
+            curve_factor_input;
         auto dynamics_input = input.wheel_tire_dynamics_inputs[wheel];
         if (input.derive_wheel_tire_setup) {
             dynamics_input.tire_terms = derive_tire_trigonometric_terms(
