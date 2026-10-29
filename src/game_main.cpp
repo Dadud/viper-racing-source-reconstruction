@@ -2128,6 +2128,10 @@ struct WindowState {
     std::optional<viper::NcarFourWheelCoreInitialization> player_wheel_core_initialization;
     MaterializedNcarRuntimeState player_runtime_state{};
     std::optional<viper::NcarWheelVertexAnchorResult> player_wheel_anchors;
+    // Retain the four axle-selected source tire definitions for the complete
+    // race session. The derived native-layout response objects below are not
+    // sufficient to reconstruct every curve lookup used by 0x442530.
+    std::array<std::optional<viper::TireDefinition>, 4> player_tire_definitions{};
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
     // Per-wheel terrain observations transform constructor wheel anchors by
     // the initialized PCAR body pose. The body remains static in this runtime;
@@ -2276,6 +2280,8 @@ struct WindowState {
         const std::optional<std::uint32_t> serialized_stream_offset,
         const viper::CarTrackConstructionPlan& construction)
     {
+        player_tire_definitions = {};
+        player_wheel_tire_setups = {};
         bool host_fdiv_compatibility = false;
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
 #else
@@ -2619,19 +2625,28 @@ struct WindowState {
         }
         player_runtime_state.constructor_outputs_materialized = true;
         for (std::size_t wheel = 0; wheel < player_wheel_tire_setups.size(); ++wheel) {
+            player_tire_definitions[wheel] = tire_definitions[wheel];
             player_wheel_tire_setups[wheel] =
                 viper::initialize_ncar_wheel_tire_setup(
-                    player_runtime_car_record, wheel, tire_definitions[wheel],
+                    player_runtime_car_record, wheel,
+                    *player_tire_definitions[wheel],
                     host_fdiv_compatibility);
             if (!player_wheel_tire_setups[wheel].has_value()) {
                 player_runtime_car_record.clear();
                 player_wheel_anchors.reset();
+                player_tire_definitions = {};
                 player_wheel_tire_setups = {};
                 return false;
             }
         }
         player_constructor_inputs_ready =
-            player_runtime_state.constructor_outputs_materialized;
+            player_runtime_state.constructor_outputs_materialized &&
+            std::all_of(player_tire_definitions.begin(),
+                player_tire_definitions.end(),
+                [](const auto& definition) { return definition.has_value(); }) &&
+            std::all_of(player_wheel_tire_setups.begin(),
+                player_wheel_tire_setups.end(),
+                [](const auto& setup) { return setup.has_value(); });
         return true;
     }
 
