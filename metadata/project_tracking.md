@@ -1,12 +1,25 @@
 # Reconstruction status and completion plan
 
-Updated: 2026-10-25. This snapshot is based on the source tree and the
+Updated: 2026-10-29. This snapshot is based on the source tree and the
 feature-by-feature evidence in [`completion_ledger.md`](completion_ledger.md).
 The old numeric scores were based on a substantially earlier prototype and
 are not carried forward as current percentages. The workstreams differ too
 much in maturity for one precise completion number to be useful. The prior
 dated score calculations and development notes are preserved in
 [`project_tracking_history_2026-10-24.md`](project_tracking_history_2026-10-24.md).
+
+### Current checkout verification
+
+At source commit `5e0d963`, the Visual Studio 18 Release target `viper_game`
+rebuilt successfully, and all 66 configured Release CTests passed, including
+asset-backed track/car validation, frontend/session smoke, keyboard input,
+route-motion policy, and fixed-step trace replay. Reproduce with
+`cmake --build build --config Release --target viper_game --parallel 4` and
+`ctest --test-dir build -C Release --output-on-failure` from a configured
+Windows checkout with the external game data installed. This is build and
+prototype plumbing evidence; it does not pass the physical-driving acceptance
+gate. Diagnostics-only replay remains route-disabled, while
+`--route-motion-prototype` is a separately named non-physical demonstration.
 
 ## Current status
 
