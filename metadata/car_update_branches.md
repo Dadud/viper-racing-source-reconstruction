@@ -358,6 +358,19 @@ Evidence is retained at
 (`ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`,
 `0x433C00`).
 
+The source-backed byte adapter `advance_ncar_integrator_wheel_scalars_from_body`
+now reads the callback operands from initialized body fields, stages the four
+strided `+0xE0` wheel writes, and commits only if every input/output is finite
+and every destination fits. A regression covers the selected response lane,
+all four byte-backed outputs, and preservation of wheel state when body inputs
+are unknown. The adapter remains a standalone model: the live Windows session
+does not call it because its current PCAR constructor does not own all shared
+integrator inputs (notably `+0xD84`, `+0xD90`, `+0xDE4`, and `+0xDE8`) at this
+callback point. The live callback trace columns remain blank until the full
+native input seam is established. In the PCAR path, `+0x500` is the value after
+the `0x4330F0` smoother immediately before `0x431150`; the similarly named
+interpolated `0x432420` source belongs to the separate GCAR/GhostBegin path.
+
 Evidence: `ev_4b3139981dceaf6b39dcb6ac3fd8f2d8561e94ba04311112a26b0c9e02b0d1c5`
 (`0x431150`), `ev_561bda702abc7970b5b820be76dc22cedb78968c7da2d82ede95809777fcf6c1`
 (`0x43F830`), `ev_e1224f8c92d66a13ee1793d2d6ed81095204c66493ad2a6b1423e4e65cc60352`

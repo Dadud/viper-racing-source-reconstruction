@@ -3432,10 +3432,9 @@ struct WindowState {
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
-            // The native PCAR callback prefix stores control-derived body
-            // scalars before entering the shared integrator's four wheel
-            // callbacks. Keep the wheel suspension/pair-history projection
-            // after that prefix; tire/body force accumulation is still open.
+            // The PCAR callback prefix stores control-derived body scalars.
+            // The shared integrator's +0x4C callback remains a standalone
+            // model until every source operand is owned by this session.
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(

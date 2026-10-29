@@ -310,6 +310,10 @@ not call that wheel/force/body sequence. The byte-backed PCAR constructor now
 also owns the `+0xDD4/+0xDD8` scales written by `0x433C00` from runtime-record
 `+0xE4/+0xE8`. Complete wheel/contact inputs, force collection, and
 body-integrator state remain unowned.
+The `0x431150/+0x4C -> 0x432170` `+0xE0` callback has an isolated byte-backed
+adapter and regression, but it is not wired into `WindowState`: constructor
+fields `+0xD84/+0xD90/+0xDE4/+0xDE8` are not all sourced at this callback
+point. Do not make an incomplete modeled callback a live pose prerequisite.
 Build those persistent inputs and connect them to the existing wheel/body
 compositions before replacing route motion as the rendered pose authority.
 All currently modeled `0x441C10` outputs are now materialized at their wheel

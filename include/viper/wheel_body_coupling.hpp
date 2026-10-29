@@ -760,6 +760,15 @@ struct NcarIntegratorWheelScalarResult {
 advance_ncar_integrator_wheel_scalars(
     const NcarIntegratorWheelScalarInput& input) noexcept;
 
+// Reads the sourced 0x431150/+0x4C callback operands from a byte-backed body,
+// computes 0x432170, and atomically stores its four wheel +0xE0 outputs.
+// Missing or non-finite source fields leave all wheel records unchanged.
+[[nodiscard]] std::optional<NcarIntegratorWheelScalarResult>
+advance_ncar_integrator_wheel_scalars_from_body(
+    const NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    std::uint32_t first_wheel_object_offset) noexcept;
+
 struct NcarIntegratorCurveGateResult {
     bool curve_helper_0x4402d0_reached{};
     bool curve_byte_0x40_written{};

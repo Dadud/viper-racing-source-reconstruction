@@ -70,6 +70,65 @@ int main()
                 "wheel callback prefix must preserve unknown source bytes");
         }
         {
+            constexpr std::uint32_t first_wheel = 0x554U;
+            viper::NcarBodyRuntimeObjectState body{};
+            const std::array<viper::NcarObjectFieldWrite, 11> body_fields{{
+                {0x4f8U, 4U, 1U},
+                {0xdccU, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+                {0x500U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+                {0xd84U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+                {0xd90U, 4U, std::bit_cast<std::uint32_t>(-1.0F)},
+                {0x244U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+                {0x234U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+                {0x238U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0x23cU, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0xde4U, 4U, std::bit_cast<std::uint32_t>(0.2F)},
+                {0xde8U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+            }};
+            require(viper::apply_ncar_body_object_writes(body, body_fields),
+                "integrator callback source fields must materialize");
+            std::array<viper::NcarWheelRuntimeObjectState, 4> wheels{};
+            const auto callback =
+                viper::advance_ncar_integrator_wheel_scalars_from_body(
+                    body, wheels, first_wheel);
+            require(callback.has_value() && callback->callback_0x4c_reached &&
+                    callback->callback_selector_nonzero &&
+                    callback->response_gate_passed &&
+                    callback->target_response > 100.0F &&
+                    callback->wheel_values_0xe0[0] == 0.2F &&
+                    callback->wheel_values_0xe0[1] == 0.2F &&
+                    std::fabs(callback->wheel_values_0xe0[2] - 0.2F) < 1.0e-6F &&
+                    callback->wheel_values_0xe0[3] > 50.0F,
+                "byte-backed integrator fields must reproduce callback gate and wheel scalars");
+            constexpr std::uint32_t wheel_stride = 0x1a4U;
+            for (std::size_t wheel = 0U; wheel < wheels.size(); ++wheel) {
+                const auto object_offset = first_wheel +
+                    static_cast<std::uint32_t>(wheel * wheel_stride);
+                const auto field = object_offset + 0xe0U;
+                require(viper::read_ncar_wheel_object_u32(
+                            wheels[wheel], 0xe0U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            callback->wheel_values_0xe0[wheel])},
+                    "integrator callback must persist each strided wheel +0xE0 output");
+            }
+
+            std::array<viper::NcarWheelRuntimeObjectState, 4> unresolved_wheels{};
+            const std::array<viper::NcarObjectFieldWrite, 1> sentinel{{
+                {first_wheel + 0xe0U, 4U,
+                    std::bit_cast<std::uint32_t>(7.0F)}}};
+            require(viper::apply_ncar_wheel_object_writes(
+                        unresolved_wheels[0], first_wheel, sentinel),
+                "unresolved wheel sentinel must materialize");
+            const auto unresolved_before = unresolved_wheels;
+            viper::NcarBodyRuntimeObjectState unresolved_body{};
+            require(!viper::advance_ncar_integrator_wheel_scalars_from_body(
+                        unresolved_body, unresolved_wheels, first_wheel) &&
+                    unresolved_wheels[0].bytes == unresolved_before[0].bytes &&
+                    unresolved_wheels[0].initialized_bytes ==
+                        unresolved_before[0].initialized_bytes,
+                "unknown integrator inputs must preserve every wheel object");
+        }
+        {
             std::vector<std::byte> runtime_record(0xecU);
             write_u32_le(runtime_record, 0xe4U,
                 std::bit_cast<std::uint32_t>(200.0F));

@@ -843,6 +843,86 @@ NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
     return result;
 }
 
+std::optional<NcarIntegratorWheelScalarResult>
+advance_ncar_integrator_wheel_scalars_from_body(
+    const NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    const std::uint32_t first_wheel_object_offset) noexcept
+{
+    const auto read_float = [&body](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        return std::bit_cast<float>(*bits);
+    };
+    const auto selector = read_ncar_body_object_u32(body, 0x4f8U);
+    const auto raw_angular_y = read_ncar_body_object_u32(body, 0x244U);
+    const auto angle = read_float(0xdccU);
+    const auto angle_scale = read_float(0x500U);
+    const auto value_d84 = read_float(0xd84U);
+    const auto value_d90 = read_float(0xd90U);
+    const auto velocity_x = read_float(0x234U);
+    const auto velocity_y = read_float(0x238U);
+    const auto velocity_z = read_float(0x23cU);
+    const auto value_de4 = read_float(0xde4U);
+    const auto value_de8 = read_ncar_body_object_u32(body, 0xde8U);
+    if (!selector || !raw_angular_y || !angle || !angle_scale || !value_d84 ||
+        !value_d90 || !velocity_x || !velocity_y || !velocity_z || !value_de4 ||
+        !value_de8) {
+        return std::nullopt;
+    }
+    const std::array<float, 8> finite_inputs{
+        *angle, *angle_scale, *value_d84, *value_d90,
+        *velocity_x, *velocity_y, *velocity_z, *value_de4};
+    if (!std::all_of(finite_inputs.begin(), finite_inputs.end(),
+            [](const float value) { return std::isfinite(value); }) ||
+        !std::isfinite(std::bit_cast<float>(*value_de8))) {
+        return std::nullopt;
+    }
+
+    NcarIntegratorWheelScalarInput input{};
+    input.selector_bits_0x4f8 = *selector;
+    input.angle_0xdcc = *angle;
+    input.angle_scale_0x500 = *angle_scale;
+    input.value_0xd84 = *value_d84;
+    input.value_0xd90 = *value_d90;
+    input.value_bits_0x244 = *raw_angular_y;
+    input.body_velocity_0x234 = {*velocity_x, *velocity_y, *velocity_z};
+    input.value_0xde4 = *value_de4;
+    input.value_bits_0xde8 = *value_de8;
+    const auto result = advance_ncar_integrator_wheel_scalars(input);
+    const std::array<float, 7> finite_outputs{
+        result.speed_magnitude, result.tangent_response, result.target_response,
+        result.wheel_values_0xe0[0], result.wheel_values_0xe0[1],
+        result.wheel_values_0xe0[2], result.wheel_values_0xe0[3]};
+    if (!std::all_of(finite_outputs.begin(), finite_outputs.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+
+    constexpr std::uint32_t wheel_stride = 0x1a4U;
+    auto updated_wheels = wheel_objects;
+    for (std::size_t wheel = 0U; wheel < updated_wheels.size(); ++wheel) {
+        const auto object_offset = static_cast<std::uint64_t>(
+            first_wheel_object_offset) + wheel_stride * wheel;
+        const auto field_offset = object_offset + 0xe0U;
+        if (object_offset > std::numeric_limits<std::uint32_t>::max() ||
+            field_offset > std::numeric_limits<std::uint32_t>::max()) {
+            return std::nullopt;
+        }
+        const NcarObjectFieldWrite write{
+            static_cast<std::uint32_t>(field_offset), 4U,
+            std::bit_cast<std::uint32_t>(result.wheel_values_0xe0[wheel])};
+        if (!apply_ncar_wheel_object_writes(updated_wheels[wheel],
+                static_cast<std::uint32_t>(object_offset),
+                std::span<const NcarObjectFieldWrite>(&write, 1U))) {
+            return std::nullopt;
+        }
+    }
+    wheel_objects = std::move(updated_wheels);
+    return result;
+}
+
 NcarIntegratorChildControlStepResult
 advance_ncar_integrator_child_control_step(
     const NcarIntegratorChildControlStepInput& input,
