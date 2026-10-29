@@ -170,10 +170,10 @@ int main()
         }
         {
             std::array<viper::NcarOrdinalPairRowInput, 4> rows{{
-                {true, 0.0F, 0.0F, 0.0F, 0.0F},
-                {true, 2.0F, 0.0F, 5.0F, 0.0F},
-                {true, 10.0F, 0.0F, 8.0F, 0.0F},
-                {true, 3.0F, 0.0F, 9.0F, 0.0F}}};
+                {true, true, 0.0F, 0.0F, 0.0F, 0.0F},
+                {true, true, 2.0F, 0.0F, 5.0F, 0.0F},
+                {true, true, 10.0F, 0.0F, 8.0F, 0.0F},
+                {true, true, 3.0F, 0.0F, 9.0F, 0.0F}}};
             const auto lookup = viper::resolve_ncar_ordinal_pair_lookup(rows, 1U);
             require(lookup.input_complete && lookup.record.has_value() &&
                     lookup.sorted_partner_ordinals.size() == rows.size() &&
@@ -268,10 +268,42 @@ int main()
                     !terminal_ordinal.sorted_partner_ordinals.back().has_value(),
                 "native sorted row must retain its single null diagonal entry at the end");
 
+            std::array<viper::NcarOrdinalPairRowInput, 4> unresolved_rows{};
+            unresolved_rows[0] = {true, true, 0.0F, 0.0F, 0.0F, 0.0F};
+            unresolved_rows[1] = {true, true, 1.0F, 0.0F, 0.0F, 0.0F};
+            const auto unresolved_row_lookup =
+                viper::resolve_ncar_ordinal_pair_lookup(unresolved_rows, 0U);
+            require(!unresolved_row_lookup.input_complete &&
+                    !unresolved_row_lookup.record.has_value(),
+                "ordinal lookup must not interpret default or missing rows as known unregistered slots");
+            viper::NcarIntegratorTimerState unresolved_rows_timer_state{0.2F, 0.0F};
+            viper::NcarIntegratorTimerInput unresolved_rows_timer_input{};
+            unresolved_rows_timer_input.timer_ticks_0x508774 = 1U;
+            unresolved_rows_timer_input.ordinal_rows_resolved = true;
+            unresolved_rows_timer_input.ordinal_rows = unresolved_rows;
+            const auto unresolved_rows_timer = viper::advance_ncar_integrator_timer(
+                unresolved_rows_timer_state, unresolved_rows_timer_input);
+            require(!unresolved_rows_timer.input_complete &&
+                    unresolved_rows_timer.ordinal_record_lookup_reached &&
+                    unresolved_rows_timer_state.record_time_0xe44 == 0.0F,
+                "timer must not consume a pair record when any participant registration is unresolved");
+            unresolved_rows[2] = {true, false, 0.0F, 0.0F, 0.0F, 0.0F};
+            unresolved_rows[3] = {true, false, 0.0F, 0.0F, 0.0F, 0.0F};
+            unresolved_rows[2].position_x_0x5c =
+                std::numeric_limits<float>::quiet_NaN();
+            const auto unregistered_row_lookup =
+                viper::resolve_ncar_ordinal_pair_lookup(unresolved_rows, 0U);
+            require(unregistered_row_lookup.input_complete &&
+                    unregistered_row_lookup.record.has_value() &&
+                    (unregistered_row_lookup.sorted_partner_ordinals[0] == 2U ||
+                     unregistered_row_lookup.sorted_partner_ordinals[0] == 3U) &&
+                    unregistered_row_lookup.record->position_delta_x_0x04 == 0.0F,
+                "known unregistered slots must use native zero-filled row values");
+
             std::array<viper::NcarOrdinalPairRowInput, 10> larger_rows{};
             for (std::size_t index = 0; index < larger_rows.size(); ++index) {
                 larger_rows[index] = {
-                    true, static_cast<float>(index), 0.0F,
+                    true, true, static_cast<float>(index), 0.0F,
                     static_cast<float>(index * 2U), 0.0F};
             }
             const auto larger_lookup =

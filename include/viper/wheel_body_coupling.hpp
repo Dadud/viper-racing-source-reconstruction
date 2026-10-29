@@ -463,6 +463,10 @@ struct NcarIntegratorTimerState {
 // Values copied by 0x419E80 into one ordinal row before the shared pair pass.
 // Unregistered slots retain the matrix allocator's zero-filled values.
 struct NcarOrdinalPairRowInput {
+    // Distinguishes a known unregistered slot from a missing owner/registration
+    // observation. Native unregistered slots are zero-filled during the row
+    // gather, but an absent caller row is not evidence of non-registration.
+    bool registration_resolved{};
     bool registered{};
     float position_x_0x5c{};
     float position_z_0x64{};

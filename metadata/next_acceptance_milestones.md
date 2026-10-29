@@ -389,6 +389,14 @@ position/velocity rows for all registered participants. Regression verifies
 the timer gate independently from rigid-body kinematics: unavailable timer
 fields do not invalidate an otherwise complete `0x43ECE0` snapshot.
 
+The standalone ordinal-pair resolver now requires an explicit registration
+observation for every descriptor slot. Missing membership fails the lookup;
+known unregistered slots are materialized as native zero-filled rows, while
+registered rows require finite body position/velocity values. This closes a
+model-input default that previously could mistake absent rows for known empty
+slots. It does not supply the production registry inventory, per-tick body
+owners, or the prior completed snapshot, so the resolver remains unwired.
+
 A fresh hash-verified original-client race capture now samples all four wheels
 for eight consecutive selected-PCAR integrator calls. It records body
 `+0x50C/+0xE44/+0x510` alongside each wheel's `+0x158/+0xE8` before and after

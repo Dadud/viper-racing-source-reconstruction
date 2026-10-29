@@ -220,6 +220,14 @@ because this row reconstruction uses dynamic storage. Comparator operation
 order is preserved, but binary64 intermediate precision is not proven to
 match the original x87 extended precision for adversarial cancellation cases.
 
+Each portable row now carries an explicit `registration_resolved` observation.
+The lookup rejects a span with any missing registration observation instead
+of silently interpreting default-initialized rows as unregistered. A row known
+to be unregistered retains the native zero-filled values; a registered row
+must provide finite position and velocity inputs. This makes the model
+fail-closed, but the production session still does not own the complete
+registry membership or current body rows needed to populate it.
+
 The next original-client capture can use the passive one-shot Frida probe at
 [`../../analysis/reference_captures/ordinal_pair_lookup_probe.js`](../../analysis/reference_captures/ordinal_pair_lookup_probe.js).
 It hooks `0x4335E5` after the lookup load and records the live descriptor,

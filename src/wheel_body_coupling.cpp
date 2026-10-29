@@ -144,10 +144,24 @@ NcarOrdinalPairLookupResult resolve_ncar_ordinal_pair_lookup(
             std::numeric_limits<std::int16_t>::max())) {
         return result;
     }
+    for (const auto& row : rows) {
+        if (!row.registration_resolved) return result;
+        if (row.registered &&
+            (!std::isfinite(row.position_x_0x5c) ||
+             !std::isfinite(row.position_z_0x64) ||
+             !std::isfinite(row.velocity_x_0x234) ||
+             !std::isfinite(row.velocity_z_0x23c))) {
+            return result;
+        }
+    }
 
     const auto row_values = [rows](const std::size_t index) {
         const auto& row = rows[index];
-        if (!row.registered) return NcarOrdinalPairRowInput{};
+        if (!row.registered) {
+            NcarOrdinalPairRowInput zero_filled{};
+            zero_filled.registration_resolved = true;
+            return zero_filled;
+        }
         return row;
     };
     const auto selected_row = static_cast<std::size_t>(ordinal);
