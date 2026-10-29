@@ -15,9 +15,10 @@ development view. It loads the selected track's `track.obt` placement table
 and renders the selected model at the human grid slot and the native Viper
 model at other valid `obj car` start positions. Normal startup keeps the
 recorded grid poses fixed while input and callback diagnostics run; the live
-session does not yet own a physical pose update. The ideal-line route follower
-is retained only as an explicit prototype via `--route-motion-prototype` and
-must not be used as a driving or race test oracle. Keyboard bindings can come
+session does not yet own a physical pose update. Ideal-line route motion is
+disabled by default; `--route-motion-prototype` enables a clearly labeled
+non-physical demo for manual inspection. No acceptance or regression test uses
+it as a driver or oracle. Keyboard bindings can come
 from `options.def`. A Win32 setup screen selects installed tracks and cars.
 Trace capture/playback, WARP rendering smoke cases, and parser regressions
 support repeatable development checks. Physical vehicle dynamics, native AI,
@@ -33,7 +34,7 @@ ctest --test-dir build -C Release --output-on-failure
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --validate-assets
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --track dundas --car sports
-# Optional non-physical route-motion prototype (not gameplay evidence):
+# Optional non-physical development demo only; never use for acceptance:
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData --route-motion-prototype
 # Force native track-basis grid placement instead of spline placement:
 ./build/Release/viper_game.exe --data-dir ../game_install/GameData -grid
@@ -54,7 +55,7 @@ the value is stored with the reconstruction's track/car selection. Explicit
 trace-recording commands bypass the selector. `--play-trace` without explicit
 track/car overrides opens setup and keeps the replayed results available for
 return to setup. Input and fixed-step diagnostics accept `--diagnostics-only`
-to bypass provisional route motion and route-state initialization while retaining
+to bypass route-state initialization while retaining
 input evaluation, PCAR callback projection, contact/suspension-history
 diagnostics and trace capture. Diagnostics-only acceptance checks select the
 native track-object grid placement with `-grid`, not the ILD-derived spline

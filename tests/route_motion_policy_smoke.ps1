@@ -37,10 +37,10 @@ try {
     if ($rows | Where-Object { $_.diagnostics_only -ne '1' -or
             [int]$_.route_motion_step_count -ne 0 -or
             $_.route_state_initialized -ne '0' }) {
-        throw 'Diagnostics runtime must keep route progression uninitialized and motion disabled'
+        throw 'Runtime must keep route progression uninitialized and motion disabled'
     }
 
-    Write-Output 'Diagnostics-only trace kept route motion disabled. This startup-policy check did not test physics or driving.'
+    Write-Output 'Runtime trace kept route motion disabled. This startup-policy check did not test physics or driving.'
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }

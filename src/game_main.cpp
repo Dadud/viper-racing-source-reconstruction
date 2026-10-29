@@ -212,7 +212,7 @@ void usage(std::ostream& out)
         << "  --load-replay PATH validates the v6 container and fixed engine-record header, then retains it; frame payload remains opaque.\n"
         << "  --record-tick-trace PATH writes one diagnostic row per scheduled player physics tick.\n"
         << "  --diagnostics-only runs input/callback diagnostics without prototype route motion.\n"
-        << "  --route-motion-prototype explicitly enables the non-physical ideal-line follower.\n"
+        << "  --route-motion-prototype enables the non-physical ideal-line demo; never use it for acceptance tests.\n"
         << "Set VIPER_DATA_DIR or pass --data-dir to locate extracted game assets.\n"
         << "Without either, searches the current and executable directories for common.res, Data/common.res, or GameData/common.res.\n";
 }
@@ -2163,6 +2163,7 @@ struct WindowState {
     bool right{};
     bool playback_active{};
     bool diagnostics_only{};
+    bool route_motion_enabled{};
     bool paused{};
     bool return_to_frontend{};
     bool camera_follow_player{true};
@@ -3605,7 +3606,7 @@ struct WindowState {
             update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
-            if (!this->diagnostics_only) {
+            if (this->route_motion_enabled) {
                 ++route_motion_step_count;
                 auto candidate_motion = motion;
                 const auto route_result = viper::advance_route_motion(candidate_motion, route,
@@ -4423,6 +4424,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
                const bool diagnostics_only,
+               const bool route_motion_enabled,
                const std::optional<std::filesystem::path>& record_trace,
                const std::optional<std::filesystem::path>& record_physics_tick_trace,
                const std::vector<TraceInputFrame>* playback_trace,
@@ -4465,6 +4467,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     }
     WindowState state;
     state.diagnostics_only = diagnostics_only;
+    state.route_motion_enabled = route_motion_enabled;
     if (state.diagnostics_only)
         std::cout << "Diagnostics-only mode: route motion disabled.\n";
     state.network_session = network_session;
@@ -5847,6 +5850,7 @@ int run_selected_race(const Options& options, const std::string_view track,
     }
     return run_window(options.software, options.smoke_frames, options.audio_smoke,
         options.diagnostics_only || !options.route_motion_prototype,
+        options.route_motion_prototype && !options.diagnostics_only,
         options.record_trace, options.record_physics_tick_trace,
         playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,

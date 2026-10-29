@@ -11,8 +11,9 @@ requirements and final gates remain in [`completion_ledger.md`](completion_ledge
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
 safe-follow policy, standings, and a return-to-setup path. Normal startup now
-disables that route-motion adapter; `--route-motion-prototype` is an explicit
-opt-in for the non-physical demo. On 2026-10-29, the Release build succeeded,
+disables route motion in the live session by default. The ideal-line follower
+remains an explicit manual demo option and is not used by acceptance tests.
+On 2026-10-29, the Release build succeeded,
 and a direct asset-backed Viper/Bemidji smoke confirmed default startup reports
 route motion disabled. The route policy CTest now runs only with
 `--diagnostics-only` and requires zero route-motion steps; it no longer opts

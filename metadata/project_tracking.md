@@ -19,7 +19,8 @@ route-motion policy, and fixed-step trace replay. Reproduce with
 Windows checkout with the external game data installed. This is build and
 prototype plumbing evidence; it does not pass the physical-driving acceptance
 gate. Diagnostics-only replay remains route-disabled, while
-`--route-motion-prototype` is a separately named non-physical demonstration.
+Ideal-line route motion is disabled by default; an explicit non-physical demo
+option remains available for manual inspection and is never acceptance evidence.
 
 ## Current status
 
