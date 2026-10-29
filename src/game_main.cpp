@@ -2132,6 +2132,10 @@ struct WindowState {
     // race session. The derived native-layout response objects below are not
     // sufficient to reconstruct every curve lookup used by 0x442530.
     std::array<std::optional<viper::TireDefinition>, 4> player_tire_definitions{};
+    std::array<std::optional<viper::TireResponseCurveSet>, 4>
+        player_tire_response_curves{};
+    std::array<std::optional<viper::TireTrigonometricTerms>, 4>
+        player_tire_trigonometric_terms{};
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
     // Per-wheel terrain observations transform constructor wheel anchors by
     // the initialized PCAR body pose. The body remains static in this runtime;
@@ -2281,6 +2285,8 @@ struct WindowState {
         const viper::CarTrackConstructionPlan& construction)
     {
         player_tire_definitions = {};
+        player_tire_response_curves = {};
+        player_tire_trigonometric_terms = {};
         player_wheel_tire_setups = {};
         bool host_fdiv_compatibility = false;
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
@@ -2626,6 +2632,12 @@ struct WindowState {
         player_runtime_state.constructor_outputs_materialized = true;
         for (std::size_t wheel = 0; wheel < player_wheel_tire_setups.size(); ++wheel) {
             player_tire_definitions[wheel] = tire_definitions[wheel];
+            player_tire_response_curves[wheel] =
+                viper::derive_tire_response_curves(
+                    *player_tire_definitions[wheel]);
+            player_tire_trigonometric_terms[wheel] =
+                viper::derive_tire_trigonometric_terms(
+                    *player_tire_definitions[wheel]);
             player_wheel_tire_setups[wheel] =
                 viper::initialize_ncar_wheel_tire_setup(
                     player_runtime_car_record, wheel,
@@ -2635,6 +2647,36 @@ struct WindowState {
                 player_runtime_car_record.clear();
                 player_wheel_anchors.reset();
                 player_tire_definitions = {};
+                player_tire_response_curves = {};
+                player_tire_trigonometric_terms = {};
+                player_wheel_tire_setups = {};
+                return false;
+            }
+            const auto& curves = *player_tire_response_curves[wheel];
+            const std::array<float, 9> curve_fields{
+                curves.quadratic.quadratic,
+                curves.quadratic.linear,
+                curves.linear.slope,
+                curves.linear.intercept,
+                curves.quadratic_scale_at_0x10,
+                curves.quadratic_scale_at_0x14,
+                curves.linear_scale_at_0x18,
+                curves.input_limit_at_0x38,
+                curves.input_slope_at_0x3c};
+            const auto& trig = *player_tire_trigonometric_terms[wheel];
+            const std::array<float, 4> trig_fields{
+                trig.coefficient_0x1c, trig.coefficient_0x20,
+                trig.coefficient_0x24, trig.coefficient_0x28};
+            const auto finite = [](const auto& values) {
+                return std::all_of(values.begin(), values.end(),
+                    [](const float value) { return std::isfinite(value); });
+            };
+            if (!finite(curve_fields) || !finite(trig_fields)) {
+                player_runtime_car_record.clear();
+                player_wheel_anchors.reset();
+                player_tire_definitions = {};
+                player_tire_response_curves = {};
+                player_tire_trigonometric_terms = {};
                 player_wheel_tire_setups = {};
                 return false;
             }
@@ -2644,6 +2686,12 @@ struct WindowState {
             std::all_of(player_tire_definitions.begin(),
                 player_tire_definitions.end(),
                 [](const auto& definition) { return definition.has_value(); }) &&
+            std::all_of(player_tire_response_curves.begin(),
+                player_tire_response_curves.end(),
+                [](const auto& curves) { return curves.has_value(); }) &&
+            std::all_of(player_tire_trigonometric_terms.begin(),
+                player_tire_trigonometric_terms.end(),
+                [](const auto& terms) { return terms.has_value(); }) &&
             std::all_of(player_wheel_tire_setups.begin(),
                 player_wheel_tire_setups.end(),
                 [](const auto& setup) { return setup.has_value(); });
