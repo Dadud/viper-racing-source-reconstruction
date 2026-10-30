@@ -411,6 +411,27 @@ struct PhysicsVector3 {
     float z{};
 };
 
+struct WheelVelocityProjection {
+    PhysicsVector3 forward_axis{};
+    PhysicsVector3 lateral_axis{};
+    float forward_velocity{};
+    float lateral_velocity{};
+};
+
+// Transforms the current wheel-local axis at +0xB0 through the body basis,
+// matching FUN_00422F30's vector transform used by 0x442530.
+[[nodiscard]] PhysicsVector3 transform_wheel_local_axis_0x422f30(
+    const PhysicsVector3& wheel_local_axis_0xb0,
+    const std::array<float, 9>& body_basis_0x38_to_0x58) noexcept;
+
+// Projects 0x43E9B0 point velocity onto the wheel forward axis and the
+// contact-normal cross forward axis used by the tire slip calculation.
+[[nodiscard]] std::optional<WheelVelocityProjection>
+project_wheel_point_velocity_onto_contact_axes(
+    const PhysicsVector3& point_velocity,
+    const PhysicsVector3& forward_axis,
+    const PhysicsVector3& contact_normal) noexcept;
+
 struct BodyPointVelocityInput {
     PhysicsVector3 body_center_0x5c{};
     PhysicsVector3 point_0x130{};

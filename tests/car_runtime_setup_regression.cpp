@@ -1055,6 +1055,26 @@ int main()
         require(viper::project_body_point_velocity_0x442530(
                     {10.0F, 20.0F, 30.0F}, projection_transform) == 140.0F,
             "wheel surface projection must preserve native +0x50/+0x58/+0x54 operand order");
+        const std::array<float, 9> wheel_axis_body_basis{
+            0.0F, 1.0F, 0.0F,
+            -1.0F, 0.0F, 0.0F,
+            0.0F, 0.0F, 1.0F};
+        const auto wheel_forward_axis = viper::transform_wheel_local_axis_0x422f30(
+            {1.0F, 0.0F, 0.0F}, wheel_axis_body_basis);
+        const auto wheel_velocity_projection =
+            viper::project_wheel_point_velocity_onto_contact_axes(
+                {3.0F, 4.0F, 0.0F}, wheel_forward_axis, {0.0F, 0.0F, 1.0F});
+        require(wheel_forward_axis.x == 0.0F && wheel_forward_axis.y == 1.0F &&
+                wheel_forward_axis.z == 0.0F && wheel_velocity_projection &&
+                wheel_velocity_projection->forward_velocity == 4.0F &&
+                wheel_velocity_projection->lateral_axis.x == -1.0F &&
+                wheel_velocity_projection->lateral_axis.y == 0.0F &&
+                wheel_velocity_projection->lateral_axis.z == 0.0F &&
+                wheel_velocity_projection->lateral_velocity == -3.0F &&
+                !viper::project_wheel_point_velocity_onto_contact_axes(
+                    {std::numeric_limits<float>::quiet_NaN(), 0.0F, 0.0F},
+                    wheel_forward_axis, {0.0F, 0.0F, 1.0F}),
+            "native wheel-axis transform and forward/lateral velocity projections must preserve operand order and reject non-finite inputs");
         const viper::WheelSuspensionSurfaceInput surface_input{
             100.0F, 0.5F, 2.0F, 4.0F, 1.0F, 3, false};
         const auto neutral_surface = viper::adjust_wheel_suspension_for_surface(

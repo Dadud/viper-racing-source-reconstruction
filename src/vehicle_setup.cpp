@@ -1248,12 +1248,9 @@ WheelMomentVectorResult derive_wheel_moment_vector_0x43e7f0(
     const WheelMomentVectorInput& input) noexcept
 {
     const auto& matrix = input.body_basis_0x38_to_0x58;
-    const auto& local = input.wheel_local_vector_0xb0;
     WheelMomentVectorResult result{};
-    result.transformed_wheel_axis = {
-        matrix[0] * local.x + matrix[3] * local.y + matrix[6] * local.z,
-        matrix[1] * local.x + matrix[4] * local.y + matrix[7] * local.z,
-        matrix[2] * local.x + matrix[5] * local.y + matrix[8] * local.z};
+    result.transformed_wheel_axis = transform_wheel_local_axis_0x422f30(
+        input.wheel_local_vector_0xb0, matrix);
     const PhysicsVector3 car_axis{matrix[3], matrix[4], matrix[5]};
     const auto& wheel_axis = result.transformed_wheel_axis;
     result.wheel_axis_cross_car_axis = {
@@ -1271,6 +1268,51 @@ WheelMomentVectorResult derive_wheel_moment_vector_0x43e7f0(
          result.wheel_axis_cross_car_axis.y * spin_rate) * scale,
         (input.spin_filter_0x140_to_0x148[2] * prior_spin_delta +
          result.wheel_axis_cross_car_axis.z * spin_rate) * scale};
+    return result;
+}
+
+PhysicsVector3 transform_wheel_local_axis_0x422f30(
+    const PhysicsVector3& wheel_local_axis_0xb0,
+    const std::array<float, 9>& body_basis_0x38_to_0x58) noexcept
+{
+    const auto& matrix = body_basis_0x38_to_0x58;
+    const auto& local = wheel_local_axis_0xb0;
+    return {
+        matrix[0] * local.x + matrix[3] * local.y + matrix[6] * local.z,
+        matrix[1] * local.x + matrix[4] * local.y + matrix[7] * local.z,
+        matrix[2] * local.x + matrix[5] * local.y + matrix[8] * local.z};
+}
+
+std::optional<WheelVelocityProjection>
+project_wheel_point_velocity_onto_contact_axes(
+    const PhysicsVector3& point_velocity,
+    const PhysicsVector3& forward_axis,
+    const PhysicsVector3& contact_normal) noexcept
+{
+    const auto finite_vector = [](const PhysicsVector3& value) {
+        return std::isfinite(value.x) && std::isfinite(value.y) &&
+            std::isfinite(value.z);
+    };
+    if (!finite_vector(point_velocity) || !finite_vector(forward_axis) ||
+        !finite_vector(contact_normal)) {
+        return std::nullopt;
+    }
+    WheelVelocityProjection result{};
+    result.forward_axis = forward_axis;
+    result.lateral_axis = {
+        contact_normal.y * forward_axis.z - contact_normal.z * forward_axis.y,
+        contact_normal.z * forward_axis.x - contact_normal.x * forward_axis.z,
+        contact_normal.x * forward_axis.y - contact_normal.y * forward_axis.x};
+    result.forward_velocity = point_velocity.x * forward_axis.x +
+        point_velocity.y * forward_axis.y + point_velocity.z * forward_axis.z;
+    result.lateral_velocity = point_velocity.x * result.lateral_axis.x +
+        point_velocity.y * result.lateral_axis.y +
+        point_velocity.z * result.lateral_axis.z;
+    if (!finite_vector(result.lateral_axis) ||
+        !std::isfinite(result.forward_velocity) ||
+        !std::isfinite(result.lateral_velocity)) {
+        return std::nullopt;
+    }
     return result;
 }
 

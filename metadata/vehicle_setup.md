@@ -1155,6 +1155,15 @@ live path still omits native collision handling and tire-response/force stages;
 these basis results are not presented as force or full per-wheel ordering
 parity.
 
+The fixed-step diagnostic now transforms current wheel axis `+0xB0..+0xB8`
+through the body basis with `transform_wheel_local_axis_0x422f30`, then records
+the point-velocity projection onto that axis and onto
+`query_normal × forward_axis`. A query miss uses the native `(0,1,0)` normal
+fallback. The projection helper rejects non-finite inputs/results and leaves
+all outputs unconnected to tire forces until the remaining response state is
+owned. Native axis-transform evidence is
+`ev_85b06e95b3134f859a52c9817b70d691eaa55e8dae49cd70bb7996c2acd6d26a`.
+
 With contact composition enabled, the same body step now sends the finalized
 suspension force through `accumulate_ncar_force_moment` after `0x443F60`, at the
 transformed wheel `+0xC8` point and body center. This is the modeled effect of

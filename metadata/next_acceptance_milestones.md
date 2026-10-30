@@ -185,6 +185,12 @@ arithmetic path. A byte-backed `0x443F60` adapter runs after current wheel
 contact/history processing, finite-gates its inputs, writes all eight native
 outputs atomically, and records them in the fixed-step trace. The regression
 requires finite output lanes for all four wheels during route-disabled replay.
+The fixed-step trace now also derives each current wheel axis through native
+`0x422F30`, forms `query_normal × forward_axis`, and projects the byte-backed
+`0x43E9B0` point velocity onto both axes. The route-disabled regression checks
+both projections are present and finite for every wheel. These are the exact
+velocity operands for tire response, but remain diagnostic until wheel spin,
+history, slip-sign, and remaining curve-factor producers are session-owned.
 Collision effects, tire forces, body integration, and exact native per-wheel
 stage order are still missing; this stage adds no force and does not qualify as
 driving acceptance. Native constructor evidence is

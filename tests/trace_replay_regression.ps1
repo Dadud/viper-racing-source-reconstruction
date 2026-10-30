@@ -148,6 +148,8 @@ try {
     $wheelAnimationFlagsColumns = [int[]]::new(4)
     $wheelAnimationModeColumns = [int[]]::new(4)
     $wheelAnimationBasisColumns = @()
+    $wheelForwardProjectionColumns = [int[]]::new(4)
+    $wheelLateralProjectionColumns = [int[]]::new(4)
     $wheelScalarColumns = [int[]]::new(4)
     $wheelQuerySucceededColumns = [int[]]::new(4)
     $wheelContactDepthLimitColumns = [int[]]::new(4)
@@ -185,6 +187,10 @@ try {
                 $tickHeader, "wheel${wheel}_$($basisNames[$lane])")
         }
         $wheelAnimationBasisColumns += ,$basisColumns
+        $wheelForwardProjectionColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_forward_velocity_projection")
+        $wheelLateralProjectionColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_lateral_velocity_projection")
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $wheelQuerySucceededColumns[$wheel] = [Array]::IndexOf(
@@ -241,6 +247,8 @@ try {
         @($wheelAnimationBasisColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelForwardProjectionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelLateralProjectionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -509,6 +517,18 @@ try {
                     $fields[$column], [cultureinfo]::InvariantCulture)
                 if ([single]::IsNaN($basisValue) -or [single]::IsInfinity($basisValue)) {
                     throw "Wheel $wheel byte-backed animation basis output is non-finite at line $($index + 1)"
+                }
+            }
+            foreach ($column in @(
+                $wheelForwardProjectionColumns[$wheel],
+                $wheelLateralProjectionColumns[$wheel])) {
+                if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                    throw "Wheel $wheel velocity projection is unavailable at line $($index + 1)"
+                }
+                $projection = [single]::Parse(
+                    $fields[$column], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($projection) -or [single]::IsInfinity($projection)) {
+                    throw "Wheel $wheel velocity projection is non-finite at line $($index + 1)"
                 }
             }
         }
