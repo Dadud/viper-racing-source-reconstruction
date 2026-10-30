@@ -848,6 +848,98 @@ bool apply_ncar_wheel_core_initialization(
         std::span<const NcarObjectFieldWrite>(writes.data(), count));
 }
 
+std::optional<WheelSpinPreprojectionResult>
+advance_ncar_wheel_spin_preprojection_in_objects(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const NcarBodyRuntimeObjectState& body) noexcept
+{
+    const auto read_wheel_float = [&wheel](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto read_body_float = [&body](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto spin_rate = read_wheel_float(0x124U);
+    const auto wheel_scalar = read_wheel_float(0x05cU);
+    const auto value_0xa8 = read_wheel_float(0x0a8U);
+    const auto value_0x50 = read_wheel_float(0x050U);
+    const auto value_0x54 = read_wheel_float(0x054U);
+    const auto value_0x58 = read_wheel_float(0x058U);
+    const auto value_0xe0 = read_wheel_float(0x0e0U);
+    const auto value_0x178 = read_wheel_float(0x178U);
+    const auto value_0x17c = read_wheel_float(0x17cU);
+    const auto value_0xe4 = read_wheel_float(0x0e4U);
+    const auto value_0x174 = read_wheel_float(0x174U);
+    const auto value_0x170 = read_wheel_float(0x170U);
+    const auto mode_bits = read_ncar_wheel_object_u32(wheel, 0x15cU);
+    const auto selector_bits = read_ncar_wheel_object_u32(wheel, 0x164U);
+    const auto damage = read_ncar_wheel_object_u8(wheel, 0x020U);
+    const auto gate = read_ncar_wheel_object_u8(wheel, 0x160U);
+    if (!spin_rate || !wheel_scalar || !value_0xa8 || !value_0x50 ||
+        !value_0x54 || !value_0x58 || !value_0xe0 || !value_0x178 ||
+        !value_0x17c || !value_0xe4 || !value_0x174 || !value_0x170 ||
+        !mode_bits || !selector_bits || !damage || !gate) {
+        return std::nullopt;
+    }
+
+    std::array<float, 12> body_transform{};
+    for (std::size_t lane = 0U; lane < 9U; ++lane) {
+        const auto value = read_body_float(0x38U +
+            static_cast<std::uint32_t>(lane * sizeof(float)));
+        if (!value) return std::nullopt;
+        body_transform[lane] = *value;
+    }
+    const auto velocity_x = read_body_float(0x234U);
+    const auto velocity_y = read_body_float(0x238U);
+    const auto velocity_z = read_body_float(0x23cU);
+    if (!velocity_x || !velocity_y || !velocity_z) return std::nullopt;
+    const auto high_speed_projection = project_body_point_velocity_0x442530(
+        {*velocity_x, *velocity_y, *velocity_z}, body_transform);
+    if (!std::isfinite(high_speed_projection)) return std::nullopt;
+
+    const WheelSpinPreprojectionInput input{
+        *spin_rate, *wheel_scalar, *value_0xa8, *value_0x50, *value_0x54,
+        *value_0x58, *value_0xe0, *value_0x178, *value_0x17c, *value_0xe4,
+        *value_0x174, *value_0x170, high_speed_projection,
+        std::bit_cast<std::int32_t>(*mode_bits),
+        std::bit_cast<std::int32_t>(*selector_bits), *damage,
+        true, *gate != 0U};
+    const auto result = update_wheel_spin_preprojection(input);
+    if (!std::isfinite(result.spin_rate_0x124) ||
+        !std::isfinite(result.auxiliary_0x12c) ||
+        !std::isfinite(result.filter_0x17c) ||
+        !std::isfinite(result.response_local_0x90) ||
+        !std::isfinite(result.blend_local_0x28)) {
+        return std::nullopt;
+    }
+
+    std::array<NcarObjectFieldWrite, 3> writes{};
+    std::size_t count = 0U;
+    const auto speed_bits = std::bit_cast<std::uint32_t>(std::abs(*spin_rate));
+    if (speed_bits < 0x41100000U) {
+        writes[count++] = {wheel_object_offset + 0x124U, 4U,
+            std::bit_cast<std::uint32_t>(result.spin_rate_0x124)};
+    }
+    writes[count++] = {wheel_object_offset + 0x12cU, 4U,
+        std::bit_cast<std::uint32_t>(result.auxiliary_0x12c)};
+    writes[count++] = {wheel_object_offset + 0x17cU, 4U,
+        std::bit_cast<std::uint32_t>(result.filter_0x17c)};
+    if (!apply_ncar_wheel_object_writes(wheel, wheel_object_offset,
+            std::span<const NcarObjectFieldWrite>(writes.data(), count))) {
+        return std::nullopt;
+    }
+    return result;
+}
+
 std::optional<WheelAnimationBasisState>
 advance_ncar_wheel_animation_basis_in_objects(
     NcarWheelRuntimeObjectState& wheel,

@@ -2034,6 +2034,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xe0_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xa8_after_tick{};
+    std::array<std::optional<viper::WheelSpinPreprojectionResult>, 4>
+        wheel_spin_preprojection_results{};
     std::array<std::optional<float>, 4> wheel_angle_0xac_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_gate_passed_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
@@ -2154,6 +2156,8 @@ struct WindowState {
     std::array<viper::WheelUpdatePipelineResult, 4> player_wheel_update_results{};
     std::array<std::optional<viper::WheelAnimationBasisState>, 4>
         player_wheel_animation_basis_outputs{};
+    std::array<std::optional<viper::WheelSpinPreprojectionResult>, 4>
+        player_wheel_spin_preprojection_results{};
     viper::NcarIntegratorWheelScalarResult player_integrator_wheel_scalars{};
     bool player_integrator_wheel_scalars_applied{};
     bool player_wheel_pair_differential_producer_applied{};
@@ -2829,6 +2833,7 @@ struct WindowState {
         player_wheel_contact_results = {};
         player_wheel_update_results = {};
         player_wheel_animation_basis_outputs = {};
+        player_wheel_spin_preprojection_results = {};
         player_wheel_surface_polarity_results = {};
         if (terrain == nullptr || !player_constructor_inputs_ready ||
             !player_wheel_core_initialization.has_value()) {
@@ -2906,6 +2911,15 @@ struct WindowState {
                 player_constructor_inputs_ready = false;
                 return;
             }
+            const auto spin_preprojection =
+                viper::advance_ncar_wheel_spin_preprojection_in_objects(
+                    player_runtime_state.wheel_objects[wheel], wheel_object_offset,
+                    player_runtime_state.body_object);
+            if (!spin_preprojection) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            player_wheel_spin_preprojection_results[wheel] = *spin_preprojection;
             const auto wheel_world_point =
                 viper::update_ncar_wheel_application_point_0xc8(
                     player_runtime_state.wheel_objects[wheel],
@@ -3141,6 +3155,8 @@ struct WindowState {
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
         tick.wheel_animation_basis_outputs = player_wheel_animation_basis_outputs;
+        tick.wheel_spin_preprojection_results =
+            player_wheel_spin_preprojection_results;
         if (player_integrator_wheel_scalars_applied) {
             tick.integrator_wheel_scalar_callback_reached = static_cast<std::uint8_t>(
                 player_integrator_wheel_scalars.callback_0x4c_reached ? 1U : 0U);
@@ -5077,6 +5093,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_value_0xe0"
                 << ",wheel" << wheel << "_value_0xa8"
+                << ",wheel" << wheel << "_spin_rate_0x124"
+                << ",wheel" << wheel << "_spin_auxiliary_0x12c"
+                << ",wheel" << wheel << "_spin_filter_0x17c"
+                << ",wheel" << wheel << "_spin_response_0x90"
+                << ",wheel" << wheel << "_spin_blend_0x28"
                 << ",wheel" << wheel << "_angle_0xac"
                 << ",wheel" << wheel << "_contact_gate_passed"
                 << ",wheel" << wheel << "_projected_depth"
@@ -5399,6 +5420,31 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << ',';
                         if (tick.wheel_value_0xa8_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_value_0xa8_after_tick[wheel];
+                        physics_tick_trace << ',';
+                        if (tick.wheel_spin_preprojection_results[wheel]) {
+                            physics_tick_trace << tick.wheel_spin_preprojection_results[wheel]
+                                ->spin_rate_0x124;
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_spin_preprojection_results[wheel]) {
+                            physics_tick_trace << tick.wheel_spin_preprojection_results[wheel]
+                                ->auxiliary_0x12c;
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_spin_preprojection_results[wheel]) {
+                            physics_tick_trace << tick.wheel_spin_preprojection_results[wheel]
+                                ->filter_0x17c;
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_spin_preprojection_results[wheel]) {
+                            physics_tick_trace << tick.wheel_spin_preprojection_results[wheel]
+                                ->response_local_0x90;
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_spin_preprojection_results[wheel]) {
+                            physics_tick_trace << tick.wheel_spin_preprojection_results[wheel]
+                                ->blend_local_0x28;
+                        }
                         physics_tick_trace << ',';
                         if (tick.wheel_angle_0xac_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_angle_0xac_after_tick[wheel];

@@ -1721,3 +1721,18 @@ existing entrant columns. The query results do not yet feed suspension forces,
 collision handling, or vehicle motion. Regression coverage checks finite query
 origins and terrain samples and non-degenerate normals for all four wheels on
 Viper/Bemidji.
+
+The live wheel callback now also executes the modeled early `0x442530`
+spin/filter block after the `+0xA8/+0xAC` prefix and before terrain contact.
+It reads the prior byte-backed `+0x124/+0x5C/+0x178/+0x17C` fields, constructor
+coefficients `+0x50/+0x54/+0x58`, callback output `+0xE0`, mode/selector and
+filter state, then derives the high-speed projection from the byte-backed PCAR
+body basis and velocity. It atomically persists native intermediate stores
+`+0x124` (under the observed magnitude gate), `+0x12C`, and `+0x17C`; the
+response and blend locals are trace-only because the tire-force/final-rate
+stages still are not live. The focused byte-backed regression compares the
+adapter result against the portable model and verifies unknown projection
+inputs leave the wheel unchanged. The route-disabled trace regression now
+requires all five spin/filter outputs to be present and finite for every wheel
+and tick. These checks establish model wiring and input completeness, not
+original-client parity or physical vehicle motion.

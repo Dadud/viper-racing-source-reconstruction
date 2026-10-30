@@ -70,6 +70,97 @@ int main()
                 "wheel callback prefix must preserve unknown source bytes");
         }
         {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 16> wheel_fields{{
+                {wheel_base + 0x124U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+                {wheel_base + 0x05cU, 4U, std::bit_cast<std::uint32_t>(1.25F)},
+                {wheel_base + 0x0a8U, 4U, std::bit_cast<std::uint32_t>(2.5F)},
+                {wheel_base + 0x050U, 4U, std::bit_cast<std::uint32_t>(0.8F)},
+                {wheel_base + 0x054U, 4U, std::bit_cast<std::uint32_t>(0.1F)},
+                {wheel_base + 0x058U, 4U, std::bit_cast<std::uint32_t>(0.2F)},
+                {wheel_base + 0x0e0U, 4U, std::bit_cast<std::uint32_t>(0.4F)},
+                {wheel_base + 0x178U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+                {wheel_base + 0x17cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+                {wheel_base + 0x0e4U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+                {wheel_base + 0x174U, 4U, std::bit_cast<std::uint32_t>(0.2F)},
+                {wheel_base + 0x170U, 4U, std::bit_cast<std::uint32_t>(0.1F)},
+                {wheel_base + 0x15cU, 4U, 0U},
+                {wheel_base + 0x164U, 4U, 0U},
+                {wheel_base + 0x020U, 1U, 0U},
+                {wheel_base + 0x160U, 1U, 1U},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, wheel_fields),
+                "spin/filter source fields must materialize on the wheel object");
+
+            viper::NcarBodyRuntimeObjectState body{};
+            std::array<viper::NcarObjectFieldWrite, 12> body_fields{};
+            for (std::size_t lane = 0U; lane < 9U; ++lane) {
+                body_fields[lane] = {0x38U + static_cast<std::uint32_t>(lane * 4U),
+                    4U, std::bit_cast<std::uint32_t>(
+                        lane % 4U == 0U ? 1.0F : 0.0F)};
+            }
+            body_fields[9] = {0x234U, 4U, std::bit_cast<std::uint32_t>(5.0F)};
+            body_fields[10] = {0x238U, 4U, std::bit_cast<std::uint32_t>(0.0F)};
+            body_fields[11] = {0x23cU, 4U, std::bit_cast<std::uint32_t>(0.0F)};
+            require(viper::apply_ncar_body_object_writes(body, body_fields),
+                "spin/filter body projection inputs must materialize");
+
+            const auto expected = viper::update_wheel_spin_preprojection({
+                2.0F, 1.25F, 2.5F, 0.8F, 0.1F, 0.2F, 0.4F, 10.0F, 1.0F,
+                0.5F, 0.2F, 0.1F, 0.0F, 0, 0, 0U, true, true});
+            const auto result = viper::advance_ncar_wheel_spin_preprojection_in_objects(
+                wheel, wheel_base, body);
+            require(result.has_value() &&
+                    result->spin_rate_0x124 == expected.spin_rate_0x124 &&
+                    result->auxiliary_0x12c == expected.auxiliary_0x12c &&
+                    result->filter_0x17c == expected.filter_0x17c &&
+                    result->response_local_0x90 == expected.response_local_0x90 &&
+                    result->blend_local_0x28 == expected.blend_local_0x28 &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x124U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.spin_rate_0x124)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x12cU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.auxiliary_0x12c)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x17cU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.filter_0x17c)},
+                "spin/filter callback must persist its finite intermediate wheel fields");
+
+            auto high_spin_wheel = wheel;
+            const std::array<viper::NcarObjectFieldWrite, 1> high_spin_rate{{
+                {wheel_base + 0x124U, 4U,
+                    std::bit_cast<std::uint32_t>(10.0F)}}};
+            require(viper::apply_ncar_wheel_object_writes(
+                        high_spin_wheel, wheel_base, high_spin_rate),
+                "high-spin branch rate must materialize");
+            const auto high_spin =
+                viper::advance_ncar_wheel_spin_preprojection_in_objects(
+                    high_spin_wheel, wheel_base, body);
+            require(high_spin.has_value() &&
+                    viper::read_ncar_wheel_object_u32(high_spin_wheel, 0x124U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            10.0F)} &&
+                    viper::read_ncar_wheel_object_u32(high_spin_wheel, 0x12cU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            high_spin->auxiliary_0x12c)} &&
+                    viper::read_ncar_wheel_object_u32(high_spin_wheel, 0x17cU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            high_spin->filter_0x17c)},
+                "high-spin branch must preserve +0x124 but persist auxiliary/filter state");
+
+            auto unresolved_body = body;
+            unresolved_body.initialized_bytes[0x38U + 6U] = 0U;
+            const auto wheel_before = wheel;
+            require(!viper::advance_ncar_wheel_spin_preprojection_in_objects(
+                        wheel, wheel_base, unresolved_body) &&
+                    wheel.bytes == wheel_before.bytes &&
+                    wheel.initialized_bytes == wheel_before.initialized_bytes,
+                "spin/filter callback must preserve wheel state when projection inputs are unknown");
+        }
+        {
             constexpr std::uint32_t first_wheel = 0x554U;
             viper::NcarBodyRuntimeObjectState body{};
             const std::array<viper::NcarObjectFieldWrite, 11> body_fields{{

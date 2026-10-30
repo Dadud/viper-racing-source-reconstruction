@@ -151,6 +151,7 @@ try {
     $wheelForwardProjectionColumns = [int[]]::new(4)
     $wheelLateralProjectionColumns = [int[]]::new(4)
     $wheelScalarColumns = [int[]]::new(4)
+    $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
     $wheelContactDepthLimitColumns = [int[]]::new(4)
     $wheelContactGeometryColumns = @()
@@ -193,6 +194,15 @@ try {
             $tickHeader, "wheel${wheel}_lateral_velocity_projection")
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
+        $spinColumns = [int[]]::new(5)
+        $spinNames = @(
+            'spin_rate_0x124', 'spin_auxiliary_0x12c', 'spin_filter_0x17c',
+            'spin_response_0x90', 'spin_blend_0x28')
+        for ($lane = 0; $lane -lt $spinNames.Count; ++$lane) {
+            $spinColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($spinNames[$lane])")
+        }
+        $wheelSpinColumns += ,$spinColumns
         $wheelQuerySucceededColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_query_succeeded")
         $wheelContactDepthLimitColumns[$wheel] = [Array]::IndexOf(
@@ -250,6 +260,9 @@ try {
         @($wheelForwardProjectionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelLateralProjectionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelSpinColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactGeometryColumns | ForEach-Object {
@@ -325,6 +338,16 @@ try {
                 $fields[$wheelScalarColumns[$wheel]], [cultureinfo]::InvariantCulture)
             if ([single]::IsNaN($wheelScalar) -or [single]::IsInfinity($wheelScalar)) {
                 throw "Wheel $wheel +0xE0 callback output is non-finite at line $($index + 1)"
+            }
+            foreach ($column in $wheelSpinColumns[$wheel]) {
+                if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                    throw "Wheel $wheel spin/filter callback output is unavailable at line $($index + 1)"
+                }
+                $spinValue = [single]::Parse(
+                    $fields[$column], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($spinValue) -or [single]::IsInfinity($spinValue)) {
+                    throw "Wheel $wheel spin/filter callback output is non-finite at line $($index + 1)"
+                }
             }
         }
         $reportedMissingOffsets = @($bodyKinematicsMissingOffsets | Where-Object {

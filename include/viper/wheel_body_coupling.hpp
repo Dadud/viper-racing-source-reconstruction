@@ -700,6 +700,15 @@ struct NcarWheelCoreInitialization {
     std::uint32_t wheel_object_offset,
     const NcarWheelCoreInitialization& initialization) noexcept;
 
+// Executes the byte-backed 0x442530 spin/filter prefix using the prior wheel
+// response fields and PCAR body speed projection, then persists its immediate
+// +0x124/+0x12C/+0x17C stores atomically.
+[[nodiscard]] std::optional<WheelSpinPreprojectionResult>
+advance_ncar_wheel_spin_preprojection_in_objects(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset,
+    const NcarBodyRuntimeObjectState& body) noexcept;
+
 // Executes the byte-backed 0x443F60 wheel basis stage from the initialized
 // wheel constructor/update fields and PCAR body basis. It returns no result
 // when an operand is absent or non-finite; all output writes are atomic.
