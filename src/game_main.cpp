@@ -2032,6 +2032,7 @@ struct PlayerPhysicsTickContext {
     std::optional<std::uint8_t> integrator_wheel_scalar_negative_pair_gate_passed;
     std::optional<float> integrator_wheel_scalar_target_response;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_suspension_reset_contact{};
     std::array<std::optional<float>, 4> wheel_value_0xe0_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xa8_after_tick{};
     std::array<std::optional<viper::WheelSpinPreprojectionResult>, 4>
@@ -2063,6 +2064,8 @@ struct PlayerPhysicsTickContext {
     // fields and the current contact/history observations. Surface adjustment,
     // finalization, force accumulation, and body integration are not implied.
     std::array<std::optional<float>, 4> wheel_base_suspension_response_0x178{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_suspension_force_vectors{};
     // Returns from the shared polarity stream and the following pure surface
     // adjustment. The stream omits other native process callers and is not a
     // force input in the current runtime.
@@ -2115,8 +2118,8 @@ struct WindowState {
     std::vector<std::array<float, 4>> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
     // session. The complete ordered stream is validated and the recovered
-    // 16 ms scheduler drives the route prototype; native task dispatch, the
-    // interpolation ring, and body integration remain disconnected.
+    // 16 ms scheduler drives session updates; native task dispatch and the
+    // interpolation ring remain disconnected.
     std::vector<std::byte> player_runtime_car_record;
     std::vector<viper::ConfiguredCarTaskRecordInput> configured_car_task_records;
     std::optional<viper::PhysicsTaskRecordStreamSession> player_task_record_stream;
@@ -2148,8 +2151,8 @@ struct WindowState {
         player_tire_trigonometric_terms{};
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> player_wheel_tire_setups{};
     // Per-wheel terrain observations transform constructor wheel anchors by
-    // the initialized PCAR body pose. The body remains static in this runtime;
-    // route motion still supplies the rendered pose.
+    // the evolving PCAR body pose. The explicit route demo can override the
+    // rendered pose; ordinary physics sessions render this integrated body.
     std::array<viper::WheelContactState, 4> player_wheel_contact_states{};
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
@@ -3152,6 +3155,135 @@ struct WindowState {
         player_wheel_pair_differential_producer_applied = true;
     }
 
+    bool advance_player_body_kinematics_from_suspension()
+    {
+        const auto diagnostics =
+            viper::read_ncar_body_integration_kinematics_input_diagnostic(
+                player_runtime_state.body_object);
+        if (!diagnostics.input || diagnostics.contains_non_finite_value ||
+            diagnostics.reader_inventory_mismatch) {
+            return false;
+        }
+
+        constexpr std::array<std::uint32_t, 7> impulse_offsets{
+            0x294U, 0x298U, 0x29cU, 0x2a0U, 0x2a4U, 0x2a8U, 0x2acU};
+        std::array<std::uint32_t, 7> impulse_bits{};
+        for (std::size_t lane = 0U; lane < impulse_offsets.size(); ++lane) {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, impulse_offsets[lane]);
+            if (!bits || !std::isfinite(std::bit_cast<float>(*bits))) return false;
+            impulse_bits[lane] = *bits;
+        }
+
+        auto accumulator = viper::NcarForceMomentAccumulator{
+            {diagnostics.input->accumulated_linear_force.x,
+             diagnostics.input->accumulated_linear_force.y,
+             diagnostics.input->accumulated_linear_force.z},
+            {diagnostics.input->accumulated_angular_moment.x,
+             diagnostics.input->accumulated_angular_moment.y,
+             diagnostics.input->accumulated_angular_moment.z}};
+        const auto& center = diagnostics.input->position;
+        for (std::size_t wheel = 0U; wheel < player_wheel_update_results.size(); ++wheel) {
+            const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
+            const auto read_float = [&wheel_object](const std::uint32_t offset)
+                -> std::optional<float> {
+                const auto bits = viper::read_ncar_wheel_object_u32(
+                    wheel_object, offset);
+                if (!bits) return std::nullopt;
+                const auto value = std::bit_cast<float>(*bits);
+                return std::isfinite(value) ? std::optional<float>{value}
+                                            : std::nullopt;
+            };
+            const auto x = read_float(0x0c8U);
+            const auto y = read_float(0x0ccU);
+            const auto z = read_float(0x0d0U);
+            const auto& force = player_wheel_update_results[wheel]
+                .suspension.finalized.applied_force;
+            if (!x || !y || !z || !std::isfinite(force.x) ||
+                !std::isfinite(force.y) || !std::isfinite(force.z)) {
+                return false;
+            }
+            const std::array<float, 3> force_vector{force.x, force.y, force.z};
+            const std::array<float, 3> application_point{*x, *y, *z};
+            const std::array<float, 3> body_center{center.x, center.y, center.z};
+            static_cast<void>(viper::accumulate_ncar_force_moment(
+                accumulator, force_vector, application_point, body_center));
+        }
+
+        viper::BodyIntegrationTailState tail_state{};
+        tail_state.running_accumulators_0x93_to_0x98 = {
+            accumulator.force_0x24c[0], accumulator.force_0x24c[1],
+            accumulator.force_0x24c[2], accumulator.moment_0x258[0],
+            accumulator.moment_0x258[1], accumulator.moment_0x258[2]};
+        viper::NcarPointImpulseAccumulator point_impulse_state{
+            std::bit_cast<float>(impulse_bits[6]),
+            {std::bit_cast<float>(impulse_bits[0]),
+             std::bit_cast<float>(impulse_bits[1]),
+             std::bit_cast<float>(impulse_bits[2])},
+            {std::bit_cast<float>(impulse_bits[3]),
+             std::bit_cast<float>(impulse_bits[4]),
+             std::bit_cast<float>(impulse_bits[5])}};
+        const viper::BodyIntegrationForceCollectionInput force_collection_input{};
+        const auto force_collection = viper::prepare_body_integration_force_collection(
+            tail_state, point_impulse_state, diagnostics.input->gravity_mass_0x7c,
+            force_collection_input);
+
+        auto kinematics_input = *diagnostics.input;
+        kinematics_input.accumulated_linear_force =
+            force_collection.accumulated_linear_force;
+        kinematics_input.accumulated_angular_moment =
+            force_collection.accumulated_angular_moment;
+        const auto result = viper::advance_body_integration_kinematics(
+            tail_state, kinematics_input);
+        const auto finite_vector = [](const viper::PhysicsVector3& value) {
+            return std::isfinite(value.x) && std::isfinite(value.y) &&
+                std::isfinite(value.z);
+        };
+        const auto finite_array = [](const auto& values) {
+            return std::all_of(values.begin(), values.end(),
+                [](const float value) { return std::isfinite(value); });
+        };
+        if (!finite_vector(result.linear.position) ||
+            !finite_vector(result.linear.velocity) ||
+            !finite_vector(result.angular.angular_velocity) ||
+            !finite_array(result.orientation.orientation_matrix) ||
+            !finite_array(result.basis.basis_matrix)) {
+            return false;
+        }
+        const auto body_x = result.linear.position.x;
+        const auto body_y = result.linear.position.y;
+        const auto body_z = result.linear.position.z;
+        const auto yaw = std::atan2(result.orientation.orientation_matrix[6],
+            result.orientation.orientation_matrix[0]);
+        if (!std::isfinite(yaw)) return false;
+        if (!viper::apply_ncar_body_integration_kinematics_result(
+                player_runtime_state.body_object, result)) {
+            return false;
+        }
+        const std::array<viper::NcarObjectFieldWrite, 7> impulse_writes{{
+            {0x294U, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.impulse_time_0x294[0])},
+            {0x298U, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.impulse_time_0x294[1])},
+            {0x29cU, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.impulse_time_0x294[2])},
+            {0x2a0U, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.moment_time_0x2a0[0])},
+            {0x2a4U, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.moment_time_0x2a0[1])},
+            {0x2a8U, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.moment_time_0x2a0[2])},
+            {0x2acU, 4U, std::bit_cast<std::uint32_t>(
+                point_impulse_state.duration_0x2ac)},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, impulse_writes)) {
+            return false;
+        }
+        player_simulated_pose = std::array<float, 4>{body_x, body_y, body_z, yaw};
+        return true;
+    }
+
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
         tick.wheel_animation_basis_outputs = player_wheel_animation_basis_outputs;
@@ -3273,6 +3405,9 @@ struct WindowState {
             }
             tick.wheel_contact_active_after_tick[wheel] =
                 player_wheel_contact_states[wheel].contact_active_0x168;
+            tick.wheel_suspension_reset_contact[wheel] = static_cast<std::uint8_t>(
+                player_wheel_update_results[wheel].suspension.finalized.reset_contact
+                    ? 1U : 0U);
             tick.wheel_surface_polarity_results[wheel] =
                 player_wheel_surface_polarity_results[wheel];
             const auto read_response_float = [&wheel_object](const std::uint32_t offset)
@@ -3321,6 +3456,8 @@ struct WindowState {
             }
             const auto& contact_observation =
                 player_wheel_contact_observations[wheel];
+            tick.wheel_suspension_force_vectors[wheel] = player_wheel_update_results[wheel]
+                .suspension.finalized.applied_force;
             if (contact_observation.body_query_enabled) {
                 tick.wheel_contact_projection_origins[wheel] =
                     contact_observation.contact_projection_origin;
@@ -3700,6 +3837,10 @@ struct WindowState {
             update_player_wheel_contacts_from_body();
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
+            if (!player_constructor_inputs_ready ||
+                !advance_player_body_kinematics_from_suspension()) {
+                return false;
+            }
             if (this->route_motion_enabled) {
                 ++route_motion_step_count;
                 auto candidate_motion = motion;
@@ -5091,6 +5232,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
+                << ",wheel" << wheel << "_suspension_reset_contact"
                 << ",wheel" << wheel << "_value_0xe0"
                 << ",wheel" << wheel << "_value_0xa8"
                 << ",wheel" << wheel << "_spin_rate_0x124"
@@ -5128,7 +5270,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_basis_0x110_y"
                 << ",wheel" << wheel << "_basis_0x110_z"
                 << ",wheel" << wheel << "_contact_query_succeeded"
-                << ",wheel" << wheel << "_contact_depth_limit_0x44";
+                << ",wheel" << wheel << "_contact_depth_limit_0x44"
+                << ",wheel" << wheel << "_suspension_force_x"
+                << ",wheel" << wheel << "_suspension_force_y"
+                << ",wheel" << wheel << "_suspension_force_z";
             for (const auto* vector_name : {"contact_origin", "query_contact_point",
                      "query_contact_normal", "contact_direction",
                      "selected_model_vertex", "position_relative_to_vertex"}) {
@@ -5415,6 +5560,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 *tick.wheel_contact_active_after_tick[wheel]);
                         }
                         physics_tick_trace << ',';
+                        if (tick.wheel_suspension_reset_contact[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_suspension_reset_contact[wheel]);
+                        }
+                        physics_tick_trace << ',';
                         if (tick.wheel_value_0xe0_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_value_0xe0_after_tick[wheel];
                         physics_tick_trace << ',';
@@ -5562,6 +5712,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 }
                             }
                         };
+                        write_vector(tick.wheel_suspension_force_vectors[wheel]);
                         write_vector(tick.wheel_contact_projection_origins[wheel]);
                         write_vector(tick.wheel_query_contact_points[wheel]);
                         write_vector(tick.wheel_query_contact_normals[wheel]);

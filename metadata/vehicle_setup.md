@@ -1736,3 +1736,26 @@ inputs leave the wheel unchanged. The route-disabled trace regression now
 requires all five spin/filter outputs to be present and finite for every wheel
 and tick. These checks establish model wiring and input completeness, not
 original-client parity or physical vehicle motion.
+
+## Live suspension force and body kinematics slice
+
+The Windows player's fixed-step path now takes the finalized `0x442530`
+suspension force from each of the four wheel updates, accumulates force and
+moment through the shared `0x43E6F0` model at each byte-backed `+0xC8` wheel
+application point, adds body gravity through the `0x43ECE0` force-collection
+model, consumes the initialized `+0x294..+0x2AC` point-impulse state, and runs
+the existing body linear/angular/orientation/basis integrator. Its result is
+written back atomically to PCAR position, velocity, orientation, matrices, and
+cleared force/moment accumulators; the consumed point-impulse state is persisted
+from its model result. The live player renderer now uses that byte-backed body
+position and the recovered transform yaw extraction when route motion is off.
+The fixed-step trace captures finalized wheel suspension force and reset state;
+the Viper/Bemidji replay regression requires at least one nonzero suspension
+force, a resulting vertical velocity change, deterministic repeated playback,
+and zero route-motion steps.
+
+This is a partial body step. It does not yet collect tire drive/lateral forces,
+resolve embedded or virtual-record callbacks, generate live collision impulses,
+integrate AI bodies, or derive race progress from physical motion. The trace is
+synthetic-input verification without a controlled original-client baseline;
+therefore it does not establish original parity or a completed playable race.

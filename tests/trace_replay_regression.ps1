@@ -139,6 +139,8 @@ try {
         [Array]::IndexOf($tickHeader, 'body_moment_y'),
         [Array]::IndexOf($tickHeader, 'body_moment_z'))
     $wheelActiveColumns = [int[]]::new(4)
+    $wheelSuspensionResetColumns = [int[]]::new(4)
+    $wheelSuspensionForceColumns = @()
     $wheelGateColumns = [int[]]::new(4)
     $wheelDepthColumns = [int[]]::new(4)
     $wheelClampedDepthColumns = [int[]]::new(4)
@@ -162,6 +164,15 @@ try {
     for ($wheel = 0; $wheel -lt 4; ++$wheel) {
         $wheelActiveColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_active")
+        $wheelSuspensionResetColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_suspension_reset_contact")
+        $forceColumns = [int[]]::new(3)
+        foreach ($axis in 0..2) {
+            $axisName = @('x', 'y', 'z')[$axis]
+            $forceColumns[$axis] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_suspension_force_$axisName")
+        }
+        $wheelSuspensionForceColumns += ,$forceColumns
         $wheelGateColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_gate_passed")
         $wheelDepthColumns[$wheel] = [Array]::IndexOf(
@@ -246,6 +257,10 @@ try {
         @($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($bodyMotionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelSuspensionResetColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelSuspensionForceColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelGateColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelClampedDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -277,6 +292,9 @@ try {
     $observedScheduledThrottle = $false
     $observedScheduledSteering = $false
     $observedScheduledBrake = $false
+    $observedBodyIntegration = $false
+    $observedSuspensionForce = $false
+    $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
             throw "Repeated fixed-step trace differs at CSV line $($index + 1)"
@@ -472,7 +490,8 @@ try {
                     throw "Wheel $wheel negative projection did not remain inactive at line $($index + 1)"
                 }
             } elseif ($fields[$wheelGateColumns[$wheel]] -eq '1' -and
-                $fields[$wheelActiveColumns[$wheel]] -ne '1') {
+                $fields[$wheelActiveColumns[$wheel]] -ne '1' -and
+                $fields[$wheelSuspensionResetColumns[$wheel]] -ne '1') {
                 throw "Wheel $wheel valid nonnegative contact did not become active at line $($index + 1)"
             }
         }
@@ -501,7 +520,28 @@ try {
                 throw "Body motion/force snapshot is non-finite at line $($index + 1)"
             }
         }
+        if ($tickIndex -ge 1) {
+            $verticalVelocity = [single]::Parse(
+                $fields[$bodyVerticalVelocityColumn], [cultureinfo]::InvariantCulture)
+            if ($verticalVelocity -lt -0.001) { $observedBodyIntegration = $true }
+        }
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
+            $suspensionForceSquared = 0.0
+            foreach ($column in $wheelSuspensionForceColumns[$wheel]) {
+                if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                    throw "Wheel $wheel finalized suspension force is unavailable at line $($index + 1)"
+                }
+                $forceComponent = [single]::Parse(
+                    $fields[$column], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($forceComponent) -or
+                    [single]::IsInfinity($forceComponent)) {
+                    throw "Wheel $wheel finalized suspension force is non-finite at line $($index + 1)"
+                }
+                $suspensionForceSquared += $forceComponent * $forceComponent
+            }
+            if ($suspensionForceSquared -gt 0.000001) {
+                $observedSuspensionForce = $true
+            }
             if ($fields[$wheelProducerOwnedColumns[$wheel]] -notin @('0', '1')) {
                 throw "Wheel $wheel +0x158 producer-ownership flag is invalid"
             }
@@ -706,8 +746,14 @@ try {
         -not $observedScheduledBrake) {
         throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
     }
+    if (-not $observedBodyIntegration) {
+        throw 'Fixed-step replay did not transfer gravity/suspension force into body velocity'
+    }
+    if (-not $observedSuspensionForce) {
+        throw 'Fixed-step replay never produced a nonzero finalized wheel suspension force'
+    }
 
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; PCAR control outputs were observed and route motion ran zero steps. This checks input-to-callback determinism, not vehicle dynamics or driving."
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Controls are not yet connected to tire forces, so this is not driving acceptance."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

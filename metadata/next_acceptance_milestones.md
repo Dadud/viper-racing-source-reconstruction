@@ -50,20 +50,25 @@ reconstructed suspension/history stages and paired `+0x158` differential
 producer. The live wheel callback now also stores its resolved `+0xA8` product
 and `+0xAC` increment/wrap prefix from initialized byte-backed fields; the
 unresolved global distance/damage gate remains disabled, and both outputs are
-present in the physics tick CSV. Tire-force collection, body accumulators,
-collisions, and pose integration remain unimplemented. The terrain plane sampler
+present in the physics tick CSV. The live player now accumulates finalized
+suspension forces at byte-backed wheel application points, adds sourced gravity,
+consumes initialized point-impulse accumulators, and runs the existing body
+kinematics/orientation/basis integrator. The resulting PCAR position and yaw now
+drive the player renderer with route motion disabled. Tire drive forces,
+embedded/virtual-record effects, live collision generation, and AI body physics
+remain unimplemented. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches
 the selected track `obj car` runtime-record transform also used by the renderer.
 The session also persists the transformed wheel application point at `+0xC8..+0xD0`
 using initialized wheel bytes and the byte-backed PCAR transform before querying
-terrain. This matches the recovered `0x437BA0` output location and makes the
-point available to later force collection; it remains a constructor-pose point
-because the body transform does not advance yet.
-`place_on_route` only seeds the provisional route progress adapter and does not
-change that body or rendered placement. The body remains static in the live
-session.
+terrain. This matches the recovered `0x437BA0` output location and supplies the
+live suspension-force accumulator. Its world position now follows the integrated
+PCAR body transform on subsequent fixed steps.
+`place_on_route` only seeds the provisional route progress adapter. With route
+motion disabled, the integrated PCAR pose owns the rendered player position; the
+explicit route demo can still override presentation when manually enabled.
 Shipped-binary Ghidra evidence confirms base initializer `0x4375C0` seeds an
 identity basis and zero position, while the PCAR derived initializer path
 `0x42FF90 -> 0x43E490 -> 0x4375C0` later invokes `0x433C00` to copy the chosen
@@ -816,3 +821,17 @@ force accumulation, and body integration in one frame with traceable
 source-owned inputs. Keep constructor defaults out of the live update. After
 integration, compare identical clean-start original and reconstructed
 schedules to measure drift and refine tolerances.
+
+### 2026-10-29 update: player suspension-to-body integration
+
+The runtime now transfers the finalized four-wheel suspension force vectors
+through the shared force/moment accumulator, includes the recovered body gravity
+term and initialized point-impulse state, runs the byte-backed body integrator,
+and uses its pose for player rendering with route motion disabled. The updated
+route-disabled replay verifies nonzero suspension force, body velocity change,
+repeatability and zero route-motion steps. It remains synthetic-input evidence;
+tire propulsion/lateral response, embedded-record callbacks, live collision
+impulses, AI integration, race progress and controlled original parity are still
+missing. Continue with tire-response factors, accumulator writers, and final
+wheel-rate stores sourced from byte-backed state, then expand the body step only
+when the missing callback inputs are owned by the session.
