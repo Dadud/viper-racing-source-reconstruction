@@ -558,7 +558,7 @@ select_ncar_wheel_vertex_anchors_from_runtime_record(
 std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
     const NcarWheelCoreInitializationInput& input) noexcept
 {
-    if (input.wheel_index >= 4U || input.runtime_record.size() < 0x148U)
+    if (input.wheel_index >= 4U || input.runtime_record.size() < 0x16cU)
         return std::nullopt;
     const auto read_float = [&input](const std::size_t offset) {
         std::uint32_t bits{};
@@ -591,6 +591,26 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
     const float accumulated_setup = amount_setup * 0.01F * scale_setup + axle_setup;
     const float mass_fraction = front ? ratio : 1.0F - ratio;
     const float body_term = input.body_mass_scale_0x1f0 * mass_fraction * 4.905F;
+    if (!std::isfinite(body_term) || body_term == 0.0F)
+        return std::nullopt;
+    const float wheel_response_0x50 =
+        read_float(front ? 0x148U : 0x14cU) * 4.45F;
+    const auto tire_response_base = divide_with_vc98_fdiv_compatibility(
+        read_float(0x164U), 0.305L, input.fdiv_compatibility_enabled);
+    const float tire_response_scaled = static_cast<float>(tire_response_base) * 2.225F;
+    const auto tire_response_mass_scale = divide_with_vc98_fdiv_compatibility(
+        front ? 0.50015L : 0.50085L, body_term,
+        input.fdiv_compatibility_enabled);
+    const float wheel_response_0x54 = static_cast<float>(
+        tire_response_mass_scale * tire_response_scaled);
+    const auto wheel_response_0x58 = static_cast<float>(
+        divide_with_vc98_fdiv_compatibility(read_float(0x168U), body_term,
+            input.fdiv_compatibility_enabled) * 1.1125L);
+    if (!std::isfinite(wheel_response_0x50) ||
+        !std::isfinite(wheel_response_0x54) ||
+        !std::isfinite(wheel_response_0x58)) {
+        return std::nullopt;
+    }
     const long double correction_numerator =
         static_cast<long double>(body_term) -
         static_cast<long double>(initial_value_0x44) * 0.5L * track_scale;
@@ -714,6 +734,9 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         value_0x48,
         0.0F,
         track_scale,
+        wheel_response_0x50,
+        wheel_response_0x54,
+        wheel_response_0x58,
         coefficient_0x9c,
         coefficient_0xa0,
         0.0F,
@@ -781,7 +804,7 @@ bool apply_ncar_wheel_core_initialization(
     const std::uint32_t wheel_object_offset,
     const NcarWheelCoreInitialization& initialization) noexcept
 {
-    std::array<NcarObjectFieldWrite, 26> writes{};
+    std::array<NcarObjectFieldWrite, 29> writes{};
     std::size_t count = 0U;
     const auto write_float = [&](const std::uint32_t local_offset,
                                  const float value) {
@@ -801,6 +824,9 @@ bool apply_ncar_wheel_core_initialization(
     write_float(0x044U, initialization.value_0x44);
     write_float(0x048U, initialization.value_0x48);
     write_float(0x04cU, initialization.value_0x4c);
+    write_float(0x050U, initialization.value_0x50);
+    write_float(0x054U, initialization.value_0x54);
+    write_float(0x058U, initialization.value_0x58);
     write_float(0x05cU, initialization.value_0x5c);
     write_float(0x060U, initialization.angle_0x60);
     write_float(0x064U, initialization.angle_0x64);

@@ -283,6 +283,17 @@ constructor outputs that follow anchor selection: axle and side classification,
 the model-space wheel candidate and offset relative to the selected FNIM vertex,
 steering angles at `+0x60/+0x64`, geometry values at
 `+0x3C/+0x5C/+0x44/+0x48`, zero at `+0x40`, and a copy of `+0x3C` at `+0x4C`.
+It now also materializes callback inputs `+0x50/+0x54/+0x58` from CARF
+`+0x148/+0x14C/+0x164/+0x168` and the body mass-like scalar at `+0x1F0`:
+`+0x50` is axle-selected `CARF * 4.45`; `+0x54` is the `+0x164` value
+divided by `0.305`, scaled by `2.225`, then multiplied by the axle constant
+`0.50015` (front) or `0.50085` (rear) divided by the axle mass term; `+0x58`
+is `CARF +0x168 / axle_mass_term * 1.1125`. These are persisted into the
+session's byte-backed wheel objects and provide source-owned operands for the
+early spin/filter block in `0x442530`. The constructor now requires the full
+CARF extent through `+0x168` and rejects a zero/non-finite axle mass term or
+non-finite outputs. They do not by themselves wire spin, tire response, or
+force updates into the runtime.
 It also selects the axle's CARF values at `+0xD4/+0xDC` (front) or
 `+0xD8/+0xE0` (rear), converts them using the constructor's `0.0254`, `4.45`,
 and `2.67` factors and explicit FDIV-compatibility input, then applies helper
@@ -325,7 +336,7 @@ case the byte-backed callback adapter leaves these fields unavailable.
 The live player's byte-backed wheel objects now receive these modeled core
 constructor results after the `0x4419A0` defaults: selected-vertex-relative
 position at `+0x04..+0x0C`, piecewise terms at `+0x24..+0x30`, geometry and
-steering fields at `+0x3C..+0x64`, animation inputs at `+0x68..+0x88`, and
+response inputs at `+0x3C..+0x64`, animation inputs at `+0x68..+0x88`, and
 surface coefficients at `+0x9C/+0xA0` when their constructor values are
 complete.
 Each store marks only its four bytes initialized. This keeps the setup-derived

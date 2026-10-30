@@ -675,6 +675,9 @@ struct NcarWheelCoreInitialization {
     float value_0x48{};
     float value_0x40{};
     float value_0x4c{};
+    float value_0x50{};
+    float value_0x54{};
+    float value_0x58{};
     float coefficient_0x9c{};
     float coefficient_0xa0{};
     // Additional 0x441C10 stores consumed later by 0x443F60. Keep their

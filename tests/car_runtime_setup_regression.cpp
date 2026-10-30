@@ -699,9 +699,13 @@ int main()
                 std::fabs(callback_setup->angle_0xdcc - 0.174F) < 1.0e-5F,
             "mapped CARF width/ratio/value must reach the exact constructor callback fields");
 
-        std::vector<std::byte> anchor_record(0x148U);
+        std::vector<std::byte> anchor_record(0x16cU);
         write_u32_le(anchor_record, 0x58U, std::bit_cast<std::uint32_t>(200.0F));
         write_u32_le(anchor_record, 0x5cU, std::bit_cast<std::uint32_t>(25.0F));
+        write_u32_le(anchor_record, 0x148U, std::bit_cast<std::uint32_t>(3.0F));
+        write_u32_le(anchor_record, 0x14cU, std::bit_cast<std::uint32_t>(4.0F));
+        write_u32_le(anchor_record, 0x164U, std::bit_cast<std::uint32_t>(0.61F));
+        write_u32_le(anchor_record, 0x168U, std::bit_cast<std::uint32_t>(0.8F));
         write_u32_le(anchor_record, 0x128U, std::bit_cast<std::uint32_t>(10.0F));
         std::array<viper::ModelVertex, 5> anchor_vertices{};
         const std::array<std::array<float, 3>, 4> expected_candidates{{
@@ -795,7 +799,7 @@ int main()
                     [](const auto& wheel) { return wheel.has_value(); }),
             "four-wheel orchestration must remain incomplete when FNIM anchors are unavailable");
 
-        std::vector<std::byte> wheel_record(0x148U);
+        std::vector<std::byte> wheel_record(0x16cU);
         const auto write_float = [&wheel_record](const std::size_t offset,
                                                   const float value) {
             write_u32_le(wheel_record, offset, std::bit_cast<std::uint32_t>(value));
@@ -834,6 +838,10 @@ int main()
         write_float(0x13cU, 6.0F);
         write_float(0x140U, 8.0F);
         write_float(0x144U, 4.0F);
+        write_float(0x148U, 3.0F);
+        write_float(0x14cU, 4.0F);
+        write_float(0x164U, 0.61F);
+        write_float(0x168U, 0.8F);
         const auto expected_surface_coefficients = [](const float track_scale) {
             const auto helper = [track_scale](const float stack_value_0x18) {
                 return (static_cast<long double>(stack_value_0x18) +
@@ -898,6 +906,15 @@ int main()
                     0.3365F) < 1.0e-6F &&
                 front_wheel->value_0x40 == 0.0F &&
                 front_wheel->value_0x4c == front_track_scale &&
+                std::fabs(front_wheel->value_0x50 - 13.35F) < 1.0e-6F &&
+                std::fabs(front_wheel->value_0x54 - static_cast<float>(
+                    (0.50015L / static_cast<long double>(0.5F * 0.25F * 4.905F)) *
+                    (static_cast<float>(static_cast<long double>(0.61F) / 0.305L) *
+                        2.225F))) < 1.0e-6F &&
+                std::fabs(front_wheel->value_0x58 - static_cast<float>(
+                    (static_cast<long double>(0.8F) /
+                        static_cast<long double>(0.5F * 0.25F * 4.905F)) *
+                    1.1125L)) < 1.0e-6F &&
                 front_wheel->coefficient_0x9c == front_surface_coefficients[0] &&
                 front_wheel->coefficient_0xa0 == front_surface_coefficients[1] &&
                 front_wheel->animation_inputs_complete &&
@@ -957,6 +974,12 @@ int main()
         };
         require(read_front_wheel_u32(0x03cU) == std::bit_cast<std::uint32_t>(
                     front_wheel->value_0x3c) &&
+                read_front_wheel_u32(0x050U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x50) &&
+                read_front_wheel_u32(0x054U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x54) &&
+                read_front_wheel_u32(0x058U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x58) &&
                 read_front_wheel_u32(0x044U) == std::bit_cast<std::uint32_t>(
                     front_wheel->value_0x44) &&
                 read_front_wheel_u32(0x024U) == std::bit_cast<std::uint32_t>(
@@ -1360,6 +1383,15 @@ int main()
                 std::fabs(rear_wheel->candidate_position[2] + 1.27F) < 1.0e-6F &&
                 rear_wheel->coefficient_0x9c == rear_surface_coefficients[0] &&
                 rear_wheel->coefficient_0xa0 == rear_surface_coefficients[1] &&
+                std::fabs(rear_wheel->value_0x50 - 17.8F) < 1.0e-6F &&
+                std::fabs(rear_wheel->value_0x54 - static_cast<float>(
+                    (0.50085L / static_cast<long double>(0.5F * 0.75F * 4.905F)) *
+                    (static_cast<float>(static_cast<long double>(0.61F) / 0.305L) *
+                        2.225F))) < 1.0e-6F &&
+                std::fabs(rear_wheel->value_0x58 - static_cast<float>(
+                    (static_cast<long double>(0.8F) /
+                        static_cast<long double>(0.5F * 0.75F * 4.905F)) *
+                    1.1125L)) < 1.0e-6F &&
                 std::fabs(rear_wheel->suspension_piecewise_terms.positive_slope -
                     ((0.02F / 0.0254F * 2.67F * 0.13333334F -
                       0.02F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F &&
@@ -1377,6 +1409,11 @@ int main()
         require(!viper::initialize_ncar_wheel_core({
                     std::span<const std::byte>(wheel_record).first(0x147U),
                     0U, front_anchor, 0.5F, false}) &&
+                !viper::initialize_ncar_wheel_core({
+                    std::span<const std::byte>(wheel_record).first(0x16bU),
+                    0U, front_anchor, 0.5F, false}) &&
+                !viper::initialize_ncar_wheel_core({
+                    wheel_record, 0U, front_anchor, 0.0F, false}) &&
                 !viper::initialize_ncar_wheel_core({
                     wheel_record, 4U, front_anchor, 0.5F, false}),
             "wheel core initialization must reject short records and invalid indices");
