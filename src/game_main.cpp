@@ -2084,6 +2084,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 4> wheel_surface_coefficient_0xa0{};
     std::array<std::optional<std::uint8_t>, 4> wheel_animation_flags_0x120{};
     std::array<std::optional<std::uint8_t>, 4> wheel_animation_mode_0x121{};
+    std::array<std::optional<viper::WheelAnimationBasisState>, 4>
+        wheel_animation_basis_outputs{};
 };
 
 struct WindowState {
@@ -2144,6 +2146,8 @@ struct WindowState {
     std::array<viper::WheelContactObservation, 4> player_wheel_contact_observations{};
     std::array<viper::WheelContactResult, 4> player_wheel_contact_results{};
     std::array<viper::WheelUpdatePipelineResult, 4> player_wheel_update_results{};
+    std::array<std::optional<viper::WheelAnimationBasisState>, 4>
+        player_wheel_animation_basis_outputs{};
     viper::NcarIntegratorWheelScalarResult player_integrator_wheel_scalars{};
     bool player_integrator_wheel_scalars_applied{};
     bool player_wheel_pair_differential_producer_applied{};
@@ -2818,6 +2822,7 @@ struct WindowState {
         player_wheel_contact_observations = {};
         player_wheel_contact_results = {};
         player_wheel_update_results = {};
+        player_wheel_animation_basis_outputs = {};
         player_wheel_surface_polarity_results = {};
         if (terrain == nullptr || !player_constructor_inputs_ready ||
             !player_wheel_core_initialization.has_value()) {
@@ -3042,6 +3047,17 @@ struct WindowState {
             auto& update = player_wheel_update_results[wheel];
             update.contact = contact;
             update.suspension = *suspension;
+            // Native 0x443F60 follows the wheel's contact/suspension update.
+            // Collision response is not yet modeled, so the byte-backed
+            // damage field remains whatever its current runtime owner wrote;
+            // this stage is deliberately not used to synthesize force.
+            const auto animation_basis =
+                viper::advance_ncar_wheel_animation_basis_in_objects(
+                    player_runtime_state.wheel_objects[wheel],
+                    wheel_object_offset, player_runtime_state.body_object);
+            if (animation_basis) {
+                player_wheel_animation_basis_outputs[wheel] = *animation_basis;
+            }
             if (suspension->finalized.reset_contact) {
                 player_wheel_contact_states[wheel].contact_active_0x168 = 0U;
                 player_wheel_contact_results[wheel].active = false;
@@ -3118,6 +3134,7 @@ struct WindowState {
 
     void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
     {
+        tick.wheel_animation_basis_outputs = player_wheel_animation_basis_outputs;
         if (player_integrator_wheel_scalars_applied) {
             tick.integrator_wheel_scalar_callback_reached = static_cast<std::uint8_t>(
                 player_integrator_wheel_scalars.callback_0x4c_reached ? 1U : 0U);
@@ -5018,6 +5035,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_surface_coefficient_0xa0"
                 << ",wheel" << wheel << "_animation_flags_0x120"
                 << ",wheel" << wheel << "_animation_mode_0x121"
+                << ",wheel" << wheel << "_basis_angle_0xd4"
+                << ",wheel" << wheel << "_basis_sine_0xb0"
+                << ",wheel" << wheel << "_basis_zero_0xb4"
+                << ",wheel" << wheel << "_basis_cosine_0xb8"
+                << ",wheel" << wheel << "_basis_offset_0xd8"
+                << ",wheel" << wheel << "_basis_0x110_x"
+                << ",wheel" << wheel << "_basis_0x110_y"
+                << ",wheel" << wheel << "_basis_0x110_z"
                 << ",wheel" << wheel << "_contact_query_succeeded"
                 << ",wheel" << wheel << "_contact_depth_limit_0x44";
             for (const auto* vector_name : {"contact_origin", "query_contact_point",
@@ -5380,6 +5405,19 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_animation_mode_0x121[wheel]) {
                             physics_tick_trace << static_cast<unsigned>(
                                 *tick.wheel_animation_mode_0x121[wheel]);
+                        }
+                        const auto& basis = tick.wheel_animation_basis_outputs[wheel];
+                        for (const auto value : {
+                                basis ? std::optional<float>{basis->angle_0xd4} : std::nullopt,
+                                basis ? std::optional<float>{basis->sine_0xb0} : std::nullopt,
+                                basis ? std::optional<float>{basis->zero_0xb4} : std::nullopt,
+                                basis ? std::optional<float>{basis->cosine_0xb8} : std::nullopt,
+                                basis ? std::optional<float>{basis->offset_0xd8} : std::nullopt,
+                                basis ? std::optional<float>{basis->basis_0x110_0x118[0]} : std::nullopt,
+                                basis ? std::optional<float>{basis->basis_0x110_0x118[1]} : std::nullopt,
+                                basis ? std::optional<float>{basis->basis_0x110_0x118[2]} : std::nullopt}) {
+                            physics_tick_trace << ',';
+                            if (value) physics_tick_trace << *value;
                         }
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_query_succeeded[wheel]) {

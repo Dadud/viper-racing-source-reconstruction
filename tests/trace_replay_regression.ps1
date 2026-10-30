@@ -147,6 +147,7 @@ try {
     $wheelPriorDepthColumns = [int[]]::new(4)
     $wheelAnimationFlagsColumns = [int[]]::new(4)
     $wheelAnimationModeColumns = [int[]]::new(4)
+    $wheelAnimationBasisColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelQuerySucceededColumns = [int[]]::new(4)
     $wheelContactDepthLimitColumns = [int[]]::new(4)
@@ -174,6 +175,16 @@ try {
             $tickHeader, "wheel${wheel}_animation_flags_0x120")
         $wheelAnimationModeColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_animation_mode_0x121")
+        $basisColumns = [int[]]::new(8)
+        $basisNames = @(
+            'basis_angle_0xd4', 'basis_sine_0xb0', 'basis_zero_0xb4',
+            'basis_cosine_0xb8', 'basis_offset_0xd8',
+            'basis_0x110_x', 'basis_0x110_y', 'basis_0x110_z')
+        for ($lane = 0; $lane -lt $basisNames.Count; ++$lane) {
+            $basisColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($basisNames[$lane])")
+        }
+        $wheelAnimationBasisColumns += ,$basisColumns
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $wheelQuerySucceededColumns[$wheel] = [Array]::IndexOf(
@@ -227,6 +238,9 @@ try {
         @($wheelPriorDepthColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelAnimationFlagsColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelAnimationModeColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelAnimationBasisColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -485,6 +499,16 @@ try {
                 if ([single]::IsNaN($historyValue) -or
                     [single]::IsInfinity($historyValue)) {
                     throw "Wheel $wheel history snapshot is non-finite at line $($index + 1)"
+                }
+            }
+            foreach ($column in $wheelAnimationBasisColumns[$wheel]) {
+                if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                    throw "Wheel $wheel byte-backed animation basis output is unavailable at line $($index + 1)"
+                }
+                $basisValue = [single]::Parse(
+                    $fields[$column], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($basisValue) -or [single]::IsInfinity($basisValue)) {
+                    throw "Wheel $wheel byte-backed animation basis output is non-finite at line $($index + 1)"
                 }
             }
         }

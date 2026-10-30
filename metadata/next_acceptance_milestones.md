@@ -178,6 +178,17 @@ route-driven full Viper/Bemidji prototype run; it was not a race acceptance
 check. Current trace regression does not advance the car through a lap. This
 does not advance body pose, produce native forces, or transfer pose authority
 from the route prototype.
+The exact `0x441C10` producer for wheel animation coefficients `+0x68..+0x7C`
+and normalized orientation `+0x80..+0x88` is now modeled from axle-selected
+CARF fields and materialized into the player wheel objects on the ordinary
+arithmetic path. A byte-backed `0x443F60` adapter runs after current wheel
+contact/history processing, finite-gates its inputs, writes all eight native
+outputs atomically, and records them in the fixed-step trace. The regression
+requires finite output lanes for all four wheels during route-disabled replay.
+Collision effects, tire forces, body integration, and exact native per-wheel
+stage order are still missing; this stage adds no force and does not qualify as
+driving acceptance. Native constructor evidence is
+`ev_f57ee69fc96ee906516ec5b011e5b6b6b0af283e004317d8824e2d7b48046594`.
 The native wheel-query origin producer is now pinned to the exact inputs at
 `0x442530`: wheel local position `+0x04..+0x0C` plus the referenced point at
 `+0x10`, transformed by all twelve body floats `+0x38..+0x64` through
@@ -185,10 +196,11 @@ The native wheel-query origin producer is now pinned to the exact inputs at
 `transform_wheel_point_0xc8` models that affine operation. The session now
 applies the byte-backed constructor transform to wheel geometry and queries
 terrain there, without route-pose substitution. The body matrix is not yet
-advanced by the physical integrator, and query direction/contact state are not
-yet composed into suspension. Keep live suspension and force integration
-disconnected until the body-transform producer is session-owned and its
-per-step wheel reference inputs are established. The native query dataflow is
+advanced by the physical integrator. Query direction/contact state already feed
+the live suspension/history and paired `+0x158` producer, but not tire forces
+or body integration. Keep force integration disconnected until the body
+transform producer is session-owned and per-step wheel reference inputs are
+established. The native query dataflow is
 documented in [`vehicle_setup.md`](vehicle_setup.md#shared-terrain-surface-query).
 The reference pointer at wheel `+0x10` is now traced through its constructor:
 `0x433C00` selects the nearest model-vertex row when `DAT_0050878c` is enabled,

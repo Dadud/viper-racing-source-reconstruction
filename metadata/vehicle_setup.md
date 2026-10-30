@@ -315,14 +315,19 @@ combination constants at `0x4C88C4..0x4C88D4` are recorded by
 Its input explicitly includes the car object's mass-like scalar at `+0x1F0` and
 the observed FDIV-compatibility flag. A short runtime record or wheel index
 outside 0..3 is rejected. The final suspension-height correction uses the
-existing VC98 compatibility division model when that flag is set. Tire loading,
-helper-owned wheel transforms and remaining `0x441C10` stores are still outside
-this core plan.
+existing VC98 compatibility division model when that flag is set. The core plan
+now also derives the later `0x443F60` inputs at wheel `+0x68..+0x7C` and the
+normalized wheel orientation at `+0x80..+0x88` from their axle-selected CARF
+fields. The ordinary arithmetic path is covered; compatibility-dependent
+helper output at `+0x68` remains unknown when legacy FDIV is enabled, in which
+case the byte-backed callback adapter leaves these fields unavailable.
 
 The live player's byte-backed wheel objects now receive these modeled core
 constructor results after the `0x4419A0` defaults: selected-vertex-relative
 position at `+0x04..+0x0C`, piecewise terms at `+0x24..+0x30`, geometry and
-steering fields at `+0x3C..+0x64`, and surface coefficients at `+0x9C/+0xA0`.
+steering fields at `+0x3C..+0x64`, animation inputs at `+0x68..+0x88`, and
+surface coefficients at `+0x9C/+0xA0` when their constructor values are
+complete.
 Each store marks only its four bytes initialized. This keeps the setup-derived
 values in the same persistent objects as later contact outputs; it does not
 run the per-frame suspension path. The mutable source and writer for the actual
@@ -1140,6 +1145,15 @@ finalized `+0xE8` depth. Its computed `+0x110..+0x118` basis now feeds
 `apply_wheel_tire_basis_update`; wheel orientation and body-basis values remain
 explicit observations. Evidence: `0x442530` calls `0x443F60` before the later
 response assembly; helper dossier at `0x443F60` cited above.
+
+The live byte-backed adapter now reads the complete callback operand set from
+the wheel object and PCAR body. It rejects absent/non-finite operands and stages
+all eight output lanes before atomically writing `+0xD4`, `+0xB0/+0xB4/+0xB8`,
+`+0xD8`, and `+0x110..+0x118`. The player update invokes it after current
+contact/history processing and records outputs in the fixed-step trace. The
+live path still omits native collision handling and tire-response/force stages;
+these basis results are not presented as force or full per-wheel ordering
+parity.
 
 With contact composition enabled, the same body step now sends the finalized
 suspension force through `accumulate_ncar_force_moment` after `0x443F60`, at the

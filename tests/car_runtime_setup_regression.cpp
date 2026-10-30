@@ -818,6 +818,15 @@ int main()
         write_float(0xf8U, 40.0F);
         write_float(0x100U, 0.3F);
         write_float(0x104U, 0.4F);
+        write_float(0x108U, 5.0F);
+        write_float(0x10cU, 6.0F);
+        write_float(0x110U, 7.0F);
+        write_float(0x114U, 8.0F);
+        write_float(0x118U, 9.0F);
+        write_float(0x11cU, 10.0F);
+        write_float(0x120U, 11.0F);
+        write_float(0x124U, 12.0F);
+        write_float(0xfcU, 13.0F);
         write_float(0x128U, 10.0F);
         write_float(0x130U, 5.0F);
         write_float(0x134U, 7.0F);
@@ -862,6 +871,10 @@ int main()
         const std::array<float, 3> front_anchor{-0.4F, -0.254F, 3.81F};
         const auto front_wheel = viper::initialize_ncar_wheel_core({
             wheel_record, 0U, front_anchor, 0.5F, false});
+        const auto rear_animation_wheel = viper::initialize_ncar_wheel_core({
+            wheel_record, 2U, front_anchor, 0.5F, false});
+        const auto compatibility_wheel = viper::initialize_ncar_wheel_core({
+            wheel_record, 0U, front_anchor, 0.5F, true});
         const float front_base_height = 8.0F * 0.0254F;
         const float front_track_scale = 0.1F * 175.19684F;
         const auto front_surface_coefficients =
@@ -887,13 +900,42 @@ int main()
                 front_wheel->value_0x4c == front_track_scale &&
                 front_wheel->coefficient_0x9c == front_surface_coefficients[0] &&
                 front_wheel->coefficient_0xa0 == front_surface_coefficients[1] &&
+                front_wheel->animation_inputs_complete &&
+                front_wheel->animation_value_0x68 == 0.0F &&
+                front_wheel->animation_value_0x6c == -(-1.0F * 7.0F *
+                    0.017453292F * 39.37008F) &&
+                front_wheel->animation_value_0x70 == 5.0F * 0.017453292F *
+                    -1.0F * -39.37008F &&
+                front_wheel->animation_value_0x74 == 9.0F * 0.017453292F *
+                    0.0002247191F &&
+                front_wheel->animation_value_0x78 == 11.0F * 0.017453292F *
+                    -0.0002247191F &&
+                front_wheel->animation_value_0x7c == 13.0F * 0.017453292F &&
                 std::fabs(front_wheel->suspension_piecewise_terms.positive_slope -
                     ((0.01F / 0.0254F * 2.67F * 0.13333334F -
                       0.01F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F &&
                 std::fabs(front_wheel->suspension_piecewise_terms.nonpositive_slope -
                     ((0.03F / 0.0254F * 4.45F * 0.13333334F -
                       0.03F / 0.0254F * 4.45F) * -1.1538461F)) < 1.0e-4F,
-            "0x441C10 front-wheel position, geometry, and steering stores must be reconstructed");
+            "0x441C10 front-wheel geometry, steering, and animation inputs must be reconstructed");
+        require(rear_animation_wheel.has_value() &&
+                rear_animation_wheel->animation_inputs_complete &&
+                rear_animation_wheel->animation_value_0x68 == 0.0F &&
+                rear_animation_wheel->animation_value_0x6c == -(-1.0F * 8.0F *
+                    0.017453292F * 39.37008F) &&
+                rear_animation_wheel->animation_value_0x70 ==
+                    6.0F * 0.017453292F *
+                    -1.0F * -39.37008F &&
+                rear_animation_wheel->animation_value_0x74 ==
+                    10.0F * 0.017453292F *
+                    0.0002247191F &&
+                rear_animation_wheel->animation_value_0x78 ==
+                    12.0F * 0.017453292F *
+                    -0.0002247191F &&
+                rear_animation_wheel->animation_value_0x7c == 0.0F &&
+                compatibility_wheel.has_value() &&
+                !compatibility_wheel->animation_inputs_complete,
+            "0x441C10 animation constructor must select rear operands and fail closed for unresolved FDIV output");
         viper::NcarWheelRuntimeObjectState materialized_front_wheel{};
         const auto front_wheel_base = 0x554U;
         const auto front_wheel_constructor = viper::plan_ncar_wheel_constructor(
@@ -921,6 +963,17 @@ int main()
                     front_wheel->suspension_piecewise_terms.positive_slope) &&
                 read_front_wheel_u32(0x09cU) == std::bit_cast<std::uint32_t>(
                     front_wheel->coefficient_0x9c) &&
+                read_front_wheel_u32(0x068U) == std::bit_cast<std::uint32_t>(0.0F) &&
+                read_front_wheel_u32(0x06cU) == std::bit_cast<std::uint32_t>(
+                    front_wheel->animation_value_0x6c) &&
+                read_front_wheel_u32(0x070U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->animation_value_0x70) &&
+                read_front_wheel_u32(0x080U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->animation_orientation_0x80_0x88[0]) &&
+                read_front_wheel_u32(0x084U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->animation_orientation_0x80_0x88[1]) &&
+                read_front_wheel_u32(0x088U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->animation_orientation_0x80_0x88[2]) &&
                 materialized_front_wheel.initialized_bytes[0x03cU] != 0U &&
                 materialized_front_wheel.initialized_bytes[0x0a0U + 3U] != 0U,
             "live wheel bytes must retain exact constructor geometry and spring fields");
@@ -937,6 +990,41 @@ int main()
                 viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x1cU) ==
                     std::bit_cast<std::uint32_t>(0.0F),
             "standard 0x441C10 shared-zero source must persist its pointer and copied vector");
+        viper::NcarWheelRuntimeObjectState unavailable_animation_wheel{};
+        viper::NcarBodyRuntimeObjectState unavailable_animation_body{};
+        require(!viper::advance_ncar_wheel_animation_basis_in_objects(
+                    unavailable_animation_wheel, front_wheel_base,
+                    unavailable_animation_body),
+            "wheel basis callback must fail closed when constructor bytes are absent");
+        const std::array<float, 12> identity_animation_body{
+            1.0F, 0.0F, 0.0F, 0.0F,
+            0.0F, 1.0F, 0.0F, 0.0F,
+            0.0F, 0.0F, 1.0F, 0.0F};
+        viper::NcarBodyRuntimeObjectState animation_body{};
+        require(viper::copy_ncar_runtime_record_transform_to_body(
+                    animation_body, identity_animation_body),
+            "wheel basis callback fixture must carry an initialized body basis");
+        const auto animation_result =
+            viper::advance_ncar_wheel_animation_basis_in_objects(
+                materialized_front_wheel, front_wheel_base, animation_body);
+        require(animation_result.has_value() &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xd4U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->angle_0xd4) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xb0U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->sine_0xb0) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xb4U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->zero_0xb4) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xb8U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->cosine_0xb8) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0xd8U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->offset_0xd8) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x110U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->basis_0x110_0x118[0]) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x114U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->basis_0x110_0x118[1]) &&
+                viper::read_ncar_wheel_object_u32(materialized_front_wheel, 0x118U) ==
+                    std::bit_cast<std::uint32_t>(animation_result->basis_0x110_0x118[2]),
+            "wheel basis callback must persist its exact eight outputs atomically");
         const std::array<float, 12> projection_transform{
             0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
             1.0F, 3.0F, 2.0F, 0.0F, 0.0F, 0.0F};

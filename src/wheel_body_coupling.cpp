@@ -652,6 +652,53 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         relative_position[axis] = candidate_position[axis] -
             input.selected_model_vertex[axis];
 
+    // The later 0x443F60 basis callback consumes the remaining wheel fields
+    // written by 0x441C10. Preserve the callback's axle/side selection and
+    // operation order from the native constructor.
+    const float animation_value_0x6c = -(
+        side_sign * read_float(front ? 0x110U : 0x114U) *
+        0.017453292F * 39.37008F);
+    const float animation_value_0x70 =
+        read_float(front ? 0x108U : 0x10cU) *
+        0.017453292F * side_sign * -39.37008F;
+    const float animation_value_0x74 =
+        read_float(front ? 0x118U : 0x11cU) *
+        0.017453292F * 0.0002247191F;
+    const float animation_value_0x78 =
+        read_float(front ? 0x120U : 0x124U) *
+        0.017453292F * -0.0002247191F;
+    const float animation_value_0x7c = front
+        ? read_float(0xfcU) * 0.017453292F : 0.0F;
+
+    const float animation_f_var3 = -relative_position[2];
+    auto orientation_y = animation_f_var3;
+    auto orientation_z = -((1.0F - read_float(front ? 0x100U : 0x104U)) *
+        relative_position[1] - relative_position[1]);
+    float orientation_x = 0.0F;
+    if (std::bit_cast<std::uint32_t>(animation_f_var3) > 0x80000000U) {
+        orientation_x = -orientation_x;
+        orientation_y = -animation_f_var3;
+        orientation_z = -orientation_z;
+    }
+    const auto orientation_length = std::sqrt(
+        static_cast<long double>(orientation_y) * orientation_y +
+        static_cast<long double>(orientation_z) * orientation_z +
+        static_cast<long double>(orientation_x) * orientation_x);
+    const bool animation_inputs_complete = !input.fdiv_compatibility_enabled &&
+        std::isfinite(animation_value_0x6c) &&
+        std::isfinite(animation_value_0x70) &&
+        std::isfinite(animation_value_0x74) &&
+        std::isfinite(animation_value_0x78) &&
+        std::isfinite(animation_value_0x7c) &&
+        std::isfinite(orientation_length) && orientation_length > 0.0L;
+    std::array<float, 3> animation_orientation{};
+    if (animation_inputs_complete) {
+        animation_orientation = {
+            static_cast<float>(orientation_x / orientation_length),
+            static_cast<float>(orientation_y / orientation_length),
+            static_cast<float>(orientation_z / orientation_length)};
+    }
+
     return NcarWheelCoreInitialization{
         input.wheel_index,
         front,
@@ -669,6 +716,14 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         track_scale,
         coefficient_0x9c,
         coefficient_0xa0,
+        0.0F,
+        animation_value_0x6c,
+        animation_value_0x70,
+        animation_value_0x74,
+        animation_value_0x78,
+        animation_value_0x7c,
+        animation_orientation,
+        animation_inputs_complete,
         {positive_slope, positive_intercept,
          nonpositive_slope, nonpositive_intercept}};
 }
@@ -726,7 +781,7 @@ bool apply_ncar_wheel_core_initialization(
     const std::uint32_t wheel_object_offset,
     const NcarWheelCoreInitialization& initialization) noexcept
 {
-    std::array<NcarObjectFieldWrite, 17> writes{};
+    std::array<NcarObjectFieldWrite, 26> writes{};
     std::size_t count = 0U;
     const auto write_float = [&](const std::uint32_t local_offset,
                                  const float value) {
@@ -751,8 +806,127 @@ bool apply_ncar_wheel_core_initialization(
     write_float(0x064U, initialization.angle_0x64);
     write_float(0x09cU, initialization.coefficient_0x9c);
     write_float(0x0a0U, initialization.coefficient_0xa0);
+    if (initialization.animation_inputs_complete) {
+        write_float(0x068U, initialization.animation_value_0x68);
+        write_float(0x06cU, initialization.animation_value_0x6c);
+        write_float(0x070U, initialization.animation_value_0x70);
+        write_float(0x074U, initialization.animation_value_0x74);
+        write_float(0x078U, initialization.animation_value_0x78);
+        write_float(0x07cU, initialization.animation_value_0x7c);
+        for (std::size_t axis = 0U; axis < 3U; ++axis) {
+            write_float(0x080U + static_cast<std::uint32_t>(axis * 4U),
+                initialization.animation_orientation_0x80_0x88[axis]);
+        }
+    }
     return apply_ncar_wheel_object_writes(destination, wheel_object_offset,
         std::span<const NcarObjectFieldWrite>(writes.data(), count));
+}
+
+std::optional<WheelAnimationBasisState>
+advance_ncar_wheel_animation_basis_in_objects(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const NcarBodyRuntimeObjectState& body) noexcept
+{
+    const auto read_wheel_float = [&wheel](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        if (!std::isfinite(value)) return std::nullopt;
+        return value;
+    };
+    const auto read_body_float = [&body](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        if (!std::isfinite(value)) return std::nullopt;
+        return value;
+    };
+
+    const auto value_0x04 = read_wheel_float(0x04U);
+    const auto value_0x14 = read_wheel_float(0x14U);
+    const auto damage = read_ncar_wheel_object_u8(wheel, 0x20U);
+    const auto depth_limit = read_wheel_float(0x44U);
+    const auto value_0x60 = read_wheel_float(0x60U);
+    const auto value_0x64 = read_wheel_float(0x64U);
+    const auto value_0x68 = read_wheel_float(0x68U);
+    const auto value_0x6c = read_wheel_float(0x6cU);
+    const auto value_0x70 = read_wheel_float(0x70U);
+    const auto value_0x74 = read_wheel_float(0x74U);
+    const auto value_0x78 = read_wheel_float(0x78U);
+    const auto value_0x7c = read_wheel_float(0x7cU);
+    const auto orientation_x = read_wheel_float(0x80U);
+    const auto orientation_y = read_wheel_float(0x84U);
+    const auto orientation_z = read_wheel_float(0x88U);
+    const auto steering_angle = read_wheel_float(0xacU);
+    const auto value_0xdc = read_wheel_float(0xdcU);
+    const auto contact_depth = read_wheel_float(0xe8U);
+    const auto scalar_0x10c = read_wheel_float(0x10cU);
+    if (!value_0x04 || !value_0x14 || !damage || !depth_limit ||
+        !value_0x60 || !value_0x64 || !value_0x68 || !value_0x6c ||
+        !value_0x70 || !value_0x74 || !value_0x78 || !value_0x7c ||
+        !orientation_x || !orientation_y || !orientation_z ||
+        !steering_angle || !value_0xdc || !contact_depth || !scalar_0x10c) {
+        return std::nullopt;
+    }
+
+    WheelAnimationBasisInput input{};
+    input.value_0x04 = *value_0x04;
+    input.value_0x14 = *value_0x14;
+    input.steering_angle_0xac = *steering_angle;
+    input.scalar_0x10c = *scalar_0x10c;
+    input.depth_limit_0x44 = *depth_limit;
+    input.contact_depth_0xe8 = *contact_depth;
+    input.value_0x60 = *value_0x60;
+    input.value_0x64 = *value_0x64;
+    input.value_0x68 = *value_0x68;
+    input.value_0x6c = *value_0x6c;
+    input.value_0x70 = *value_0x70;
+    input.value_0x74 = *value_0x74;
+    input.value_0x78 = *value_0x78;
+    input.value_0x7c = *value_0x7c;
+    input.orientation_0x80_0x88 = {*orientation_x, *orientation_y, *orientation_z};
+    input.value_0xdc = *value_0xdc;
+    input.damage_flag_0x20 = *damage != 0U;
+    for (std::size_t axis = 0U; axis < input.body_basis_0x38_to_0x58.size(); ++axis) {
+        const auto value = read_body_float(0x38U +
+            static_cast<std::uint32_t>(axis * sizeof(float)));
+        if (!value) return std::nullopt;
+        input.body_basis_0x38_to_0x58[axis] = *value;
+    }
+
+    const auto result = advance_wheel_animation_basis(input);
+    const auto finite_output = std::isfinite(result.angle_0xd4) &&
+        std::isfinite(result.sine_0xb0) && std::isfinite(result.zero_0xb4) &&
+        std::isfinite(result.cosine_0xb8) && std::isfinite(result.offset_0xd8) &&
+        std::all_of(result.basis_0x110_0x118.begin(),
+            result.basis_0x110_0x118.end(), [](const float value) {
+                return std::isfinite(value);
+            });
+    if (!finite_output) return std::nullopt;
+    const std::array<NcarObjectFieldWrite, 8> writes{{
+        {wheel_object_offset + 0x0d4U, 4U,
+            std::bit_cast<std::uint32_t>(result.angle_0xd4)},
+        {wheel_object_offset + 0x0b0U, 4U,
+            std::bit_cast<std::uint32_t>(result.sine_0xb0)},
+        {wheel_object_offset + 0x0b4U, 4U,
+            std::bit_cast<std::uint32_t>(result.zero_0xb4)},
+        {wheel_object_offset + 0x0b8U, 4U,
+            std::bit_cast<std::uint32_t>(result.cosine_0xb8)},
+        {wheel_object_offset + 0x0d8U, 4U,
+            std::bit_cast<std::uint32_t>(result.offset_0xd8)},
+        {wheel_object_offset + 0x110U, 4U,
+            std::bit_cast<std::uint32_t>(result.basis_0x110_0x118[0])},
+        {wheel_object_offset + 0x114U, 4U,
+            std::bit_cast<std::uint32_t>(result.basis_0x110_0x118[1])},
+        {wheel_object_offset + 0x118U, 4U,
+            std::bit_cast<std::uint32_t>(result.basis_0x110_0x118[2])},
+    }};
+    if (!apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes))
+        return std::nullopt;
+    return result;
 }
 
 std::optional<NcarWheelTireSetup> initialize_ncar_wheel_tire_setup(

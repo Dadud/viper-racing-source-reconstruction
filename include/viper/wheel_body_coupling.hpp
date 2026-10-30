@@ -677,6 +677,16 @@ struct NcarWheelCoreInitialization {
     float value_0x4c{};
     float coefficient_0x9c{};
     float coefficient_0xa0{};
+    // Additional 0x441C10 stores consumed later by 0x443F60. Keep their
+    // constructor provenance alongside the already modeled geometry outputs.
+    float animation_value_0x68{};
+    float animation_value_0x6c{};
+    float animation_value_0x70{};
+    float animation_value_0x74{};
+    float animation_value_0x78{};
+    float animation_value_0x7c{};
+    std::array<float, 3> animation_orientation_0x80_0x88{};
+    bool animation_inputs_complete{};
     WheelPiecewiseTerms suspension_piecewise_terms{};
 };
 
@@ -686,6 +696,15 @@ struct NcarWheelCoreInitialization {
     NcarWheelRuntimeObjectState& destination,
     std::uint32_t wheel_object_offset,
     const NcarWheelCoreInitialization& initialization) noexcept;
+
+// Executes the byte-backed 0x443F60 wheel basis stage from the initialized
+// wheel constructor/update fields and PCAR body basis. It returns no result
+// when an operand is absent or non-finite; all output writes are atomic.
+[[nodiscard]] std::optional<WheelAnimationBasisState>
+advance_ncar_wheel_animation_basis_in_objects(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset,
+    const NcarBodyRuntimeObjectState& body) noexcept;
 
 // Reconstructs position and steering stores from wheel constructor 0x441C10.
 // Missing record fields or wheel indices outside [0, 4) yield no result.
