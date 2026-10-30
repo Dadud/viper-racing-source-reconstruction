@@ -383,7 +383,10 @@ struct TireWheelCurveFactorInput {
     float wheel_spin_rate_0x124{};
     float wheel_scalar_0x5c{};
     bool derive_rolling_surface_speed{};
-    std::uint32_t slip_direction_sign_bits{};
+    // 0x442530 passes the raw float bits of its lateral/forward ratio to
+    // 0x4356D0's uint32 parameter. The helper tests the sign bit as an
+    // unsigned value; keep the source operand typed as a float here.
+    float slip_direction_ratio{};
     float slip_curve_input{};
     float tire_scale_0x98{};
     float wheel_scale_0x94{};

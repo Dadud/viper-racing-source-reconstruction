@@ -456,6 +456,7 @@ int main()
         ordinary_tire_factor_input.lateral_velocity = 1.0F;
         ordinary_tire_factor_input.rolling_surface_speed = 2.2F;
         ordinary_tire_factor_input.slip_curve_input = 0.2F;
+        ordinary_tire_factor_input.slip_direction_ratio = -0.5F;
         ordinary_tire_factor_input.tire_scale_0x98 = 1.0F;
         ordinary_tire_factor_input.wheel_scale_0x94 = 1.0F;
         ordinary_tire_factor_input.mode_scale_0xf0 = 1.0F;
@@ -463,6 +464,15 @@ int main()
         ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
         const auto ordinary_tire_response = viper::derive_tire_wheel_response(
             {}, ordinary_tire_factor_input);
+        const auto negative_zero_slip_direction = viper::evaluate_tire_slip_curve(
+            tire_curves, std::bit_cast<std::uint32_t>(-0.0F), 0.2F);
+        const auto negative_slip_direction = viper::evaluate_tire_slip_curve(
+            tire_curves,
+            std::bit_cast<std::uint32_t>(ordinary_tire_factor_input.slip_direction_ratio),
+            0.2F);
+        require(negative_zero_slip_direction.signed_input == 0.2F &&
+                negative_slip_direction.signed_input == -0.2F,
+            "native tire slip helper must test raw float argument bits against the strict unsigned sign threshold");
         const auto scaled_profile = viper::classify_wheel_contact_feature(
             {10, 0.0F, false, true});
         auto scaled_tire_factor_input = ordinary_tire_factor_input;

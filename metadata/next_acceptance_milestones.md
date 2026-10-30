@@ -195,7 +195,8 @@ The fixed-step trace now also derives each current wheel axis through native
 `0x43E9B0` point velocity onto both axes. The route-disabled regression checks
 both projections are present and finite for every wheel. These are the exact
 velocity operands for tire response, but remain diagnostic until wheel spin,
-history, slip-sign, and remaining curve-factor producers are session-owned.
+history, the exact low-speed-adjusted slip ratio, and remaining curve-factor
+producers are session-owned.
 Collision effects, tire forces, body integration, and exact native per-wheel
 stage order are still missing; this stage adds no force and does not qualify as
 driving acceptance. Native constructor evidence is

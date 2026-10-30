@@ -1132,7 +1132,17 @@ forward response when the divisor is nonzero. The curve input itself is
 computed from the three suspension-response plus stored-wheel-vector terms
 projected on the contact normal, floored at `1.0`, and divided by wheel
 `+0x90`. The component terms, contact normal, wheel scalar, velocity
-projections, tire curves, and slip-sign status remain explicit observations.
+projections, tire curves, and the numeric operands used to form the slip ratio
+remain explicit inputs. The `0x4356D0` direction parameter is not an opaque
+status word: at `0x443511..0x443529`, `0x442530` pushes the raw float bits of
+its local `+0x74` ratio into that `uint32` parameter. The ratio is the lateral
+wheel-velocity projection divided by the absolute low-speed-adjusted forward
+projection. `0x4356D0` negates slip only when those raw bits are strictly
+greater than `0x80000000`; negative zero therefore does not negate. The
+portable tire-factor input now represents this operand as a float and bit-casts
+it at the helper boundary. This resolves its representation and comparison,
+but the live session still does not source every value needed to compute the
+ratio exactly, so tire-force integration remains disconnected.
 
 The factors correspond to the post-dynamics locals in `0x442530`: local `0xE4`
 is the `0x435780` trigonometric result; `0x74/0x9C` are forward/lateral ratios;

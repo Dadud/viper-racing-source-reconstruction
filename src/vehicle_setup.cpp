@@ -1358,7 +1358,8 @@ TireWheelResponseDerivation derive_tire_wheel_response(
     const auto curves = evaluate_tire_response_curves(
         input.curves, curve_input);
     const auto slip_curve = evaluate_tire_slip_curve(
-        input.curves, input.slip_direction_sign_bits, input.slip_curve_input);
+        input.curves, std::bit_cast<std::uint32_t>(input.slip_direction_ratio),
+        input.slip_curve_input);
     factors.ratio_normalization = curves.quadratic * input.tire_scale_0x98;
     factors.forward_ratio = ratios.lateral_velocity_ratio;
     factors.lateral_ratio = ratios.rolling_speed_mismatch_ratio;
