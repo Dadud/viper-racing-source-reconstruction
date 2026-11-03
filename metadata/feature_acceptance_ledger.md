@@ -1,6 +1,6 @@
 # Feature, evidence, and acceptance ledger
 
-Updated: 2026-10-29. This is a compact acceptance index for the stated goal:
+Updated: 2026-11-03. This is a compact acceptance index for the stated goal:
 a complete, playable modern Windows reconstruction of Viper Racing using
 separately supplied original assets. Original-client interoperability is out
 of scope. It summarizes, and does not replace, the detailed evidence and
@@ -13,17 +13,22 @@ change the sequencing in [`next_acceptance_milestones.md`](next_acceptance_miles
 condition is not met. **Unverified** means there is no integrated implementation
 with runtime evidence. A parser, static model, smoke test, route trace, or
 prototype lifecycle by itself does not establish playable or original-matched
-behavior. The current runtime is a route-kinematic prototype; the route adapter
-still owns player and opponent pose. No required system below is accepted as
-complete.
+behavior. The normal race path still enables route-kinematic motion, which owns
+player and opponent poses. In `--diagnostics-only` mode, route motion is disabled
+and the player render pose comes from the integrated PCAR body state; that live
+integrator currently accumulates finalized suspension forces but does not yet
+include tire response forces. This mode is not an accepted driving simulation.
+No required system below is accepted as complete.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
-keep route motion disabled. Until the session owns a physics-integrated pose,
-tests may verify parsing, input delivery, and deterministic diagnostics only.
-Once that pose exists, driving tests must replay a timestamped recorded input
-sequence and compare body state, contacts/forces, and surface observations at
-matched tick ordinals against an original-client capture. Existing synthetic
+keep route motion disabled. In that mode, tests may verify input delivery,
+deterministic diagnostics, and integrated body state, but must not treat that
+state as proof of complete driving until the tire and remaining force stages
+are connected and validated. Driving acceptance must replay a timestamped
+recorded input sequence and compare body state, contacts/forces, and surface
+observations at matched tick ordinals against an original-client capture.
+Existing synthetic
 DirectInput captures are field-selection and probe-validation references; their
 uncontrolled initial motion and instrumented input prevent them serving as a
 numeric golden trace.
