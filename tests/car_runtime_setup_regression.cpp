@@ -1199,6 +1199,18 @@ int main()
                     {std::numeric_limits<float>::quiet_NaN(), 0.0F, 0.0F},
                     wheel_forward_axis, {0.0F, 0.0F, 1.0F}),
             "native wheel-axis transform and forward/lateral velocity projections must preserve operand order and reject non-finite inputs");
+        const auto ordinary_slip_direction_ratio =
+            viper::derive_tire_slip_direction_ratio(-3.0F, 12.0F, 0.8F);
+        const auto low_speed_slip_direction_ratio =
+            viper::derive_tire_slip_direction_ratio(-3.0F, 1.0F, 0.8F);
+        require(ordinary_slip_direction_ratio &&
+                *ordinary_slip_direction_ratio == -0.25F &&
+                low_speed_slip_direction_ratio &&
+                *low_speed_slip_direction_ratio == -0.375F &&
+                !viper::derive_tire_slip_direction_ratio(1.0F, 1.0F, 0.0F) &&
+                !viper::derive_tire_slip_direction_ratio(
+                    std::numeric_limits<float>::quiet_NaN(), 1.0F, 1.0F),
+            "native +0x74 tire slip ratio must use lateral/absolute forward velocity with the mode-scaled low-speed floor");
         const viper::WheelSuspensionSurfaceInput surface_input{
             100.0F, 0.5F, 2.0F, 4.0F, 1.0F, 3, false};
         const auto neutral_surface = viper::adjust_wheel_suspension_for_surface(

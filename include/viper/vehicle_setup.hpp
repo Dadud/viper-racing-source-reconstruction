@@ -1320,8 +1320,15 @@ read_ncar_body_integration_kinematics_input_diagnostic(
     const TireDefinition& tire) noexcept;
 [[nodiscard]] TireCurveEvaluation evaluate_tire_response_curves(
     const TireResponseCurveSet& curves, float input) noexcept;
+// Derives the wheel local +0x74 slip ratio from its point-velocity projections
+// and native ten-times low-speed denominator floor.
+[[nodiscard]] std::optional<float> derive_tire_slip_direction_ratio(
+    float lateral_velocity,
+    float longitudinal_velocity,
+    float mode_scale) noexcept;
+
 // Models 0x4356D0's signed-input clamp and 1 + input*(+0x3C/+0x38).
-// direction_sign_bits is the caller's synthesized status word, not an input float.
+// direction_sign_bits are the raw float bits of the caller's local +0x74 ratio.
 [[nodiscard]] TireSlipCurveEvaluation evaluate_tire_slip_curve(
     const TireResponseCurveSet& curves,
     std::uint32_t direction_sign_bits,

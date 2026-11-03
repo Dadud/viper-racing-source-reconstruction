@@ -1205,6 +1205,27 @@ WheelKinematicRatios derive_wheel_kinematic_ratios(
         -(rolling_surface_speed - longitudinal_velocity) / denominator};
 }
 
+std::optional<float> derive_tire_slip_direction_ratio(
+    const float lateral_velocity,
+    const float longitudinal_velocity,
+    const float mode_scale) noexcept
+{
+    if (!std::isfinite(lateral_velocity) ||
+        !std::isfinite(longitudinal_velocity) ||
+        !std::isfinite(mode_scale) || mode_scale <= 0.0F) {
+        return std::nullopt;
+    }
+    const auto low_speed_limit = static_cast<float>(
+        static_cast<long double>(mode_scale) * 10.0L);
+    if (!std::isfinite(low_speed_limit) || low_speed_limit <= 0.0F)
+        return std::nullopt;
+    auto denominator = std::abs(longitudinal_velocity);
+    if (denominator < low_speed_limit) denominator = low_speed_limit;
+    const auto ratio = static_cast<float>(
+        static_cast<long double>(lateral_velocity) / denominator);
+    return std::isfinite(ratio) ? std::optional<float>(ratio) : std::nullopt;
+}
+
 TireWheelResponseComponents combine_tire_wheel_response(
     const TireWheelResponseFactors& factors) noexcept
 {

@@ -193,10 +193,11 @@ requires finite output lanes for all four wheels during route-disabled replay.
 The fixed-step trace now also derives each current wheel axis through native
 `0x422F30`, forms `query_normal × forward_axis`, and projects the byte-backed
 `0x43E9B0` point velocity onto both axes. The route-disabled regression checks
-both projections are present and finite for every wheel. These are the exact
-velocity operands for tire response, but remain diagnostic until wheel spin,
-history, the exact low-speed-adjusted slip ratio, and remaining curve-factor
-producers are session-owned.
+both projections and the derived local `+0x74` slip ratio are present and
+finite for every wheel. The ratio uses the byte-backed contact-feature response
+scale, native strict low-speed floor, and absolute forward projection. It is
+recorded as diagnostic state; the remaining curve-factor inputs and force
+response still need live producers.
 Collision effects, tire forces, body integration, and exact native per-wheel
 stage order are still missing; this stage adds no force and does not qualify as
 driving acceptance. Native constructor evidence is

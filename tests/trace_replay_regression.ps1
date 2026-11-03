@@ -152,6 +152,7 @@ try {
     $wheelAnimationBasisColumns = @()
     $wheelForwardProjectionColumns = [int[]]::new(4)
     $wheelLateralProjectionColumns = [int[]]::new(4)
+    $wheelSlipRatioColumns = [int[]]::new(4)
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
@@ -203,6 +204,8 @@ try {
             $tickHeader, "wheel${wheel}_forward_velocity_projection")
         $wheelLateralProjectionColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_lateral_velocity_projection")
+        $wheelSlipRatioColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_slip_direction_ratio_0x74")
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $spinColumns = [int[]]::new(5)
@@ -274,6 +277,7 @@ try {
         }).Count -gt 0 -or
         @($wheelForwardProjectionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelLateralProjectionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelSlipRatioColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelSpinColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
@@ -593,6 +597,15 @@ try {
                 if ([single]::IsNaN($projection) -or [single]::IsInfinity($projection)) {
                     throw "Wheel $wheel velocity projection is non-finite at line $($index + 1)"
                 }
+            }
+            $slipRatioText = $fields[$wheelSlipRatioColumns[$wheel]]
+            if ([string]::IsNullOrWhiteSpace($slipRatioText)) {
+                throw "Wheel $wheel source-derived tire slip ratio is unavailable at line $($index + 1)"
+            }
+            $slipRatio = [single]::Parse(
+                $slipRatioText, [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($slipRatio) -or [single]::IsInfinity($slipRatio)) {
+                throw "Wheel $wheel source-derived tire slip ratio is non-finite at line $($index + 1)"
             }
         }
         ++$expectedTick

@@ -2083,6 +2083,7 @@ struct PlayerPhysicsTickContext {
         wheel_lateral_axes_world{};
     std::array<std::optional<float>, 4> wheel_forward_velocity_projections{};
     std::array<std::optional<float>, 4> wheel_lateral_velocity_projections{};
+    std::array<std::optional<float>, 4> wheel_slip_direction_ratios_0x74{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_response_vectors_0xf4{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
@@ -3527,6 +3528,12 @@ struct WindowState {
                             projection->forward_velocity;
                         tick.wheel_lateral_velocity_projections[wheel] =
                             projection->lateral_velocity;
+                        tick.wheel_slip_direction_ratios_0x74[wheel] =
+                            viper::derive_tire_slip_direction_ratio(
+                                projection->lateral_velocity,
+                                projection->forward_velocity,
+                                player_wheel_update_results[wheel]
+                                    .feature_profile.response_scale);
                     }
                 }
             }
@@ -5252,6 +5259,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_surface_motion_projection"
                 << ",wheel" << wheel << "_forward_velocity_projection"
                 << ",wheel" << wheel << "_lateral_velocity_projection"
+                << ",wheel" << wheel << "_slip_direction_ratio_0x74"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
                 << ",wheel" << wheel << "_response_scalar_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
@@ -5650,6 +5658,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_lateral_velocity_projections[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_lateral_velocity_projections[wheel];
+                        }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_slip_direction_ratios_0x74[wheel]) {
+                            physics_tick_trace <<
+                                *tick.wheel_slip_direction_ratios_0x74[wheel];
                         }
                         physics_tick_trace << ',';
                         if (tick.wheel_surface_adjusted_responses[wheel]) {
