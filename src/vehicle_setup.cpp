@@ -1200,9 +1200,18 @@ WheelKinematicRatios derive_wheel_kinematic_ratios(
     const float clamped_reference_speed) noexcept
 {
     const float denominator = std::abs(clamped_reference_speed);
+    auto rolling_speed_mismatch_ratio =
+        -(rolling_surface_speed - longitudinal_velocity) / denominator;
+    // 0x442530 clamps local +0x9C to [-20, 20] before its tire-response
+    // assembly. Preserve that bound in the shared portable ratio helper.
+    if (rolling_speed_mismatch_ratio > 20.0F) {
+        rolling_speed_mismatch_ratio = 20.0F;
+    } else if (rolling_speed_mismatch_ratio < -20.0F) {
+        rolling_speed_mismatch_ratio = -20.0F;
+    }
     return {
         lateral_velocity / denominator,
-        -(rolling_surface_speed - longitudinal_velocity) / denominator};
+        rolling_speed_mismatch_ratio};
 }
 
 std::optional<float> derive_tire_slip_direction_ratio(

@@ -519,6 +519,13 @@ int main()
         ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
         const auto ordinary_tire_response = viper::derive_tire_wheel_response(
             {}, ordinary_tire_factor_input);
+        const auto upper_bounded_tire_ratio =
+            viper::derive_wheel_kinematic_ratios(0.0F, 0.0F, 100.0F, 1.0F);
+        const auto lower_bounded_tire_ratio =
+            viper::derive_wheel_kinematic_ratios(0.0F, 0.0F, -100.0F, 1.0F);
+        require(upper_bounded_tire_ratio.rolling_speed_mismatch_ratio == -20.0F &&
+                lower_bounded_tire_ratio.rolling_speed_mismatch_ratio == 20.0F,
+            "native local +0x9C rolling-speed mismatch ratio must clamp to [-20, 20]");
         const auto negative_zero_slip_direction = viper::evaluate_tire_slip_curve(
             tire_curves, std::bit_cast<std::uint32_t>(-0.0F), 0.2F);
         const auto negative_slip_direction = viper::evaluate_tire_slip_curve(

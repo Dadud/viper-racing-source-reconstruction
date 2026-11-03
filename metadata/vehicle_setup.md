@@ -1309,18 +1309,19 @@ stack balance, but its exact callee cleanup has not been independently pinned.
 
 | Native access | Entry-relative slot | Recovered operation | Confidence / remaining gap |
 |---|---:|---|---|
-| `0x4432C1`, `0x4433FF` `[ESP+0x74]` | `E-0x98` | Initializes to `1.0`, then overwrites with `abs([E-0xE8]) / [E-0xE4]`. | The slot identity and formula are direct; the semantic producers for both locals still need complete source mapping. |
-| `0x443403..0x443423` `[ESP+0x98]` | `E-0x74` | Stores `abs([E-0xE8]) / [E-0xFC]`. | Formula is direct; the two upstream local producers are not yet fully mapped. |
-| `0x44348E` `[ESP+0x74]` | `E-0x9C` | Overwrites a different entry-relative slot while one argument is live: `-(([wheel+0x124] * [E-0xD4] - [E-0xE0]) / [E-0xC4])`. The following `0x435670` call consumes that pending argument (`RET 4`). | Operation and stack slot are direct; the locals' full semantic mapping remains open. This is not the earlier `E-0x98` ratio. |
-| `0x44352E..0x443535` `[ESP+0xBC]` | `E-0x50` | Multiplies the slot by the `0x4356D0` return and stores the product back. `0x4356D0` consumes the three pushed arguments (`RET 0x0C`). | Read/modify/write and slot are direct; the initial value at `E-0x50` lacks a confirmed producer. |
-| `0x44359C..0x4435D0` `[ESP+0x9C]` | `E-0x70` | Stores a sign-selected product, then clamps it to `[-0.9, 0.9]`. | Store and clamp are direct; the selected product's source semantics are not fully mapped. |
-| `0x4435E7..0x44362A` `[ESP+0x70]` | `E-0x9C` | Reads a pre-existing slot for the `20.0` comparison, conditionally replaces it with `20.0`, then clamps its lower bound to `-20.0`. | Clamp is direct; the initial producer at `E-0x9C` is still unknown. This is stack storage, not wheel `+0x70`. |
+| `0x4432C1`, `0x4433FF` `[ESP+0x74]` | `E-0x98` | Initializes to `1.0`, then stores the lateral point-velocity projection divided by the absolute forward projection after its mode-scale low-speed floor; this is the tire slip-direction ratio passed to `0x4356D0`. | Confirmed by the normalized assembly and the `0x442530` pseudocode in `wheel_update_value_e0.evidence.json`. |
+| `0x443403..0x443423` `[ESP+0x98]` | `E-0x74` | Stores the low-speed weight. The binary starts at `1.0`; below the `mode_scale * 10` forward-speed threshold it computes the ratio using the signed floor. | Confirmed by the assembly and pseudocode; the native helper's special floating-point compatibility path remains platform-specific. |
+| `0x44348E` `[ESP+0x74]` | `E-0x9C` | Overwrites a different entry-relative slot while one argument is live with `-((wheel[+0x124] * wheel[+0x5C] - forward_point_velocity) / abs(adjusted_forward_speed))`; this is the rolling-speed mismatch ratio. The following `0x435670` call consumes the pending argument (`RET 4`). | Source operands are byte-backed in the live session; the slot is distinct from the earlier `E-0x98` ratio. |
+| `0x44352E..0x443535` `[ESP+0xBC]` | `E-0x50` | Multiplies the initialized forward curve value (`linear_curve * wheel[+0x94] * mode_scale`) by the `0x4356D0` slip-curve return and stores the result back. `0x4356D0` consumes its three pushed arguments (`RET 0x0C`). | Producer and operation are confirmed by the instruction sequence and matching pseudocode. |
+| `0x44359C..0x4435D0` `[ESP+0x9C]` | `E-0x70` | Stores the signed quadratic correction divided by the forward curve denominator and multiplied by slip input, then clamps it to `[-0.9, 0.9]`. | Confirmed by the pseudocode; sign/status handling remains represented by explicit model inputs. |
+| `0x4435E7..0x44362A` `[ESP+0x70]` | `E-0x9C` | Reads the rolling-speed mismatch ratio produced at `0x44348E`, clamps its upper bound to `20.0` and lower bound to `-20.0`, then uses it in response assembly. | Confirmed by assembly and pseudocode. This stack local is not wheel `+0x70`. |
 
-The table distinguishes the two raw `[ESP+0x74]` stores and the two different
-slots they address. It is not enough to wire the portable response model:
-until the unresolved producers and the earlier `ESP` adjustments are mapped,
-these local observations remain diagnostics and tire-force accumulation stays
-disconnected from the live body step.
+The table distinguishes the two raw `[ESP+0x74]` stores and their different
+entry-relative slots. These mappings resolve the ratio clamps and curve-value
+producer, but do not by themselves establish every live vector operand or the
+original's per-wheel force accumulation order. Tire-force accumulation remains
+disconnected from the live body step until those remaining inputs and ordering
+are sourced and validated.
 
 The threshold producer's base matches `evaluate_wheel_suspension`: piecewise
 response times scaled depth delta, wheel `+0x40/+0x158`, spring scale times
