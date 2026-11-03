@@ -890,3 +890,11 @@ composition now derives these operands accordingly, with focused regression
 coverage. The live session still does not execute the full tire response and
 force chain. Next, trace and connect its per-wheel state writes in the native
 order, then compare controlled no-ideal-line runs against the original.
+
+The diagnostics-only live seam is now present, but the replay leaves its curve
+outputs empty because the materialized player wheel bytes at `+0x90`, `+0x94`,
+and `+0x98` are unknown. The next short task is to identify and implement the
+native producers for those three fields, add constructor/runtime byte-level
+regression coverage, and rerun the route-disabled replay until all four wheels
+emit finite tire-factor values. Then source the remaining factor/vector stores
+and accumulation call order before connecting tire forces to body integration.

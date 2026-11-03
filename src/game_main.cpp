@@ -2086,6 +2086,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 4> wheel_forward_velocity_projections{};
     std::array<std::optional<float>, 4> wheel_lateral_velocity_projections{};
     std::array<std::optional<float>, 4> wheel_slip_direction_ratios_0x74{};
+    std::array<std::optional<viper::TireWheelResponseDerivation>, 4>
+        wheel_tire_response_derivations{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_response_vectors_0xf4{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
@@ -3536,6 +3538,95 @@ struct WindowState {
                                 projection->forward_velocity,
                                 player_wheel_update_results[wheel]
                                     .feature_profile.response_scale);
+                        const auto& curves = player_tire_response_curves[wheel];
+                        const auto& animation =
+                            player_wheel_animation_basis_outputs[wheel];
+                        const auto& spin =
+                            player_wheel_spin_preprojection_results[wheel];
+                        const auto& corrected_response =
+                            tick.wheel_corrected_response_vectors_0x100[wheel];
+                        const auto& adjusted_suspension =
+                            player_wheel_update_results[wheel]
+                                .suspension.surface.adjusted_response;
+                        const auto wheel_scalar_0x90 =
+                            tick.wheel_curve_scale_0x90[wheel];
+                        const auto wheel_scale_0x94 =
+                            tick.wheel_curve_scale_0x94[wheel];
+                        const auto tire_scale_0x98 =
+                            tick.wheel_curve_scale_0x98[wheel];
+                        const auto scalar_0x5c = read_response_float(0x5cU);
+                        const auto response_scale = player_wheel_update_results[wheel]
+                            .feature_profile.response_scale;
+                        if (curves && animation && spin && corrected_response &&
+                            wheel_scalar_0x90 && wheel_scale_0x94 &&
+                            tire_scale_0x98 && scalar_0x5c &&
+                            tick.wheel_slip_direction_ratios_0x74[wheel] &&
+                            std::isfinite(adjusted_suspension) &&
+                            std::isfinite(response_scale)) {
+                            const auto normal_cross_forward =
+                                viper::PhysicsVector3{
+                                    contact_normal.y * projection->forward_axis.z -
+                                        contact_normal.z * projection->forward_axis.y,
+                                    contact_normal.z * projection->forward_axis.x -
+                                        contact_normal.x * projection->forward_axis.z,
+                                    contact_normal.x * projection->forward_axis.y -
+                                        contact_normal.y * projection->forward_axis.x};
+                            const auto geometric_slip = animation->offset_0xd8 -
+                                (normal_cross_forward.x * body_transform[3] +
+                                 normal_cross_forward.y * body_transform[4] +
+                                 normal_cross_forward.z * body_transform[5]);
+                            const auto finite_response_vector = [](
+                                const viper::PhysicsVector3& value) {
+                                return std::isfinite(value.x) &&
+                                    std::isfinite(value.y) && std::isfinite(value.z);
+                            };
+                            if (finite_response_vector(contact_normal) &&
+                                finite_response_vector(normal_cross_forward) &&
+                                std::isfinite(geometric_slip) &&
+                                *wheel_scalar_0x90 != 0.0F) {
+                                viper::TireWheelCurveFactorInput response_input{};
+                                response_input.curves = *curves;
+                                response_input.suspension_response_components = {
+                                    body_transform[3] * adjusted_suspension,
+                                    body_transform[4] * adjusted_suspension,
+                                    body_transform[5] * adjusted_suspension};
+                                response_input.wheel_response_components = {
+                                    corrected_response->x, corrected_response->y,
+                                    corrected_response->z};
+                                response_input.contact_normal_components = {
+                                    contact_normal.x, contact_normal.y,
+                                    contact_normal.z};
+                                response_input.wheel_scalar_0x90 = *wheel_scalar_0x90;
+                                response_input.lateral_velocity =
+                                    projection->lateral_velocity;
+                                response_input.longitudinal_velocity =
+                                    projection->forward_velocity;
+                                response_input.wheel_spin_rate_0x124 =
+                                    spin->spin_rate_0x124;
+                                response_input.wheel_scalar_0x5c = *scalar_0x5c;
+                                response_input.derive_rolling_surface_speed = true;
+                                response_input.slip_direction_ratio =
+                                    *tick.wheel_slip_direction_ratios_0x74[wheel];
+                                response_input.tire_scale_0x98 = *tire_scale_0x98;
+                                response_input.wheel_scale_0x94 = *wheel_scale_0x94;
+                                response_input.mode_scale_0xf0 = response_scale;
+                                response_input.slip_curve_input = geometric_slip;
+                                const auto low_speed =
+                                    viper::derive_tire_wheel_response(
+                                        {}, response_input);
+                                response_input.slip_curve_input = geometric_slip *
+                                    low_speed.factors.low_speed_weight;
+                                const auto derivation =
+                                    viper::derive_tire_wheel_response(
+                                        {}, response_input);
+                                if (std::isfinite(derivation.factors.curve_input) &&
+                                    std::isfinite(derivation.factors.forward_curve_value) &&
+                                    std::isfinite(derivation.factors.lateral_curve_value)) {
+                                    tick.wheel_tire_response_derivations[wheel] =
+                                        derivation;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -5262,6 +5353,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_forward_velocity_projection"
                 << ",wheel" << wheel << "_lateral_velocity_projection"
                 << ",wheel" << wheel << "_slip_direction_ratio_0x74"
+                << ",wheel" << wheel << "_tire_curve_input"
+                << ",wheel" << wheel << "_tire_forward_curve_value"
+                << ",wheel" << wheel << "_tire_lateral_curve_value"
+                << ",wheel" << wheel << "_tire_dynamics_division_valid"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
                 << ",wheel" << wheel << "_response_scalar_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
@@ -5666,6 +5761,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace <<
                                 *tick.wheel_slip_direction_ratios_0x74[wheel];
                         }
+                        const auto& tire_derivation =
+                            tick.wheel_tire_response_derivations[wheel];
+                        physics_tick_trace << ',';
+                        if (tire_derivation) physics_tick_trace <<
+                            tire_derivation->factors.curve_input;
+                        physics_tick_trace << ',';
+                        if (tire_derivation) physics_tick_trace <<
+                            tire_derivation->factors.forward_curve_value;
+                        physics_tick_trace << ',';
+                        if (tire_derivation) physics_tick_trace <<
+                            tire_derivation->factors.lateral_curve_value;
+                        physics_tick_trace << ',';
+                        if (tire_derivation) physics_tick_trace <<
+                            (tire_derivation->dynamics_division_valid ? 1 : 0);
                         physics_tick_trace << ',';
                         if (tick.wheel_surface_adjusted_responses[wheel]) {
                             physics_tick_trace <<

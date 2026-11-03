@@ -1107,6 +1107,14 @@ session still lacks complete tire-response force ownership. Evidence:
 This `+0x7C` store is distinct from the tail's `local_90`; it is not the
 response input to the final wheel-rate increment.
 
+The live diagnostics path now attempts that factor derivation from current
+wheel/body/contact state, but only when every source byte is initialized. In
+the Viper/Bemidji no-route replay, wheel offsets `+0x90`, `+0x94`, and `+0x98`
+are unknown in the materialized player wheel objects, so derivation is skipped
+and the CSV outputs remain empty. Trace these values to their native
+constructor or callback producers before claiming live curve values or tire
+forces.
+
 `advance_four_wheel_body_step` now combines each wheel's supplied response
 factors after replacing their trigonometric term with the result of
 `advance_wheel_tire_dynamics`. It constructs the lateral vector from the
