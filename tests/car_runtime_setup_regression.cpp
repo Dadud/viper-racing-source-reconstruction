@@ -1304,11 +1304,15 @@ int main()
         body_step_input.kinematics.linear_velocity = {1.0F, 2.0F, 3.0F};
         body_step_input.kinematics.gravity_mass_0x7c = 8.0F;
         body_step_input.kinematics.angular_velocity = {0.0F, 0.0F, 2.0F};
+        body_step_input.wheel_tire_dynamics_inputs[0].smoothing_gate_local_0x20 =
+            20.0F;
+        body_step_input.wheel_tire_dynamics_inputs[0].contact_active = true;
         body_step_input.wheel_contact_states[0].contact_point_0x130 = {4.0F, 5.0F, 0.0F};
         auto& body_step_wheel = body_step_input.wheel_update_pipeline_inputs[0];
         body_step_wheel.point_transform.body_transform_0x38_to_0x64 =
             projection_transform;
         body_step_wheel.suspension.base.spring_scale_0x3c = 1.0F;
+        body_step_wheel.suspension.base.spring_base_0x40 = 10.0F;
         const auto body_step = viper::advance_four_wheel_body_step(body_step_input);
         require(body_step.wheel_point_velocities_0x43e9b0[0].x == -9.0F &&
                 body_step.wheel_point_velocities_0x43e9b0[0].y == 10.0F &&
@@ -1317,6 +1321,12 @@ int main()
         require(body_step.wheel_contact_pipeline_results[0]
                     .suspension.surface.absolute_motion_projection == 20.0F,
             "four-wheel step must project point velocity through the body fields");
+        require(body_step.wheel_contact_pipeline_results[0]
+                    .suspension.surface.adjusted_response == 10.0F &&
+                body_step.wheel_tire_dynamics_results[0].smoothing_weight == 0.6F &&
+                body_step.wheel_tire_dynamics_results[0].second_blend_weight == 0.2F &&
+                body_step.wheel_tire_dynamics_states[0].response_gate_0x11c == 0.0F,
+            "four-wheel tire dynamics must use derived suspension gate and contact state instead of caller observations");
         require(std::fabs(body_step.force_collection.accumulated_linear_force.y +
                     78.48F) < 1.0e-4F,
             "four-wheel composition must source its gravity term from the body kinematics input");

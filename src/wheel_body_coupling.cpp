@@ -2543,9 +2543,17 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         dynamics_input.secondary_slip_component_0xe4 =
             response_derivation.secondary_slip_component_0xe4;
         if (input.wheel_contact_pipeline_enabled) {
+            const auto& suspension =
+                result.wheel_contact_pipeline_results[wheel].suspension;
+            // 0x442530 compares the pre-filter local +0x20, which is the
+            // suspension response after its feature-scaled surface term.
+            // Wheel +0x178 may be cleared later and is not the stack input.
+            dynamics_input.smoothing_gate_local_0x20 =
+                suspension.surface.adjusted_response;
+            dynamics_input.contact_active =
+                result.wheel_contact_states[wheel].contact_active_0x168 != 0U;
             result.wheel_tire_dynamics_states[wheel].suspension_response_0x178 =
-                result.wheel_contact_pipeline_results[wheel]
-                    .suspension.surface.adjusted_response;
+                suspension.surface.adjusted_response;
         }
         result.wheel_tire_dynamics_results[wheel] = advance_wheel_tire_dynamics(
             result.wheel_tire_dynamics_states[wheel], dynamics_input);

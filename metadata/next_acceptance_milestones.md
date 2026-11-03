@@ -853,3 +853,10 @@ portable model's provenance only. The caller-frame producer operands, reset
 flag history, and `ESP+0x70/+0x74/+0x98/+0x9C/+0xBC` are not fully connected to
 the live session. Continue tracing those fields before wiring live tire
 dynamics or force accumulation.
+
+The portable four-wheel composition now supplies this filter gate from the
+surface-adjusted suspension response and supplies contact activity from the
+current contact `+0x168` state when its contact pipeline is enabled. The
+exact `0x4193F0(2)` sign selection and feature correction constants match the
+hash-verified binary. This does not close the Windows live-session gap or prove
+shared random-stream alignment.

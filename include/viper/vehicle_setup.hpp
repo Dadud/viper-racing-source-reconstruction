@@ -96,8 +96,10 @@ struct WheelTireDynamicsInput {
     float instantaneous_component_0x2c{};
     float instantaneous_component_0x30{};
     float secondary_slip_component_0xe4{};
-    // Caller-frame local at ESP+0x20 in 0x442530. Its producer is not yet
-    // connected to the live session; wheel +0xEC is an output, not this gate.
+    // Caller-frame local at ESP+0x20 in 0x442530. The four-wheel model sources
+    // it from suspension.surface.adjusted_response when contact composition is
+    // enabled; the Windows session does not yet run that tire stage. Wheel
+    // +0xEC is an output, not this gate.
     float smoothing_gate_local_0x20{};
     TireTrigonometricTerms tire_terms{};
     bool contact_active{};

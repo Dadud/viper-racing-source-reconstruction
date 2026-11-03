@@ -1295,6 +1295,21 @@ chain. `ESP+0x70` has no identified assignment before its first observed use
 at `0x4435E7`. These fields remain caller observations in the portable model;
 they are not connected to the live session.
 
+The threshold producer's base matches `evaluate_wheel_suspension`: piecewise
+response times scaled depth delta, wheel `+0x40/+0x158`, spring scale times
+depth, the `+0x44/+0x4C` excess-depth correction, and (when damage byte `+0x20`
+is set) the `-0.9` spring adjustment. The later correction matches
+`adjust_wheel_suspension_for_surface`: capped motion weight, the `0x4193F0(2)`
+zero-to-`-1` / nonzero-to-`+1` factor, feature scales 9/3/0, then a `0.3`
+addition to the base. Exact-hash data values are `0x4C8854=-1.0`,
+`0x4C8900=9.0`, `0x4C8930=3.0`, and `0x4C893C=0.3`. When the portable
+four-wheel composition enables its contact pipeline, it now sources the tire
+filter gate from that `surface.adjusted_response` local and contact activity
+from the updated `+0x168` state. Regression uses contradictory caller values to
+check both sources. The Windows live session still does not execute tire
+dynamics; the shared random stream's full native call inventory and the reset
+flag history remain unresolved.
+
 `classify_wheel_contact_feature` models the following contact-feature switch
 in `0x442530`. It preserves raw feature codes, strict signed-bit gates at
 response thresholds 0.7, 0.9, and 1.5, the resulting animation bytes at
