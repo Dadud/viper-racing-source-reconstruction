@@ -1286,14 +1286,12 @@ are at `0x443691` and `0x4436BE`. The slot is overwritten later at
 `0x443748`/`0x44376F`, so its value must be captured before those stores. These
 instructions identify the producer span, but its projected-velocity and
 response operands are not yet fully mapped to the live byte-backed session.
-Other stack locals remain incomplete: `ESP+0x98` is formed as
-`abs(local+0x24) / local+0x10` at `0x443403..0x443423`; `ESP+0x74` changes
-from `1.0` to a projected-velocity ratio, then to a negated wheel-speed / point-
-velocity expression (`0x4432C1`, `0x4433FF`, `0x44348E`); `ESP+0x9C` is clamped
-to `[-0.9,0.9]` at `0x44359C..0x4435D0`; and `ESP+0xBC` lacks a complete source
-chain. `ESP+0x70` has no identified assignment before its first observed use
-at `0x4435E7`. These fields remain caller observations in the portable model;
-they are not connected to the live session.
+The initial disassembly pass left several stack locals ambiguous because it
+compared raw `ESP+offset` labels across temporary argument pushes. The
+normalized map below resolves their distinct entry-relative slots and the
+rolling-speed clamp. The remaining gap is complete live assembly of their
+upstream vector inputs and response stages; the portable response model is not
+yet called by the Windows session.
 
 #### Normalized tire-response stack slots (2026-11-03)
 

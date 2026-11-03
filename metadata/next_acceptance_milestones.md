@@ -865,3 +865,16 @@ current contact `+0x168` state when its contact pipeline is enabled. The
 exact `0x4193F0(2)` sign selection and feature correction constants match the
 hash-verified binary. This does not close the Windows live-session gap or prove
 shared random-stream alignment.
+
+### 2026-11-03 update: normalized tire-response slots and mismatch clamp
+
+Entry-ESP normalization of `0x442530` distinguishes the two raw `[ESP+0x74]`
+stores and maps the response locals to their Ghidra pseudocode producers. In
+particular, local `+0x9C` is the negative wheel-spin/surface-speed mismatch
+ratio and is clamped to `[-20,20]` before it enters the tire response. The
+portable `derive_wheel_kinematic_ratios` now applies this bound, with regression
+coverage for positive and negative saturation. Release target
+`viper_car_runtime_setup_regression` rebuilt, and its focused CTest passed
+1/1. The Windows live session still does not assemble or accumulate tire
+response forces; resolve its remaining vector and trigonometric operands
+before enabling them.
