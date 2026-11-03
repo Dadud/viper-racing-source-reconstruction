@@ -1265,16 +1265,35 @@ defaults and denominator factors map to the derived curve input and lateral
 curve value. These locals are formed directly before
 the accumulator writes at `0x004438F3..0x0044399B`.
 
-`advance_wheel_tire_dynamics` now models the stateful smoothing immediately
-before the `0x435780` call. It can apply the preceding invalid-response reset,
-stores the instantaneous component at `+0x180`, smooths the values into
+`advance_wheel_tire_dynamics` models the stateful smoothing immediately before
+the `0x435780` call. The gate is the caller-frame `ESP+0x20` local (a raw
+signed-bit comparison against `0x41200001`); it is not wheel `+0xEC`, which
+this routine does not read and which the later accumulator writes. The
+weights are `0.6/0.2` at or below 10.0 and `0.4/0.0` above it. The model stores
+the post-reset instantaneous component at `+0x180`, smooths values into
 `+0x174` and `+0x170`, computes the combined magnitude, and writes the
-contact-gated nonnegative response scalar to `+0x11C`. The low-speed branch is
-preserved as the raw signed-bit comparison against `0x41200001`; its smoothing
-weights are `0.6/0.2` below that gate and `0.4/0.0` otherwise. The resulting
-magnitude is passed into the recovered trigonometric tire response. Inputs
-remain named by stack-local or wheel offsets where their physical roles are
-not established.
+contact-gated nonnegative response scalar to `+0x11C`. The reset branch's
+condition depends on preserved `BL` and wheel `+0x168`; it clears the three
+filter fields only when both are zero. `BL` is initialized at `0x442BEB`, set
+on the active-contact branch at `0x442DE1`, stored to `+0x168` at `0x442DF7`,
+and can be changed by later history logic at `0x44305B`/`0x44306D`. Thus
+contact absence alone is not a complete reset predicate, and an invalid
+response denominator is not part of the observed gate.
+
+The caller-frame `ESP+0x20` threshold value is built at `0x442E54..0x442E85`
+and receives another contribution at `0x442F5F..0x442F71`; the threshold reads
+are at `0x443691` and `0x4436BE`. The slot is overwritten later at
+`0x443748`/`0x44376F`, so its value must be captured before those stores. These
+instructions identify the producer span, but its projected-velocity and
+response operands are not yet fully mapped to the live byte-backed session.
+Other stack locals remain incomplete: `ESP+0x98` is formed as
+`abs(local+0x24) / local+0x10` at `0x443403..0x443423`; `ESP+0x74` changes
+from `1.0` to a projected-velocity ratio, then to a negated wheel-speed / point-
+velocity expression (`0x4432C1`, `0x4433FF`, `0x44348E`); `ESP+0x9C` is clamped
+to `[-0.9,0.9]` at `0x44359C..0x4435D0`; and `ESP+0xBC` lacks a complete source
+chain. `ESP+0x70` has no identified assignment before its first observed use
+at `0x4435E7`. These fields remain caller observations in the portable model;
+they are not connected to the live session.
 
 `classify_wheel_contact_feature` models the following contact-feature switch
 in `0x442530`. It preserves raw feature codes, strict signed-bit gates at

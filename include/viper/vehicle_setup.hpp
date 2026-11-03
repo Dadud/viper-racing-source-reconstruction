@@ -96,10 +96,14 @@ struct WheelTireDynamicsInput {
     float instantaneous_component_0x2c{};
     float instantaneous_component_0x30{};
     float secondary_slip_component_0xe4{};
-    float smoothing_gate_value_0xec{};
+    // Caller-frame local at ESP+0x20 in 0x442530. Its producer is not yet
+    // connected to the live session; wheel +0xEC is an output, not this gate.
+    float smoothing_gate_local_0x20{};
     TireTrigonometricTerms tire_terms{};
     bool contact_active{};
-    bool clear_filter_state{};
+    // Explicit observation of the native reset branch; do not infer from an
+    // invalid tire-response division or contact absence.
+    bool filter_reset_branch_observed{};
 };
 
 struct WheelTireDynamicsResult {

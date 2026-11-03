@@ -65,6 +65,32 @@ int main()
                 "tire accumulator outputs must use native coefficients and divisors");
         }
         {
+            viper::WheelTireDynamicsState state{};
+            state.filtered_component_0x170 = 10.0F;
+            state.filtered_component_0x174 = 10.0F;
+            state.suspension_response_0x178 = 7.0F;
+            viper::WheelTireDynamicsInput input{};
+            input.instantaneous_component_0x2c = 20.0F;
+            input.instantaneous_component_0x30 = 30.0F;
+            input.tire_terms = {1.0F, 1.0F, 1.0F, 0.2F};
+            input.contact_active = true;
+            input.smoothing_gate_local_0x20 = 10.0F;
+            auto low_gate = viper::advance_wheel_tire_dynamics(state, input);
+            require(low_gate.smoothing_weight == 0.6F &&
+                    low_gate.second_blend_weight == 0.2F &&
+                    state.filtered_component_0x174 == 14.0F &&
+                    state.filtered_component_0x170 == 30.0F &&
+                    state.instantaneous_component_0x180 == 20.0F &&
+                    state.suspension_response_0x178 == 7.0F,
+                "tire filters must use the caller +0x20 gate and preserve unrelated +0x178 state");
+
+            input.smoothing_gate_local_0x20 = 10.01F;
+            const auto high_gate = viper::advance_wheel_tire_dynamics(state, input);
+            require(high_gate.smoothing_weight == 0.4F &&
+                    high_gate.second_blend_weight == 0.0F,
+                "tire filter branch must change above the caller +0x20 threshold");
+        }
+        {
             constexpr std::uint32_t wheel_base = 0x554U;
             viper::NcarWheelRuntimeObjectState wheel{};
             const std::array<viper::NcarObjectFieldWrite, 3> source_fields{{

@@ -227,7 +227,7 @@ WheelTireDynamicsResult advance_wheel_tire_dynamics(
     WheelTireDynamicsResult result{};
     auto instantaneous_0x2c = input.instantaneous_component_0x2c;
     auto instantaneous_0x30 = input.instantaneous_component_0x30;
-    if (input.clear_filter_state) {
+    if (input.filter_reset_branch_observed) {
         state.filtered_component_0x170 = 0.0F;
         state.filtered_component_0x174 = 0.0F;
         state.suspension_response_0x178 = 0.0F;
@@ -238,7 +238,7 @@ WheelTireDynamicsResult advance_wheel_tire_dynamics(
 
     constexpr auto low_gate_bits = std::int32_t{0x41200001};
     const auto low_speed_gate =
-        std::bit_cast<std::int32_t>(input.smoothing_gate_value_0xec) < low_gate_bits;
+        std::bit_cast<std::int32_t>(input.smoothing_gate_local_0x20) < low_gate_bits;
     result.smoothing_weight = low_speed_gate ? 0.6F : 0.4F;
     result.second_blend_weight = low_speed_gate ? 0.2F : 0.0F;
 

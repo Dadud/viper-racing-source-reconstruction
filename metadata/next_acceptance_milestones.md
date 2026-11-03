@@ -837,3 +837,19 @@ impulses, AI integration, race progress and controlled original parity are still
 missing. Continue with tire-response factors, accumulator writers, and final
 wheel-rate stores sourced from byte-backed state, then expand the body step only
 when the missing callback inputs are owned by the session.
+
+### 2026-11-03 update: tire-filter source boundary
+
+An exact-hash disassembly audit corrected the portable tire-filter interface:
+the 10.0 smoothing threshold reads caller-frame `ESP+0x20` at
+`0x443691`/`0x4436BE`; it does not read wheel `+0xEC`. The latter is written by
+the later accumulator. The filter clear branch at `0x443664..0x443691` requires
+both the preserved `BL` reset flag and wheel `+0x168` to be zero, so an invalid
+response division is not a valid substitute. The model and regression now
+reflect those inputs. The full Release build and serial CTest suite pass 66/66;
+the foreground keyboard smoke failed once in a parallel full-suite run, then
+passed alone and in the serial suite. This fixes the
+portable model's provenance only. The caller-frame producer operands, reset
+flag history, and `ESP+0x70/+0x74/+0x98/+0x9C/+0xBC` are not fully connected to
+the live session. Continue tracing those fields before wiring live tire
+dynamics or force accumulation.

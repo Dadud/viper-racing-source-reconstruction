@@ -13,11 +13,12 @@ change the sequencing in [`next_acceptance_milestones.md`](next_acceptance_miles
 condition is not met. **Unverified** means there is no integrated implementation
 with runtime evidence. A parser, static model, smoke test, route trace, or
 prototype lifecycle by itself does not establish playable or original-matched
-behavior. The normal race path still enables route-kinematic motion, which owns
-player and opponent poses. In `--diagnostics-only` mode, route motion is disabled
-and the player render pose comes from the integrated PCAR body state; that live
-integrator currently accumulates finalized suspension forces but does not yet
-include tire response forces. This mode is not an accepted driving simulation.
+behavior. Normal startup disables route-kinematic motion; the explicit
+`--route-motion-prototype` option is a manual demo only. With route motion
+disabled, the player render pose comes from the integrated PCAR body state; the
+live integrator currently accumulates finalized suspension forces but does not
+yet include accepted tire response forces. This mode is not an accepted driving
+simulation.
 No required system below is accepted as complete.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap

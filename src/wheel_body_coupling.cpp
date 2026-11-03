@@ -2542,8 +2542,6 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             response_derivation.dynamics_component_0x30;
         dynamics_input.secondary_slip_component_0xe4 =
             response_derivation.secondary_slip_component_0xe4;
-        dynamics_input.clear_filter_state = dynamics_input.clear_filter_state ||
-            !response_derivation.dynamics_division_valid;
         if (input.wheel_contact_pipeline_enabled) {
             result.wheel_tire_dynamics_states[wheel].suspension_response_0x178 =
                 result.wheel_contact_pipeline_results[wheel]
