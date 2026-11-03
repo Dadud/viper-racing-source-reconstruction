@@ -109,6 +109,8 @@ struct WheelTireDynamicsResult {
     float trigonometric_response{};
 };
 
+// Global coefficients loaded by the 0x442530 wheel update from the exact
+// race.bin build SHA-256 f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56.
 struct WheelTireAccumulatorInput {
     float accumulator_0xa4{};
     float accumulator_0x10c{};
@@ -119,12 +121,12 @@ struct WheelTireAccumulatorInput {
     float forward_response_local_0x38{};
     float lateral_response_local_0x2c{};
     float divisor_0x1c{};
-    float divisor_factor_0x48{};
-    float divisor_factor_0xc0{};
-    float forward_accumulator_scale{};
-    float signed_lateral_scale{};
-    float decay_0x10c{};
-    float forward_scale_0x10c{};
+    float divisor_factor_0x48{}; // tire response curve_input (stack local +0x48)
+    float divisor_factor_0xc0{}; // lateral_curve_value (stack local +0xC0)
+    float forward_accumulator_scale{-0x1.1d0934p-14F}; // 0x4C897C
+    float signed_lateral_scale{0x1.560b0cp-16F};       // 0x4C8980
+    float decay_0x10c{0x1.ccccccp-1F};                 // 0x4C88B0
+    float forward_scale_0x10c{0x1.99999ap-4F};         // 0x4C88B4
     bool contact_active_0x168{};
     bool fdiv_compatibility_enabled{};
 };

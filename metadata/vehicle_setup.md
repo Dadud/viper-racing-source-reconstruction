@@ -1229,13 +1229,28 @@ the previous accumulator plus scaled forward response, divides by
 `1 + +0x11C` and stores that intermediate, then adds the signed lateral term;
 the sign comes from the unsigned raw-bit comparison of wheel `+0x04` against
 `0x80000000`. It also updates `+0x10C` as its previous value times one global
-coefficient plus forward response times another. All four global coefficients
-and incoming response locals are explicit inputs. When contact byte `+0x168`
-is set, the helper also writes `+0xEC = local_0x38 / local_0x1C` and
+coefficient plus forward response times another. The four global coefficients
+are explicit input fields with defaults from the matching original binary; the
+incoming response locals remain inputs. When contact byte `+0x168` is set, the
+helper also writes `+0xEC = local_0x38 / local_0x1C` and
 `+0xF0 = local_0x2C / (local_0x48 * local_0xC0)`. It reports whether the
 Pentium-FDIV compatibility path is active; host division only approximates
 that path's result. Evidence: `0x442530` assembly
 `0x004438F3..0x0044399B`.
+
+The four global accumulator coefficients are now defaulted from the matching
+`race.bin` build (SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
+forward `+0xA4` scale `-6.7957866e-5` at `0x4C897C`, signed lateral scale
+`2.0387361e-5` at `0x4C8980`, `+0x10C` decay `0.9` at `0x4C88B0`, and forward
+scale `0.1` at `0x4C88B4`. Their raw float bits are preserved by the
+hexadecimal literals in `WheelTireAccumulatorInput`. The final `ESP+0x48` and
+`ESP+0xC0` denominator factors are now mapped exactly: they are `curve_input`
+and `lateral_curve_value`, respectively. The latter is the linear tire curve
+scaled by wheel `+0x94` and the feature mode scale. The stack correction at
+`0x443501` accounts for one pushed argument before storing the stable `+0xC0`
+local. These mappings match `WheelTireResponseDerivation`; they remain
+caller-supplied until live response derivation is connected.
 
 The four-wheel composition can now execute this accumulator stage directly
 after the per-wheel tire-dynamics update and before tire response vector and
@@ -1245,8 +1260,9 @@ updated tire-dynamics state. It now also derives the accumulator's forward
 `local_0x38` and lateral `local_0x2C` values from the evolved tire factors,
 using the newly smoothed `0x435780` trigonometric response. Previous accumulator
 values now live in `WheelTireAccumulatorState` and are carried from the prior
-four-wheel result into the next call. Global coefficients and denominator
-factors remain supplied observations. These locals are formed directly before
+four-wheel result into the next call. The global coefficients are source-backed
+defaults and denominator factors map to the derived curve input and lateral
+curve value. These locals are formed directly before
 the accumulator writes at `0x004438F3..0x0044399B`.
 
 `advance_wheel_tire_dynamics` now models the stateful smoothing immediately

@@ -36,6 +36,35 @@ int main()
 {
     try {
         {
+            const viper::WheelTireAccumulatorInput defaults{};
+            require(std::bit_cast<std::uint32_t>(
+                        defaults.forward_accumulator_scale) == 0xb88e849aU &&
+                    std::bit_cast<std::uint32_t>(
+                        defaults.signed_lateral_scale) == 0x37ab0586U &&
+                    std::bit_cast<std::uint32_t>(defaults.decay_0x10c) ==
+                        0x3f666666U &&
+                    std::bit_cast<std::uint32_t>(
+                        defaults.forward_scale_0x10c) == 0x3dcccccdU,
+                "tire accumulator coefficients must match the hashed original binary");
+
+            auto input = defaults;
+            input.forward_response_local_0x38 = 1000.0F;
+            input.lateral_response_local_0x2c = 500.0F;
+            input.divisor_0x1c = 0.9F;
+            input.divisor_factor_0x48 = 1.0F;
+            input.divisor_factor_0xc0 = 2.0F;
+            input.contact_active_0x168 = true;
+            const auto result = viper::advance_wheel_tire_accumulators(input);
+            require(std::fabs(result.accumulator_0xa4 -
+                        (-1000.0F * 0x1.1d0934p-14F +
+                         500.0F * 0x1.560b0cp-16F)) < 1.0e-6F &&
+                    result.accumulator_0x10c == 100.0F &&
+                    result.contact_states_updated &&
+                    result.state_0xec > 1111.0F && result.state_0xec < 1112.0F &&
+                    result.state_0xf0 == 250.0F,
+                "tire accumulator outputs must use native coefficients and divisors");
+        }
+        {
             constexpr std::uint32_t wheel_base = 0x554U;
             viper::NcarWheelRuntimeObjectState wheel{};
             const std::array<viper::NcarObjectFieldWrite, 3> source_fields{{
