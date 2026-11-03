@@ -606,9 +606,13 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
     const auto wheel_response_0x58 = static_cast<float>(
         divide_with_vc98_fdiv_compatibility(read_float(0x168U), body_term,
             input.fdiv_compatibility_enabled) * 1.1125L);
+    const float wheel_scale_0x94 = read_float(front ? 0x150U : 0x154U);
+    const float tire_scale_0x98 = read_float(front ? 0x158U : 0x15cU);
     if (!std::isfinite(wheel_response_0x50) ||
         !std::isfinite(wheel_response_0x54) ||
-        !std::isfinite(wheel_response_0x58)) {
+        !std::isfinite(wheel_response_0x58) ||
+        !std::isfinite(wheel_scale_0x94) ||
+        !std::isfinite(tire_scale_0x98)) {
         return std::nullopt;
     }
     const long double correction_numerator =
@@ -737,6 +741,8 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
         wheel_response_0x50,
         wheel_response_0x54,
         wheel_response_0x58,
+        wheel_scale_0x94,
+        tire_scale_0x98,
         coefficient_0x9c,
         coefficient_0xa0,
         0.0F,
@@ -804,7 +810,7 @@ bool apply_ncar_wheel_core_initialization(
     const std::uint32_t wheel_object_offset,
     const NcarWheelCoreInitialization& initialization) noexcept
 {
-    std::array<NcarObjectFieldWrite, 29> writes{};
+    std::array<NcarObjectFieldWrite, 31> writes{};
     std::size_t count = 0U;
     const auto write_float = [&](const std::uint32_t local_offset,
                                  const float value) {
@@ -828,6 +834,8 @@ bool apply_ncar_wheel_core_initialization(
     write_float(0x054U, initialization.value_0x54);
     write_float(0x058U, initialization.value_0x58);
     write_float(0x05cU, initialization.value_0x5c);
+    write_float(0x094U, initialization.value_0x94);
+    write_float(0x098U, initialization.value_0x98);
     write_float(0x060U, initialization.angle_0x60);
     write_float(0x064U, initialization.angle_0x64);
     write_float(0x09cU, initialization.coefficient_0x9c);
@@ -1073,6 +1081,19 @@ std::optional<NcarWheelTireSetup> initialize_ncar_wheel_tire_setup(
         loader_dimension_argument,
         tire_response_object_0x2c,
         initialize_tire_response_object(tire, tire_response_object_0x2c)};
+}
+
+bool apply_ncar_wheel_tire_response_scale(
+    NcarWheelRuntimeObjectState& destination,
+    const std::uint32_t wheel_object_offset,
+    const NcarWheelTireSetup& setup) noexcept
+{
+    if (!std::isfinite(setup.tire_response_object_0x2c)) return false;
+    const NcarObjectFieldWrite scale_write{
+        wheel_object_offset + 0x090U, 4U,
+        std::bit_cast<std::uint32_t>(setup.tire_response_object_0x2c)};
+    return apply_ncar_wheel_object_writes(destination, wheel_object_offset,
+        std::span<const NcarObjectFieldWrite>(&scale_write, 1U));
 }
 
 NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(

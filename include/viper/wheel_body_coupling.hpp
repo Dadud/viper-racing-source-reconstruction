@@ -678,6 +678,8 @@ struct NcarWheelCoreInitialization {
     float value_0x50{};
     float value_0x54{};
     float value_0x58{};
+    float value_0x94{};
+    float value_0x98{};
     float coefficient_0x9c{};
     float coefficient_0xa0{};
     // Additional 0x441C10 stores consumed later by 0x443F60. Keep their
@@ -751,6 +753,14 @@ struct NcarWheelTireSetup {
     float tire_response_object_0x2c{};
     TireResponseObject response_object{};
 };
+
+// Persists the 0x441C10 copy of the allocated tire response object's +0x2C
+// scale into wheel +0x90. The host pointer stored at wheel +0x8C is modeled
+// separately and is not exposed as a native address.
+[[nodiscard]] bool apply_ncar_wheel_tire_response_scale(
+    NcarWheelRuntimeObjectState& destination,
+    std::uint32_t wheel_object_offset,
+    const NcarWheelTireSetup& setup) noexcept;
 
 // Reconstructs 0x441C10's axle setup scale and 0x435B50's division by TIRE
 // float 0, then initializes the complete 0x40-byte response object.

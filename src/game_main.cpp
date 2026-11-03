@@ -2675,6 +2675,18 @@ struct WindowState {
                 player_wheel_tire_setups = {};
                 return false;
             }
+            const auto wheel_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+            if (!viper::apply_ncar_wheel_tire_response_scale(
+                    player_runtime_state.wheel_objects[wheel], wheel_offset,
+                    *player_wheel_tire_setups[wheel])) {
+                player_runtime_car_record.clear();
+                player_tire_definitions = {};
+                player_tire_response_curves = {};
+                player_tire_trigonometric_terms = {};
+                player_wheel_tire_setups = {};
+                return false;
+            }
             const auto& curves = *player_tire_response_curves[wheel];
             const std::array<float, 9> curve_fields{
                 curves.quadratic.quadratic,

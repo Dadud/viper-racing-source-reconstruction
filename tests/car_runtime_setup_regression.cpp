@@ -1003,6 +1003,10 @@ int main()
         write_float(0x144U, 4.0F);
         write_float(0x148U, 3.0F);
         write_float(0x14cU, 4.0F);
+        write_float(0x150U, 2.25F);
+        write_float(0x154U, 3.5F);
+        write_float(0x158U, 4.75F);
+        write_float(0x15cU, 5.25F);
         write_float(0x164U, 0.61F);
         write_float(0x168U, 0.8F);
         const auto expected_surface_coefficients = [](const float track_scale) {
@@ -1069,6 +1073,8 @@ int main()
                     0.3365F) < 1.0e-6F &&
                 front_wheel->value_0x40 == 0.0F &&
                 front_wheel->value_0x4c == front_track_scale &&
+                front_wheel->value_0x94 == 2.25F &&
+                front_wheel->value_0x98 == 4.75F &&
                 std::fabs(front_wheel->value_0x50 - 13.35F) < 1.0e-6F &&
                 std::fabs(front_wheel->value_0x54 - static_cast<float>(
                     (0.50015L / static_cast<long double>(0.5F * 0.25F * 4.905F)) *
@@ -1124,7 +1130,11 @@ int main()
                 viper::materialize_ncar_wheel_constructor(materialized_front_wheel,
                     front_wheel_base, front_wheel_constructor) &&
                 viper::apply_ncar_wheel_core_initialization(materialized_front_wheel,
-                    front_wheel_base, *front_wheel),
+                    front_wheel_base, *front_wheel) &&
+                front_tire_setup.has_value() &&
+                viper::apply_ncar_wheel_tire_response_scale(
+                    materialized_front_wheel, front_wheel_base,
+                    *front_tire_setup),
             "resolved wheel-core constructor outputs must apply to persistent storage");
         const auto read_front_wheel_u32 = [&materialized_front_wheel](
                 const std::size_t offset) {
@@ -1143,6 +1153,12 @@ int main()
                     front_wheel->value_0x54) &&
                 read_front_wheel_u32(0x058U) == std::bit_cast<std::uint32_t>(
                     front_wheel->value_0x58) &&
+                read_front_wheel_u32(0x090U) == std::bit_cast<std::uint32_t>(
+                    front_tire_setup->tire_response_object_0x2c) &&
+                read_front_wheel_u32(0x094U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x94) &&
+                read_front_wheel_u32(0x098U) == std::bit_cast<std::uint32_t>(
+                    front_wheel->value_0x98) &&
                 read_front_wheel_u32(0x044U) == std::bit_cast<std::uint32_t>(
                     front_wheel->value_0x44) &&
                 read_front_wheel_u32(0x024U) == std::bit_cast<std::uint32_t>(
@@ -1579,6 +1595,8 @@ int main()
                 std::fabs(rear_wheel->candidate_position[2] + 1.27F) < 1.0e-6F &&
                 rear_wheel->coefficient_0x9c == rear_surface_coefficients[0] &&
                 rear_wheel->coefficient_0xa0 == rear_surface_coefficients[1] &&
+                rear_wheel->value_0x94 == 3.5F &&
+                rear_wheel->value_0x98 == 5.25F &&
                 std::fabs(rear_wheel->value_0x50 - 17.8F) < 1.0e-6F &&
                 std::fabs(rear_wheel->value_0x54 - static_cast<float>(
                     (0.50085L / static_cast<long double>(0.5F * 0.75F * 4.905F)) *

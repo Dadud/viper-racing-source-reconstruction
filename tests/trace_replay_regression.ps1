@@ -401,11 +401,8 @@ try {
             $tireCurveValueCount = @($tireCurveValues | Where-Object {
                 -not [string]::IsNullOrWhiteSpace($_)
             }).Count
-            if ($tireCurveValueCount -notin @(0, 3) -or
-                ($tireCurveValueCount -eq 0 -and
-                    -not [string]::IsNullOrWhiteSpace($tireCurveStatus)) -or
-                ($tireCurveValueCount -eq 3 -and
-                    $tireCurveStatus -notin @('0', '1'))) {
+            if ($tireCurveValueCount -ne 3 -or
+                $tireCurveStatus -notin @('0', '1')) {
                 throw "Wheel $wheel tire-curve division status is invalid at line $($index + 1)"
             }
         }
@@ -801,6 +798,9 @@ try {
     }
     if (-not $observedSuspensionForce) {
         throw 'Fixed-step replay never produced a nonzero finalized wheel suspension force'
+    }
+    if (-not $observedTireCurveDerivation) {
+        throw 'Fixed-step replay never produced live tire-curve factors for all four wheels'
     }
 
     Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Tire-curve factors were $(if ($observedTireCurveDerivation) { 'derived' } else { 'not yet available from initialized live wheel operands' }); controls are not yet connected to tire forces, so this is not driving acceptance."
