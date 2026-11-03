@@ -65,12 +65,16 @@ audio parity and modern multiplayer remain separate acceptance tracks.
 The native contact query is now statically traced through a coordinate
 quantizer, binary plane selector, plane equation, and signed-short surface code.
 The matching `track.bpp` TPPB v2 loader/parser and PCAR-based runtime query
-already exist. The native wheel callback now has a trace-only model of its
-surface polarity draw and `0 -> -1`, nonzero `-> +1` adjustment. The portable
-four-wheel tire-factor composition now propagates its terrain-feature-derived
-mode scale to both the low-speed cutoff and forward/lateral tire-curve
-multipliers; regression covers a feature-code result of `0.9`. This does not
-connect tire forces to the Windows runtime. The remaining data gap is
+already exist. The native wheel callback now has a model of its surface
+polarity draw and `0 -> -1`, nonzero `-> +1` adjustment. The Windows tick
+advances a private timer-seeded stream once per player wheel and applies this
+sign to provisional suspension response; the native process shares this stream
+with other unmodeled callsites, so these forces are not parity evidence. The
+portable four-wheel tire-factor composition now propagates its
+terrain-feature-derived mode scale to both the low-speed cutoff and
+forward/lateral tire-curve multipliers; regression covers a feature-code
+result of `0.9`. Tire-response force generation and accumulation are not
+connected to the Windows body step. The remaining data gap is
 fixed-seed/shared-stream parity and sourcing every frame-dependent wheel input
 into the runtime session. The immediate behavioral gap is a controlled
 per-wheel/body capture

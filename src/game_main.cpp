@@ -57,10 +57,12 @@ namespace {
 
 using Microsoft::WRL::ComPtr;
 
-// The original process initializes one timer-seeded polarity stream and all
-// wheel updates draw from that shared state. Other native callsites are not
-// implemented yet, so this stream is diagnostic input only and must not drive
-// wheel forces until the rest of its callers are reconstructed.
+// The original process initializes one timer-seeded stream shared by many
+// callsites. This reconstruction uses a private QPC/timeGetTime-seeded copy
+// and currently advances it once per player wheel. Those draws feed the
+// provisional suspension surface term, but other native callers and exact
+// startup/draw ordering are missing; the resulting force is not parity
+// evidence.
 class NcarSurfacePolarityStream {
 public:
     NcarSurfacePolarityStream() noexcept

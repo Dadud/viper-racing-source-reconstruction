@@ -142,10 +142,14 @@ the shared call order. Evidence:
 ## Implementation boundary
 
 The repository models the per-call `0x419620` transition, `0x4193F0`
-conversion, and the wrapper's signed low-dword seed reduction/order. The live
-session still does not own the clock source, table initializer, or shared
-process-wide stream. Next exact steps are to finish the x87-compatible table
-generator, capture native tables for fixed seed pairs when the original disc
-can be mounted through its intended path, model the timer source behind an
-injectable clock service, and route reconstructed consumers through one
-locked session-level stream while recording unresolved call-order differences.
+conversion, and the wrapper's signed low-dword seed reduction/order. The
+Windows app currently initializes a private copy of the table from a
+QPC/`timeGetTime`-derived timer pair and advances it once per player wheel.
+That local draw count follows the four-wheel callback order, but the native
+process shares the state with many other direct callers and initializes it
+through the engine timer lifecycle. The reconstructed stream currently drives
+a provisional suspension-surface term. It is not parity evidence until its
+table output, timer state, and cross-feature call ordering match. Next steps
+are to compare the table against a native fixed-seed fixture, route the timer
+through an injectable platform clock, and implement the other active native
+consumers through one locked process-level stream.

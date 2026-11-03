@@ -731,16 +731,21 @@ availability; details and its REA evidence id are in
 [`original_physics_dispatch_capture.md`](original_physics_dispatch_capture.md#live-wheel-response-probe-retry-2026-10-29).
 The trace now carries contact-gate status, raw and clamped depth, byte-backed
 prior `+0xE8` and pre-update `+0x158`, the finite-checked base suspension
-response, and the trace-only surface polarity/projection/adjustment stage.
+response, and the surface polarity/projection/adjustment stage. The
+reconstructed per-wheel draw feeds provisional suspension response, but its
+private timer-seeded stream omits other native callers and is not parity
+evidence.
 The fixed-step CSV now also records initialized wheel response scales
 `+0x90/+0x94/+0x98`, surface coefficients `+0x9C/+0xA0`, response scalar
 `+0x7C`, response vectors `+0xF4/+0x100`, and the source-derived point velocity
-at `+0x130`. These are diagnostic values only; tire finalization, force
-accumulation, and body integration remain disconnected. Full Release build and
-all 66 configured CTests passed 2026-10-29; this verifies build and replay
-determinism, not tire-force behavior. The operand/result row is intended to
-support the next controlled original capture without substituting invented
-forces.
+at `+0x130`. These observations support the provisional suspension path; tire
+response finalization and tire-force accumulation remain disconnected. The
+body integrator does consume suspension forces, but the incomplete shared
+polarity stream means those forces are not original-parity evidence. Full
+Release build and all 66 configured CTests passed 2026-10-29; this verifies
+build and replay determinism, not tire-force behavior. The operand/result row
+is intended to support the next controlled original capture without
+substituting invented forces.
 
 A corrected passive probe retained eight integrator calls and 32 wheel calls
 from a hidden pre-existing original process; all contact bytes were active,
