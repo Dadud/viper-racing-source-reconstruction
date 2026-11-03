@@ -876,5 +876,17 @@ portable `derive_wheel_kinematic_ratios` now applies this bound, with regression
 coverage for positive and negative saturation. Release target
 `viper_car_runtime_setup_regression` rebuilt, and its focused CTest passed
 1/1. The Windows live session still does not assemble or accumulate tire
-response forces; resolve its remaining vector and trigonometric operands
-before enabling them.
+response forces; source the complete per-wheel operand and write order before
+enabling them.
+
+### 2026-11-03 update: tire curve-load and slip-curve operands
+
+The exact-hash callback pseudocode shows curve load as the body-basis
+projection of adjusted suspension response plus the prior wheel `+0x100`
+vector. Its slip-curve input uses wheel animation offset `+0xD8`, the
+contact-normal/forward cross product, and the body basis row at `+0x44..+0x4C`;
+it is distinct from rolling-speed mismatch. The portable four-wheel
+composition now derives these operands accordingly, with focused regression
+coverage. The live session still does not execute the full tire response and
+force chain. Next, trace and connect its per-wheel state writes in the native
+order, then compare controlled no-ideal-line runs against the original.

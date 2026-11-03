@@ -1318,8 +1318,13 @@ int main()
         auto& body_step_wheel = body_step_input.wheel_update_pipeline_inputs[0];
         body_step_wheel.point_transform.body_transform_0x38_to_0x64 =
             projection_transform;
+        body_step_wheel.point_transform.body_transform_0x38_to_0x64[3] = 0.25F;
+        body_step_wheel.point_transform.body_transform_0x38_to_0x64[4] = 0.5F;
+        body_step_wheel.point_transform.body_transform_0x38_to_0x64[5] = 0.75F;
         body_step_wheel.suspension.base.spring_scale_0x3c = 1.0F;
         body_step_wheel.suspension.base.spring_base_0x40 = 10.0F;
+        body_step_input.wheel_tire_response_vector_inputs[0].forward_basis =
+            {1.0F, 0.0F, 0.0F};
         const auto body_step = viper::advance_four_wheel_body_step(body_step_input);
         require(body_step.wheel_point_velocities_0x43e9b0[0].x == -9.0F &&
                 body_step.wheel_point_velocities_0x43e9b0[0].y == 10.0F &&
@@ -1334,6 +1339,12 @@ int main()
                 body_step.wheel_tire_dynamics_results[0].second_blend_weight == 0.2F &&
                 body_step.wheel_tire_dynamics_states[0].response_gate_0x11c == 0.0F,
             "four-wheel tire dynamics must use derived suspension gate and contact state instead of caller observations");
+        const auto& tire_factor_input =
+            body_step.wheel_tire_curve_factor_inputs_applied[0];
+        require(tire_factor_input.suspension_response_components ==
+                    std::array<float, 3>{2.5F, 5.0F, 7.5F} &&
+                std::fabs(tire_factor_input.slip_curve_input - 0.75F) < 1.0e-5F,
+            "native tire curve inputs must use suspension response along the body basis and wheel animation offset rather than rolling-speed difference");
         require(std::fabs(body_step.force_collection.accumulated_linear_force.y +
                     78.48F) < 1.0e-4F,
             "four-wheel composition must source its gravity term from the body kinematics input");

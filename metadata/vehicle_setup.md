@@ -1016,14 +1016,13 @@ When the optional contact pipeline is enabled, the four-wheel composition
 feeds the updated wheel `+0x130` point and current body kinematics to this
 primitive, then projects the result onto the supplied forward axis and the
 contact-normal/forward-axis cross product. Those projections replace the
-caller-supplied lateral and longitudinal velocities; slip input is rolling
-surface speed minus projected forward velocity. If the caller supplies the
-post-preprojection wheel spin rate at `+0x124` and wheel scalar at `+0x5C`,
-the composed path derives rolling surface speed as their product, matching
-the source expression; otherwise it preserves the explicit rolling-speed
-observation. The path remains optional
-because callers that do not enable the contact pipeline still provide these
-scalar observations directly.
+caller-supplied lateral and longitudinal velocities. The slip-curve argument
+is a separate geometric quantity: `(wheel +0xD8 - dot(contact_normal x
+forward_axis, body_basis[+0x44..+0x4C])) * low_speed_weight`. It is not the
+rolling-speed difference. Rolling surface speed is separately derived from
+the post-preprojection wheel spin rate at `+0x124` times wheel scalar `+0x5C`.
+The four-wheel composition now uses the produced animation offset and the
+body-basis row for the slip-curve argument.
 
 Before this projection, `update_wheel_spin_preprojection` models the early
 spin/filter block: it computes the capped response from `abs(+0x124)` and
@@ -1043,14 +1042,14 @@ then uses the updated spin in the rolling-speed product. Extended-precision
 division/rounding and subsequent contact and tire-vector updates to
 `local_90` remain separate reconstruction work.
 
-The TIRE coefficient curves are evaluated using a separate value assembled
-from the contact-plane normal, wheel response, and three wheel state values.
-The value is floored at `1.0` and divided by wheel offset `0x90` before it is
-passed to the quadratic and linear evaluators. This identifies the curves'
-input data flow; it does not prove that the value is a particular physical
-load measurement. Thus `0x442530` contains at least three distinguishable
-stages: wheel-position response, normalized wheel-relative velocity, and
-TIRE-record curve evaluation before force and impulse accumulation.
+The TIRE coefficient curves are evaluated using the contact normal dotted
+with `suspension_response * body_basis[+0x44..+0x4C] + wheel[+0x100..+0x108]`.
+The result is floored at `1.0` and divided by wheel offset `+0x90` before it
+is passed to the quadratic and linear evaluators. The portable four-wheel
+composition now supplies the surface-adjusted suspension scalar along that
+body-basis row; it no longer substitutes the finalized suspension force
+vector. This identifies the curves' input data flow; it does not prove the
+value is a particular physical load measurement.
 
 The final tire-response scalars can be written directly from the assignments
 at `0x442530`. With `t` as the trigonometric response, `r_f` and `r_l` as the
@@ -1083,11 +1082,12 @@ corrected_vector = response_vector - basis * dot(basis, response_vector)
 `correct_tire_response_projection` models this correction before the routine
 accumulates the final vector and its moment with `0x43E6F0`. The basis is used
 as stored; the helper does not assume it is normalized.
-`compose_wheel_tire_response` now connects the recovered response factors,
-contact-normal cross product, negated response-vector assembly, and projection
-in the observed order. The earlier ground/contact query, curve-input derivation,
-wheel animation/state writes, and force accumulator mutation remain separate
-inputs or effects.
+`compose_wheel_tire_response` connects the recovered response factors,
+contact-normal cross product, negated response-vector assembly, and projection.
+The four-wheel composition now derives the curve-load and geometric slip
+inputs above from the current suspension result, body basis, and wheel
+animation result. This corrects portable composition inputs only; the Windows
+live session still does not call the complete tire response/force chain.
 
 `apply_wheel_tire_basis_update` captures the following direct stores: the
 scaled response vector is copied to `+0xF4..+0xFC`, and
@@ -1100,10 +1100,9 @@ control-flow order in `0x442530` confirms that `+0xF4..+0xFC` is written from
 that current local after the response calculation and before the direct tire
 force call. A value sampled at the force callsite is therefore the current
 update's pre-projection output, while a value sampled at function entry is
-prior wheel state; neither observation alone identifies the producer inputs
-that formed the current local. The response curves, ratios, contact-normal
-calculation, velocity projections, and mode scales that feed that local must
-be sourced before this modeled stage can own live physics. Evidence:
+prior wheel state. The portable factor composition now sources the corrected
+suspension-load and slip-curve operands described above. The Windows live
+session still lacks complete tire-response force ownership. Evidence:
 `0x442530` assembly `0x00443AA7..0x00443B1D` and `0x00443BBD..0x00443BEE`.
 This `+0x7C` store is distinct from the tail's `local_90`; it is not the
 response input to the final wheel-rate increment.

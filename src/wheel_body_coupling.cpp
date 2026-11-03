@@ -2458,9 +2458,17 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                     collision_input.contact_depth = 0.0F;
                 }
             }
-            const auto& suspension_force = update.suspension.finalized.applied_force;
+            // Native curve-load input is the suspension scalar along the
+            // body's +0x44/+0x48/+0x4C basis row, plus wheel +0x100. It is
+            // not the already finalized contact-force vector.
+            const auto suspension_response =
+                update.suspension.surface.adjusted_response;
+            const auto& body_transform =
+                wheel_update_input.point_transform.body_transform_0x38_to_0x64;
             curve_factor_input.suspension_response_components = {
-                suspension_force.x, suspension_force.y, suspension_force.z};
+                body_transform[3] * suspension_response,
+                body_transform[4] * suspension_response,
+                body_transform[5] * suspension_response};
 
             const auto& forward = response_vector_input.forward_basis;
             const auto& normal = response_vector_input.contact_normal;
@@ -2474,9 +2482,22 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             curve_factor_input.longitudinal_velocity =
                 point_velocity.x * forward.x + point_velocity.y * forward.y +
                 point_velocity.z * forward.z;
-            curve_factor_input.slip_curve_input =
-                curve_factor_input.rolling_surface_speed -
+            const auto speed_floor = update.feature_profile.response_scale * 10.0F;
+            auto adjusted_forward_speed =
                 curve_factor_input.longitudinal_velocity;
+            if (std::abs(adjusted_forward_speed) < speed_floor) {
+                adjusted_forward_speed =
+                    std::bit_cast<std::int32_t>(std::bit_cast<std::uint32_t>(
+                        curve_factor_input.longitudinal_velocity)) <= 0
+                    ? -speed_floor : speed_floor;
+            }
+            const auto low_speed_weight = speed_floor != 0.0F
+                ? std::abs(adjusted_forward_speed) / speed_floor : 1.0F;
+            curve_factor_input.slip_curve_input =
+                (result.wheel_animation_basis_states[wheel].offset_0xd8 -
+                 (lateral.x * body_transform[3] +
+                  lateral.y * body_transform[4] +
+                  lateral.z * body_transform[5])) * low_speed_weight;
         }
         // These collision arguments are read from the body and wheel records
         // by 0x442530. Reuse the state already carried by the body step and
