@@ -121,20 +121,26 @@ listeners.push(Interceptor.attach(at(0x442530), {
 }));
 
 listeners.push(Interceptor.attach(at(0x43e6f0), {
-  onEnter(args) {
+  onEnter() {
     const state = active.get(threadId());
     if (!state || !state.wheel || rows.length >= rowLimit) return;
     const body = this.context.ecx;
     const wheel = state.wheel.pointer;
-    const forcePtr = args[0];
-    const pointPtr = args[1];
     const esp = this.context.esp;
+    // 0x43E6F0 is an x86 thiscall. The disassembly ends in `ret 8` and reads
+    // its force and application-point pointers from the two stack arguments.
+    // Read those slots directly instead of relying on Frida's generic args
+    // view, which was mis-decoded in the prior capture.
+    const forcePtr = safe(() => esp.add(4).readPointer());
+    const pointPtr = safe(() => esp.add(8).readPointer());
     this.row = {
       integrator: state.serial,
       wheelIndex: state.wheel.index,
       wheel: wheel.toString(),
       body: body.toString(),
       returnAddress: this.returnAddress.toString(),
+      forcePointer: forcePtr ? forcePtr.toString() : null,
+      pointPointer: pointPtr ? pointPtr.toString() : null,
       force: vector3(forcePtr),
       point: vector3(pointPtr),
       center: vector3(body, 0x5c),

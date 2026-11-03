@@ -1562,3 +1562,13 @@ the Frida session closed. REA evidence id:
 the script SHA-256 matches the checked-in probe recorded above. Treat the
 capture as callback-stage inventory only, never a numeric fixture or
 acceptance result.
+
+On 2026-11-03, the probe's `0x43E6F0` argument reader was corrected after
+checking the helper's x86 ABI in `disasm/engine_.text.asm`: it is a thiscall
+that reads two pointer arguments from the entry stack and returns with `ret 8`.
+The probe now reads the force pointer at `ESP+4` and the application-point
+pointer at `ESP+8`, instead of using Frida's generic `args[]` view that made
+the previous capture unusable. This repairs capture instrumentation only; no
+new original-game run or force attribution is claimed. A future capture must
+still verify the decoded pointers against the captured stack bytes and check
+the before/after body accumulator deltas.
