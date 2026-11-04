@@ -79,18 +79,17 @@ D-block endpoints plus wheel `+0xE4/+0x124/+0x128` around `0x431150`,
 motion disabled.
 
 The exact-write capture is prepared as `tools/pcar_source_field_watch.js` and
-the controlled state-correlation probe now includes the related PCAR/wheel
-fields. Both scripts pass Node syntax checks, but no original game process was
-running to validate the Frida APIs, constructor watch, exception handler,
-selected-player identity, or observed input response. The watch now arms on
-`0x4381E0`'s `ECX` object and follows the first `0x4C8188` PCAR callback through
-`0x431150`; reject the capture unless those object identities match. Run the
-source-field watch on the original before integrating the unresolved
-multiplier path; retain route motion disabled in all reconstruction
-acceptance checks. Added optional CTest `pcar_source_field_watch_mock` when
-Node is present; this checks the probe's script flow without claiming native
-watchpoint or original-game validation. The configured Release suite now
-passes 70/70.
+the controlled state-correlation probe includes the related PCAR/wheel fields.
+The watch now records every `0x4C8188` callback candidate and marks capture
+validity false unless exactly one candidate matches a watched constructor and
+has selected-integrator samples. Hardware-watch events count only when one
+watched field changes, optional memory details agree, and the writer is inside
+`race.bin`; re-arm failures and unclassified events invalidate the capture.
+Node syntax and expanded mock scenarios pass, but no original game process was
+run to validate Frida's native watchpoint or exception behavior. Run this watch
+on the original before integrating the unresolved multiplier path; keep route
+motion disabled in reconstruction acceptance. The CTest mock checks agent
+control flow only, not native instrumentation or game behavior.
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent

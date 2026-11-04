@@ -11,10 +11,12 @@ const fields = [0x5b0, 0x8f8];
 const state = {
   selected: null,
   selectedOrdinal: null,
+  callbackCandidates: new Map(),
   watchedThreads: new Map(),
   constructorRows: [],
   tickSamples: 0,
   writeEvents: 0,
+  unclassifiedEvents: 0,
   errors: [],
 };
 const safe = fn => { try { return fn(); } catch (e) { return { error: String(e) }; } };
@@ -78,6 +80,35 @@ const writeRow = (details, watched) => {
   const current = readValues(watched.body);
   const changedOffsets = fields.filter((_, index) =>
     JSON.stringify(current[index]) !== JSON.stringify(watched.last[index]));
+  const instruction = safe(() => details.context.pc);
+  const writerModule = instruction && instruction.toString
+    ? safe(() => Process.findModuleByAddress(instruction)) : null;
+  const memoryAddress = safe(() => details.memory.address);
+  const memoryOperation = safe(() => details.memory.operation);
+  const changedOffset = changedOffsets.length === 1 ? changedOffsets[0] : null;
+  const expectedAddress = changedOffset === null
+    ? null : watched.body.add(changedOffset);
+  const memoryMatches = !details.memory ||
+    (memoryOperation === "write" && changedOffset !== null && memoryAddress &&
+      memoryAddress.equals(expectedAddress));
+  const instructionMatches = writerModule && writerModule.name === engine.name;
+  if (changedOffset === null || !memoryMatches || !instructionMatches) {
+    state.unclassifiedEvents++;
+    state.errors.push(`unclassified_watch_event_${state.unclassifiedEvents}`);
+    send({
+      event: "pcar_source_field_watch_event_unclassified",
+      elapsed_ms: Date.now() - started,
+      purpose: watched.purpose,
+      exception_type: details.type,
+      instruction: safe(() => details.context.pc.toString()),
+      watched_address: safe(() => details.memory.address.toString()),
+      memory_operation: safe(() => details.memory.operation),
+      changed_offsets: changedOffsets,
+      body: watched.body.toString(),
+    });
+    watched.last = current;
+    return false;
+  }
   state.writeEvents++;
   send({
     event: "pcar_source_field_write",
@@ -91,6 +122,7 @@ const writeRow = (details, watched) => {
     memory_operation: safe(() => details.memory.operation),
     body: watched.body.toString(),
     offsets: fields,
+    target_offset: changedOffset,
     changed_offsets: changedOffsets,
     values: current,
     backtrace: safe(() => Thread.backtrace(details.context, Backtracer.FUZZY)
@@ -158,13 +190,18 @@ const callback = Interceptor.attach(at(0x4384d0), {
   onEnter() {
     const body = this.context.ecx;
     if (body.isNull() || safe(() => body.readU32()) !== 0x4c8188) return;
+    state.callbackCandidates.set(body.toString(), {
+      body,
+      ordinal: safe(() => body.add(0x510).readU32()),
+    });
     if (state.selected !== null) return;
     state.selected = body;
     state.selectedOrdinal = safe(() => body.add(0x510).readU32());
     send({
-      event: "pcar_selected_player",
+      event: "pcar_callback_candidate",
       body: body.toString(),
       ordinal_510: state.selectedOrdinal,
+      selection_is_provisional: true,
       state: snapshotState(body),
     });
   },
@@ -221,19 +258,60 @@ setTimeout(() => {
   callback.detach();
   integrator.detach();
   Process.setExceptionHandler(null);
+  const selectedBody = state.selected ? state.selected.toString() : null;
+  const selectedConstructor = state.constructorRows.find(row =>
+    row.body === selectedBody && row.watch_installed);
+  const uniqueCandidate = state.callbackCandidates.size === 1;
+  const captureValid = uniqueCandidate && selectedConstructor !== undefined &&
+    state.tickSamples > 0 && state.errors.length === 0 &&
+    state.unclassifiedEvents === 0;
+  const invalidReasons = [];
+  if (!uniqueCandidate) invalidReasons.push("player_callback_identity_not_unique");
+  if (!selectedConstructor) invalidReasons.push("selected_constructor_watch_missing");
+  if (state.tickSamples === 0) invalidReasons.push("selected_integrator_not_observed");
+  if (state.errors.length > 0) invalidReasons.push("watch_errors_present");
+  if (state.unclassifiedEvents > 0) invalidReasons.push("unclassified_watch_events_present");
   send({
     event: "pcar_source_field_watch_done",
     elapsed_ms: Date.now() - started,
-    selected_body: state.selected ? state.selected.toString() : null,
+    selected_body: selectedBody,
     selected_ordinal_510: state.selectedOrdinal,
+    callback_candidate_count: state.callbackCandidates.size,
+    callback_candidates: Array.from(state.callbackCandidates.values(), candidate => ({
+      body: candidate.body.toString(),
+      ordinal_510: candidate.ordinal,
+    })),
+    selected_constructor_matched: selectedConstructor !== undefined,
     constructor_rows: state.constructorRows,
     integrator_samples: state.tickSamples,
     write_events: state.writeEvents,
+    unclassified_events: state.unclassifiedEvents,
     errors: state.errors,
+    capture_valid: captureValid,
+    invalid_reasons: invalidReasons,
     limitations: [
       "hardware watchpoints are per-thread; threads are armed at PCAR construction or integrator entry",
-      "the first 0x4C8188 PCAR callback is treated as the selected player candidate",
+      "capture_valid is false unless exactly one PCAR callback candidate was observed",
       "a debugger/hypervisor restriction may prevent hardware watchpoint installation",
     ],
   });
 }, 15000);
+
+rpc.exports = {
+  status() {
+    return {
+      selected_body: state.selected ? state.selected.toString() : null,
+      selected_ordinal_510: state.selectedOrdinal,
+      callback_candidate_count: state.callbackCandidates.size,
+      callback_candidates: Array.from(state.callbackCandidates.values(), candidate => ({
+        body: candidate.body.toString(),
+        ordinal_510: candidate.ordinal,
+      })),
+      constructor_rows: state.constructorRows.length,
+      integrator_samples: state.tickSamples,
+      write_events: state.writeEvents,
+      unclassified_events: state.unclassifiedEvents,
+      errors: state.errors.slice(),
+    };
+  },
+};

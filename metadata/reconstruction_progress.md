@@ -1,3 +1,17 @@
+- **2026-11-04, exact-write probe fail-closed identity and event checks:**
+  Hardened `tools/pcar_source_field_watch.js` after a source/evidence review.
+  It records all PCAR callback candidates with their scene-derived ordinal and
+  keeps the first only as a provisional sample target; completion is valid only
+  for one unique candidate matched to a watched constructor and observed
+  integrator tick. A hardware exception is counted as a field write only when
+  exactly one watched value changed, any supplied Frida memory address and
+  operation agree, and the post-write instruction resolves inside `race.bin`.
+  Unclassified steps, ambiguity, missing constructor identity, and watchpoint
+  re-arm failures invalidate the capture. Expanded the Node mock across those
+  valid/failure cases. Node syntax checks, the mock CTest, and the
+  complete Release CTest suite passed 72/72, including the 40-pair route-disabled asset matrix and fixed-step Viper replay. No original
+  process was started, so native Frida watchpoint behavior and torque provenance
+  remain unverified.
 - **2026-11-04, engine-curve scoring boundary:** Traced the existing
   `configure_acar_update_curve` model to native selector scoring: `0x43FDD0`
   scores controller candidates through `0x4404A0` and updates selector

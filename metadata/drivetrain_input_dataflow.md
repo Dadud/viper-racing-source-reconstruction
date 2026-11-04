@@ -189,21 +189,22 @@ instruction wrote a field between samples. Probe syntax was checked with
 `node --check`; a new controlled original run has not yet validated the added
 memory reads.
 
-An exact-write probe, `tools/pcar_source_field_watch.js`, now arms x86 hardware
+An exact-write probe, `tools/pcar_source_field_watch.js`, arms x86 hardware
 write watchpoints for both fields at PCAR constructor `0x4381E0`, using its
-`ECX` body pointer, and retains them through that constructor's return. It then
-selects the first callback object with PCAR vtable `0x4C8188`, verifies body
-identity at `0x431150`, and arms the integrator thread if it differs from the
-constructor thread. Each hit records the post-write instruction address,
-field values, changed fields, and fuzzy backtrace. The script does not launch
-the game or modify input. Its syntax passes `node --check`, but a live original
-capture has not validated watchpoint setup, exception handling, or selection of
-the intended player object. Results must be rejected unless the body matches
-the selected callback object and the writer address resolves inside `race.bin`.
-The deterministic mock in `tests/pcar_source_field_watch_mock.js` exercises
-constructor arming, changed-field events, re-arming, selected-object tick
-sampling, and cleanup. CMake registers it when Node is available; the mock
-validates the agent's control flow only, not Frida's native watchpoint support.
+`ECX` body pointer, and retains them through that constructor's return. It
+records every callback body with PCAR vtable `0x4C8188` and its `+0x510`
+ordinal; the first body is only provisional. The completion event marks the
+capture valid only if exactly one callback body was observed, it matches a
+constructor watch, a selected integrator sample exists, and no watch errors or
+unclassified events occurred. A watch event counts as a write only when exactly
+one watched field changed, any supplied Frida memory details agree with that
+write, and the post-write instruction resolves inside `race.bin`. The script
+does not launch the game or modify input. Syntax and mock coverage pass, but a
+live original capture has not validated Frida's native watchpoint setup or
+exception behavior. The deterministic mock covers valid writes, unrelated
+single-step events, wrong memory addresses/operations, multiple PCAR candidates,
+missing constructor identity, re-arm failure, selected-object tick sampling,
+and cleanup; it still cannot establish native Frida behavior.
 
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,
