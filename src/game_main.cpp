@@ -4898,10 +4898,29 @@ struct WindowState {
             (seconds < 10U ? "0" : "") + std::to_string(seconds) + "." +
             (hundredths < 10U ? "0" : "") + std::to_string(hundredths);
         status += "\nSPEED " + std::to_string(static_cast<int>(
-            std::lround(std::abs(motion.speed) * 3.6F))) + " KM/H";
+            std::lround(hud_speed_kilometers_per_hour()))) + " KM/H";
         if (paused) status += "\nPAUSED\nP: RESUME / ESC: EXIT";
         if (motion.race.finished) status += "\nRACE FINISHED";
         return status;
+    }
+
+    float hud_speed_kilometers_per_hour() const noexcept
+    {
+        if (route_motion_enabled) return std::abs(motion.speed) * 3.6F;
+        std::array<float, 3> velocity{};
+        for (std::size_t axis = 0U; axis < velocity.size(); ++axis) {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, 0x234U +
+                    static_cast<std::uint32_t>(axis * sizeof(float)));
+            if (!bits) return 0.0F;
+            velocity[axis] = std::bit_cast<float>(*bits);
+            if (!std::isfinite(velocity[axis])) return 0.0F;
+        }
+        const float speed_meters_per_second = std::sqrt(
+            velocity[0] * velocity[0] + velocity[1] * velocity[1] +
+            velocity[2] * velocity[2]);
+        return std::isfinite(speed_meters_per_second)
+            ? speed_meters_per_second * 3.6F : 0.0F;
     }
 };
 
@@ -5952,7 +5971,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                   << "_ai_target_speed,car" << car << "_ai_leader,car" << car
                   << "_ai_gap";
         }
-        trace << ",player_route_distance_travelled,live_position,live_field_size";
+        trace << ",player_route_distance_travelled,live_position,live_field_size"
+            ",player_body_velocity_x,player_body_velocity_y,player_body_velocity_z"
+            ",player_hud_speed_kmh";
         for (std::size_t car = 0U; car < state.opponent_motions.size(); ++car) {
             if (car == player_car_index) continue;
             trace << ",car" << car << "_route_distance_travelled";
@@ -6701,6 +6722,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     trace << ',' << state.opponent_motions[car]
                         .route_distance_travelled;
                 }
+                for (const auto offset : {0x234U, 0x238U, 0x23cU}) {
+                    const auto bits = viper::read_ncar_body_object_u32(
+                        state.player_runtime_state.body_object, offset);
+                    if (bits.has_value()) trace << ',' << std::bit_cast<float>(*bits);
+                    else trace << ',';
+                }
+                trace << ',' << state.hud_speed_kilometers_per_hour();
                 trace << '\n';
                 if (!trace) {
                     std::cerr << "Could not write race trace.\n";

@@ -1094,7 +1094,14 @@ try {
     $header = $replayedLines[0].Split(',')
     $diagnosticsOnlyColumn = [Array]::IndexOf($header, 'diagnostics_only')
     $routeMotionStepColumn = [Array]::IndexOf($header, 'route_motion_step_count')
-    if ($diagnosticsOnlyColumn -lt 0 -or $routeMotionStepColumn -lt 0) {
+    $playerBodyVelocityColumns = @(
+        [Array]::IndexOf($header, 'player_body_velocity_x'),
+        [Array]::IndexOf($header, 'player_body_velocity_y'),
+        [Array]::IndexOf($header, 'player_body_velocity_z'))
+    $playerHudSpeedColumn = [Array]::IndexOf($header, 'player_hud_speed_kmh')
+    if ($diagnosticsOnlyColumn -lt 0 -or $routeMotionStepColumn -lt 0 -or
+        @($playerBodyVelocityColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        $playerHudSpeedColumn -lt 0) {
         throw 'Trace omitted fields needed to prove diagnostics-only mode'
     }
     foreach ($line in $replayedLines | Select-Object -Skip 1) {
@@ -1105,6 +1112,26 @@ try {
         if ([uint32]::Parse($fields[$routeMotionStepColumn],
                 [cultureinfo]::InvariantCulture) -ne 0) {
             throw 'Diagnostics-only replay called the ideal-line route motion adapter'
+        }
+        $bodyVelocity = [single[]]::new(3)
+        for ($axis = 0; $axis -lt 3; ++$axis) {
+            $bodyVelocity[$axis] = [single]::Parse(
+                $fields[$playerBodyVelocityColumns[$axis]],
+                [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($bodyVelocity[$axis]) -or
+                [single]::IsInfinity($bodyVelocity[$axis])) {
+                throw "Route-disabled HUD body velocity is non-finite at frame $($fields[0])"
+            }
+        }
+        $hudSpeed = [single]::Parse(
+            $fields[$playerHudSpeedColumn], [cultureinfo]::InvariantCulture)
+        $bodySpeed = [Math]::Sqrt(
+            [double]$bodyVelocity[0] * $bodyVelocity[0] +
+            [double]$bodyVelocity[1] * $bodyVelocity[1] +
+            [double]$bodyVelocity[2] * $bodyVelocity[2])
+        if ([single]::IsNaN($hudSpeed) -or [single]::IsInfinity($hudSpeed) -or
+            [Math]::Abs($hudSpeed - $bodySpeed * 3.6) -gt 0.0001) {
+            throw "Route-disabled HUD speed does not follow the live PCAR body velocity at frame $($fields[0])"
         }
     }
     $pcarPrefixStart = [Array]::IndexOf($header, 'pcar_prefix_0xde0')
