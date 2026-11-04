@@ -63,6 +63,61 @@ apply_ncar_integrator_wheel_pair_differentials(
     std::uint32_t first_wheel_object_offset,
     const NcarIntegratorWheelPairDifferentialResult& result) noexcept;
 
+struct NcarSelectedWheelPairTargetInput {
+    // CARF runtime-record words consumed by constructor 0x4346A9..0x4346FB.
+    float value_0x90{};
+    std::uint32_t selector_value_bits_0xb4{};
+    float value_0xb8{};
+    float value_0xbc{};
+    float value_0xc0{};
+    // The argument delivered to the selected target's virtual +4 slot by
+    // controller 0x43FFC0. Its upstream 0x43F830 inputs are still explicit.
+    float controller_setter_argument{};
+    // Current wheel getter values read from +0x128 by 0x444600.
+    std::array<float, 4> wheel_spin_0x128{};
+};
+
+struct NcarSelectedWheelPairTargetResult {
+    // Constructor selector: 0 selects +0xD24, 1 selects +0xD04, and 2
+    // selects +0xD44. The raw +0xB4 bit comparisons are preserved.
+    std::uint32_t selected_target{};
+    float getter_d24{};
+    float getter_d44{};
+    float getter_d04{};
+    // Values passed through the wheel vtable +4 setters to wheel +0xE4.
+    std::array<float, 4> wheel_value_0xe4{};
+    std::array<bool, 4> wheel_setter_reached{};
+};
+
+[[nodiscard]] std::optional<NcarSelectedWheelPairTargetInput>
+make_ncar_selected_wheel_pair_target_input_from_runtime_record(
+    std::span<const std::byte> runtime_record,
+    float controller_setter_argument,
+    std::array<float, 4> wheel_spin_0x128) noexcept;
+
+// Reconstructs the constructor-selected D04/D24/D44 pair hierarchy and its
+// 0x43F760 update arithmetic. The caller supplies the 0x43FFC0 argument;
+// this function does not invent the unresolved upstream callback value.
+[[nodiscard]] std::optional<NcarSelectedWheelPairTargetResult>
+advance_ncar_selected_wheel_pair_target(
+    const NcarSelectedWheelPairTargetInput& input) noexcept;
+
+// Atomically persists the selected target's four wheel +0xE4 setter results.
+[[nodiscard]] bool apply_ncar_selected_wheel_pair_target_to_wheels(
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    std::uint32_t first_wheel_object_offset,
+    const NcarSelectedWheelPairTargetResult& result) noexcept;
+
+// Reads constructor fields and initialized wheel +0x128 values, computes the
+// selected target, and atomically writes its wheel +0xE4 outputs. Unknown
+// source bytes leave the wheel objects unchanged.
+[[nodiscard]] std::optional<NcarSelectedWheelPairTargetResult>
+advance_ncar_selected_wheel_pair_target_in_wheels(
+    std::span<const std::byte> runtime_record,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    std::uint32_t first_wheel_object_offset,
+    float controller_setter_argument) noexcept;
+
 struct NcarIntegratorCommonForceInput {
     std::array<std::uint8_t, 4> contact_bytes{};
     PhysicsVector3 velocity_delta_0x234_0xdfc{};

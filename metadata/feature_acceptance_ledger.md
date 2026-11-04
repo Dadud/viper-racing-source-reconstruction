@@ -51,6 +51,21 @@ reviewed chain. The separate `+0x124` write at `0x44435B` belongs to
 ghost/interpolated records. This narrows the next static search but does not
 prove that a player powertrain producer is absent elsewhere.
 
+A follow-up constructor/vtable trace now connects PCAR's selected `+0xD04`,
+`+0xD24`, or `+0xD44` pair block through controller slot `0x43FFC0` and pair
+slot `0x43F760` to wheel `+0xE4`, which the active `0x442530` updater consumes.
+The portable selected-pair arithmetic and atomic byte writer are implemented
+and covered by selector-branch regressions. The controller setter argument is
+still an explicit input, and the Windows fixed-step does not call this model;
+the `+0xCE4` getter and the full `0x43F830` controller/curve path remain open.
+This closes a wheel-spin response writer seam, not the engine/gear torque
+producer or a playable powered race.
+
+After this model was added, the Visual Studio 18 Release build and configured
+CTest suite passed again on 2026-11-04 (69/69). These checks cover the local
+selector and byte-writer regressions plus the existing route-disabled replay;
+they do not validate original-client values or a live powered race.
+
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
 keep route motion disabled. In that mode, tests may verify input delivery,

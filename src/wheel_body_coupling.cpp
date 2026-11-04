@@ -2214,6 +2214,184 @@ bool apply_ncar_integrator_wheel_pair_differentials_to_wheels(
     return true;
 }
 
+std::optional<NcarSelectedWheelPairTargetInput>
+make_ncar_selected_wheel_pair_target_input_from_runtime_record(
+    const std::span<const std::byte> runtime_record,
+    const float controller_setter_argument,
+    const std::array<float, 4> wheel_spin_0x128) noexcept
+{
+    constexpr std::size_t required_size = 0xc4U;
+    if (runtime_record.size() < required_size) return std::nullopt;
+    const auto read_u32_le = [&runtime_record](const std::size_t offset) {
+        std::uint32_t value{};
+        for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+            value |= static_cast<std::uint32_t>(
+                std::to_integer<std::uint8_t>(runtime_record[offset + byte]))
+                << (byte * 8U);
+        }
+        return value;
+    };
+    NcarSelectedWheelPairTargetInput input{};
+    input.value_0x90 = std::bit_cast<float>(read_u32_le(0x90U));
+    input.selector_value_bits_0xb4 = read_u32_le(0xb4U);
+    input.value_0xb8 = std::bit_cast<float>(read_u32_le(0xb8U));
+    input.value_0xbc = std::bit_cast<float>(read_u32_le(0xbcU));
+    input.value_0xc0 = std::bit_cast<float>(read_u32_le(0xc0U));
+    input.controller_setter_argument = controller_setter_argument;
+    input.wheel_spin_0x128 = wheel_spin_0x128;
+    return input;
+}
+
+std::optional<NcarSelectedWheelPairTargetResult>
+advance_ncar_selected_wheel_pair_target(
+    const NcarSelectedWheelPairTargetInput& input) noexcept
+{
+    if (!std::isfinite(input.value_0x90) ||
+        !std::isfinite(input.value_0xb8) ||
+        !std::isfinite(input.value_0xbc) ||
+        !std::isfinite(input.value_0xc0) ||
+        !std::isfinite(input.controller_setter_argument) ||
+        !std::all_of(input.wheel_spin_0x128.begin(),
+            input.wheel_spin_0x128.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+
+    constexpr std::uint32_t first_selector_boundary_bits = 0x3c23d70aU;
+    constexpr std::uint32_t second_selector_boundary_bits = 0x3f7d70a4U;
+    const auto selector_bits = input.selector_value_bits_0xb4;
+    const std::uint32_t selected_target =
+        selector_bits < first_selector_boundary_bits ? 0U :
+        selector_bits <= second_selector_boundary_bits ? 1U : 2U;
+
+    // 0x4C7EF4 is the constructor's exact scale constant (bits 0x3FADBA5E).
+    constexpr float pair_scale = std::bit_cast<float>(0x3FADBA5EU);
+    constexpr float half_scale = 0.5F; // 0x4C8638, bits 0x3F000000.
+    const float front_delta_scale = input.value_0xb8 * pair_scale;
+    const float rear_delta_scale = input.value_0xbc * pair_scale;
+    const float combined_delta_scale = input.value_0xc0 * pair_scale;
+    if (!std::isfinite(front_delta_scale) || !std::isfinite(rear_delta_scale) ||
+        !std::isfinite(combined_delta_scale)) {
+        return std::nullopt;
+    }
+
+    const auto pair_getter = [half_scale](const float first, const float second,
+                               const float time_scale) {
+        return ((first + second) * time_scale) * half_scale;
+    };
+    const float getter_d24 = pair_getter(
+        input.wheel_spin_0x128[0], input.wheel_spin_0x128[1], input.value_0x90);
+    const float getter_d44 = pair_getter(
+        input.wheel_spin_0x128[2], input.wheel_spin_0x128[3], input.value_0x90);
+    const float getter_d04 = pair_getter(getter_d44, getter_d24, 1.0F);
+
+    NcarSelectedWheelPairTargetResult result{};
+    result.selected_target = selected_target;
+    result.getter_d24 = getter_d24;
+    result.getter_d44 = getter_d44;
+    result.getter_d04 = getter_d04;
+
+    const auto advance_leaf_pair = [&](const std::size_t first,
+                                   const std::size_t second,
+                                   const float delta_scale,
+                                   const float time_scale,
+                                   const float argument) {
+        const float delta =
+            (input.wheel_spin_0x128[second] - input.wheel_spin_0x128[first]) *
+            delta_scale;
+        const float time_delta = (time_scale * argument) * half_scale;
+        result.wheel_value_0xe4[first] = delta + time_delta;
+        result.wheel_value_0xe4[second] = time_delta - delta;
+        result.wheel_setter_reached[first] = true;
+        result.wheel_setter_reached[second] = true;
+    };
+
+    if (selected_target == 0U) {
+        advance_leaf_pair(0U, 1U, front_delta_scale, input.value_0x90,
+            input.controller_setter_argument);
+    } else if (selected_target == 2U) {
+        advance_leaf_pair(2U, 3U, rear_delta_scale, input.value_0x90,
+            input.controller_setter_argument);
+    } else {
+        // D04's endpoints are D24 then D44. Its setters recursively update
+        // those blocks with the two values produced by its own 0x43F760 call.
+        const float combined_delta =
+            (getter_d44 - getter_d24) * combined_delta_scale;
+        const float combined_time_delta = input.controller_setter_argument *
+            half_scale;
+        const float d24_argument = combined_delta + combined_time_delta;
+        const float d44_argument = combined_time_delta - combined_delta;
+        advance_leaf_pair(0U, 1U, front_delta_scale, input.value_0x90,
+            d24_argument);
+        advance_leaf_pair(2U, 3U, rear_delta_scale, input.value_0x90,
+            d44_argument);
+    }
+
+    if (!std::all_of(result.wheel_value_0xe4.begin(),
+            result.wheel_value_0xe4.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+    return result;
+}
+
+bool apply_ncar_selected_wheel_pair_target_to_wheels(
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    const std::uint32_t first_wheel_object_offset,
+    const NcarSelectedWheelPairTargetResult& result) noexcept
+{
+    constexpr std::uint32_t wheel_stride = 0x1a4U;
+    constexpr std::uint32_t wheel_value_offset = 0xe4U;
+    auto updated = wheel_objects;
+    for (std::size_t wheel = 0U; wheel < updated.size(); ++wheel) {
+        if (!result.wheel_setter_reached[wheel]) continue;
+        const auto object_offset = static_cast<std::uint64_t>(
+            first_wheel_object_offset) + wheel_stride * wheel;
+        const auto field_offset = object_offset + wheel_value_offset;
+        if (field_offset > std::numeric_limits<std::uint32_t>::max() ||
+            !std::isfinite(result.wheel_value_0xe4[wheel])) {
+            return false;
+        }
+        const NcarObjectFieldWrite write{
+            static_cast<std::uint32_t>(field_offset), 4U,
+            std::bit_cast<std::uint32_t>(result.wheel_value_0xe4[wheel])};
+        if (!apply_ncar_wheel_object_writes(updated[wheel],
+                static_cast<std::uint32_t>(object_offset),
+                std::span<const NcarObjectFieldWrite>(&write, 1U))) {
+            return false;
+        }
+    }
+    wheel_objects = std::move(updated);
+    return true;
+}
+
+std::optional<NcarSelectedWheelPairTargetResult>
+advance_ncar_selected_wheel_pair_target_in_wheels(
+    const std::span<const std::byte> runtime_record,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheel_objects,
+    const std::uint32_t first_wheel_object_offset,
+    const float controller_setter_argument) noexcept
+{
+    std::array<float, 4> wheel_spin{};
+    for (std::size_t wheel = 0; wheel < wheel_objects.size(); ++wheel) {
+        const auto bits = read_ncar_wheel_object_u32(wheel_objects[wheel], 0x128U);
+        if (!bits) return std::nullopt;
+        wheel_spin[wheel] = std::bit_cast<float>(*bits);
+    }
+    const auto input = make_ncar_selected_wheel_pair_target_input_from_runtime_record(
+        runtime_record, controller_setter_argument, wheel_spin);
+    if (!input) return std::nullopt;
+    const auto result = advance_ncar_selected_wheel_pair_target(*input);
+    if (!result) return std::nullopt;
+    auto updated_wheels = wheel_objects;
+    if (!apply_ncar_selected_wheel_pair_target_to_wheels(
+            updated_wheels, first_wheel_object_offset, *result)) {
+        return std::nullopt;
+    }
+    wheel_objects = std::move(updated_wheels);
+    return result;
+}
+
 std::optional<NcarIntegratorWheelPairDifferentialInput>
 make_ncar_integrator_wheel_pair_differential_input_from_updates(
     const std::array<WheelUpdatePipelineResult, 4>& wheel_updates,

@@ -1,8 +1,11 @@
 #include "viper/wheel_body_coupling.hpp"
 
+#include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 
 namespace {
 void require(const bool condition)
@@ -73,4 +76,129 @@ int main()
     require(application.response.damage_gate_input_known);
     require(application.damage_flag_written);
     require(damage_flag == 1U);
+
+    viper::NcarSelectedWheelPairTargetInput pair_input{};
+    pair_input.value_0x90 = 2.0F;
+    pair_input.selector_value_bits_0xb4 = 0x3f000000U;
+    pair_input.value_0xb8 = 1.0F;
+    pair_input.value_0xbc = 2.0F;
+    pair_input.value_0xc0 = 1.5F;
+    pair_input.controller_setter_argument = 0.4F;
+    pair_input.wheel_spin_0x128 = {2.0F, 4.0F, 6.0F, 8.0F};
+    auto selected_pair =
+        viper::advance_ncar_selected_wheel_pair_target(pair_input);
+    require(selected_pair.has_value());
+    require(selected_pair->selected_target == 1U);
+    require(std::abs(selected_pair->getter_d24 - 6.0F) < 1e-6F);
+    require(std::abs(selected_pair->getter_d44 - 14.0F) < 1e-6F);
+    require(std::abs(selected_pair->getter_d04 - 10.0F) < 1e-6F);
+    require(selected_pair->wheel_setter_reached ==
+        std::array<bool, 4>{true, true, true, true});
+    require(std::abs(selected_pair->wheel_value_0xe4[0] - 19.2015F) < 1e-4F &&
+            std::abs(selected_pair->wheel_value_0xe4[1] - 13.7725F) < 1e-4F &&
+            std::abs(selected_pair->wheel_value_0xe4[2] + 10.658F) < 1e-4F &&
+            std::abs(selected_pair->wheel_value_0xe4[3] + 21.516F) < 1e-4F);
+
+    // A value below the first raw boundary selects D24 and leaves the rear
+    // wheel bytes untouched. The fixture uses the source constructor values,
+    // including the exact 0x4C7EF4 scale bits.
+    pair_input.selector_value_bits_0xb4 = 0x3c000000U;
+    selected_pair =
+        viper::advance_ncar_selected_wheel_pair_target(pair_input);
+    require(selected_pair.has_value() && selected_pair->selected_target == 0U);
+    require(selected_pair->wheel_setter_reached ==
+        std::array<bool, 4>{true, true, false, false});
+
+    pair_input.selector_value_bits_0xb4 = 0x3f800000U;
+    selected_pair =
+        viper::advance_ncar_selected_wheel_pair_target(pair_input);
+    require(selected_pair.has_value() && selected_pair->selected_target == 2U);
+    require(selected_pair->wheel_setter_reached ==
+        std::array<bool, 4>{false, false, true, true});
+    require(std::abs(selected_pair->wheel_value_0xe4[2] - 5.829F) < 1e-4F &&
+            std::abs(selected_pair->wheel_value_0xe4[3] + 5.029F) < 1e-4F);
+
+    pair_input.selector_value_bits_0xb4 = 0x3c000000U;
+    selected_pair =
+        viper::advance_ncar_selected_wheel_pair_target(pair_input);
+    require(selected_pair.has_value() && selected_pair->selected_target == 0U);
+
+    constexpr std::uint32_t first_wheel_offset = 0x554U;
+    constexpr std::uint32_t wheel_stride = 0x1a4U;
+    std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
+    for (std::size_t wheel = 0; wheel < wheel_objects.size(); ++wheel) {
+        const auto base = first_wheel_offset +
+            wheel_stride * static_cast<std::uint32_t>(wheel);
+        const viper::NcarObjectFieldWrite initial{
+            base + 0xe4U, 4U, std::bit_cast<std::uint32_t>(99.0F)};
+        require(viper::apply_ncar_wheel_object_writes(wheel_objects[wheel],
+            base, std::span<const viper::NcarObjectFieldWrite>(&initial, 1U)));
+    }
+    require(viper::apply_ncar_selected_wheel_pair_target_to_wheels(
+        wheel_objects, first_wheel_offset, *selected_pair));
+    require(std::abs(std::bit_cast<float>(
+        *viper::read_ncar_wheel_object_u32(wheel_objects[0], 0xe4U)) -
+        selected_pair->wheel_value_0xe4[0]) < 1e-6F);
+    require(std::abs(std::bit_cast<float>(
+        *viper::read_ncar_wheel_object_u32(wheel_objects[1], 0xe4U)) -
+        selected_pair->wheel_value_0xe4[1]) < 1e-6F);
+    require(std::bit_cast<float>(
+        *viper::read_ncar_wheel_object_u32(wheel_objects[2], 0xe4U)) == 99.0F);
+    require(std::bit_cast<float>(
+        *viper::read_ncar_wheel_object_u32(wheel_objects[3], 0xe4U)) == 99.0F);
+
+    pair_input.selector_value_bits_0xb4 = 0x7fc00000U;
+    selected_pair =
+        viper::advance_ncar_selected_wheel_pair_target(pair_input);
+    require(selected_pair.has_value() && selected_pair->selected_target == 2U);
+
+    std::array<std::byte, 0xc4U> runtime_record{};
+    const auto write_record_u32 = [&runtime_record](const std::size_t offset,
+                                        const std::uint32_t bits) {
+        for (std::size_t byte = 0; byte < sizeof(bits); ++byte) {
+            runtime_record[offset + byte] = static_cast<std::byte>(
+                (bits >> (byte * 8U)) & 0xffU);
+        }
+    };
+    write_record_u32(0x90U, std::bit_cast<std::uint32_t>(2.0F));
+    write_record_u32(0xb4U, 0x3c000000U);
+    write_record_u32(0xb8U, std::bit_cast<std::uint32_t>(1.0F));
+    write_record_u32(0xbcU, std::bit_cast<std::uint32_t>(2.0F));
+    write_record_u32(0xc0U, std::bit_cast<std::uint32_t>(1.5F));
+    const auto record_input =
+        viper::make_ncar_selected_wheel_pair_target_input_from_runtime_record(
+            runtime_record, 0.4F, pair_input.wheel_spin_0x128);
+    require(record_input.has_value() &&
+            record_input->selector_value_bits_0xb4 == 0x3c000000U &&
+            record_input->value_0x90 == 2.0F &&
+            record_input->value_0xb8 == 1.0F &&
+            record_input->value_0xbc == 2.0F &&
+            record_input->value_0xc0 == 1.5F);
+    require(!viper::make_ncar_selected_wheel_pair_target_input_from_runtime_record(
+        std::span<const std::byte>(runtime_record.data(), 0xc3U), 0.4F,
+        pair_input.wheel_spin_0x128));
+
+    std::array<viper::NcarWheelRuntimeObjectState, 4> integrated_wheels{};
+    for (std::size_t wheel = 0; wheel < integrated_wheels.size(); ++wheel) {
+        const auto base = first_wheel_offset +
+            wheel_stride * static_cast<std::uint32_t>(wheel);
+        const std::array<viper::NcarObjectFieldWrite, 2> initial{
+            viper::NcarObjectFieldWrite{
+                base + 0xe4U, 4U, std::bit_cast<std::uint32_t>(99.0F)},
+            viper::NcarObjectFieldWrite{
+                base + 0x128U, 4U,
+                std::bit_cast<std::uint32_t>(pair_input.wheel_spin_0x128[wheel])}};
+        require(viper::apply_ncar_wheel_object_writes(integrated_wheels[wheel],
+            base, initial));
+    }
+    const auto integrated_pair =
+        viper::advance_ncar_selected_wheel_pair_target_in_wheels(
+            runtime_record, integrated_wheels, first_wheel_offset, 0.4F);
+    require(integrated_pair.has_value() &&
+            integrated_pair->selected_target == 0U);
+    require(std::abs(std::bit_cast<float>(
+        *viper::read_ncar_wheel_object_u32(integrated_wheels[0], 0xe4U)) -
+        integrated_pair->wheel_value_0xe4[0]) < 1e-6F);
+    require(std::bit_cast<float>(
+        *viper::read_ncar_wheel_object_u32(integrated_wheels[2], 0xe4U)) == 99.0F);
 }

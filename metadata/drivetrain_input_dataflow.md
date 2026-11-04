@@ -38,6 +38,68 @@ initialization at `0x43AFBE..0x43AFD0`, their ramp/copy sequence in
 absolute references to these globals in this listing, but does not exclude
 computed aliases, copied control state, or a separate input-to-powertrain path.
 
+## Embedded selector and wheel-pair output
+
+The `0x431150` integrator copies PCAR `+0xDE0` and `+0xDEC` into controller
+`+0xC98` fields `+0x64` and `+0x5C`, then calls `0x43FAE0` with PCAR byte
+`+0x534`. For PCAR construction, `0x4381E0` loads the `AutoClutch` option into
+`+0xEC9`, applies the auto-shifting override, and copies the result into
+`+0x534` at `0x438299..0x4382A4`. This establishes that the option gates the
+controller; it does not establish clutch or gearbox actuation.
+
+Constructor `0x4346A9..0x4347A4` configures three paired state blocks at
+`+0xD04/+0xD24/+0xD44`. `0x43F6F0` stores its arguments at block `+0x14`,
+`+0x1C`, and `+0x18`; `0x43F710` stores endpoint pointers at `+4/+8`.
+`D24` uses runtime-record `+0x90` as `+0x1C` and
+`runtime[+0xB8] * 0x4C7EF4` as `+0x18`, with wheel endpoints `+0x554/+0x6F8`.
+`D44` uses the same `+0x90`, `runtime[+0xBC] * 0x4C7EF4`, and endpoints
+`+0x89C/+0xA40`. `D04` uses `+0x1C = 1.0`,
+`runtime[+0xC0] * 0x4C7EF4`, and endpoints `D24` then `D44`.
+
+The constructor's raw runtime-record `+0xB4` DWORD selects the controller's
+target `+0x4C`: bits below `0x3C23D70A` select `D24` (index 0), bits through
+`0x3F7D70A4` select `D04` (index 1), and larger bits select `D44` (index 2).
+These are unsigned raw-bit comparisons; interpreting the boundaries as float
+values is only a convenience, not the comparison semantics.
+
+The `0x4C8768` vtable maps slots 0/+4 to `0x43F730/0x43F760`. For each pair,
+slot 0 returns `(endpoint1_getter + endpoint2_getter) * block[+0x1C] * 0.5`.
+Slot +4 first reads both endpoints, computes `time = block[+0x1C] * argument
+* 0.5` and `difference = (endpoint2 - endpoint1) * block[+0x18]`, then calls
+endpoint1's setter with `difference + time` and endpoint2's setter with
+`time - difference`. `D04` therefore applies one pair update recursively to
+`D24` and `D44`.
+
+This target is reached through controller vtable `0x4C8778`, whose slots 0/+4
+are `0x43FF90/0x43FFC0`. The PCAR constructor selects the D-block pointer and
+stores it in controller `+0x4C`. Constructor `0x4347AF..0x4347C5` links the
+`+0xC7C` signal block to the curve at `+0xBFC` and controller at `+0xC98`.
+`0x431150` calls `0x43F830` on `+0xC7C`; that helper calls the signal pair's
+two virtual +4 setters with opposite values. When the second child is the
+controller, `0x43FFC0` updates the selected D block, which dispatches to the
+wheel endpoints. Wheel vtable `0x4C89C8` slots 0/+4 are `0x444600/0x4445F0`:
+the getter reads wheel `+0x128`, and the setter writes wheel `+0xE4`. The active
+`0x442530` wheel updater consumes `+0xE4` in its spin response.
+
+`advance_ncar_selected_wheel_pair_target` now models the constructor-selected
+D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
+only the wheel `+0xE4` fields reached by the selected block. The Windows
+fixed-step does not call this adapter yet. Its controller setter argument
+remains explicit because `0x43F830`'s `+0xCE4` virtual getter and the active
+runtime's associated controller/curve setter path are not fully integrated.
+This establishes a source-backed path from that argument to the wheel
+spin-response input; it does not yet identify engine torque, prove that
+throttle supplies the argument, or establish original numeric parity.
+
+After the `+0xC98` animation-controller update, `0x431150` calls the virtual getter at PCAR
+`+0xCE4`, multiplies its result by `+0xDD0`, and stores `+0xDDC`. The exact
+getter identity is unresolved. Direct `+0xDDC` xrefs also include a distinct
+velocity-magnitude writer at `0x4324B8`, snapshot copying at `0x432AF4`, and
+per-step record copying at `0x438770`; the checked listing shows no direct
+`+0xDDC` use in wheel-force calculations. Indirect consumers of copied records
+are outside this bounded conclusion. This makes the selector path a concrete
+next investigation target, not a source-backed torque formula.
+
 ## Live wheel-rate writer and decoy writer
 
 The live PCAR wheel objects are updated by four calls from `0x431150` to
