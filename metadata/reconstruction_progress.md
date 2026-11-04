@@ -2497,3 +2497,24 @@ original-runtime fidelity.
   runtime silence, first-tick capture, and source provenance remain
   unverified; this copy is for physics capture only, not audio comparison.
 
+- **2026-11-04, bounded original PCAR capture runner:** Added
+  `tools/run_original_pcar_capture.py` and a process-local startup video-memory
+  agent. The host requires the hash-verified ISO `race.bin`, validates both
+  staged sound configs are disabled, installs the startup/PCAR/control agents
+  before resuming its own suspended direct-spawn process, writes JSONL outside
+  Git, and kills only that process at agent completion or a 135-second host
+  deadline. Increased the exact-write agent window to 120 seconds for menu
+  navigation and tested its timeout bound in the mock. Python syntax and the
+  staged silent-config preflight, JavaScript syntax, exact-watch mock, focused
+  CTest (1/1), and `git diff --check` pass. One run of the initial direct-spawn
+  runner launched verified PID 12528 with both copied sound configs disabled;
+  Frida loaded all three agents, but the game stopped at its MGI “Sneaky user!
+  Where is my canary!” dialog. The controlled agent timed out with zero PCAR
+  callbacks, so the JSONL is invalid for physics inference. The process was
+  terminated and no game remains. Static analysis ties the dialog to engine
+  gate `0x412050`, which requires the named Canary semaphore to pre-exist. The
+  host runner now holds that named object for its run and has passed a
+  Windows named-semaphore self-test; retrying that environment change awaits a
+  clear desktop because Windows Security owned the foreground modal. No
+  runtime-silence or PCAR-field provenance claim is made.
+

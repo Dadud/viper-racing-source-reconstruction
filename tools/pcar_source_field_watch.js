@@ -6,6 +6,7 @@
 const engine = Process.findModuleByName("race.bin");
 if (!engine) throw new Error("race.bin is not mapped");
 if (Process.arch !== "ia32") throw new Error("expected 32-bit x86 race.bin");
+const captureDurationMs = 120000;
 const at = va => engine.base.add(va - 0x400000);
 const fields = [0x5b0, 0x8f8];
 const state = {
@@ -247,7 +248,7 @@ send({
   selected_callback: "0x4384D0",
   integrator: "0x431150",
   watched_fields: fields,
-  duration_ms: 15000,
+  duration_ms: captureDurationMs,
   route_or_ideal_line_input: false,
 });
 
@@ -298,7 +299,7 @@ setTimeout(() => {
       "a debugger/hypervisor restriction may prevent hardware watchpoint installation",
     ],
   });
-}, 15000);
+}, captureDurationMs);
 
 rpc.exports = {
   status() {

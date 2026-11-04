@@ -1064,7 +1064,18 @@ is not a substitute for this original-client capture. The constructor-thread
 watchpoints now stay active after constructor return through setup callbacks,
 so writes before the first selected integrator tick are observable. The mock
 asserts a second field write after constructor return and rejects a capture if
-the watch is not retained; native/original behavior remains unverified.
+the watch is not retained; native/original behavior remains unverified. The
+new `tools/run_original_pcar_capture.py` enforces the official ISO engine hash,
+requires both staged sound configs disabled, installs the video-memory hook
+and both bounded capture agents before resuming the isolated game, and kills
+only its own game process at completion or timeout. Its PCAR exact-write window
+is two minutes to allow menu navigation; the host runner is capped at 135
+seconds. The first direct-spawn attempt reached the MGI canary warning before
+PCAR callbacks and was invalid. Static analysis shows the engine requires the
+named canary semaphore to pre-exist; the runner now holds that named object for
+the capture lifetime. This environment setup has only a named-object self-test,
+not an original-game retry. A Windows Security-owned foreground window blocked
+further menu interaction, so no retry was attempted.
 
 The controlled state probe now reads configured throttle/brake type and
 selector values from PCAR records `0x509328/0x509368`. It schedules neutral,

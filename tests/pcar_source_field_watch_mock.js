@@ -15,6 +15,7 @@ function runScenario(options = {}) {
     const emitted = [];
     let exceptionHandler = null;
     let timeoutCallback = null;
+    let timeoutDelayMs = null;
     let watchpointSetCount = 0;
 
     class MockPointer {
@@ -71,7 +72,11 @@ function runScenario(options = {}) {
         Backtracer: { FUZZY: 1 },
         rpc: { exports: {} },
         send: event => emitted.push(event),
-        setTimeout: callback => { timeoutCallback = callback; return 1; },
+        setTimeout: (callback, delayMs) => {
+            timeoutCallback = callback;
+            timeoutDelayMs = delayMs;
+            return 1;
+        },
         Date,
         Map,
         Array,
@@ -144,6 +149,7 @@ function runScenario(options = {}) {
 
     const done = emitted.find(event => event.event === "pcar_source_field_watch_done");
     assert(done, "watch must emit a completion assessment");
+    assert.equal(timeoutDelayMs, 120000, "watch has a bounded two-minute capture window");
     assert.equal(watchedThread.watchpoints.size, 0, "timeout clears watches");
     assert.equal(exceptionHandler, null, "timeout clears exception handler");
     assert.equal(done.callback_candidate_count, options.ambiguousCandidate ? 2 : 1);

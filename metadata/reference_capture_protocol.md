@@ -134,6 +134,28 @@ process was started, so runtime silence and capture behavior are unverified.
 Use this copy for physics instrumentation only after verifying it produces no
 audible output; do not use its muted settings for audio acceptance.
 
+The bounded host runner `tools/run_original_pcar_capture.py` now validates the
+ISO `race.bin` hash and both silent config files, spawns the staged `race.bin`
+with `-1`, installs the video-memory workaround plus the exact-write and
+controlled wheel-state agents before resuming, writes private JSONL, and kills
+only the process it spawned after both agents finish or the 135-second host
+deadline. The exact-write agent has a two-minute bound so the operator can
+reach Quick Race from the initial menu. The controlled agent applies its
+documented synthetic keyboard schedule only after selecting the PCAR.
+
+The first direct-spawn attempt on 2026-11-04 stopped at the original MGI dialog
+“Sneaky user! Where is my canary!” before video-memory queries or PCAR callbacks.
+The controlled agent timed out with zero selected-PCAR callbacks; this is an
+invalid capture, not gameplay evidence. Static code at `0x412050` confirms the
+engine's gate expects the named `MGI Viper Racing 1998 Canary` semaphore to
+already exist. The host runner now holds that named object for its bounded
+process lifetime and closes its handle after the capture process ends; it does
+not patch the executable. This matches the gate's observed existing-object
+branch, but a retry has not validated the workaround. The target was stopped
+and no game process remains. Runtime silence, PCAR provenance, and controlled
+field capture remain unverified. The raw failed JSONL and its host manifest are
+external under `silent_reference_copy_20261104`.
+
 ## Pairing a scenario
 
 Run the original and reconstruction separately on the same Windows machine and
