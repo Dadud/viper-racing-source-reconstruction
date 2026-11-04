@@ -157,6 +157,28 @@ two 12-DWORD ranges, plus explicit nearby fields. None of those spans includes
 these values. Other callees, alternate base aliases and later mutation remain
 outside this conclusion; their actual values and origins are still unknown.
 
+A follow-up alias audit confirmed that `0x4381E0`, `0x43DFB0`, and `0x42FF90`
+forward the same PCAR base. `0x43E490` calls `0x4375C0` on subobject `+0x6C`
+and initializes another group at `+0x2B0`; its inspected direct stores remain
+within those base/subobject ranges. The four wheel constructor calls beginning
+at `0x42FFC7` initialize children at `+0x554 + 0x1A4*i` with `0x4419A0`.
+That initializer clears known wheel fields, including wheel `+0x124`, but is
+not a PCAR-body copy and does not cover `+0x5B0/+0x8F8`. This strengthens the
+bounded constructor exclusion; indirect callbacks and writes through computed
+aliases are still not ruled out.
+
+The next decisive observation is a write watch on the newly allocated PCAR
+body's `+0x5B0` and `+0x8F8`, armed before constructor `0x434700` and kept
+through the first `0x431150` update. At each write, record the instruction,
+effective destination, value, and call stack. In the same run, capture PCAR
+`+0xDC4/+0xDD0/+0xDDC`, `+0xDE0/+0xDE4/+0xDE8/+0xDEC`, the `+0xC98` child
+pointer and vtable, selected D-block and endpoint values, and four wheel
+`+0xE4/+0x124/+0x128` states around `0x442530` and `0x443E9D`. Capture any
+candidate gear/RPM child only after its pointer and vtable identity are
+observed. This distinguishes untouched allocator contents from a constructor
+or first-tick source without assigning semantics from offsets. Do not use
+route motion to generate or interpret the input-to-motion trace.
+
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,
 selector and `0x4C7D48` scale all explicit. Regression covers both interpolation
@@ -224,9 +246,9 @@ pretending the powered-driving acceptance condition has passed.
 
 ## Next source-reconstruction target
 
-Continue from the call sites that update the PCAR's drivetrain-related state
-outside this bounded callback/integrator/wheel slice. Trace any engine RPM,
-gear selection, clutch engagement, differential allocation, and the update
-that supplies the active contact response at `0x443E9D`. Establish object
-ownership and caller identity before adapting it into the C++20 session. No
-direct throttle-to-force formula should be introduced from the current traces.
+The bounded checked-in listing audit still does not identify an engine/gear
+torque producer. Continue with a constructor/first-tick write watch for PCAR
+`+0x5B0/+0x8F8` and trace the object state feeding the active contact response
+at `0x443E9D`. Record caller identity, child pointers/vtables, endpoint values,
+and wheel state before adapting discovered behavior into the C++20 session.
+No direct throttle-to-force formula should be introduced from current traces.

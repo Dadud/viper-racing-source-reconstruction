@@ -67,6 +67,17 @@ insufficient, identify the precise controlled runtime observation required.
 Then continue upstream to the engine/gear torque producer. All driving checks
 keep ideal-line route motion disabled.
 
+The 2026-11-04 follow-up verified same-base forwarding through
+`0x4381E0 -> 0x43DFB0 -> 0x42FF90`, then examined the `0x43E490` subobject
+initializers and four `0x4419A0` wheel initializers. The latter clear wheel
+state, including wheel `+0x124`; none of these inspected ranges or direct stores
+sources PCAR `+0x5B0/+0x8F8`. Remaining uncertainty is computed aliases, indirect
+callbacks, and later writes. The next concrete capture is a constructor to
+first-tick write watch on both fields, paired with the selected controller and
+D-block endpoints plus wheel `+0xE4/+0x124/+0x128` around `0x431150`,
+`0x442530`, and `0x443E9D`. Do not add a guessed torque law; keep ideal-line
+motion disabled.
+
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
 safe-follow policy, standings, and a return-to-setup path. Normal startup now
