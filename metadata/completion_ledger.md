@@ -2,6 +2,17 @@
 
 ## 2026-11-04 update
 
+The exact-write watch for PCAR `+0x5B0/+0x8F8` now accepts a hardware event
+that explicitly reports a write to one watched field even when the stored
+value is unchanged. Previously that legitimate native store was classified as
+unresolved because the post-event bytes matched the pre-event bytes. Events
+without access details still require exactly one changed field, and reported
+addresses must match the changed field; ambiguous events invalidate the
+capture. The mock now covers changed-value writes, reported same-value writes,
+and unreported same-value single-step events. Its focused Release CTest passed
+1/1. This repairs probe classification only; native Frida watchpoint behavior
+and PCAR field provenance remain unverified.
+
 The 15-second startup capture at `130140Z` did not execute the engine: the
 launcher bridge created the child suspended, while the host waited 15 seconds
 and the bridge fallback resume was 30 seconds. The 100 identical Frida thread

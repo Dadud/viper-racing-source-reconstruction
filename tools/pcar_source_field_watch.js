@@ -84,16 +84,26 @@ const writeRow = (details, watched) => {
   const instruction = safe(() => details.context.pc);
   const writerModule = instruction && instruction.toString
     ? safe(() => Process.findModuleByAddress(instruction)) : null;
-  const memoryAddress = safe(() => details.memory.address);
-  const memoryOperation = safe(() => details.memory.operation);
+  const hasMemoryDetails = details.memory !== undefined && details.memory !== null;
+  const memoryAddress = hasMemoryDetails
+    ? safe(() => details.memory.address) : null;
+  const memoryOperation = hasMemoryDetails
+    ? safe(() => details.memory.operation) : null;
+  const reportedWriteOffset = hasMemoryDetails && memoryOperation === "write" &&
+    memoryAddress && typeof memoryAddress.equals === "function"
+    ? fields.find(offset => memoryAddress.equals(watched.body.add(offset))) ?? null
+    : null;
   const changedOffset = changedOffsets.length === 1 ? changedOffsets[0] : null;
-  const expectedAddress = changedOffset === null
-    ? null : watched.body.add(changedOffset);
-  const memoryMatches = !details.memory ||
-    (memoryOperation === "write" && changedOffset !== null && memoryAddress &&
-      memoryAddress.equals(expectedAddress));
+  const changedValuesMatch = changedOffsets.length === 1 &&
+    (reportedWriteOffset === null || reportedWriteOffset === changedOffset);
+  const unchangedReportedWrite = changedOffsets.length === 0 &&
+    reportedWriteOffset !== null;
+  const memoryMatches = hasMemoryDetails
+    ? reportedWriteOffset !== null &&
+      (changedOffsets.length === 0 || changedValuesMatch)
+    : changedValuesMatch;
   const instructionMatches = writerModule && writerModule.name === engine.name;
-  if (changedOffset === null || !memoryMatches || !instructionMatches) {
+  if (!memoryMatches || !instructionMatches) {
     state.unclassifiedEvents++;
     state.errors.push(`unclassified_watch_event_${state.unclassifiedEvents}`);
     send({
@@ -102,8 +112,9 @@ const writeRow = (details, watched) => {
       purpose: watched.purpose,
       exception_type: details.type,
       instruction: safe(() => details.context.pc.toString()),
-      watched_address: safe(() => details.memory.address.toString()),
-      memory_operation: safe(() => details.memory.operation),
+      watched_address: memoryAddress && memoryAddress.toString
+        ? safe(() => memoryAddress.toString()) : null,
+      memory_operation: memoryOperation,
       changed_offsets: changedOffsets,
       body: watched.body.toString(),
     });
@@ -119,12 +130,14 @@ const writeRow = (details, watched) => {
     exception_type: details.type,
     instruction: safe(() => details.context.pc.toString()),
     instruction_x86: safe(() => details.context.eip.toString()),
-    watched_address: safe(() => details.memory.address.toString()),
-    memory_operation: safe(() => details.memory.operation),
+    watched_address: memoryAddress && memoryAddress.toString
+      ? safe(() => memoryAddress.toString()) : null,
+    memory_operation: memoryOperation,
     body: watched.body.toString(),
     offsets: fields,
-    target_offset: changedOffset,
+    target_offset: reportedWriteOffset ?? changedOffset,
     changed_offsets: changedOffsets,
+    value_unchanged: unchangedReportedWrite,
     values: current,
     backtrace: safe(() => Thread.backtrace(details.context, Backtracer.FUZZY)
       .map(formatAddress)),

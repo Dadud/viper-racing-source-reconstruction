@@ -199,15 +199,19 @@ first tick. It records every callback body with PCAR vtable `0x4C8188` and its
 marks the capture valid only if exactly one callback body was observed, it
 matches a constructor watch retained after return, a selected integrator sample
 exists, and no watch errors or unclassified events occurred. A watch event
-counts as a write only when exactly
-one watched field changed, any supplied Frida memory details agree with that
-write, and the post-write instruction resolves inside `race.bin`. The script
-does not launch the game or modify input. Syntax and mock coverage pass, but a
-live original capture has not validated Frida's native watchpoint setup or
-exception behavior. The deterministic mock covers valid writes, unrelated
-single-step events, wrong memory addresses/operations, multiple PCAR candidates,
-missing constructor identity, re-arm failure, selected-object tick sampling,
-and cleanup; it still cannot establish native Frida behavior.
+counts as a write when supplied Frida access details identify one watched
+address with a write operation, or when exactly one watched field changes and
+no access details are supplied. When both are available they must agree, and
+the post-write instruction must resolve inside `race.bin`. A reported hardware
+write remains valid when it stores the field's existing value, because that
+writer is relevant provenance. A same-value single-step without access details
+remains unclassified. The script does not launch the game or modify input.
+Syntax and mock coverage pass, but a live original capture has not validated
+Frida's native watchpoint setup or exception behavior. The deterministic mock
+covers changed-value and same-value writes, unreported same-value events,
+unrelated single-step events, wrong memory addresses/operations, multiple PCAR
+candidates, missing constructor identity, re-arm failure, selected-object tick
+sampling, and cleanup; it still cannot establish native Frida behavior.
 
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,

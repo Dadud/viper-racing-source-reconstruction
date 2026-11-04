@@ -126,7 +126,7 @@ function runScenario(options = {}) {
             : options.badMemory === "operation"
                 ? { address: body.add(0x5b0), operation: "read" }
                 : undefined;
-        triggerWrite(0x5b0, 12.5, firstMemory);
+        triggerWrite(0x5b0, options.sameValueWrite ? 0 : 12.5, firstMemory);
         hooks.get(0x381e0).onLeave.call(constructorInvocation);
         if (!options.rearmFailure) {
             assert.equal(watchedThread.watchpoints.size, 2,
@@ -170,6 +170,19 @@ assert(valid.emitted.some(event => event.event === "pcar_source_field_write" &&
 const validWithoutMemoryDetails = runScenario({ missingMemoryDetails: true });
 assert.equal(validWithoutMemoryDetails.done.capture_valid, true);
 assert.equal(validWithoutMemoryDetails.done.write_events, 2);
+const sameValueWrite = runScenario({ sameValueWrite: true });
+assert.equal(sameValueWrite.done.capture_valid, true,
+    "a reported hardware write is valid even when it stores the existing value");
+assert(sameValueWrite.emitted.some(event =>
+    event.event === "pcar_source_field_write" &&
+    event.target_offset === 0x5b0 && event.value_unchanged === true &&
+    event.changed_offsets.length === 0));
+const unreportedSameValueWrite = runScenario({
+    sameValueWrite: true, missingMemoryDetails: true,
+});
+assert.equal(unreportedSameValueWrite.done.capture_valid, false,
+    "a same-value single-step without a reported access remains unclassified");
+assert.equal(unreportedSameValueWrite.done.unclassified_events, 1);
 
 for (const scenario of [
     { spuriousEvent: true },
