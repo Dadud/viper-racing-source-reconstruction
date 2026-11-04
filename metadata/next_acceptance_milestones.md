@@ -887,14 +887,16 @@ vector. Its slip-curve input uses wheel animation offset `+0xD8`, the
 contact-normal/forward cross product, and the body basis row at `+0x44..+0x4C`;
 it is distinct from rolling-speed mismatch. The portable four-wheel
 composition now derives these operands accordingly, with focused regression
-coverage. The live session still does not execute the full tire response and
-force chain. Next, trace and connect its per-wheel state writes in the native
+coverage. The live session now executes active-contact tire-filter updates,
+while response vectors and tire forces remain disconnected. Next, source the
+upstream tire-accumulator values and connect per-wheel vector stores in native
 order, then compare controlled no-ideal-line runs against the original.
 
-The diagnostics-only live seam is now present, but the replay leaves its curve
-outputs empty because the materialized player wheel bytes at `+0x90`, `+0x94`,
-and `+0x98` are unknown. The next short task is to identify and implement the
-native producers for those three fields, add constructor/runtime byte-level
-regression coverage, and rerun the route-disabled replay until all four wheels
-emit finite tire-factor values. Then source the remaining factor/vector stores
-and accumulation call order before connecting tire forces to body integration.
+The route-disabled live path now derives finite curve inputs and advances
+stateful tire filters for active-contact wheels, with byte-backed history
+validation and trace regression. The next gap is upstream tire accumulator
+state `+0xA4/+0x10C/+0xEC/+0xF0` and exact same-tick local producers. Resolve
+those lanes and the native reset/history predicates, then produce and persist
+`+0xF4/+0x100/+0x7C` in callback order. Keep force application gated until
+per-wheel response vectors and their native `0x43E6F0` call sequence pass
+source-backed regression and no-ideal-line replay checks.

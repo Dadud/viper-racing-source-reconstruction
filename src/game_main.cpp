@@ -2075,8 +2075,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 4> wheel_surface_motion_projections{};
     std::array<std::optional<float>, 4> wheel_surface_adjusted_responses{};
     // Source-owned wheel response operands captured after the reconstructed
-    // suspension/contact prefix. These are diagnostics only; no force is
-    // accumulated from them yet.
+    // suspension/contact prefix. They feed tire filters on active contact;
+    // response vectors and tire forces are not applied to the body.
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_body_point_velocities_0x130{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
@@ -2088,6 +2088,12 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 4> wheel_slip_direction_ratios_0x74{};
     std::array<std::optional<viper::TireWheelResponseDerivation>, 4>
         wheel_tire_response_derivations{};
+    std::array<std::optional<viper::WheelTireDynamicsResult>, 4>
+        wheel_tire_dynamics_results{};
+    std::array<std::optional<float>, 4> wheel_tire_filter_0x170{};
+    std::array<std::optional<float>, 4> wheel_tire_filter_0x174{};
+    std::array<std::optional<float>, 4> wheel_tire_instantaneous_0x180{};
+    std::array<std::optional<float>, 4> wheel_tire_response_gate_0x11c{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_response_vectors_0xf4{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
@@ -3301,7 +3307,7 @@ struct WindowState {
         return true;
     }
 
-    void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick) const
+    void capture_player_tick_physics_state(PlayerPhysicsTickContext& tick)
     {
         tick.wheel_animation_basis_outputs = player_wheel_animation_basis_outputs;
         tick.wheel_spin_preprojection_results =
@@ -3636,12 +3642,37 @@ struct WindowState {
                                     std::isfinite(derivation.factors.lateral_curve_value)) {
                                     tick.wheel_tire_response_derivations[wheel] =
                                         derivation;
+                                    // The native reset branch is impossible on
+                                    // this path: active +0x168 is one of its
+                                    // negated predicates. Inactive contact does
+                                    // not identify the preserved BL predicate,
+                                    // so do not guess and mutate its filter state.
+                                    if (player_wheel_contact_states[wheel]
+                                            .contact_active_0x168 != 0U &&
+                                        player_tire_trigonometric_terms[wheel]) {
+                                        const auto wheel_object_offset =
+                                            static_cast<std::uint32_t>(
+                                                0x554U + 0x1a4U *
+                                                    static_cast<std::uint32_t>(wheel));
+                                        tick.wheel_tire_dynamics_results[wheel] =
+                                            viper::advance_ncar_wheel_tire_dynamics_in_object(
+                                                player_runtime_state.wheel_objects[wheel],
+                                                wheel_object_offset, derivation,
+                                                *player_tire_trigonometric_terms[wheel],
+                                                adjusted_suspension, true, false);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            tick.wheel_tire_filter_0x170[wheel] = read_response_float(0x170U);
+            tick.wheel_tire_filter_0x174[wheel] = read_response_float(0x174U);
+            tick.wheel_tire_instantaneous_0x180[wheel] =
+                read_response_float(0x180U);
+            tick.wheel_tire_response_gate_0x11c[wheel] =
+                read_response_float(0x11cU);
             const auto read_wheel_float = [&wheel_object](const std::uint32_t offset)
                 -> std::optional<float> {
                 const auto bits = viper::read_ncar_wheel_object_u32(
@@ -5369,6 +5400,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_forward_curve_value"
                 << ",wheel" << wheel << "_tire_lateral_curve_value"
                 << ",wheel" << wheel << "_tire_dynamics_division_valid"
+                << ",wheel" << wheel << "_tire_filter_applied"
+                << ",wheel" << wheel << "_tire_filter_0x170"
+                << ",wheel" << wheel << "_tire_filter_0x174"
+                << ",wheel" << wheel << "_tire_instantaneous_0x180"
+                << ",wheel" << wheel << "_tire_response_gate_0x11c"
+                << ",wheel" << wheel << "_tire_trigonometric_response"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
                 << ",wheel" << wheel << "_response_scalar_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
@@ -5787,6 +5824,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << ',';
                         if (tire_derivation) physics_tick_trace <<
                             (tire_derivation->dynamics_division_valid ? 1 : 0);
+                        physics_tick_trace << ',' <<
+                            (tick.wheel_tire_dynamics_results[wheel] ? 1 : 0);
+                        for (const auto value : {
+                                tick.wheel_tire_filter_0x170[wheel],
+                                tick.wheel_tire_filter_0x174[wheel],
+                                tick.wheel_tire_instantaneous_0x180[wheel],
+                                tick.wheel_tire_response_gate_0x11c[wheel],
+                                tick.wheel_tire_dynamics_results[wheel]
+                                    ? std::optional<float>{tick.wheel_tire_dynamics_results[wheel]
+                                          ->trigonometric_response}
+                                    : std::nullopt}) {
+                            physics_tick_trace << ',';
+                            if (value) physics_tick_trace << *value;
+                        }
                         physics_tick_trace << ',';
                         if (tick.wheel_surface_adjusted_responses[wheel]) {
                             physics_tick_trace <<

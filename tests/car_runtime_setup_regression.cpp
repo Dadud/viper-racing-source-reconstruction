@@ -93,6 +93,81 @@ int main()
         {
             constexpr std::uint32_t wheel_base = 0x554U;
             viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 2> histories{{
+                {wheel_base + 0x170U, 4U,
+                    std::bit_cast<std::uint32_t>(10.0F)},
+                {wheel_base + 0x174U, 4U,
+                    std::bit_cast<std::uint32_t>(10.0F)},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, histories),
+                "tire filter history fields must materialize for the byte-backed stage");
+            viper::TireWheelResponseDerivation response{};
+            response.dynamics_component_0x2c = 20.0F;
+            response.dynamics_component_0x30 = 30.0F;
+            response.secondary_slip_component_0xe4 = 3.0F;
+            response.factors.curve_input = 1.0F;
+            response.dynamics_division_valid = true;
+            viper::WheelTireDynamicsState expected_state{};
+            expected_state.filtered_component_0x170 = 10.0F;
+            expected_state.filtered_component_0x174 = 10.0F;
+            viper::WheelTireDynamicsInput expected_input{};
+            expected_input.instantaneous_component_0x2c = 20.0F;
+            expected_input.instantaneous_component_0x30 = 30.0F;
+            expected_input.secondary_slip_component_0xe4 = 3.0F;
+            expected_input.tire_terms = {1.0F, 1.0F, 1.0F, 0.2F};
+            expected_input.smoothing_gate_local_0x20 = 10.0F;
+            expected_input.contact_active = true;
+            const auto expected = viper::advance_wheel_tire_dynamics(
+                expected_state, expected_input);
+            const auto applied = viper::advance_ncar_wheel_tire_dynamics_in_object(
+                wheel, wheel_base, response, expected_input.tire_terms,
+                expected_input.smoothing_gate_local_0x20, true, false);
+            require(applied &&
+                    std::bit_cast<std::uint32_t>(*viper::read_ncar_wheel_object_u32(
+                        wheel, 0x170U)) == std::bit_cast<std::uint32_t>(
+                            expected_state.filtered_component_0x170) &&
+                    std::bit_cast<std::uint32_t>(*viper::read_ncar_wheel_object_u32(
+                        wheel, 0x174U)) == std::bit_cast<std::uint32_t>(
+                            expected_state.filtered_component_0x174) &&
+                    std::bit_cast<std::uint32_t>(*viper::read_ncar_wheel_object_u32(
+                        wheel, 0x180U)) == std::bit_cast<std::uint32_t>(
+                            expected_state.instantaneous_component_0x180) &&
+                    std::bit_cast<std::uint32_t>(*viper::read_ncar_wheel_object_u32(
+                        wheel, 0x11cU)) == std::bit_cast<std::uint32_t>(
+                            expected_state.response_gate_0x11c) &&
+                    applied->trigonometric_response ==
+                        expected.trigonometric_response,
+                "byte-backed tire dynamics must persist only finite native filter outputs");
+
+            auto reset_wheel = wheel;
+            const auto reset_result =
+                viper::advance_ncar_wheel_tire_dynamics_in_object(
+                    reset_wheel, wheel_base, response, expected_input.tire_terms,
+                    expected_input.smoothing_gate_local_0x20, true, true);
+            require(reset_result &&
+                    viper::read_ncar_wheel_object_u32(reset_wheel, 0x170U) ==
+                        std::optional<std::uint32_t>{0U} &&
+                    viper::read_ncar_wheel_object_u32(reset_wheel, 0x174U) ==
+                        std::optional<std::uint32_t>{0U} &&
+                    viper::read_ncar_wheel_object_u32(reset_wheel, 0x178U) ==
+                        std::optional<std::uint32_t>{0U} &&
+                    viper::read_ncar_wheel_object_u32(reset_wheel, 0x180U) ==
+                        std::optional<std::uint32_t>{0U},
+                "observed tire filter reset must persist its four native zero stores");
+
+            viper::NcarWheelRuntimeObjectState unresolved{};
+            const auto unresolved_before = unresolved;
+            require(!viper::advance_ncar_wheel_tire_dynamics_in_object(
+                        unresolved, wheel_base, response, expected_input.tire_terms,
+                        expected_input.smoothing_gate_local_0x20, true, false) &&
+                    unresolved.bytes == unresolved_before.bytes &&
+                    unresolved.initialized_bytes == unresolved_before.initialized_bytes,
+                "tire dynamics must fail closed when either history lane is unknown");
+        }
+        {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
             const std::array<viper::NcarObjectFieldWrite, 3> source_fields{{
                 {wheel_base + 0x124U, 4U,
                     std::bit_cast<std::uint32_t>(10.0F)},

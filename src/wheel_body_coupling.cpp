@@ -1083,6 +1083,85 @@ std::optional<NcarWheelTireSetup> initialize_ncar_wheel_tire_setup(
         initialize_tire_response_object(tire, tire_response_object_0x2c)};
 }
 
+std::optional<WheelTireDynamicsResult>
+advance_ncar_wheel_tire_dynamics_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const TireWheelResponseDerivation& response,
+    const TireTrigonometricTerms& tire_terms,
+    const float smoothing_gate_local_0x20,
+    const bool contact_active,
+    const bool filter_reset_branch_observed) noexcept
+{
+    const auto read_finite = [&wheel](
+            const std::uint32_t local_offset) -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(
+            wheel, local_offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto filtered_0x170 = read_finite(0x170U);
+    const auto filtered_0x174 = read_finite(0x174U);
+    const std::array<float, 11> finite_inputs{
+        response.dynamics_component_0x2c,
+        response.dynamics_component_0x30,
+        response.secondary_slip_component_0xe4,
+        tire_terms.coefficient_0x1c,
+        tire_terms.coefficient_0x20,
+        tire_terms.coefficient_0x24,
+        tire_terms.coefficient_0x28,
+        smoothing_gate_local_0x20,
+        filtered_0x170.value_or(std::numeric_limits<float>::quiet_NaN()),
+        filtered_0x174.value_or(std::numeric_limits<float>::quiet_NaN()),
+        response.factors.curve_input};
+    if (!response.dynamics_division_valid || !filtered_0x170 || !filtered_0x174 ||
+        !std::all_of(finite_inputs.begin(), finite_inputs.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+
+    WheelTireDynamicsState state{};
+    state.filtered_component_0x170 = *filtered_0x170;
+    state.filtered_component_0x174 = *filtered_0x174;
+    WheelTireDynamicsInput input{};
+    input.instantaneous_component_0x2c = response.dynamics_component_0x2c;
+    input.instantaneous_component_0x30 = response.dynamics_component_0x30;
+    input.secondary_slip_component_0xe4 = response.secondary_slip_component_0xe4;
+    input.smoothing_gate_local_0x20 = smoothing_gate_local_0x20;
+    input.tire_terms = tire_terms;
+    input.contact_active = contact_active;
+    input.filter_reset_branch_observed = filter_reset_branch_observed;
+    const auto result = advance_wheel_tire_dynamics(state, input);
+    const std::array<float, 4> outputs{
+        state.instantaneous_component_0x180,
+        state.filtered_component_0x174,
+        state.filtered_component_0x170,
+        state.response_gate_0x11c};
+    if (!std::all_of(outputs.begin(), outputs.end(),
+            [](const float value) { return std::isfinite(value); }) ||
+        !std::isfinite(result.trigonometric_response)) {
+        return std::nullopt;
+    }
+    std::array<NcarObjectFieldWrite, 5> writes{};
+    std::size_t write_count = 0U;
+    writes[write_count++] = {wheel_object_offset + 0x180U, 4U,
+        std::bit_cast<std::uint32_t>(state.instantaneous_component_0x180)};
+    writes[write_count++] = {wheel_object_offset + 0x174U, 4U,
+        std::bit_cast<std::uint32_t>(state.filtered_component_0x174)};
+    writes[write_count++] = {wheel_object_offset + 0x170U, 4U,
+        std::bit_cast<std::uint32_t>(state.filtered_component_0x170)};
+    writes[write_count++] = {wheel_object_offset + 0x11cU, 4U,
+        std::bit_cast<std::uint32_t>(state.response_gate_0x11c)};
+    if (filter_reset_branch_observed) {
+        writes[write_count++] = {wheel_object_offset + 0x178U, 4U,
+            std::bit_cast<std::uint32_t>(state.suspension_response_0x178)};
+    }
+    return apply_ncar_wheel_object_writes(wheel, wheel_object_offset,
+        std::span<const NcarObjectFieldWrite>(writes.data(), write_count))
+        ? std::optional<WheelTireDynamicsResult>{result} : std::nullopt;
+}
+
 bool apply_ncar_wheel_tire_response_scale(
     NcarWheelRuntimeObjectState& destination,
     const std::uint32_t wheel_object_offset,

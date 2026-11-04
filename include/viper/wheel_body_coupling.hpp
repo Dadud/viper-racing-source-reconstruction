@@ -754,6 +754,19 @@ struct NcarWheelTireSetup {
     TireResponseObject response_object{};
 };
 
+// Runs the stateful 0x442530 tire-filter stage against persistent wheel bytes.
+// The caller must only assert the reset branch when its native predicate is
+// observed; otherwise the filter histories are read from +0x170/+0x174.
+[[nodiscard]] std::optional<WheelTireDynamicsResult>
+advance_ncar_wheel_tire_dynamics_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset,
+    const TireWheelResponseDerivation& response,
+    const TireTrigonometricTerms& tire_terms,
+    float smoothing_gate_local_0x20,
+    bool contact_active,
+    bool filter_reset_branch_observed) noexcept;
+
 // Persists the 0x441C10 copy of the allocated tire response object's +0x2C
 // scale into wheel +0x90. The host pointer stored at wheel +0x8C is modeled
 // separately and is not exposed as a native address.

@@ -154,6 +154,7 @@ try {
     $wheelLateralProjectionColumns = [int[]]::new(4)
     $wheelSlipRatioColumns = [int[]]::new(4)
     $wheelTireCurveColumns = @()
+    $wheelTireDynamicsColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
@@ -216,6 +217,16 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireCurveNames[$lane])")
         }
         $wheelTireCurveColumns += ,$tireCurveColumns
+        $tireDynamicsNames = @(
+            'tire_filter_applied', 'tire_filter_0x170',
+            'tire_filter_0x174', 'tire_instantaneous_0x180',
+            'tire_response_gate_0x11c', 'tire_trigonometric_response')
+        $tireDynamicsColumns = [int[]]::new($tireDynamicsNames.Count)
+        for ($lane = 0; $lane -lt $tireDynamicsNames.Count; ++$lane) {
+            $tireDynamicsColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($tireDynamicsNames[$lane])")
+        }
+        $wheelTireDynamicsColumns += ,$tireDynamicsColumns
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $spinColumns = [int[]]::new(5)
@@ -291,6 +302,9 @@ try {
         @($wheelTireCurveColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelTireDynamicsColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelSpinColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
@@ -312,6 +326,7 @@ try {
     $observedBodyIntegration = $false
     $observedSuspensionForce = $false
     $observedTireCurveDerivation = $false
+    $observedTireDynamicsStage = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
@@ -404,6 +419,27 @@ try {
             if ($tireCurveValueCount -ne 3 -or
                 $tireCurveStatus -notin @('0', '1')) {
                 throw "Wheel $wheel tire-curve division status is invalid at line $($index + 1)"
+            }
+            $dynamicsColumns = $wheelTireDynamicsColumns[$wheel]
+            $dynamicsApplied = $fields[$dynamicsColumns[0]]
+            $wheelContactActive = $fields[$wheelActiveColumns[$wheel]] -eq '1'
+            if ($wheelContactActive -and $tireCurveStatus -eq '1' -and
+                $dynamicsApplied -ne '1') {
+                throw "Wheel $wheel active-contact tire filter stage did not apply at line $($index + 1)"
+            }
+            if ($dynamicsApplied -eq '1') {
+                $observedTireDynamicsStage = $true
+                foreach ($column in $dynamicsColumns[1..5]) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel tire filter output is missing at line $($index + 1)"
+                    }
+                    $filterValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($filterValue) -or
+                        [single]::IsInfinity($filterValue)) {
+                        throw "Wheel $wheel tire filter output is non-finite at line $($index + 1)"
+                    }
+                }
             }
         }
         $reportedMissingOffsets = @($bodyKinematicsMissingOffsets | Where-Object {
@@ -802,8 +838,11 @@ try {
     if (-not $observedTireCurveDerivation) {
         throw 'Fixed-step replay never produced live tire-curve factors for all four wheels'
     }
+    if (-not $observedTireDynamicsStage) {
+        throw 'Fixed-step replay never entered the finite active-contact tire-filter stage'
+    }
 
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Tire-curve factors were $(if ($observedTireCurveDerivation) { 'derived' } else { 'not yet available from initialized live wheel operands' }); controls are not yet connected to tire forces, so this is not driving acceptance."
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Tire-curve factors and active-contact filter outputs were derived; tire forces remain outside body integration."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

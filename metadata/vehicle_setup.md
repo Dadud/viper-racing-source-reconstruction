@@ -1107,14 +1107,14 @@ session still lacks complete tire-response force ownership. Evidence:
 This `+0x7C` store is distinct from the tail's `local_90`; it is not the
 response input to the final wheel-rate increment.
 
-The live diagnostics path now attempts that factor derivation from current
-wheel/body/contact state, but only when every source byte is initialized. In
-the Viper/Bemidji no-route replay, wheel offsets `+0x90`, `+0x94`, and `+0x98`
-are unknown in the materialized player wheel objects, so derivation is skipped
-and the CSV outputs remain empty. Trace these values to their native
-constructor or callback producers before claiming live curve values or tire
-forces.
-
+The live diagnostics path now derives finite tire factors and advances the
+stateful `0x442530` filter stage when the native active-contact gate is
+satisfied. The hash-matched constructor supplies the persistent `+0x170` and
+`+0x174` histories; the byte-backed stage refuses unknown or non-finite
+history, records `+0x180/+0x174/+0x170/+0x11C`, and only takes the reset path
+when its caller has observed that predicate. The route-disabled replay requires
+an active-contact stage execution and finite stored outputs. Tire response
+vectors and force accumulation remain outside the live body integration.
 `advance_four_wheel_body_step` now combines each wheel's supplied response
 factors after replacing their trigonometric term with the result of
 `advance_wheel_tire_dynamics`. It constructs the lateral vector from the
@@ -1339,9 +1339,10 @@ addition to the base. Exact-hash data values are `0x4C8854=-1.0`,
 four-wheel composition enables its contact pipeline, it now sources the tire
 filter gate from that `surface.adjusted_response` local and contact activity
 from the updated `+0x168` state. Regression uses contradictory caller values to
-check both sources. The Windows live session still does not execute tire
-dynamics; the shared random stream's full native call inventory and the reset
-flag history remain unresolved.
+check both sources. The Windows live session now advances the stateful tire
+filter stage for active contacts. Response-vector writes and force accumulation
+remain open; the shared random stream's full native call inventory and the
+inactive-contact reset predicate remain unresolved.
 
 `classify_wheel_contact_feature` models the following contact-feature switch
 in `0x442530`. It preserves raw feature codes, strict signed-bit gates at
