@@ -325,3 +325,23 @@ The capture completion event reports per-phase throttle/brake means and compares
 `throttle` against the mean of all three neutral phases and `brake` against the
 same neutral baseline. A whole-run range change alone cannot make the capture
 valid.
+
+## Curve scoring is not wheel torque
+
+The `configure_acar_update_curve` helper builds the curve subobject at parent
+`+0xBFC` from runtime-record floats, including the terms named `torque_scale`
+and `horsepower_term` in the portable arithmetic. In the checked native
+consumer, `0x43FDD0` passes each controller candidate (`entry * x`) to
+`0x4404A0`, then uses the returned score to choose or preserve selector
+`+0x24` through `0x43FAD0`. `0x43FAE0` updates selector state. The
+`0x431150` path later reads the selected-pair getter, scales
+it into `+0xDDC`, and dispatches wheel updates. The reviewed curve-score path
+has no store or call that applies its score as wheel force, wheel rate, or body
+force. Therefore the coefficient names and values are not evidence for a
+throttle torque law. Keep this model confined to the source-observed selector
+until a separate force-producing consumer is identified.
+
+This is a bounded conclusion for the reviewed call chain, not a claim that no
+other engine/transmission producer exists. The `+0x5B0/+0x8F8` constructor
+source watch and state correlation around the selected D block and live wheel
+`+0x124` writer remain the next decisive investigation.

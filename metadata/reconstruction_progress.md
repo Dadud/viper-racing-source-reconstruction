@@ -1,3 +1,14 @@
+- **2026-11-04, engine-curve scoring boundary:** Traced the existing
+  `configure_acar_update_curve` model to native selector scoring: `0x43FDD0`
+  scores controller candidates through `0x4404A0` and updates selector
+  `+0x24`; `0x431150` later reads selected-pair state before its wheel-update
+  calls. The reviewed path does not apply the score itself as wheel or body
+  force. Added this boundary to `metadata/drivetrain_input_dataflow.md` to
+  prevent the coefficient names (`torque_scale`, `horsepower_term`) from being
+  mistaken for a sourced throttle law. `update_curve_regression` and the
+  route-motion-disabled 320-frame Viper replay both passed (2/2). Throttle
+  propulsion remains unproven; the next target is the exact write watch on
+  PCAR `+0x5B0/+0x8F8` through construction and first integrator ticks.
 - **2026-11-04, repeated route-free Viper response gate:** Re-ran the Release
   `game_fixed_step_trace_replay_regression` (CTest 33) with verbose output and
   inspected its direct matched-window metrics. The authored 320-frame input,
