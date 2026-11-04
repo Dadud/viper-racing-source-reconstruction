@@ -2465,9 +2465,11 @@ original-runtime fidelity.
   The native target-thread watchpoint armed and reported a `single-step` at the
   post-write PC; Frida supplied no `details.memory` for that event. The probe
   mock now covers this observed case and passes directly under Node, while
-  supplied incorrect memory details remain fail-closed. The configured build
-  tree is present, but `ctest`/CMake are unavailable on this shell's PATH, so
-  the registered CTest could not be rerun here. No game or audio process was
-  launched; applying the watchpoint to original `race.bin`, capturing PCAR
-  field provenance, and tracing propulsion remain open.
+  supplied incorrect memory details remain fail-closed. CMake/CTest were not
+  on this shell's PATH, but the Visual Studio 18 CTest executable ran the full
+  configured Release suite: 72/72 passed, including the updated mock, the
+  route-motion-disabled physics replay, all 40 track/car runtime combinations,
+  and sound-resource checks. Runtime smoke processes exited cleanly; no game
+  process remains running. Applying the watchpoint to original `race.bin`,
+  capturing PCAR field provenance, and tracing propulsion remain open.
 
