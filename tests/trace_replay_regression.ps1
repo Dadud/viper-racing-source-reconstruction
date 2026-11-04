@@ -3,10 +3,41 @@ param(
     [Parameter(Mandatory = $true)][string]$DataDir
 )
 
+function Get-MatchedForwardSpeedAverage {
+    param(
+        [Parameter(Mandatory = $true)][string]$TickPath,
+        [Parameter(Mandatory = $true)][string[]]$Header,
+        [Parameter(Mandatory = $true)][int[]]$VelocityColumns,
+        [Parameter(Mandatory = $true)][int[]]$ForwardColumns,
+        [Parameter(Mandatory = $true)][int]$FrameLimit
+    )
+    $rows = [System.IO.File]::ReadAllLines($TickPath)
+    if ($rows.Count -lt 2 -or $rows[0] -cne ($Header -join ',')) {
+        throw "Matched trace has an invalid tick schema: $TickPath"
+    }
+    $speeds = [System.Collections.Generic.List[single]]::new()
+    foreach ($row in $rows | Select-Object -Skip 1) {
+        $fields = $row.Split(',')
+        if ($fields.Count -ne $Header.Count) { throw "Matched trace row is malformed: $TickPath" }
+        $outer = [int]::Parse($fields[0], [cultureinfo]::InvariantCulture)
+        if ($outer -ge $FrameLimit) { break }
+        $speed = [single]0
+        for ($axis = 0; $axis -lt 3; ++$axis) {
+            $speed += [single]::Parse($fields[$VelocityColumns[$axis]], [cultureinfo]::InvariantCulture) *
+                [single]::Parse($fields[$ForwardColumns[$axis]], [cultureinfo]::InvariantCulture)
+        }
+        $speeds.Add($speed)
+    }
+    if ($speeds.Count -eq 0) { throw "Matched trace has no samples in the requested window: $TickPath" }
+    return ($speeds | Measure-Object -Average).Average
+}
+
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_trace_$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $root | Out-Null
 $capture = Join-Path $root 'capture.csv'
 $rightCapture = Join-Path $root 'right-capture.csv'
+$neutralCapture = Join-Path $root 'neutral-capture.csv'
+$brakeCapture = Join-Path $root 'brake-capture.csv'
 $yawDataDir = Join-Path $root 'YawData'
 $replay = Join-Path $root 'replay.csv'
 $rightReplay = Join-Path $root 'right-replay.csv'
@@ -16,6 +47,8 @@ $replayTicks = Join-Path $root 'replay-ticks.csv'
 $rightReplayTicks = Join-Path $root 'right-replay-ticks.csv'
 $yawReplayTicks = Join-Path $root 'yaw-replay-ticks.csv'
 $repeatTicks = Join-Path $root 'repeat-ticks.csv'
+$neutralTicks = Join-Path $root 'neutral-ticks.csv'
+$brakeTicks = Join-Path $root 'brake-ticks.csv'
 try {
     # Author a repeatable fixed-step driver input fixture. Route motion is
     # disabled below, so these actions exercise the real binding/PCAR control
@@ -29,13 +62,13 @@ try {
         $throttle = 0
         $brake = 0
         $phase = 'coast'
-        if ($frame -lt 96) {
+        if ($frame -ge 32 -and $frame -lt 128) {
             $throttle = 1
             $phase = 'throttle'
-        } elseif ($frame -ge 160 -and $frame -lt 208) {
+        } elseif ($frame -ge 192 -and $frame -lt 240) {
             $left = 1
             $phase = 'steer-left'
-        } elseif ($frame -ge 240 -and $frame -lt 288) {
+        } elseif ($frame -ge 256 -and $frame -lt 304) {
             $brake = 1
             $phase = 'brake'
         }
@@ -46,6 +79,24 @@ try {
         [void]$inputLines.Add($row)
     }
     [System.IO.File]::WriteAllLines($capture, $inputLines)
+
+    $neutralInputLines = [System.Collections.Generic.List[string]]::new()
+    [void]$neutralInputLines.Add($inputLines[0])
+    for ($frame = 0; $frame -lt 320; ++$frame) {
+        $elapsed = [single]($frame * 0.016)
+        [void]$neutralInputLines.Add(('{0},{1},0.016,0,0,0,0,neutral' -f $frame,
+            $elapsed.ToString('R', [cultureinfo]::InvariantCulture)))
+    }
+    [System.IO.File]::WriteAllLines($neutralCapture, $neutralInputLines)
+    $brakeInputLines = [System.Collections.Generic.List[string]]::new()
+    [void]$brakeInputLines.Add($inputLines[0])
+    for ($frame = 0; $frame -lt 320; ++$frame) {
+        $elapsed = [single]($frame * 0.016)
+        $brakeValue = [int]($frame -ge 32 -and $frame -lt 128)
+        [void]$brakeInputLines.Add(('{0},{1},0.016,0,0,0,{2},brake-control' -f $frame,
+            $elapsed.ToString('R', [cultureinfo]::InvariantCulture), $brakeValue))
+    }
+    [System.IO.File]::WriteAllLines($brakeCapture, $brakeInputLines)
 
     # Mirror only steering while preserving timing, throttle, and brake.
     $rightInputLines = [System.Collections.Generic.List[string]]::new()
@@ -64,6 +115,14 @@ try {
         --diagnostics-only -grid --play-trace $capture --record-trace $replay `
         --record-tick-trace $replayTicks
     if ($LASTEXITCODE -ne 0) { throw "Trace replay exited with $LASTEXITCODE" }
+    & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
+        --diagnostics-only -grid --play-trace $neutralCapture `
+        --record-tick-trace $neutralTicks
+    if ($LASTEXITCODE -ne 0) { throw "Neutral trace replay exited with $LASTEXITCODE" }
+    & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
+        --diagnostics-only -grid --play-trace $brakeCapture `
+        --record-tick-trace $brakeTicks
+    if ($LASTEXITCODE -ne 0) { throw "Brake-control trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
         --diagnostics-only -grid --play-trace $capture --record-trace $repeat `
         --record-tick-trace $repeatTicks
@@ -121,6 +180,7 @@ try {
         throw 'Yaw-control trace row counts or fixed-step schemas differ'
     }
     $tickHeader = $replayedTickLines[0].Split(',')
+    $tickHeaderLine = $replayedTickLines[0]
     $tickIndexColumn = [Array]::IndexOf($tickHeader, 'tick_index')
     $tickStepColumn = [Array]::IndexOf($tickHeader, 'scheduled_step_index')
     $tickStepCountColumn = [Array]::IndexOf($tickHeader, 'scheduled_step_count')
@@ -532,7 +592,6 @@ try {
     if ($bodyForwardAxisColumns -contains -1 -or $bodyVelocityColumns -contains -1) {
         throw 'Fixed-step trace is missing the PCAR forward axis or linear velocity'
     }
-    $preThrottleForwardSpeed = $null
     $throttleForwardSpeeds = [System.Collections.Generic.List[single]]::new()
     $brakeForwardSpeeds = [System.Collections.Generic.List[single]]::new()
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
@@ -616,14 +675,14 @@ try {
             $fields[$tickThrottleInputColumn], [cultureinfo]::InvariantCulture)
         $tickBrake = [single]::Parse(
             $fields[$tickBrakeInputColumn], [cultureinfo]::InvariantCulture)
-        if ($outerUpdate -lt 96 -and $tickThrottle -gt 0.2) {
+        if ($outerUpdate -ge 32 -and $outerUpdate -lt 128 -and $tickThrottle -gt 0.2) {
             $observedScheduledThrottle = $true
         }
-        if ($outerUpdate -ge 160 -and $outerUpdate -lt 208 -and
+        if ($outerUpdate -ge 192 -and $outerUpdate -lt 240 -and
             [Math]::Abs($tickSteering) -gt 0.2) {
             $observedScheduledSteering = $true
         }
-        if ($outerUpdate -ge 240 -and $outerUpdate -lt 288 -and
+        if ($outerUpdate -ge 256 -and $outerUpdate -lt 304 -and
             $tickBrake -gt 0.2) {
             $observedScheduledBrake = $true
         }
@@ -639,13 +698,10 @@ try {
             $bodyVelocity[0] * $bodyForwardAxis[0] +
             $bodyVelocity[1] * $bodyForwardAxis[1] +
             $bodyVelocity[2] * $bodyForwardAxis[2])
-        if ($outerUpdate -eq 0) {
-            $preThrottleForwardSpeed = $forwardSpeed
-        }
-        if ($outerUpdate -lt 96 -and $tickThrottle -gt 0.2) {
+        if ($outerUpdate -ge 32 -and $outerUpdate -lt 128 -and $tickThrottle -gt 0.2) {
             $throttleForwardSpeeds.Add($forwardSpeed)
         }
-        if ($outerUpdate -ge 240 -and $outerUpdate -lt 288 -and $tickBrake -gt 0.2) {
+        if ($outerUpdate -ge 256 -and $outerUpdate -lt 304 -and $tickBrake -gt 0.2) {
             $brakeForwardSpeeds.Add([Math]::Abs($forwardSpeed))
         }
         $stepIndex = [int]::Parse($fields[$tickStepColumn], [cultureinfo]::InvariantCulture)
@@ -1299,17 +1355,33 @@ try {
         -not $observedScheduledBrake) {
         throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
     }
-    if ($null -eq $preThrottleForwardSpeed -or $throttleForwardSpeeds.Count -eq 0 -or
+    if ($null -eq $initialThrottleForwardSpeed -or $throttleForwardSpeeds.Count -eq 0 -or
         $brakeForwardSpeeds.Count -eq 0) {
         throw 'Fixed-step replay did not sample forward speed in coast, throttle, and brake phases'
     }
     $throttleAverageForwardSpeed = ($throttleForwardSpeeds |
         Measure-Object -Average).Average
-    if (($throttleAverageForwardSpeed - $preThrottleForwardSpeed) -lt 0.01) {
-        throw "Throttle phase did not increase PCAR forward speed above coast baseline: coast=$preThrottleForwardSpeed throttle-average=$throttleAverageForwardSpeed"
+    $neutralTickLines = [System.IO.File]::ReadAllLines($neutralTicks)
+    if ($neutralTickLines.Count -lt 2 -or
+        $neutralTickLines[0] -cne $tickHeaderLine) {
+        throw 'Matched neutral replay has a different tick schedule or schema'
     }
-    if (($brakeForwardSpeeds[0] - $brakeForwardSpeeds[$brakeForwardSpeeds.Count - 1]) -lt 0.01) {
-        throw "Brake phase did not reduce PCAR forward speed magnitude: start=$($brakeForwardSpeeds[0]) end=$($brakeForwardSpeeds[$brakeForwardSpeeds.Count - 1])"
+    $neutralAverageForwardSpeed = Get-MatchedForwardSpeedAverage `
+        $neutralTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+    $throttleInputAverage = Get-MatchedForwardSpeedAverage `
+        $replayTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+    if (($throttleInputAverage - $neutralAverageForwardSpeed) -lt 0.01) {
+        throw "Throttle did not increase forward speed relative to matched neutral inputs over 32 fixed updates: neutral=$neutralAverageForwardSpeed throttle=$throttleInputAverage"
+    }
+    $brakeNeutralAverage = Get-MatchedForwardSpeedAverage `
+        $neutralTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+    $brakeCompare = Get-MatchedForwardSpeedAverage `
+        $brakeTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+    if (($brakeNeutralAverage - $brakeCompare) -lt 0.01) {
+        throw "Brake did not reduce forward speed relative to matched neutral inputs over 32 fixed updates: neutral=$brakeNeutralAverage brake=$brakeCompare"
+    }
+    if (($brakeNeutralAverage - $brakeCompare) -lt 0.01) {
+        throw "Brake did not reduce forward speed relative to matched neutral inputs over 32 fixed updates: neutral=$brakeNeutralAverage brake=$brakeCompare"
     }
     if (-not $observedBodyIntegration) {
         throw 'Fixed-step replay did not transfer gravity, suspension, and tire force into body velocity'
@@ -1473,7 +1545,7 @@ try {
 finally {
     Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,
         $yawReplay, $repeat, $replayTicks, $rightReplayTicks, $yawReplayTicks,
-        $repeatTicks -Force `
+        $repeatTicks, $neutralCapture, $neutralTicks, $brakeCapture, $brakeTicks -Force `
         -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $yawDataDir) {
         $rootFullPath = [System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\'

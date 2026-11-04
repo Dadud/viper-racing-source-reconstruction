@@ -29,12 +29,13 @@ values and body translation. The focused Windows Release replay passes. This
 closes a self-consistency coverage gap only; original-matched response and a
 complete race remain open.
 
-The same route-free authored replay now also projects PCAR velocity onto the
-recovered forward basis (`+0x50..+0x58`) and requires throttle to increase
-forward speed from the initial zero-velocity sample and braking to reduce
-forward-speed magnitude within the brake phase. The focused replay passes. This
-verifies input-sensitive longitudinal movement inside the reconstructed model;
-it does not establish original acceleration/braking parity or a complete race.
+The route-free longitudinal regression now compares fresh neutral, throttle,
+and brake runs from the same placement over equal 32-update windows. The
+2026-11-04 result shows identical `-2.43288038065657` forward-speed averages
+for neutral, throttle, and brake, and the test fails accordingly. This exposes
+the missing engine/gear-to-wheel producer and invalidates the previous
+slope-sensitive pass claim. The first-race physics gate remains blocked on a
+source-backed driveline implementation; no ideal-line motion is used.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
