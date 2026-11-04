@@ -111,6 +111,12 @@ recorded as incomplete in the physics, AI, and race-mode rows of
 models are substantial but many still accept caller observations and are not
 owned by the live session (`metadata/car_update_branches.md`,
 `metadata/simulation_loop.md`, `metadata/vehicle_setup.md`).
+Each bound ACAR now also owns its selected AIDR group/slot, all 35 generated
+setup words, and the matching raw `0x220`-byte profile in the race session;
+the Viper/Bemidji frontend smoke verifies seven group-1 bindings. This closes
+static setup lifetime and identity provenance only. The ACAR task constructor,
+manager/model registry, mutable callback inputs, AI body physics, and physical
+race progression are still incomplete.
 Each scheduled player tick now retains an immutable input/timing context
 including live-keyboard versus logical-replay provenance, recovered controls,
 callback globals, scheduler clock, and the pre-increment native tick time.

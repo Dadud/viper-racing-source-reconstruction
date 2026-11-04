@@ -172,6 +172,9 @@ try {
     if ($stdout -notmatch 'selected AIDR profile 1') {
         throw "Selected profile did not reach AI setup. stdout=$stdout stderr=$stderr"
     }
+    if ($stdout -notmatch 'session-owned 7/7 source AI tuning inputs \(AIDR group 1, all 35 setup words and raw 0x220-byte profile retained per record\)') {
+        throw "Selected AI setup/profile inputs were not retained against all seven ACAR records. stdout=$stdout stderr=$stderr"
+    }
 
     $randomConfigDir = Join-Path $configDir 'random-track'
     [void](New-Item -ItemType Directory -Path $randomConfigDir)

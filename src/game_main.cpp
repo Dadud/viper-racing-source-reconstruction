@@ -1901,11 +1901,23 @@ struct AcarCurveSourceRuntimeState {
     viper::AcarCurveSourceRecord source_record{};
 };
 
+// Source-exact, pointer-free inputs selected for one configured ACAR. These
+// are retained with the race session so constructor/runtime work does not
+// depend on the caller's stack-owned AI setup plan or silently reselect data.
+struct AcarSessionTuningInputs {
+    std::size_t entrant_index{};
+    viper::AIDriverGroup profile_group{viper::AIDriverGroup::easy};
+    std::uint32_t driver_slot{};
+    std::array<std::uint32_t, 35> setup_words{};
+    viper::AIDriverResource::Record raw_driver_profile{};
+};
+
 // Persistent constructor state for one configured ACAR record. The inherited
 // body, four wheel geometry objects, and tire response setup are retained;
 // the ACAR driver object, callbacks, and simulation dispatch are not.
 struct AcarBodyRuntimeState {
     viper::ConfiguredCarTaskStreamBinding stream_binding{};
+    std::optional<AcarSessionTuningInputs> session_tuning_inputs;
     viper::NcarBodyRuntimeObjectState body_object{};
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
@@ -4906,6 +4918,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::vector<std::string>& participant_names,
                const std::span<const std::uint32_t> configured_car_record_tags,
                const viper::SingleRaceAISetupPlan* const selected_ai_setups,
+               const viper::AIDriverResource& ai_driver_resource,
+               const std::optional<viper::AIDriverGroup> selected_ai_driver_group,
                const viper::CarFileResourcePayloads& ai_car_resources,
                const std::uint32_t target_laps,
                const std::string_view track_name,
@@ -5157,6 +5171,30 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         stream_ok = false;
                         break;
                     }
+                    if (selected_ai_setups == nullptr ||
+                        !selected_ai_driver_group.has_value()) {
+                        stream_ok = false;
+                        break;
+                    }
+                    const auto selected_setup = std::find_if(
+                        selected_ai_setups->ai_setups.begin(),
+                        selected_ai_setups->ai_setups.end(),
+                        [&binding](const auto& candidate) {
+                            return candidate.entrant_index ==
+                                binding.configured_car_index;
+                        });
+                    if (selected_setup == selected_ai_setups->ai_setups.end() ||
+                        !selected_setup->input_complete) {
+                        stream_ok = false;
+                        break;
+                    }
+                    const auto* driver_profile = viper::find_ai_driver_record(
+                        ai_driver_resource, *selected_ai_driver_group,
+                        selected_setup->driver_slot);
+                    if (driver_profile == nullptr) {
+                        stream_ok = false;
+                        break;
+                    }
                     state.ai_acar_curve_sources.push_back({binding, *curve_source});
 
                     // 0x4285D0 enters 0x43DFB0, whose shared 0x42FF90
@@ -5166,6 +5204,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     // ACAR callback object.
                     AcarBodyRuntimeState body_state{};
                     body_state.stream_binding = binding;
+                    AcarSessionTuningInputs tuning_inputs{};
+                    tuning_inputs.entrant_index = binding.configured_car_index;
+                    tuning_inputs.profile_group = *selected_ai_driver_group;
+                    tuning_inputs.driver_slot = selected_setup->driver_slot;
+                    tuning_inputs.setup_words = selected_setup->setup.setup_words;
+                    tuning_inputs.raw_driver_profile = *driver_profile;
+                    body_state.session_tuning_inputs = std::move(tuning_inputs);
                     const auto body_plan =
                         viper::plan_ncar_body_constructor(*body_observation);
                     const auto constructor_subobjects =
@@ -5355,7 +5400,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << state.ai_acar_curve_sources.size()
                       << " AI ACAR curve source records and "
                       << state.ai_acar_body_states.size()
-                      << " ACAR body and four-wheel constructor states; materialized "
+                      << " ACAR body and four-wheel constructor states; session-owned "
+                      << std::count_if(state.ai_acar_body_states.begin(),
+                          state.ai_acar_body_states.end(), [](const auto& body) {
+                              return body.session_tuning_inputs.has_value();
+                          }) << "/" << state.ai_acar_body_states.size()
+                      << " source AI tuning inputs (AIDR group "
+                      << (selected_ai_driver_group.has_value()
+                          ? static_cast<std::size_t>(*selected_ai_driver_group) : 0U)
+                      << ", all 35 setup words and raw 0x220-byte profile retained per record); materialized "
                       << retained_checkpoint_count
                       << " inert CHKP records and "
                       << retained_inactive_stat_count
@@ -6515,6 +6568,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         }
     }
     std::optional<viper::SingleRaceAISetupPlan> selected_ai_setups;
+    std::optional<viper::AIDriverGroup> selected_ai_driver_group;
     if (entrants.participant_count > 1) {
         if (!assets.track_index())
             throw std::runtime_error("selected track has no matching tracks.tab row for AI setup");
@@ -6530,8 +6584,9 @@ int run_selected_race(const Options& options, const std::string_view track,
             viper::SingleRaceAISetupObservation ai_observation{};
             ai_observation.entrants = &entrants;
             ai_observation.drivers = &assets.ai_drivers();
-            ai_observation.driver_group =
+            selected_ai_driver_group =
                 static_cast<viper::AIDriverGroup>(opponent_strength);
+            ai_observation.driver_group = *selected_ai_driver_group;
             ai_observation.track_index = *assets.track_index();
             ai_observation.tuning_mode = single_race_tuning_mode;
             ai_observation.base_setup_payload = assets.ai_vehicle_setup();
@@ -6601,6 +6656,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         participant_names,
         configured_car_record_tags,
         selected_ai_setups ? &*selected_ai_setups : nullptr,
+        assets.ai_drivers(), selected_ai_driver_group,
         assets.ai_car(),
         std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),

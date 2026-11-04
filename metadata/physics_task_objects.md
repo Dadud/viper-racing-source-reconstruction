@@ -41,6 +41,17 @@ configured-car identities. This lets the runtime associate each selected AI
 ACAR record with its stream entry, but ACAR objects and their callback state
 are still not constructed; opponent motion remains on the route prototype.
 
+The race session now copies each bound ACAR's selected `SingleRaceAISetupRecord`
+inputs into `AcarBodyRuntimeState`: configured entrant index, selected AIDR
+group and driver slot, all 35 generated setup words, and the exact raw
+0x220-byte AIDR profile. The join uses the configured entrant index from the
+validated stream binding, then resolves the profile through the selected
+group/slot; missing or incomplete setup/profile data fails closed. The Windows
+frontend smoke verifies seven Viper/Bemidji AI records retain these inputs for
+profile group 1. This closes the setup-data lifetime/provenance gap only. It
+does not materialize native pointers, model descriptors, manager registrations
+or mutable ACAR callback state, and it does not advance AI physics.
+
 For each bound AI `ACAR`, `WindowState` now retains the eight mapped curve
 source floats from record `+0x68..+0x84` alongside its configured-car and
 stream-entry identity. `read_car_curve_source_record` validates the complete
