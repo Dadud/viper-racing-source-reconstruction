@@ -95,8 +95,28 @@ try {
         assert.equal(game.error, undefined, game.error?.message);
         assert.equal(game.status, 0,
             `viper_game rejected generated schedule: ${game.stderr || game.stdout}`);
+        const gameReplayLines = fs.readFileSync(gameReplayPath, "utf8")
+            .trimEnd().split(/\r?\n/);
+        assert(gameReplayLines.length > 1, "viper_game recorded no replay frames");
+        const replayHeader = gameReplayLines[0].split(",");
+        const replayRows = gameReplayLines.slice(1).map(line => line.split(","));
+        const replayColumn = name => replayHeader.indexOf(name);
+        assert(replayColumn("throttle") >= 0 && replayColumn("brake") >= 0 &&
+            replayColumn("route_motion_step_count") >= 0);
+        assert(replayRows.some(row => row[replayColumn("throttle")] === "1"));
+        assert(replayRows.some(row => row[replayColumn("brake")] === "1"));
+        assert(replayRows.every(row => row[replayColumn("route_motion_step_count")] === "0"),
+            "converted playback invoked ideal-line route motion");
         const tickLines = fs.readFileSync(tickTracePath, "utf8").trimEnd().split(/\r?\n/);
         assert(tickLines.length > 1, "viper_game produced no tick records from generated schedule");
+        const tickHeader = tickLines[0].split(",");
+        const tickRows = tickLines.slice(1).map(line => line.split(","));
+        const tickColumn = name => tickHeader.indexOf(name);
+        assert(tickColumn("throttle") >= 0 && tickColumn("brake") >= 0);
+        const peak = name => Math.max(...tickRows.map(row =>
+            Number(row[tickColumn(name)])).filter(Number.isFinite));
+        assert(peak("throttle") > 0.05, "replayed throttle did not reach PCAR controls");
+        assert(peak("brake") > 0.05, "replayed brake did not reach PCAR controls");
     }
 
     const invalid = [...events];
