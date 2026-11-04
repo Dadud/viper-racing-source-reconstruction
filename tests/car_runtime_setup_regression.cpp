@@ -195,6 +195,50 @@ int main()
                 "tire response vector stores must fail closed on unknown +0x110 basis");
         }
         {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 4> initial{{
+                {wheel_base + 0x124U, 4U,
+                    std::bit_cast<std::uint32_t>(10.0F)},
+                {wheel_base + 0x038U, 4U,
+                    std::bit_cast<std::uint32_t>(2.0F)},
+                {wheel_base + 0x020U, 1U, 1U},
+                {wheel_base + 0x120U, 1U, 0x02U},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, initial),
+                "wheel-rate finalization source bytes must materialize");
+            const viper::WheelSpinPreprojectionResult spin{
+                9.0F, 0.0F, 0.0F, 3.0F, 0.25F};
+            const viper::PhysicsVector3 tire_vector{1.0F, 2.0F, 3.0F};
+            const viper::PhysicsVector3 forward{0.0F, 1.0F, 0.0F};
+            const viper::WheelRateFinalizationInput expected_input{
+                10.0F, 0.25F, 2.0F, 1.0F,
+                viper::kBodyIntegrationScale, 9.549296F, 1U, 0x02U};
+            const auto expected = viper::finalize_wheel_rate_state(expected_input);
+            const auto result = viper::advance_ncar_wheel_rate_finalization_in_object(
+                wheel, wheel_base, spin, tire_vector, forward);
+            require(result && result->rate_0x124 == expected.rate_0x124 &&
+                    result->auxiliary_rate_0x128 == expected.auxiliary_rate_0x128 &&
+                    result->animation_flags_0x120 ==
+                        static_cast<std::uint8_t>(expected.animation_flags_0x120 | 0x40U) &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x124U) ==
+                        std::optional<std::uint32_t>{
+                            std::bit_cast<std::uint32_t>(expected.rate_0x124)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x128U) ==
+                        std::optional<std::uint32_t>{
+                            std::bit_cast<std::uint32_t>(expected.auxiliary_rate_0x128)},
+                "wheel-rate finalization must subtract response projection before writing native tail lanes");
+
+            viper::NcarWheelRuntimeObjectState unknown_rate{};
+            const auto unknown_before = unknown_rate;
+            require(!viper::advance_ncar_wheel_rate_finalization_in_object(
+                        unknown_rate, wheel_base, spin, tire_vector, forward) &&
+                    unknown_rate.bytes == unknown_before.bytes &&
+                    unknown_rate.initialized_bytes == unknown_before.initialized_bytes,
+                "wheel-rate finalization must preserve unknown native inputs");
+        }
+        {
             viper::WheelTireDynamicsState state{};
             state.filtered_component_0x170 = 10.0F;
             state.filtered_component_0x174 = 10.0F;

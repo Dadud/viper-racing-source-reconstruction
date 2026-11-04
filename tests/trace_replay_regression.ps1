@@ -158,6 +158,7 @@ try {
     $wheelTireResetColumns = @()
     $wheelTireAccumulatorColumns = @()
     $wheelTireVectorColumns = @()
+    $wheelRateFinalizeColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
@@ -251,6 +252,15 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireVectorNames[$lane])")
         }
         $wheelTireVectorColumns += ,$tireVectorColumns
+        $wheelRateFinalizeNames = @(
+            'wheel_rate_finalized', 'wheel_rate_final_0x124',
+            'wheel_rate_final_0x128')
+        $wheelRateFinalizeLaneColumns = [int[]]::new($wheelRateFinalizeNames.Count)
+        for ($lane = 0; $lane -lt $wheelRateFinalizeNames.Count; ++$lane) {
+            $wheelRateFinalizeLaneColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($wheelRateFinalizeNames[$lane])")
+        }
+        $wheelRateFinalizeColumns += ,$wheelRateFinalizeLaneColumns
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $spinColumns = [int[]]::new(5)
@@ -336,6 +346,9 @@ try {
         @($wheelTireVectorColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelRateFinalizeColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelSpinColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
@@ -361,6 +374,7 @@ try {
     $observedInactiveTireReset = $false
     $observedTireAccumulatorStage = $false
     $observedTireVectorStage = $false
+    $observedWheelRateFinalization = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
@@ -515,6 +529,25 @@ try {
                     if ([single]::IsNaN($vectorValue) -or
                         [single]::IsInfinity($vectorValue)) {
                         throw "Wheel $wheel tire response vector output is non-finite at line $($index + 1)"
+                    }
+                }
+            }
+            $rateFinalizeColumns = $wheelRateFinalizeColumns[$wheel]
+            $rateFinalized = $fields[$rateFinalizeColumns[0]]
+            if ($vectorsApplied -eq '1' -and $rateFinalized -ne '1') {
+                throw "Wheel $wheel tire response did not reach final wheel-rate stores at line $($index + 1)"
+            }
+            if ($rateFinalized -eq '1') {
+                $observedWheelRateFinalization = $true
+                foreach ($column in $rateFinalizeColumns[1..2]) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel final wheel-rate output is missing at line $($index + 1)"
+                    }
+                    $rateValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($rateValue) -or
+                        [single]::IsInfinity($rateValue)) {
+                        throw "Wheel $wheel final wheel-rate output is non-finite at line $($index + 1)"
                     }
                 }
             }
@@ -926,6 +959,9 @@ try {
     }
     if (-not $observedTireVectorStage) {
         throw 'Fixed-step replay never entered the finite active-contact tire response vector stage'
+    }
+    if (-not $observedWheelRateFinalization) {
+        throw 'Fixed-step replay never entered finite final wheel-rate stores'
     }
 
     Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Active-contact tire filters and accumulator state were derived and persisted; tire forces remain outside body integration."

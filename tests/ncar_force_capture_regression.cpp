@@ -163,7 +163,7 @@ int main()
              scalar_projection.corrected_vector_0x100_0x108.z},
             {1.5F, -3.0F, 4.0F},
             "tire vector projection must use its +0x110 basis");
-        if (std::fabs(scalar_projection.response_scalar_0x7c - 9.75F) >
+        if (std::fabs(scalar_projection.response_local_0x90 - 9.75F) >
             1.0e-6F) {
             throw std::runtime_error(
                 "tire response scalar must subtract the independent +0x58 projection");

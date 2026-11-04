@@ -1080,11 +1080,17 @@ applies a basis projection using the wheel's body-space basis vector:
 
 ```text
 corrected_vector = response_vector - basis * dot(basis, response_vector)
+local_90_after_tire_projection = local_90_before_projection -
+    dot(transformed_wheel_forward_axis, response_vector)
 ```
 
-`correct_tire_response_projection` models this correction before the routine
-accumulates the final vector and its moment with `0x43E6F0`. The basis is used
-as stored; the helper does not assume it is normalized.
+`correct_tire_response_projection` models the vector correction, while
+`apply_wheel_tire_basis_update` also models the independent scalar projection
+onto the transformed wheel-forward axis. The scalar is the stack temporary
+`[ESP+0x7C]` / Ghidra `local_90` (entry-relative `E-0x90`), not wheel field
+`+0x7C`. The corrected value feeds the `+0x124` rate tail at
+`0x443E7C..0x443E9D`. The wheel `+0x110..+0x118` projection basis is used as
+stored; the helper does not assume it is normalized.
 `compose_wheel_tire_response` connects the recovered response factors,
 contact-normal cross product, negated response-vector assembly, and projection.
 The four-wheel composition now derives the curve-load and geometric slip
@@ -1111,16 +1117,21 @@ prior wheel state. The portable factor composition now sources the corrected
 suspension-load and slip-curve operands described above. The Windows live
 session now persists `+0x100..+0x108` followed by `+0xF4..+0xFC` from the
 active-contact response derivation, using the transformed wheel-forward axis
-and initialized wheel `+0x110..+0x118`. This does not yet apply tire force.
-The seed for the separate `+0x7C` scalar correction remains unresolved.
-Evidence:
+and initialized wheel `+0x110..+0x118`. The live session then subtracts the
+same-tick response-vector projection from `WheelSpinPreprojectionResult`'s
+`local_90` and writes final wheel `+0x120/+0x124/+0x128` on this active-contact
+path. Tire force remains outside body integration. Evidence:
 `0x442530` assembly `0x00443AA7..0x00443B1D` and `0x00443BBD..0x00443BEE`.
-This `+0x7C` store is distinct from the tail's `local_90`; it is not the
-response input to the final wheel-rate increment.
+The `[ESP+0x7C]` temporary maps to Ghidra `local_90` (entry-relative `E-0x90`);
+it is a stack local, not wheel object `+0x7C`, and it directly feeds the final
+wheel-rate increment at `0x443E7C..0x443E9D`. Its initial value and mode
+attenuation are already produced by `update_wheel_spin_preprojection`; the
+live byte-backed finalizer now applies the post-vector correction and writes
+the three tail fields for active contact.
 
-The live diagnostics path now derives finite tire factors and advances the
-stateful `0x442530` filter stage when the native active-contact gate is
-satisfied. The hash-matched constructor supplies the persistent `+0x170` and
+The live path now derives finite tire factors, advances the stateful `0x442530`
+filter stage, and finalizes wheel rate for active contact. The hash-matched
+constructor supplies the persistent `+0x170` and
 `+0x174` histories; the byte-backed stage refuses unknown or non-finite
 history, records `+0x180/+0x174/+0x170/+0x11C`, and only takes the reset path
 when its caller has observed that predicate. The route-disabled replay requires
@@ -1134,8 +1145,9 @@ cross product, forms the weighted response vector, and applies the observed
 `1e8` squared-length normalization cap and `10000` vector limit before basis
 projection. Its corrected
 `+0x100..+0x108` vector feeds both subsequent tire-force calls. The final
-wheel-rate update keeps its evolved `local_90` as a separate explicit input;
-the tire-basis `+0x7C` result does not feed it. The tire-curve portion
+wheel-rate update consumes the evolved `local_90` after the response-vector
+projection, and the live session now applies that tail after active-contact
+vector stores. The tire-curve portion
 of the factors is now evaluated from the `TireResponseCurveSet`, including the
 signed/clamped forward slip correction, and call-site scales. With contact
 composition enabled, the wheel contact-feature profile supplies native

@@ -781,6 +781,14 @@ advance_ncar_wheel_tire_response_vectors_in_object(
     const PhysicsVector3& contact_normal,
     float response_scale) noexcept;
 
+[[nodiscard]] std::optional<WheelRateFinalizationResult>
+advance_ncar_wheel_rate_finalization_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset,
+    const WheelSpinPreprojectionResult& spin_preprojection,
+    const PhysicsVector3& response_vector,
+    const PhysicsVector3& forward_basis) noexcept;
+
 // Applies the active-contact 0x442530 accumulator stage to initialized wheel
 // bytes. Contact-active writes replace +0xEC/+0xF0, so their prior contents
 // are deliberately not treated as inputs.

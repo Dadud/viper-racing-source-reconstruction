@@ -1505,13 +1505,13 @@ WheelTireBasisUpdateResult apply_wheel_tire_basis_update(
         static_cast<float>(static_cast<long double>(vector.y) - basis.y * basis_projection),
         static_cast<float>(static_cast<long double>(vector.z) - basis.z * basis_projection)};
 
-    const auto& scalar_basis = input.scalar_projection_basis_0x58_0x60;
+    const auto& scalar_basis = input.local_90_projection_basis_0x58_0x60;
     const auto scalar_projection =
         static_cast<long double>(scalar_basis.x) * vector.x +
         static_cast<long double>(scalar_basis.y) * vector.y +
         static_cast<long double>(scalar_basis.z) * vector.z;
-    result.response_scalar_0x7c = static_cast<float>(
-        static_cast<long double>(input.response_scalar_0x7c) - scalar_projection);
+    result.response_local_0x90 = static_cast<float>(
+        static_cast<long double>(input.response_local_0x90) - scalar_projection);
     return result;
 }
 

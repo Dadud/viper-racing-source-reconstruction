@@ -2095,6 +2095,8 @@ struct PlayerPhysicsTickContext {
         wheel_tire_accumulator_results{};
     std::array<std::optional<viper::WheelTireResponseVectorStoreResult>, 4>
         wheel_tire_response_vector_store_results{};
+    std::array<std::optional<viper::WheelRateFinalizationResult>, 4>
+        wheel_rate_finalization_results{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x170{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x174{};
     std::array<std::optional<float>, 4> wheel_tire_instantaneous_0x180{};
@@ -2103,7 +2105,7 @@ struct PlayerPhysicsTickContext {
         wheel_response_vectors_0xf4{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_corrected_response_vectors_0x100{};
-    std::array<std::optional<float>, 4> wheel_response_scalar_0x7c{};
+    std::array<std::optional<float>, 4> wheel_state_0x7c{};
     std::array<std::optional<float>, 4> wheel_curve_scale_0x90{};
     std::array<std::optional<float>, 4> wheel_curve_scale_0x94{};
     std::array<std::optional<float>, 4> wheel_curve_scale_0x98{};
@@ -3455,7 +3457,7 @@ struct WindowState {
             tick.wheel_surface_coefficient_0xa0[wheel] =
                 read_response_float(0xa0U);
             if (const auto response_scalar = read_response_float(0x7cU))
-                tick.wheel_response_scalar_0x7c[wheel] = response_scalar;
+                tick.wheel_state_0x7c[wheel] = response_scalar;
             const auto read_response_vector = [&wheel_object](
                 const std::uint32_t offset) -> std::optional<viper::PhysicsVector3> {
                 const auto x = viper::read_ncar_wheel_object_u32(wheel_object, offset);
@@ -3699,6 +3701,17 @@ struct WindowState {
                                                     projection->forward_axis,
                                                     contact_normal,
                                                     *wheel_scalar_0x90);
+                                            if (tick.wheel_tire_response_vector_store_results[wheel] &&
+                                                player_wheel_spin_preprojection_results[wheel]) {
+                                                tick.wheel_rate_finalization_results[wheel] =
+                                                    viper::advance_ncar_wheel_rate_finalization_in_object(
+                                                        player_runtime_state.wheel_objects[wheel],
+                                                        wheel_object_offset,
+                                                        *player_wheel_spin_preprojection_results[wheel],
+                                                        tick.wheel_tire_response_vector_store_results[wheel]
+                                                            ->response_vector_0xf4_0xfc,
+                                                        projection->forward_axis);
+                                            }
                                     }
                                 }
                             }
@@ -5469,8 +5482,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_vector_0x100_x"
                 << ",wheel" << wheel << "_tire_vector_0x100_y"
                 << ",wheel" << wheel << "_tire_vector_0x100_z"
+                << ",wheel" << wheel << "_wheel_rate_finalized"
+                << ",wheel" << wheel << "_wheel_rate_final_0x124"
+                << ",wheel" << wheel << "_wheel_rate_final_0x128"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
-                << ",wheel" << wheel << "_response_scalar_0x7c"
+                << ",wheel" << wheel << "_wheel_state_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
                 << ",wheel" << wheel << "_curve_scale_0x94"
                 << ",wheel" << wheel << "_curve_scale_0x98"
@@ -5948,13 +5964,22 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace << ',';
                             if (value) physics_tick_trace << *value;
                         }
+                        const auto& rate_finalization =
+                            tick.wheel_rate_finalization_results[wheel];
+                        physics_tick_trace << ',' << (rate_finalization ? 1 : 0)
+                            << ',';
+                        if (rate_finalization)
+                            physics_tick_trace << rate_finalization->rate_0x124;
+                        physics_tick_trace << ',';
+                        if (rate_finalization)
+                            physics_tick_trace << rate_finalization->auxiliary_rate_0x128;
                         physics_tick_trace << ',';
                         if (tick.wheel_surface_adjusted_responses[wheel]) {
                             physics_tick_trace <<
                                 *tick.wheel_surface_adjusted_responses[wheel];
                         }
                         for (const auto value : {
-                                tick.wheel_response_scalar_0x7c[wheel],
+                                tick.wheel_state_0x7c[wheel],
                                 tick.wheel_curve_scale_0x90[wheel],
                                 tick.wheel_curve_scale_0x94[wheel],
                                 tick.wheel_curve_scale_0x98[wheel],

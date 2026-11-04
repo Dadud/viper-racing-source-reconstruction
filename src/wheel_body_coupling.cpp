@@ -1246,6 +1246,67 @@ advance_ncar_wheel_tire_response_vectors_in_object(
         : std::nullopt;
 }
 
+std::optional<WheelRateFinalizationResult>
+advance_ncar_wheel_rate_finalization_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const WheelSpinPreprojectionResult& spin_preprojection,
+    const PhysicsVector3& response_vector,
+    const PhysicsVector3& forward_basis) noexcept
+{
+    const auto read_float = [&wheel](const std::uint32_t local_offset)
+            -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, local_offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto rate = read_float(0x124U);
+    const auto wheel_scalar = read_float(0x038U);
+    const auto damage = read_ncar_wheel_object_u8(wheel, 0x020U);
+    const auto animation_flags = read_ncar_wheel_object_u8(wheel, 0x120U);
+    const auto finite_vector = [](const PhysicsVector3& value) {
+        return std::isfinite(value.x) && std::isfinite(value.y) &&
+            std::isfinite(value.z);
+    };
+    if (!rate || !wheel_scalar || !damage || !animation_flags ||
+        !finite_vector(response_vector) || !finite_vector(forward_basis) ||
+        !std::isfinite(spin_preprojection.response_local_0x90) ||
+        !std::isfinite(spin_preprojection.blend_local_0x28)) {
+        return std::nullopt;
+    }
+
+    const auto response_local_0x90 =
+        spin_preprojection.response_local_0x90 -
+        (response_vector.x * forward_basis.x +
+         response_vector.y * forward_basis.y +
+         response_vector.z * forward_basis.z);
+    if (!std::isfinite(response_local_0x90)) return std::nullopt;
+    const auto result = finalize_wheel_rate_state({
+        *rate,
+        spin_preprojection.blend_local_0x28,
+        *wheel_scalar,
+        response_local_0x90,
+        kBodyIntegrationScale,
+        9.549296F,
+        *damage,
+        *animation_flags});
+    if (!std::isfinite(result.rate_0x124) ||
+        !std::isfinite(result.auxiliary_rate_0x128)) {
+        return std::nullopt;
+    }
+
+    const std::array<NcarObjectFieldWrite, 3> writes{{
+        {wheel_object_offset + 0x120U, 1U, result.animation_flags_0x120},
+        {wheel_object_offset + 0x124U, 4U,
+            std::bit_cast<std::uint32_t>(result.rate_0x124)},
+        {wheel_object_offset + 0x128U, 4U,
+            std::bit_cast<std::uint32_t>(result.auxiliary_rate_0x128)},
+    }};
+    return apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes)
+        ? std::optional<WheelRateFinalizationResult>{result} : std::nullopt;
+}
+
 std::optional<WheelTireAccumulatorResult>
 advance_ncar_wheel_tire_accumulators_in_object(
     NcarWheelRuntimeObjectState& wheel,

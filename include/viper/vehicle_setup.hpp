@@ -1071,8 +1071,8 @@ struct WheelTireResponseResult {
 struct WheelTireBasisUpdateInput {
     PhysicsVector3 response_vector_after_scaling{};
     PhysicsVector3 basis_0x110_0x118{};
-    PhysicsVector3 scalar_projection_basis_0x58_0x60{};
-    float response_scalar_0x7c{};
+    PhysicsVector3 local_90_projection_basis_0x58_0x60{};
+    float response_local_0x90{};
 };
 
 struct WheelTireResponseVectorInput {
@@ -1091,7 +1091,7 @@ struct WheelTireResponseVectorInput {
 struct WheelTireBasisUpdateResult {
     PhysicsVector3 response_vector_0xf4_0xfc{};
     PhysicsVector3 corrected_vector_0x100_0x108{};
-    float response_scalar_0x7c{};
+    float response_local_0x90{};
 };
 
 struct WheelTireResponseVectorStoreResult {
