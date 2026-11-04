@@ -172,6 +172,17 @@ only its launcher after the engine's natural exit and detached the ISO.
 These are original startup diagnostics only. They do not establish a completed
 original race or resolve reconstruction gameplay gaps.
 
+The `132548Z` trace also captured the complete `0x458D60` request descriptor:
+size `0x6c`, flags `0x1001`, `DDPF_RGB` (`0x40`), 16 bits per pixel, no width or
+height filter, and caps `0x2000`. The trace proves the engine's `0x44EE00`
+callback was not entered in that run. It does not prove whether the COM
+`EnumDisplayModes` method ran, nor that Windows DirectDraw lacks a matching
+mode. The startup cause therefore remains unresolved. The passive trace now
+hooks `DirectDrawCreate`, follows its returned COM interface and instruments
+the verified `IDirectDraw::EnumDisplayModes` vtable slot; its mock checks that
+discovery path. A new original capture is pending because Frida is not
+available in the current Python environment.
+
 A child-only override probes
 `../../analysis/reference_captures/vidmem_override_20261025T031500Z.json`
 and `../../analysis/reference_captures/vidmem_override_retry_20261025T031150Z.json`

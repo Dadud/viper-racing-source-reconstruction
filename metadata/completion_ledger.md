@@ -13,12 +13,23 @@ and capability selection succeeded, then `0x44EEB0` entered mode enumeration.
 The `0x458D60` EnumDisplayModes wrapper returned `S_OK` (`0`), but the engine's
 `0x44EE00` callback did not run and required 640x480 flag `0x509C52` stayed
 zero. The original child then exited naturally with code 5 before video-memory
-classification and before gameplay. This identifies the required-resolution
-enumeration gate as the current original-startup boundary; why the host's
-DirectDraw enumerator supplied no callback remains open. Exact logs are
+classification and before gameplay. In `132548Z`, the wrapper's request record
+was `0x6c` bytes with flags `0x1001`, `DDPF_RGB` (`0x40`), 16 bits per pixel,
+zero width/height filters, and surface caps `0x2000`. The capture observes the
+engine callback was not entered; it does not identify whether the underlying
+COM method was called or why no callback arrived. The required-resolution
+enumeration gate remains the startup boundary, while the cause is unresolved.
+Exact logs are
 external: `../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T130830Z.jsonl`
 and `../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T131253Z.jsonl`.
-The runner stopped the launcher it created and detached the ISO after both.
+The full descriptor is in `132548Z`. A passive follow-up trace now starts at
+`DirectDrawCreate`, discovers the returned interface and hooks its verified
+`IDirectDraw::EnumDisplayModes` vtable slot, so a next capture can distinguish
+the COM call/return from the engine wrapper and callback. Its Node mock covers
+interface discovery and call-event wiring. The current host lacks an importable
+Frida Python package, so this new hook has not yet been exercised in another
+original-client run. The runner stopped the launcher it created and detached
+the ISO after the prior captures.
 
 The passive sampler and its runner wiring are covered by a Node mock and
 capture-config regression; all five focused capture CTests passed. This
