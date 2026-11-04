@@ -1041,3 +1041,24 @@ physics comparison remains a clean matched original/reconstruction grid-start
 capture for the four wheel anchors and contact projections; retain inactive
 state for negative signed depths until that upstream comparison resolves the
 mismatch.
+
+### Next powered-driving capture gate
+
+Do not wire the modeled PCAR signal multiplier or wheel-pair setter into the
+live tick yet. First run `tools/pcar_source_field_watch.js` against a controlled
+original Viper/Bemidji session and retain the raw capture outside Git. The
+capture is usable only if the constructor object, selected `0x4C8188` callback,
+and `0x431150` integrator body are identical, both `+0x5B0/+0x8F8` write
+provenance paths are recorded (or are demonstrably untouched through the
+first tick), and the watch resolves the actual selected thread and writer
+addresses inside `race.bin`. Correlate those events with the existing
+`tools/original_pcar_controlled_wheel_capture.js` fields for controller,
+selected D-block endpoints, wheel `+0xE4/+0x124/+0x128`, and sampled throttle,
+neutral, and brake inputs. Reject captures that lack verified input delivery,
+object identity, timing, or clean grid-start conditions. Then replay the same
+input schedule with ideal-line motion disabled and compare timestamp-aligned
+body velocity, wheel state, and force traces before implementing the sourced
+upstream behavior. Until that evidence exists, powered longitudinal response
+and complete Viper/Bemidji race acceptance remain open. The committed
+`pcar_source_field_watch_mock` CTest only checks agent script control flow; it
+is not a substitute for this original-client capture.
