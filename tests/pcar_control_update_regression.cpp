@@ -1,4 +1,5 @@
 #include "viper/pcar_control_update.hpp"
+#include "viper/ncar_state.hpp"
 
 #include <bit>
 #include <cmath>
@@ -9,6 +10,40 @@
 
 int main()
 {
+    viper::NcarIntegratorChildControl controller_getter_state{};
+    controller_getter_state.enabled_0x58 = 1U;
+    controller_getter_state.selected_value_0x18 = 2.0F;
+    const auto active_controller_getter =
+        viper::read_ncar_animation_controller_getter(
+            controller_getter_state, 3.0F);
+    if (!active_controller_getter || *active_controller_getter != 6.0F) {
+        std::cerr << "0x43FF90 did not scale the selected pair getter by +0x18.\n";
+        return EXIT_FAILURE;
+    }
+    controller_getter_state.enabled_0x58 = 0U;
+    const auto disabled_controller_getter =
+        viper::read_ncar_animation_controller_getter(
+            controller_getter_state,
+            std::numeric_limits<float>::quiet_NaN(), -4.0F);
+    if (!disabled_controller_getter || *disabled_controller_getter != -4.0F) {
+        std::cerr << "0x43FF90 disabled arm did not return +0x10.\n";
+        return EXIT_FAILURE;
+    }
+    controller_getter_state.enabled_0x58 = 1U;
+    if (viper::read_ncar_animation_controller_getter(
+            controller_getter_state,
+            std::numeric_limits<float>::quiet_NaN())) {
+        std::cerr << "0x43FF90 accepted non-finite getter inputs or output.\n";
+        return EXIT_FAILURE;
+    }
+    controller_getter_state.enabled_0x58 = 0U;
+    if (viper::read_ncar_animation_controller_getter(
+            controller_getter_state, 1.0F,
+            std::numeric_limits<float>::infinity())) {
+        std::cerr << "0x43FF90 accepted a non-finite +0x10 fallback.\n";
+        return EXIT_FAILURE;
+    }
+
     if (viper::evaluate_pcar_constructor_helper_0x43ba90(false, 1U) != 1U ||
         viper::evaluate_pcar_constructor_helper_0x43ba90(false, 3U) != 1U ||
         viper::evaluate_pcar_constructor_helper_0x43ba90(false, 4U) != 1U ||

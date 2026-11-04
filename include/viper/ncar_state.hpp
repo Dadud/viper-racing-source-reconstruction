@@ -1011,6 +1011,14 @@ struct NcarAnimationControllerResult {
     NcarAnimationControllerTargets& targets,
     const NcarAnimationControllerObservation& observation) noexcept;
 
+// Reconstructs the post-0x43FAE0 0x43FF90 getter. The enabled arm returns the
+// selected D-block getter multiplied by controller +0x18; the disabled arm
+// discards the D-block return and yields controller +0x10.
+[[nodiscard]] std::optional<float> read_ncar_animation_controller_getter(
+    const NcarIntegratorChildControl& child,
+    float selected_pair_getter,
+    float disabled_value_0x10 = 0.0F) noexcept;
+
 struct NcarLinkedTargetFields {
     std::array<std::uint32_t, 12> copied_state_0x38{};
     std::array<float, 3> subtractor_0x44{};

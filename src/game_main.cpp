@@ -4290,18 +4290,16 @@ struct WindowState {
                 static_cast<float>(physics_step_count) * 0.016F;
             player_physics_ticks_this_update.push_back(tick_context);
             // The PCAR callback prefix stores control-derived body scalars;
-            // the shared integrator's +0x4C callback then writes the four
-            // wheel +0xE0 values before the per-wheel update pass.
+            // then 0x431150 runs its curve getter before the shared +0x4C
+            // callback. Controller callback inputs are still being traced.
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
+            if (!sample_player_integrator_curve_getter(
+                    player_physics_ticks_this_update.back(),
+                    scheduler_input.gate_0x508a40)) return false;
             if (!update_player_integrator_wheel_scalars()) return false;
             update_player_wheel_contacts_from_body(
                 player_physics_ticks_this_update.back());
-            if (!player_constructor_inputs_ready ||
-                !sample_player_integrator_curve_getter(
-                    player_physics_ticks_this_update.back(),
-                    scheduler_input.gate_0x508a40)) {
-                return false;
-            }
+            if (!player_constructor_inputs_ready) return false;
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
             if (!player_constructor_inputs_ready ||

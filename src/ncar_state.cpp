@@ -502,6 +502,24 @@ NcarAnimationControllerResult advance_ncar_animation_controller(
     return result;
 }
 
+std::optional<float> read_ncar_animation_controller_getter(
+    const NcarIntegratorChildControl& child,
+    const float selected_pair_getter,
+    const float disabled_value_0x10) noexcept
+{
+    if (child.enabled_0x58 == 0U) {
+        return std::isfinite(disabled_value_0x10)
+            ? std::optional<float>{disabled_value_0x10}
+            : std::nullopt;
+    }
+    if (!std::isfinite(selected_pair_getter) ||
+        !std::isfinite(child.selected_value_0x18)) {
+        return std::nullopt;
+    }
+    const auto result = selected_pair_getter * child.selected_value_0x18;
+    return std::isfinite(result) ? std::optional<float>{result} : std::nullopt;
+}
+
 bool initialize_ncar_constructor_storage(
     const std::span<std::byte> object,
     const std::span<std::byte> sample_window,
@@ -2485,6 +2503,7 @@ NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
         write(offset, 4U, 0U);
     }
     write(0x0c98U, 4U, 0x004c8778U);
+    write(0x0cbcU, 4U, 0U); // controller selection index +0x24
     for (const std::uint32_t offset : {0x0cb0U, 0x0cb8U, 0x0cb4U,
              0x0cc0U, 0x0ce4U}) {
         write(offset, 4U, 0U);

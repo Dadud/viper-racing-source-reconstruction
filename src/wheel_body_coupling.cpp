@@ -425,6 +425,21 @@ NcarIntegratorSignalResult advance_ncar_integrator_signal(
     NcarIntegratorSignalResult result{};
     const float scaled_callback = input.callback_value_0x339 * input.multiplier_0xdd0;
     state.stored_value_0xddc = scaled_callback;
+    result.stored_value_0xddc_written = true;
+    return [&]() noexcept {
+        auto control = advance_ncar_integrator_signal_control(
+            state, input, copied_flag_0xc3c);
+        control.stored_value_0xddc_written = true;
+        return control;
+    }();
+}
+
+NcarIntegratorSignalResult advance_ncar_integrator_signal_control(
+    NcarIntegratorSignalState& state,
+    const NcarIntegratorSignalInput& input,
+    const std::uint8_t copied_flag_0xc3c) noexcept
+{
+    NcarIntegratorSignalResult result{};
     state.copied_flag_0xe49 = copied_flag_0xc3c;
 
     constexpr std::int32_t ramp_threshold_bits = 0x44FA0000;

@@ -655,6 +655,7 @@ make_ncar_integrator_signal_state_from_runtime_record(
     std::span<const std::byte> runtime_record) noexcept;
 
 struct NcarIntegratorSignalResult {
+    bool stored_value_0xddc_written{};
     bool ramp_setter_0x43f8e0_reached{};
     bool helper_0x43f830_reached{};
     bool paired_setters_reached{};
@@ -663,6 +664,14 @@ struct NcarIntegratorSignalResult {
     float paired_setter_value{};
     float paired_setter_opposite{};
 };
+
+// Runs the 0x43F830 clamp/smoother and opposite setter calculation without
+// projecting the separate +0xDDC callback product whose +0xDD0 input is not
+// necessarily available to a caller.
+[[nodiscard]] NcarIntegratorSignalResult advance_ncar_integrator_signal_control(
+    NcarIntegratorSignalState& state,
+    const NcarIntegratorSignalInput& input,
+    std::uint8_t copied_flag_0xc3c) noexcept;
 
 struct NcarIntegratorWheelCallbackSetupInput {
     // Constructor source-record fields read by 0x433C00 at +0x58, +0x5C,

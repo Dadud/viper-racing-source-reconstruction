@@ -291,7 +291,8 @@ if(BUILD_TESTING)
         COMMAND viper_render_transform_regression)
     add_executable(viper_pcar_control_regression
         tests/pcar_control_update_regression.cpp)
-    target_link_libraries(viper_pcar_control_regression PRIVATE viper_pcar_model)
+    target_link_libraries(viper_pcar_control_regression PRIVATE
+        viper_pcar_model viper_ncar_model)
     add_test(NAME pcar_control_update_regression
         COMMAND viper_pcar_control_regression)
     add_executable(viper_race_progression_regression
