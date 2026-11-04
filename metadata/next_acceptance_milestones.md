@@ -116,6 +116,21 @@ order. Any transform mismatch must be resolved at its producer before testing
 suspension integration.
 It is reconstructed-client diagnostic evidence, not an original-game
 comparison or proof that those fields are dynamically sourced correctly.
+
+The 2026-11-03 neutral route-disabled trace updates that initial-contact
+snapshot: in 8.336 seconds with throttle, brake, and steering all zero, the
+wheel query projections start near -0.10 m, gravity lowers the chassis, and
+contact is active from sampled tick 9 onward in 512/522 rows. The body then
+moves about 2.50 m in X and 5.63 m in Z over the trace. This is a stability
+observation, not evidence of original behavior; no depth offset or control
+force is inferred from it. The original passive callback capture has a
+different pose and lacks surface-normal/selected-vertex provenance, so the
+matched clean grid capture remains the next parity gate. Native powertrain-to-
+wheel torque is also still missing; dashboard gear rendering and the `+0xE0`
+geometric callback do not source an engine torque law. The 2026-11-03 Release
+build and all 67 configured CTests passed after the curve-constructor
+correction. Trace and hash are recorded in `reconstruction_progress.md`.
+
 This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
 [`completion_ledger.md`](completion_ledger.md). Existing portable physics

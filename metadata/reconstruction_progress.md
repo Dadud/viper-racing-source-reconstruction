@@ -1,5 +1,24 @@
 # Reconstruction progress
 
+- **2026-11-03, neutral grid contact trace:** Ran the Release Viper/Bemidji
+  runtime with route motion disabled and all sampled controls at zero, writing
+  the trace outside the repository to
+  `../analysis/reference_captures/reconstructed_grid_contact_20261103/trace.csv`
+  (SHA-256 `A5DE248FA24A5C6C9499CA9927747FD6181F04E0E869AC7B39EF8FF47AB80162`).
+  The selected placement begins about 0.10 m above the sampled plane along the
+  wheel projection; gravity advances the body before the four contacts engage
+  by sampled tick 9. Contact is active in 512 of 522 retained rows. Over the
+  8.336-second capture the body settles vertically but moves about 2.50 m in X
+  and 5.63 m in Z with throttle, brake, and steering all zero. The first fall
+  matches the reconstructed `-9.81 m/s^2` gravity term; later neutral drift is
+  not established as original behavior and remains an unresolved physics
+  stability/parity issue. No control, contact-depth, or gravity tuning was
+  applied from this single reconstructed run. The original passive wheel
+  capture is not directly comparable: it has a different body pose and omits
+  terrain normal/selected-vertex provenance. The source-backed powertrain to
+  wheel-spin producer is also still unidentified, so engine torque remains
+  unimplemented.
+
 - **2026-11-03, full body orientation reaches vehicle rendering:** The route-free
   PCAR integrator already updates the native 3x3 orientation matrix, but the
   scene renderer discarded it and rotated FNIM vertices by yaw only. The race
