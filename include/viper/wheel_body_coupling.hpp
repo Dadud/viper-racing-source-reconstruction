@@ -772,6 +772,15 @@ advance_ncar_wheel_tire_dynamics_in_object(
     NcarWheelRuntimeObjectState& wheel,
     std::uint32_t wheel_object_offset) noexcept;
 
+[[nodiscard]] std::optional<WheelTireResponseVectorStoreResult>
+advance_ncar_wheel_tire_response_vectors_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset,
+    const TireWheelResponseFactors& factors,
+    const PhysicsVector3& forward_basis,
+    const PhysicsVector3& contact_normal,
+    float response_scale) noexcept;
+
 // Applies the active-contact 0x442530 accumulator stage to initialized wheel
 // bytes. Contact-active writes replace +0xEC/+0xF0, so their prior contents
 // are deliberately not treated as inputs.

@@ -889,16 +889,15 @@ it is distinct from rolling-speed mismatch. The portable four-wheel
 composition now derives these operands accordingly, with focused regression
 coverage. The live session now executes active-contact tire-filter and
 accumulator updates and clears filter history on confirmed inactive contact;
-response vectors and tire forces remain disconnected. Next, source the exact
-`+0x7C` basis and per-wheel vector stores in native order, then compare
-controlled no-ideal-line runs against the original.
+response vectors now persist for active contact, while tire forces remain
+disconnected. Next, source the `+0x7C` scalar seed and remaining force-call
+operands, then compare controlled no-ideal-line runs against the original.
 
 The route-disabled live path now derives finite curve inputs, advances the
 active-contact tire filters, and persists `+0xA4/+0x10C/+0xEC/+0xF0` from the
 same-tick accumulator model. Its `+0xEC` divisor is the native forward-curve
 product. The inactive-contact filter reset now clears
 `+0x180/+0x174/+0x170/+0x178/+0x11C` when wheel `+0x168` is zero. The
-remaining immediate gap is exact `+0xF4/+0x100/+0x7C` stores and their
-projection bases.
-Keep force application gated until per-wheel vectors and their native
-`0x43E6F0` call sequence pass source-backed regression and no-ideal-line replay.
+remaining immediate gap is the `+0x7C` scalar seed and complete per-wheel
+`0x43E6F0` operands/order. Keep force application gated until those pass
+source-backed regression and no-ideal-line replay.

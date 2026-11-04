@@ -144,6 +144,57 @@ int main()
             }
         }
         {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 3> basis_writes{{
+                {wheel_base + 0x110U, 4U,
+                    std::bit_cast<std::uint32_t>(0.0F)},
+                {wheel_base + 0x114U, 4U,
+                    std::bit_cast<std::uint32_t>(1.0F)},
+                {wheel_base + 0x118U, 4U,
+                    std::bit_cast<std::uint32_t>(0.0F)},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, basis_writes),
+                "tire vector projection basis must materialize");
+            const viper::TireWheelResponseFactors factors{
+                2.0F, 3.0F, 29.0F, 5.0F, 7.0F, 11.0F, 13.0F,
+                17.0F, 19.0F, 23.0F, 31.0F};
+            const viper::PhysicsVector3 forward{1.0F, 0.0F, 0.0F};
+            const viper::PhysicsVector3 normal{0.0F, 1.0F, 0.0F};
+            const auto vector = viper::derive_wheel_tire_response_vector(
+                {factors, forward, normal, 2.0F});
+            const auto basis_update = viper::apply_wheel_tire_basis_update(
+                {vector, {0.0F, 1.0F, 0.0F}, {}, 0.0F});
+            const auto result =
+                viper::advance_ncar_wheel_tire_response_vectors_in_object(
+                    wheel, wheel_base, factors, forward, normal, 2.0F);
+            require(result &&
+                    result->response_vector_0xf4_0xfc.x == vector.x &&
+                    result->response_vector_0xf4_0xfc.y == vector.y &&
+                    result->response_vector_0xf4_0xfc.z == vector.z &&
+                    result->corrected_vector_0x100_0x108.x ==
+                        basis_update.corrected_vector_0x100_0x108.x &&
+                    result->corrected_vector_0x100_0x108.y ==
+                        basis_update.corrected_vector_0x100_0x108.y &&
+                    result->corrected_vector_0x100_0x108.z ==
+                        basis_update.corrected_vector_0x100_0x108.z &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x0f4U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(vector.x)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x100U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            basis_update.corrected_vector_0x100_0x108.x)},
+                "byte-backed tire response vectors must match native capped and projected stores");
+
+            viper::NcarWheelRuntimeObjectState unknown_basis{};
+            const auto unknown_before = unknown_basis;
+            require(!viper::advance_ncar_wheel_tire_response_vectors_in_object(
+                        unknown_basis, wheel_base, factors, forward, normal, 2.0F) &&
+                    unknown_basis.bytes == unknown_before.bytes &&
+                    unknown_basis.initialized_bytes == unknown_before.initialized_bytes,
+                "tire response vector stores must fail closed on unknown +0x110 basis");
+        }
+        {
             viper::WheelTireDynamicsState state{};
             state.filtered_component_0x170 = 10.0F;
             state.filtered_component_0x174 = 10.0F;
@@ -673,6 +724,17 @@ int main()
         ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
         const auto ordinary_tire_response = viper::derive_tire_wheel_response(
             {}, ordinary_tire_factor_input);
+        const viper::TireWheelResponseFactors response_assembly_factors{
+            2.0F, 3.0F, 29.0F, 5.0F, 7.0F, 11.0F, 13.0F,
+            17.0F, 19.0F, 23.0F, 31.0F};
+        const auto response_components =
+            viper::combine_tire_wheel_response(response_assembly_factors);
+        require(response_components.forward ==
+                    (2.0F * 3.0F * 5.0F * 7.0F * 11.0F + 13.0F) *
+                        17.0F * 19.0F * 23.0F &&
+                response_components.lateral ==
+                    2.0F * 29.0F * 5.0F * 17.0F * 19.0F * 31.0F,
+            "native tire response assembly must apply blend/direction/correction to forward and lateral ratio to lateral");
         require(ordinary_tire_response.dynamics_division_valid &&
                 ordinary_tire_response.dynamics_denominator_0x1c ==
                     ordinary_tire_response.factors.forward_curve_value *

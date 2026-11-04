@@ -2093,6 +2093,8 @@ struct PlayerPhysicsTickContext {
     std::array<bool, 4> wheel_tire_dynamics_reset_applied{};
     std::array<std::optional<viper::WheelTireAccumulatorResult>, 4>
         wheel_tire_accumulator_results{};
+    std::array<std::optional<viper::WheelTireResponseVectorStoreResult>, 4>
+        wheel_tire_response_vector_store_results{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x170{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x174{};
     std::array<std::optional<float>, 4> wheel_tire_instantaneous_0x180{};
@@ -3689,6 +3691,14 @@ struct WindowState {
                                                     player_runtime_state.wheel_objects[wheel],
                                                     wheel_object_offset,
                                                     accumulator_input);
+                                            tick.wheel_tire_response_vector_store_results[wheel] =
+                                                viper::advance_ncar_wheel_tire_response_vectors_in_object(
+                                                    player_runtime_state.wheel_objects[wheel],
+                                                    wheel_object_offset,
+                                                    evolved_factors,
+                                                    projection->forward_axis,
+                                                    contact_normal,
+                                                    *wheel_scalar_0x90);
                                     }
                                 }
                             }
@@ -5452,6 +5462,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_accumulator_0x10c"
                 << ",wheel" << wheel << "_tire_state_0xec"
                 << ",wheel" << wheel << "_tire_state_0xf0"
+                << ",wheel" << wheel << "_tire_vectors_applied"
+                << ",wheel" << wheel << "_tire_vector_0xf4_x"
+                << ",wheel" << wheel << "_tire_vector_0xf4_y"
+                << ",wheel" << wheel << "_tire_vector_0xf4_z"
+                << ",wheel" << wheel << "_tire_vector_0x100_x"
+                << ",wheel" << wheel << "_tire_vector_0x100_y"
+                << ",wheel" << wheel << "_tire_vector_0x100_z"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
                 << ",wheel" << wheel << "_response_scalar_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
@@ -5902,6 +5919,31 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                     : std::nullopt,
                                 tire_accumulator
                                     ? std::optional<float>{tire_accumulator->state_0xf0}
+                                    : std::nullopt}) {
+                            physics_tick_trace << ',';
+                            if (value) physics_tick_trace << *value;
+                        }
+                        const auto& tire_vectors =
+                            tick.wheel_tire_response_vector_store_results[wheel];
+                        physics_tick_trace << ',' << (tire_vectors ? 1 : 0);
+                        for (const auto value : {
+                                tire_vectors
+                                    ? std::optional<float>{tire_vectors->response_vector_0xf4_0xfc.x}
+                                    : std::nullopt,
+                                tire_vectors
+                                    ? std::optional<float>{tire_vectors->response_vector_0xf4_0xfc.y}
+                                    : std::nullopt,
+                                tire_vectors
+                                    ? std::optional<float>{tire_vectors->response_vector_0xf4_0xfc.z}
+                                    : std::nullopt,
+                                tire_vectors
+                                    ? std::optional<float>{tire_vectors->corrected_vector_0x100_0x108.x}
+                                    : std::nullopt,
+                                tire_vectors
+                                    ? std::optional<float>{tire_vectors->corrected_vector_0x100_0x108.y}
+                                    : std::nullopt,
+                                tire_vectors
+                                    ? std::optional<float>{tire_vectors->corrected_vector_0x100_0x108.z}
                                     : std::nullopt}) {
                             physics_tick_trace << ',';
                             if (value) physics_tick_trace << *value;

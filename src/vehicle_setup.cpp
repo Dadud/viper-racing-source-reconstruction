@@ -1239,14 +1239,14 @@ TireWheelResponseComponents combine_tire_wheel_response(
     const TireWheelResponseFactors& factors) noexcept
 {
     return {
-        factors.trigonometric_response * factors.forward_ratio *
-            factors.ratio_normalization * factors.low_speed_weight *
-            factors.curve_input * factors.forward_curve_value,
-        (factors.trigonometric_response * factors.lateral_ratio *
+        (factors.trigonometric_response * factors.forward_ratio *
              factors.ratio_normalization * factors.lateral_blend *
              factors.lateral_direction_factor + factors.lateral_correction) *
             factors.low_speed_weight * factors.curve_input *
-            factors.lateral_curve_value};
+            factors.forward_curve_value,
+        factors.trigonometric_response * factors.lateral_ratio *
+            factors.ratio_normalization * factors.low_speed_weight *
+            factors.curve_input * factors.lateral_curve_value};
 }
 
 PhysicsVector3 derive_body_point_velocity_0x43e9b0(

@@ -1175,6 +1175,77 @@ bool clear_ncar_wheel_tire_dynamics_in_object(
     return apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes);
 }
 
+std::optional<WheelTireResponseVectorStoreResult>
+advance_ncar_wheel_tire_response_vectors_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const TireWheelResponseFactors& factors,
+    const PhysicsVector3& forward_basis,
+    const PhysicsVector3& contact_normal,
+    const float response_scale) noexcept
+{
+    const auto read_finite = [&wheel](const std::uint32_t local_offset)
+            -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, local_offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto basis_x = read_finite(0x110U);
+    const auto basis_y = read_finite(0x114U);
+    const auto basis_z = read_finite(0x118U);
+    if (!basis_x || !basis_y || !basis_z) return std::nullopt;
+
+    const std::array<float, 14> scalar_inputs{
+        factors.trigonometric_response, factors.forward_ratio,
+        factors.lateral_ratio, factors.ratio_normalization,
+        factors.lateral_blend, factors.lateral_direction_factor,
+        factors.lateral_correction, factors.low_speed_weight,
+        factors.curve_input, factors.forward_curve_value,
+        factors.lateral_curve_value, response_scale,
+        *basis_x, *basis_y};
+    const auto finite_vector = [](const PhysicsVector3& value) {
+        return std::isfinite(value.x) && std::isfinite(value.y) &&
+            std::isfinite(value.z);
+    };
+    if (!std::all_of(scalar_inputs.begin(), scalar_inputs.end(),
+            [](const float value) { return std::isfinite(value); }) ||
+        !std::isfinite(*basis_z) || !finite_vector(forward_basis) ||
+        !finite_vector(contact_normal)) {
+        return std::nullopt;
+    }
+
+    const auto response_vector = derive_wheel_tire_response_vector({
+        factors, forward_basis, contact_normal, response_scale});
+    const auto basis_update = apply_wheel_tire_basis_update({
+        response_vector, {*basis_x, *basis_y, *basis_z}, {}, 0.0F});
+    const WheelTireResponseVectorStoreResult result{
+        basis_update.response_vector_0xf4_0xfc,
+        basis_update.corrected_vector_0x100_0x108};
+    if (!finite_vector(result.response_vector_0xf4_0xfc) ||
+        !finite_vector(result.corrected_vector_0x100_0x108)) {
+        return std::nullopt;
+    }
+
+    const std::array<NcarObjectFieldWrite, 6> writes{{
+        {wheel_object_offset + 0x100U, 4U,
+            std::bit_cast<std::uint32_t>(result.corrected_vector_0x100_0x108.x)},
+        {wheel_object_offset + 0x104U, 4U,
+            std::bit_cast<std::uint32_t>(result.corrected_vector_0x100_0x108.y)},
+        {wheel_object_offset + 0x108U, 4U,
+            std::bit_cast<std::uint32_t>(result.corrected_vector_0x100_0x108.z)},
+        {wheel_object_offset + 0x0f4U, 4U,
+            std::bit_cast<std::uint32_t>(result.response_vector_0xf4_0xfc.x)},
+        {wheel_object_offset + 0x0f8U, 4U,
+            std::bit_cast<std::uint32_t>(result.response_vector_0xf4_0xfc.y)},
+        {wheel_object_offset + 0x0fcU, 4U,
+            std::bit_cast<std::uint32_t>(result.response_vector_0xf4_0xfc.z)},
+    }};
+    return apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes)
+        ? std::optional<WheelTireResponseVectorStoreResult>{result}
+        : std::nullopt;
+}
+
 std::optional<WheelTireAccumulatorResult>
 advance_ncar_wheel_tire_accumulators_in_object(
     NcarWheelRuntimeObjectState& wheel,

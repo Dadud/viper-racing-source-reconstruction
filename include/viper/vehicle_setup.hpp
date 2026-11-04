@@ -1094,6 +1094,11 @@ struct WheelTireBasisUpdateResult {
     float response_scalar_0x7c{};
 };
 
+struct WheelTireResponseVectorStoreResult {
+    PhysicsVector3 response_vector_0xf4_0xfc{};
+    PhysicsVector3 corrected_vector_0x100_0x108{};
+};
+
 // Projects and stores the tire vector and scalar in the 0x442530 tail.
 [[nodiscard]] WheelTireBasisUpdateResult apply_wheel_tire_basis_update(
     const WheelTireBasisUpdateInput& input) noexcept;

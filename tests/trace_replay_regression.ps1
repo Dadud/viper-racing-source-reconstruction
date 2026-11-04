@@ -157,6 +157,7 @@ try {
     $wheelTireDynamicsColumns = @()
     $wheelTireResetColumns = @()
     $wheelTireAccumulatorColumns = @()
+    $wheelTireVectorColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
@@ -240,6 +241,16 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireAccumulatorNames[$lane])")
         }
         $wheelTireAccumulatorColumns += ,$tireAccumulatorColumns
+        $tireVectorNames = @(
+            'tire_vectors_applied',
+            'tire_vector_0xf4_x', 'tire_vector_0xf4_y', 'tire_vector_0xf4_z',
+            'tire_vector_0x100_x', 'tire_vector_0x100_y', 'tire_vector_0x100_z')
+        $tireVectorColumns = [int[]]::new($tireVectorNames.Count)
+        for ($lane = 0; $lane -lt $tireVectorNames.Count; ++$lane) {
+            $tireVectorColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($tireVectorNames[$lane])")
+        }
+        $wheelTireVectorColumns += ,$tireVectorColumns
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $spinColumns = [int[]]::new(5)
@@ -322,6 +333,9 @@ try {
         @($wheelTireAccumulatorColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelTireVectorColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelSpinColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
@@ -346,6 +360,7 @@ try {
     $observedTireDynamicsStage = $false
     $observedInactiveTireReset = $false
     $observedTireAccumulatorStage = $false
+    $observedTireVectorStage = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
@@ -481,6 +496,25 @@ try {
                     if ([single]::IsNaN($accumulatorValue) -or
                         [single]::IsInfinity($accumulatorValue)) {
                         throw "Wheel $wheel tire accumulator output is non-finite at line $($index + 1)"
+                    }
+                }
+            }
+            $vectorColumns = $wheelTireVectorColumns[$wheel]
+            $vectorsApplied = $fields[$vectorColumns[0]]
+            if ($dynamicsApplied -eq '1' -and $vectorsApplied -ne '1') {
+                throw "Wheel $wheel active-contact tire response vectors did not apply at line $($index + 1)"
+            }
+            if ($vectorsApplied -eq '1') {
+                $observedTireVectorStage = $true
+                foreach ($column in $vectorColumns[1..6]) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel tire response vector output is missing at line $($index + 1)"
+                    }
+                    $vectorValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($vectorValue) -or
+                        [single]::IsInfinity($vectorValue)) {
+                        throw "Wheel $wheel tire response vector output is non-finite at line $($index + 1)"
                     }
                 }
             }
@@ -889,6 +923,9 @@ try {
     }
     if (-not $observedTireAccumulatorStage) {
         throw 'Fixed-step replay never entered the finite active-contact tire accumulator stage'
+    }
+    if (-not $observedTireVectorStage) {
+        throw 'Fixed-step replay never entered the finite active-contact tire response vector stage'
     }
 
     Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Active-contact tire filters and accumulator state were derived and persisted; tire forces remain outside body integration."
