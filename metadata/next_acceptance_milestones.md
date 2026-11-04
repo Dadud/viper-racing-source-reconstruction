@@ -12,13 +12,16 @@ The 2026-11-04 official-launcher trace exposed and fixed a capture setup bug:
 the launcher itself must create `MGI Viper Racing 1998 Canary`, so the host
 now creates that semaphore only for direct-engine runs. With this correction,
 the launcher passed its startup checks and created `race.bin` in the expected
-`GameRoot\Data` working directory. The child terminated about 0.75 seconds
-after resume, before video-memory initialization and all PCAR callbacks. The
-capture has no exit API event or crash record, so the cause remains unknown.
-Next compare a VRAM-only startup against runs that add exception, process-exit,
-and file/resource observers one at a time. Capture host-observed exit status
-and any `NtTerminateProcess`, first-chance/unhandled exception, and early file
-failure. Do not change the unresolved powertrain model from this startup-only
+`GameRoot\Data` working directory. With the recovered `-1` argument, no
+graphics startup entry or video-memory initialization ran. A bounded 100-sample
+passive trace found the launcher-created engine thread stopped at
+`ntdll.dll+0x7A7C0` with unchanged PC/SP for the full 10 seconds; no native
+termination or exception event fired before host cleanup. This establishes a
+stable pre-graphics wait, but does not identify its cause. Do not repeat the
+same startup-only run. Next resolve the wait routine in installed ntdll and
+trace its stack arguments, wait object, return path, and loader/debug events to
+identify what prevents the engine thread from progressing. Keep original
+assets external, do not change the unresolved powertrain model from startup
 evidence, and keep ideal-line motion disabled in driving acceptance.
 
 The ACAR constructor projection now serializes the `0x4401D0` curve writes at

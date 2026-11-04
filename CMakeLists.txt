@@ -273,6 +273,12 @@ if(BUILD_TESTING)
         add_test(NAME original_directsound_process_silencer_mock
             COMMAND "${VIPER_NODE_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_directsound_process_silencer_mock.js")
+        add_test(NAME original_graphics_startup_trace_mock
+            COMMAND "${VIPER_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_graphics_startup_trace_mock.js")
+        add_test(NAME original_startup_thread_sample_mock
+            COMMAND "${VIPER_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_startup_thread_sample_mock.js")
         add_test(NAME pcar_source_field_watch_mock
             COMMAND "${VIPER_NODE_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/pcar_source_field_watch_mock.js")

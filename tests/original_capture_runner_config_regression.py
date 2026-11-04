@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import runpy
+import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -11,6 +14,10 @@ select_launcher_paths = runner_functions["select_launcher_paths"]
 validate_disc_volume_label = runner_functions["validate_disc_volume_label"]
 required_capture_sound_settings = runner_functions["required_capture_sound_settings"]
 canary_semaphore_strategy = runner_functions["canary_semaphore_strategy"]
+capture_agent_names = runner_functions["capture_agent_names"]
+query_process_exit_status = runner_functions["query_process_exit_status"]
+terminate_owned_process = runner_functions["terminate_owned_process"]
+resolve_launcher_arguments = runner_functions["resolve_launcher_arguments"]
 
 with tempfile.TemporaryDirectory(prefix="viper_capture_paths_") as temporary:
     root = Path(temporary) / "GameRoot"
@@ -52,5 +59,41 @@ assert required_capture_sound_settings(process_silent_audio=True) == {
 }
 assert canary_semaphore_strategy(False) == "launcher_creates_for_child"
 assert canary_semaphore_strategy(True) == "host_holds_for_direct_engine"
+assert resolve_launcher_arguments(None) == ("-1",)
+assert resolve_launcher_arguments(["-safe"]) == ("-safe",)
+assert capture_agent_names(True) == ("startup_vram", "exit_status")
+assert capture_agent_names(True, include_source_watch=True) == (
+    "startup_vram", "exit_status", "pcar_source_watch")
+assert capture_agent_names(True, include_controlled_capture=True) == (
+    "startup_vram", "exit_status", "controlled_wheel_capture")
+assert capture_agent_names(True, include_source_watch=True,
+                           include_controlled_capture=True) == (
+    "startup_vram", "exit_status", "pcar_source_watch",
+    "controlled_wheel_capture")
+assert capture_agent_names(True, include_graphics_trace=True) == (
+    "startup_vram", "exit_status", "graphics_startup_trace")
+assert capture_agent_names(True, include_thread_sample=True) == (
+    "startup_vram", "exit_status", "startup_thread_sampler")
+assert capture_agent_names(True, include_graphics_trace=True,
+                           include_thread_sample=True) == (
+    "startup_vram", "exit_status", "graphics_startup_trace",
+    "startup_thread_sampler")
+assert capture_agent_names(False) == (
+    "startup_vram", "exit_status", "pcar_source_watch",
+    "controlled_wheel_capture")
+if os.name == "nt":
+    own_status = query_process_exit_status(os.getpid())
+    assert own_status["process_still_active"] is True
+    assert own_status["process_exit_code"] == 259
+    assert terminate_owned_process(0xFFFFFFFF) is True
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        assert terminate_owned_process(child.pid) is True
+        child.wait(timeout=5)
+        assert child.returncode is not None
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait()
 
-print("capture launcher path, audio profiles, and canary ownership passed")
+print("capture path, audio, semaphore ownership, and startup-only agent selection passed")

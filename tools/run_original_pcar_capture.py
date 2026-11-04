@@ -13,6 +13,7 @@ import ctypes
 from ctypes import wintypes
 import hashlib
 import json
+import subprocess
 import sys
 import threading
 import time
@@ -24,6 +25,22 @@ EXPECTED_ISO_RACE_SHA256 = "f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d
 EXPECTED_LAUNCHER_SHA256 = "d75b38228d4b68b2c5ef39252b95e43a9de16976005c26fab4491d05ce3d32d4"
 HOST_TIMEOUT_SECONDS = 180
 CANARY_SEMAPHORE_NAME = "MGI Viper Racing 1998 Canary"
+
+
+def capture_agent_names(startup_only: bool, include_source_watch: bool = False,
+                        include_controlled_capture: bool = False,
+                        include_graphics_trace: bool = False,
+                        include_thread_sample: bool = False) -> tuple[str, ...]:
+    names = ["startup_vram", "exit_status"]
+    if not startup_only or include_source_watch:
+        names.append("pcar_source_watch")
+    if not startup_only or include_controlled_capture:
+        names.append("controlled_wheel_capture")
+    if include_graphics_trace:
+        names.append("graphics_startup_trace")
+    if include_thread_sample:
+        names.append("startup_thread_sampler")
+    return tuple(names)
 
 
 def sha256(path: Path) -> str:
@@ -101,6 +118,62 @@ def canary_semaphore_strategy(direct_engine: bool) -> str:
     return "host_holds_for_direct_engine" if direct_engine else "launcher_creates_for_child"
 
 
+def resolve_launcher_arguments(arguments: list[str] | None) -> tuple[str, ...]:
+    # Match the recovered primary-adapter launch used in the controlled
+    # original startup reference. Earlier runner traces showed this switch was
+    # not reaching race.bin despite an outdated comment claiming it did.
+    return tuple(arguments) if arguments is not None else ("-1",)
+
+
+def query_process_exit_status(process_id: int) -> dict[str, object]:
+    """Read the target process exit code after a Frida detach notification."""
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    open_process = kernel32.OpenProcess
+    open_process.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    open_process.restype = wintypes.HANDLE
+    handle = open_process(0x1000, False, process_id)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return {"exit_status_query_error": ctypes.get_last_error()}
+    try:
+        value = wintypes.DWORD()
+        get_exit_code = kernel32.GetExitCodeProcess
+        get_exit_code.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        get_exit_code.restype = wintypes.BOOL
+        if not get_exit_code(handle, ctypes.byref(value)):
+            return {"exit_status_query_error": ctypes.get_last_error()}
+        return {"process_exit_code": value.value,
+                "process_exit_code_hex": f"0x{value.value:08X}",
+                "process_still_active": value.value == 259}
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def terminate_owned_process(process_id: int, exit_code: int = 0xC000013A) -> bool:
+    """Terminate only a PID created by this runner and wait for its exit."""
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    open_process = kernel32.OpenProcess
+    open_process.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    open_process.restype = wintypes.HANDLE
+    handle = open_process(0x0001 | 0x001000 | 0x100000, False, process_id)
+    if not handle:
+        # ERROR_INVALID_PARAMETER / ERROR_NOT_FOUND means the process exited
+        # between the host's final observation and cleanup.
+        return ctypes.get_last_error() in (87, 1168)
+    try:
+        terminate = kernel32.TerminateProcess
+        terminate.argtypes = (wintypes.HANDLE, wintypes.UINT)
+        terminate.restype = wintypes.BOOL
+        if not terminate(handle, exit_code):
+            observed = query_process_exit_status(process_id)
+            return observed.get("process_exit_code") != 259
+        wait = kernel32.WaitForSingleObject
+        wait.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+        wait.restype = wintypes.DWORD
+        return wait(wintypes.HANDLE(handle), 5000) == 0
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def hold_canary_semaphore(name: str = CANARY_SEMAPHORE_NAME) -> tuple[object, int, bool]:
     """Supply the named-object precondition expected by engine startup."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -117,7 +190,8 @@ def hold_canary_semaphore(name: str = CANARY_SEMAPHORE_NAME) -> tuple[object, in
     return kernel32, int(handle), preexisting
 
 
-def create_launcher_suspended(launcher: Path, cwd: Path) -> tuple[object, int, int, int, int]:
+def create_launcher_suspended(launcher: Path, cwd: Path,
+                              arguments: tuple[str, ...]) -> tuple[object, int, int, int, int]:
     """Start the staged official launcher suspended and return owned handles."""
     class StartupInfo(ctypes.Structure):
         _fields_ = [
@@ -150,9 +224,8 @@ def create_launcher_suspended(launcher: Path, cwd: Path) -> tuple[object, int, i
     info = StartupInfo()
     info.cb = ctypes.sizeof(StartupInfo)
     process = ProcessInformation()
-    # The adapter switch belongs to the race.bin child; the verified launcher
-    # itself is started without arguments and forwards `-1` to that child.
-    command = ctypes.create_unicode_buffer(f'"{launcher}"')
+    command = ctypes.create_unicode_buffer(
+        subprocess.list2cmdline([str(launcher), *arguments]))
     if not create(str(launcher), command, None, None, False, 0x00000004,
                   None, str(cwd), ctypes.byref(info), ctypes.byref(process)):
         raise ctypes.WinError(ctypes.get_last_error())
@@ -181,6 +254,8 @@ def main() -> int:
                         help="isolated GameRoot containing Data/race.bin")
     parser.add_argument("--launcher-path", type=Path,
                         help="verified official launcher; defaults to the staged GameRoot copy")
+    parser.add_argument("--launcher-arg", action="append", default=None,
+                        help="argument forwarded by the official launcher (default: -1; repeat for multiple arguments)")
     parser.add_argument("--frida-python-path", required=True, type=Path,
                         help="directory containing the installed frida Python package")
     parser.add_argument("--capture-dir", required=True, type=Path,
@@ -192,7 +267,18 @@ def main() -> int:
                         help="spawn race.bin directly instead of the official launcher")
     parser.add_argument("--process-silent-audio", action="store_true",
                         help="allow active effects/music settings only with the in-process DirectSound volume clamp")
+    parser.add_argument("--startup-only", action="store_true",
+                        help="load only startup video-memory and process-exit observers; omit PCAR probes")
+    parser.add_argument("--include-pcar-source-watch", action="store_true",
+                        help="with --startup-only, add the exact PCAR constructor write watcher")
+    parser.add_argument("--include-controlled-wheel-capture", action="store_true",
+                        help="with --startup-only, add the controlled PCAR/wheel observer")
+    parser.add_argument("--graphics-startup-trace", action="store_true",
+                        help="trace recovered DirectDraw startup functions and native termination/exception events")
+    parser.add_argument("--sample-main-thread", action="store_true",
+                        help="sample the launcher-created engine thread PC/SP at 10 Hz for 10 seconds")
     args = parser.parse_args()
+    launcher_arguments = resolve_launcher_arguments(args.launcher_arg)
 
     game_root = args.game_root.resolve(strict=True)
     race_bin = (game_root / "Data" / "race.bin").resolve(strict=True)
@@ -232,12 +318,20 @@ def main() -> int:
 
     repo_tools = Path(__file__).resolve().parent
     launcher_bridge = repo_tools / "original_launcher_child_bridge.js"
-    agents = {
+    agent_paths = {
         "startup_vram": repo_tools / "original_startup_vram_override.js",
         "exit_status": repo_tools / "original_exit_status_probe.js",
         "pcar_source_watch": repo_tools / "pcar_source_field_watch.js",
         "controlled_wheel_capture": repo_tools / "original_pcar_controlled_wheel_capture.js",
+        "graphics_startup_trace": repo_tools / "original_graphics_startup_trace.js",
+        "startup_thread_sampler": repo_tools / "original_startup_thread_sample.js",
     }
+    agents = {name: agent_paths[name]
+              for name in capture_agent_names(
+                  args.startup_only, args.include_pcar_source_watch,
+                  args.include_controlled_wheel_capture,
+                  args.graphics_startup_trace,
+                  args.sample_main_thread)}
     if args.process_silent_audio:
         agents["directsound_silencer"] = (
             repo_tools / "original_directsound_process_silencer.js")
@@ -256,6 +350,7 @@ def main() -> int:
     audio_silencer_ready = threading.Event()
     done_agents: set[str] = set()
     child_info: dict[str, int] = {}
+    shutdown_requested_processes: set[int] = set()
     output_lock = threading.Lock()
     device = frida.get_local_device()
     existing_game_processes = [
@@ -297,11 +392,13 @@ def main() -> int:
         "working_directory": str(expected_cwd),
         "sound_settings": checked_sound,
         "process_silent_audio": args.process_silent_audio,
+        "startup_only": args.startup_only,
         "frida_version": frida.__version__,
         "launcher_bridge": str(launcher_bridge),
         "launch_mode": "direct_engine" if args.direct_engine else "official_launcher",
+        "launcher_arguments": list(launcher_arguments),
         "agents": {name: str(path) for name, path in agents.items()},
-        "host_timeout_seconds": HOST_TIMEOUT_SECONDS,
+        "host_timeout_seconds": 15 if args.startup_only else HOST_TIMEOUT_SECONDS,
     })
 
     def on_message(agent_name: str):
@@ -346,6 +443,10 @@ def main() -> int:
                         row["process_exit_code"] = exit_code.value
                 launcher_detached.set()
             else:
+                if child_pid is not None:
+                    row.update(query_process_exit_status(child_pid))
+                    row["termination_requested_by_host"] = (
+                        child_pid in shutdown_requested_processes)
                 child_detached.set()
             record(row)
         return handler
@@ -367,7 +468,8 @@ def main() -> int:
                     "strategy": canary_semaphore_strategy(False),
                     "host_utc": datetime.now(timezone.utc).isoformat()})
             (launcher_kernel32, launcher_process_handle, launcher_thread_handle,
-             launcher_pid, launcher_tid) = create_launcher_suspended(launcher, launcher_cwd)
+             launcher_pid, launcher_tid) = create_launcher_suspended(
+                 launcher, launcher_cwd, launcher_arguments)
             launcher_handles = (launcher_kernel32, launcher_process_handle, launcher_thread_handle)
             launcher_session = device.attach(launcher_pid)
             launcher_session.on("detached", on_detached("launcher"))
@@ -404,7 +506,10 @@ def main() -> int:
             child_session = device.attach(child_pid)
             child_session.on("detached", on_detached("race.bin"))
         for name, path in agents.items():
-            script = child_session.create_script(path.read_text(encoding="utf-8"))
+            source = path.read_text(encoding="utf-8")
+            if name == "startup_thread_sampler":
+                source = source.replace("__TARGET_TID__", str(child_info.get("tid", 0)))
+            script = child_session.create_script(source)
             script.on("message", on_message(name))
             script.load()
             child_scripts.append(script)
@@ -414,28 +519,47 @@ def main() -> int:
         record({"event": "capture_agents_loaded", "pid": child_pid,
                 "process_silent_audio": args.process_silent_audio,
                 "host_utc": datetime.now(timezone.utc).isoformat()})
+        wait_seconds = 15 if args.startup_only else HOST_TIMEOUT_SECONDS
         if args.direct_engine:
             device.resume(child_pid)
             record({"event": "direct_engine_resumed", "pid": child_pid,
                     "cwd": str(expected_cwd),
                     "host_utc": datetime.now(timezone.utc).isoformat()})
         print(f"Capture running via {'direct engine' if args.direct_engine else 'isolated launcher'}; race.bin pid={child_pid}", flush=True)
-        if args.process_silent_audio:
+        if args.startup_only:
+            print(f"Startup-only observation: no synthetic input; observers={','.join(agents)}; host records the process exit status and stops the target after {wait_seconds} seconds if it remains alive.", flush=True)
+        elif args.process_silent_audio:
             print("Select Quick Race > Bemidji > RACE; DirectSound buffers are clamped to minimum volume in race.bin and CD audio is disabled. Other output APIs are not suppressed.", flush=True)
         else:
             print("Select Quick Race > Bemidji > RACE; effects/music volumes are zero, CD audio is disabled, and the host closes launched processes at completion or timeout.", flush=True)
-        deadline = time.monotonic() + HOST_TIMEOUT_SECONDS
+        deadline = time.monotonic() + wait_seconds
         while (time.monotonic() < deadline and not finished.is_set()
                and not child_detached.is_set()):
             time.sleep(0.2)
         outcome = "both_agents_completed" if finished.is_set() else (
-            "target_detached" if child_detached.is_set() else "host_timeout")
+            "target_detached" if child_detached.is_set() else
+            "startup_window_elapsed" if args.startup_only else "host_timeout")
         record({"event": "capture_host_end", "outcome": outcome,
                 "done_agents": sorted(done_agents),
+                "child_active_at_capture_end": not child_detached.is_set(),
                 "host_utc": datetime.now(timezone.utc).isoformat()})
         print(f"Capture ended: {outcome}; output={output_path}", flush=True)
         return 0 if finished.is_set() else 2
     finally:
+        for process_id in (child_pid, launcher_pid):
+            if process_id is None:
+                continue
+            status = query_process_exit_status(process_id)
+            still_active = status.get("process_still_active") is True
+            if still_active:
+                shutdown_requested_processes.add(process_id)
+            stopped = (terminate_owned_process(process_id) if still_active else True)
+            record({"event": "capture_process_cleanup", "pid": process_id,
+                    "was_active": still_active, "termination_requested": still_active,
+                    "termination_succeeded": stopped, **status,
+                    "host_utc": datetime.now(timezone.utc).isoformat()})
+            if still_active:
+                print(f"Stopped capture process pid={process_id}; terminated={stopped}", flush=True)
         for script in child_scripts + launcher_scripts:
             try:
                 script.unload()
@@ -451,13 +575,6 @@ def main() -> int:
                 launcher_session.detach()
             except Exception:
                 pass
-        for process_id in (child_pid, launcher_pid):
-            if process_id is not None:
-                try:
-                    device.kill(process_id)
-                    print(f"Stopped capture process pid={process_id}", flush=True)
-                except Exception:
-                    pass
         if launcher_handles is not None:
             kernel32, process_handle, thread_handle = launcher_handles
             for handle in (thread_handle, process_handle):

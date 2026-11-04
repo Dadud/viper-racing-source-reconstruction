@@ -2,6 +2,23 @@
 
 ## 2026-11-04 update
 
+The latest bounded original startup capture adds a passive 10 Hz sampler for
+the launcher-created engine thread. Across all 100 samples, its PC/SP remained
+`ntdll.dll+0x7A7C0` / `0x1AFFF0`; none of the 12 recovered graphics startup
+entries, video-memory query, native process-termination hooks, or exception
+events fired. The thread stayed stopped at capture end and the runner then
+terminated only its two launched PIDs; the VIPER ISO was detached. This is a
+stable pre-graphics wait observation, not an identified cause or gameplay
+trace. External evidence:
+`../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T130140Z.jsonl`.
+The next useful capture should resolve the ntdll wait routine and its stack
+arguments, then collect the launcher-created thread's wait object/return path
+or loader/debug events. Do not repeat the same 15-second startup-only capture.
+
+The passive sampler and its runner wiring are covered by a Node mock and
+capture-config regression; all five focused capture CTests passed. This
+validates the instrumentation path only.
+
 Two launcher capture attempts with active effects/music settings
 (`effects=1`, `music=1`, CD audio disabled) exited normally before creating
 `race.bin`. The DirectSound silencer was therefore not loaded into an original
