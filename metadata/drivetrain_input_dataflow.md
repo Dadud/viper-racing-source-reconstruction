@@ -315,6 +315,12 @@ response; reject captures unless those native responses and phase coverage are
 actually observed. Synthetic input remains distinct from physical keyboard
 delivery.
 
+The analog evaluator confirms the hook target: `0x446F40` calls `0x446980`;
+for type 1, `0x446980` reads `[record+4]` and calls `0x413170`, then returns
+the configured pressed/released scalar. Thus the type-gated probe intercepts
+the same keyboard wrapper used by the throttle/brake ramp, while its matching
+record selector prevents patching unrelated key reads.
+
 The capture completion event reports per-phase throttle/brake means and compares
 `throttle` against the mean of all three neutral phases and `brake` against the
 same neutral baseline. A whole-run range change alone cannot make the capture
