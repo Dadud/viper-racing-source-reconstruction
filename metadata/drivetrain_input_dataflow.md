@@ -147,6 +147,25 @@ register-based aliases, block copies, or writes through a subobject/base
 pointer, so the source fields are unresolved rather than zero or constructor
 constants. Do not project the `+0xDDC` product until their provenance is found.
 
+The constructor ranges were checked for those copy/alias possibilities. The
+PCAR allocator requests `0xEF0` bytes and then calls `0x4381E0 -> 0x43DFB0 ->
+0x42FF90 -> 0x43E490 -> 0x4375C0`; the base initializer writes its vtable and
+explicit fields, not a whole-object clear. `0x42FF90` calls `0x433C00`, whose
+observed bulk copies cover `+0x514` from a string, `+0xE6C` and `+0x38` from
+two 12-DWORD ranges, plus explicit nearby fields. None of those spans includes
+`+0x5B0` or `+0x8F8`. The reviewed constructor chain therefore does not source
+these values. Other callees, alternate base aliases and later mutation remain
+outside this conclusion; their actual values and origins are still unknown.
+
+The arithmetic is now available as
+`derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,
+selector and `0x4C7D48` scale all explicit. Regression covers both interpolation
+endpoints, an interior selector, zero divisor, and nonfinite inputs. This model
+is useful once those values are sourced; it is not called by the live PCAR tick.
+The Visual Studio 18 Release build and all 69 configured Release CTests pass
+with this helper and regression; the route-free replay continues to pass but
+does not assert throttle propulsion.
+
 The full `0x431150` ordering is also explicit in the listing: set selector
 `+0x64/+0x5C` from PCAR `+0xDE0/+0xDEC`; invoke selector update `0x43FAE0`;
 read selected pair getter `+0xCE4`, multiply by `+0xDD0`, and store `+0xDDC`;

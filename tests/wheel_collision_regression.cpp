@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <span>
 
 namespace {
@@ -46,6 +47,28 @@ int main()
     require(signal_constructor_state->limit_scale_0xc8c == 8.0F);
     require(signal_constructor_state->callback_scale_0xc90 == 0.02F);
     require(signal_constructor_state->smoothed_value_0xc94 == 0.0F);
+    const auto signal_multiplier =
+        viper::derive_ncar_integrator_signal_multiplier(
+            2.0F, 10.0F, 0.25F, 2.0F, 3.0F);
+    require(signal_multiplier.has_value());
+    require(std::abs(*signal_multiplier - 6.0F) < 1e-6F);
+    const auto signal_multiplier_at_first_endpoint =
+        viper::derive_ncar_integrator_signal_multiplier(
+            2.0F, 10.0F, 0.0F, 2.0F, 3.0F);
+    require(signal_multiplier_at_first_endpoint.has_value());
+    require(std::abs(*signal_multiplier_at_first_endpoint - 3.0F) < 1e-6F);
+    const auto signal_multiplier_at_second_endpoint =
+        viper::derive_ncar_integrator_signal_multiplier(
+            2.0F, 10.0F, 1.0F, 2.0F, 3.0F);
+    require(signal_multiplier_at_second_endpoint.has_value());
+    require(std::abs(*signal_multiplier_at_second_endpoint - 15.0F) < 1e-6F);
+    require(!viper::derive_ncar_integrator_signal_multiplier(
+        2.0F, 10.0F, 0.25F, 0.0F, 3.0F));
+    require(!viper::derive_ncar_integrator_signal_multiplier(
+        std::numeric_limits<float>::quiet_NaN(), 10.0F, 0.25F, 2.0F, 3.0F));
+    require(!viper::derive_ncar_integrator_signal_multiplier(
+        2.0F, 10.0F, 0.25F, 2.0F,
+        std::numeric_limits<float>::infinity()));
     require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
         std::span<const std::byte>(signal_runtime_record.data(), 0x6bU)));
     signal_runtime_record[0x68U] = std::byte{0U};

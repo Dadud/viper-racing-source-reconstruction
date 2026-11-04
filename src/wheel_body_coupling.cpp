@@ -417,6 +417,33 @@ make_ncar_integrator_signal_state_from_runtime_record(
     return result;
 }
 
+std::optional<float> derive_ncar_integrator_signal_multiplier(
+    const float value_0x5b0,
+    const float value_0x8f8,
+    const float selector_0xdc4,
+    const float divisor_runtime_0x90,
+    const float constructor_scale_0x4c7d48) noexcept
+{
+    if (!std::isfinite(value_0x5b0) || !std::isfinite(value_0x8f8) ||
+        !std::isfinite(selector_0xdc4) ||
+        !std::isfinite(divisor_runtime_0x90) || divisor_runtime_0x90 == 0.0F ||
+        !std::isfinite(constructor_scale_0x4c7d48)) {
+        return std::nullopt;
+    }
+
+    // 0x434700..0x434756 performs the interpolation in x87 extended
+    // precision, divides by runtime-record +0x90, then applies 0x4C7D48.
+    const auto selector = static_cast<long double>(selector_0xdc4);
+    const auto interpolated =
+        (1.0L - selector) * static_cast<long double>(value_0x5b0) +
+        static_cast<long double>(value_0x8f8) * selector;
+    const auto multiplier = interpolated /
+        static_cast<long double>(divisor_runtime_0x90) *
+        static_cast<long double>(constructor_scale_0x4c7d48);
+    const auto result = static_cast<float>(multiplier);
+    return std::isfinite(result) ? std::optional<float>{result} : std::nullopt;
+}
+
 NcarIntegratorSignalResult advance_ncar_integrator_signal(
     NcarIntegratorSignalState& state,
     const NcarIntegratorSignalInput& input,

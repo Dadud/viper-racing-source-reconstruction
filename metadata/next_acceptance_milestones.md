@@ -53,12 +53,19 @@ the `+0xDD0` product multiplier from body `+0x5B0/+0x8F8`, selector
 `+0xDC4`, runtime-record `+0x90`, and a constant. The two body source fields
 have no other direct displacement references in the checked listing; their
 provenance remains open, including possible copies or aliases. The route-free
-neutral/throttle test still has identical measured forward-speed means.
-Therefore, do not wire the modeled signal into the player tick or claim powered
-driving until those sources and callback inputs are resolved. The immediate
-source target is to trace constructor writes/copies for `+0x5B0/+0x8F8`, then
-continue upstream to the engine/gear torque producer; all driving checks keep
-ideal-line route motion disabled.
+neutral/throttle test still has identical measured forward-speed means. The
+follow-up constructor-range audit found no whole-object clear and no copy span
+covering either field in `0x4375C0`, `0x42FF90`, or `0x433C00`. Added a portable
+`derive_ncar_integrator_signal_multiplier` helper for the exact interpolation,
+normalization and scale, with explicit source inputs and endpoint/invalid-input
+regressions; the helper is not part of the live tick. The Visual Studio 18
+Release build and all 69 configured Release CTests pass. Do not wire the signal
+into the player tick or claim powered driving until the fields' real storage
+and callback inputs are resolved. Next target is alternate callees, register
+base changes and later mutations of `+0x5B0/+0x8F8`; if static evidence remains
+insufficient, identify the precise controlled runtime observation required.
+Then continue upstream to the engine/gear torque producer. All driving checks
+keep ideal-line route motion disabled.
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent

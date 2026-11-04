@@ -654,6 +654,17 @@ struct NcarIntegratorSignalInput {
 make_ncar_integrator_signal_state_from_runtime_record(
     std::span<const std::byte> runtime_record) noexcept;
 
+// Models constructor 0x434700's +0xDD0 weighted interpolation and scaling.
+// The two object fields and 0x4C7D48 constant remain explicit inputs until
+// their storage/value provenance has been established.
+[[nodiscard]] std::optional<float>
+derive_ncar_integrator_signal_multiplier(
+    float value_0x5b0,
+    float value_0x8f8,
+    float selector_0xdc4,
+    float divisor_runtime_0x90,
+    float constructor_scale_0x4c7d48) noexcept;
+
 struct NcarIntegratorSignalResult {
     bool stored_value_0xddc_written{};
     bool ramp_setter_0x43f8e0_reached{};
