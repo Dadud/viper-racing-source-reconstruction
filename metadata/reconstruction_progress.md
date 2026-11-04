@@ -1,5 +1,18 @@
 # Reconstruction progress
 
+- **2026-11-03, native PCAR yaw-response x87 order:** Re-read the exact
+  `0x432170` instruction stack around `FPTAN`, `FDIVP`, and the speed multiply.
+  The native expression is `speed * tan(angle) / geometry_width`; the portable
+  model had inverted the quotient, creating NaNs/infinities for normal
+  zero-steering inputs when `yaw_control=1`. Corrected the expression, retained
+  the native unordered threshold-skip behavior for zero geometry, and added
+  regressions for both the active response and unordered branch. A 320-frame
+  Viper/Bemidji replay with `yaw_control=1` now completes with finite response
+  values and moving body state while route motion stays disabled. The automated
+  fixed-step test exercises that setting through an isolated GameData copy;
+  focused CTests passed 2/2. Full Release suite is pending. This is a source
+  parity correction and route-free runtime check, not original numeric parity.
+
 - **2026-11-03, route-free steering reaches wheel orientation and body motion:**
   The initial mirrored probe found that the PCAR callback updated parent
   `+0x630/+0x7D4` steering outputs while the session stored wheel objects in
@@ -13,9 +26,9 @@
   `-0.292194933/+0.303876966`, and the body traces diverged during steering.
   Visual Studio 18 Release build succeeded and all 66 configured CTests passed.
   This demonstrates the reconstructed input-to-body path only, not numeric
-  parity or a complete race. The earlier temporary `yaw_control 1` probe still
-  fails before a physics tick; native floating-point behavior for that setting
-  remains unresolved. Original assets were untouched; both schedules avoided
+  parity or a complete race. The initial temporary `yaw_control 1` probe
+  exposed an inverted response equation, corrected in the later x87-order
+  entry above. Original assets were untouched; both schedules avoided
   ideal-line route motion.
 
 - **2026-10-29, persistent wheel application points:** The player runtime now

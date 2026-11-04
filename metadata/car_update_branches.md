@@ -364,7 +364,7 @@ parent `+0x634`, with `0x1A4` bytes between wheels. When the signed raw DWORD at
 stores. Both observed class vtables that contain `0x431150` at slot `+0x08`
 point their slot `+0x4C` to `0x432170`. That routine returns unchanged if
 `+0x4F8` is zero. Otherwise it computes
-`speed(+0x234) * ((+0xD84 - +0xD90) / tan(+0xDCC * +0x500))` and proceeds only
+`speed(+0x234) * tan(+0xDCC * +0x500) / (+0xD84 - +0xD90)` and proceeds only
 when the resulting float is greater than the global float at `0x4C7E2C`
 (`0x3F638E39`). Selector value 1 uses scale 0.5 for the positive response;
 other nonzero selectors use 5.0, while the negative response uses 5.0. The
@@ -375,7 +375,13 @@ fields. `advance_ncar_integrator_wheel_scalars` now reconstructs this callback
 and applies the caller's pairwise sign gate before exposing the stores. It
 feeds each wheel value into the existing spin-response stage, which consumes
 its absolute value. Exact x87 tangent/division rounding and the optional
-Pentium math-wrapper path remain approximate.
+Pentium math-wrapper path remain approximate. The x87 stack order is
+`FPTAN`, pop its pushed one, load/subtract the two geometry fields, `FDIVP`,
+then multiply by the saved speed; this gives `tan(angle) / geometry_width *
+speed`, not its reciprocal. The portable model and numeric regression now
+follow that order. The byte adapter preserves the native unordered-compare
+path when a zero geometry denominator yields a NaN target and the threshold
+gate therefore skips its updates.
 
 The callback's geometric inputs can now be initialized from the source vehicle
 setup record using the constructor stores in `0x433C00`: `width = source[0x58]

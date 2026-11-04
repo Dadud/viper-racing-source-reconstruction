@@ -586,7 +586,7 @@ int main()
             const std::array<viper::NcarObjectFieldWrite, 11> body_fields{{
                 {0x4f8U, 4U, 1U},
                 {0xdccU, 4U, std::bit_cast<std::uint32_t>(0.5F)},
-                {0x500U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+                {0x500U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
                 {0xd84U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
                 {0xd90U, 4U, std::bit_cast<std::uint32_t>(-1.0F)},
                 {0x244U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
@@ -605,11 +605,13 @@ int main()
             require(callback.has_value() && callback->callback_0x4c_reached &&
                     callback->callback_selector_nonzero &&
                     callback->response_gate_passed &&
-                    callback->target_response > 100.0F &&
+                    callback->target_response > 1.776F &&
+                    callback->target_response < 1.9F &&
                     callback->wheel_values_0xe0[0] == 0.2F &&
                     callback->wheel_values_0xe0[1] == 0.2F &&
                     std::fabs(callback->wheel_values_0xe0[2] - 0.2F) < 1.0e-6F &&
-                    callback->wheel_values_0xe0[3] > 50.0F,
+                    callback->wheel_values_0xe0[3] > 0.8F &&
+                    callback->wheel_values_0xe0[3] < 0.82F,
                 "byte-backed integrator fields must reproduce callback gate and wheel scalars");
             constexpr std::uint32_t wheel_stride = 0x1a4U;
             for (std::size_t wheel = 0U; wheel < wheels.size(); ++wheel) {
@@ -638,6 +640,36 @@ int main()
                     unresolved_wheels[0].initialized_bytes ==
                         unresolved_before[0].initialized_bytes,
                 "unknown integrator inputs must preserve every wheel object");
+        }
+        {
+            constexpr std::uint32_t first_wheel = 0x554U;
+            auto body = viper::NcarBodyRuntimeObjectState{};
+            const std::array<viper::NcarObjectFieldWrite, 11> fields{{
+                {0x4f8U, 4U, 1U},
+                {0xdccU, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+                {0x500U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0xd84U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+                {0xd90U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+                {0x244U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0x234U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0x238U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0x23cU, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                {0xde4U, 4U, std::bit_cast<std::uint32_t>(0.2F)},
+                {0xde8U, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+            }};
+            require(viper::apply_ncar_body_object_writes(body, fields),
+                "stationary yaw-callback source fields must materialize");
+            std::array<viper::NcarWheelRuntimeObjectState, 4> wheels{};
+            const auto callback =
+                viper::advance_ncar_integrator_wheel_scalars_from_body(
+                    body, wheels, first_wheel);
+            require(callback.has_value() &&
+                    std::isnan(callback->target_response) &&
+                    !callback->response_gate_passed &&
+                    std::all_of(callback->wheel_values_0xe0.begin(),
+                        callback->wheel_values_0xe0.end(),
+                        [](const float value) { return value == 0.2F; }),
+                "unordered zero-width yaw response must skip stores and retain finite seed scalars");
         }
         {
             std::vector<std::byte> runtime_record(0xecU);

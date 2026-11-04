@@ -1423,10 +1423,12 @@ NcarIntegratorWheelScalarResult advance_ncar_integrator_wheel_scalars(
             static_cast<long double>(constructor_setup.angle_0xdcc) *
             static_cast<long double>(input.angle_scale_0x500));
         result.tangent_response = static_cast<float>(tangent);
-        const auto target_wide =
-            ((static_cast<long double>(constructor_setup.value_0xd84) -
-              static_cast<long double>(constructor_setup.value_0xd90)) /
-             tangent) * speed;
+        const auto geometry_width =
+            static_cast<long double>(constructor_setup.value_0xd84) -
+            static_cast<long double>(constructor_setup.value_0xd90);
+        // x87 stack order in 0x432170 is tan(angle), geometry_width,
+        // FDIVP, then speed, yielding speed * tan(angle) / geometry_width.
+        const auto target_wide = (tangent / geometry_width) * speed;
         result.target_response = static_cast<float>(target_wide);
 
         constexpr float target_cutoff = std::bit_cast<float>(0x3F638E39U);
@@ -1531,12 +1533,21 @@ advance_ncar_integrator_wheel_scalars_from_body(
     input.value_0xde4 = *value_de4;
     input.value_bits_0xde8 = *value_de8;
     const auto result = advance_ncar_integrator_wheel_scalars(input);
-    const std::array<float, 7> finite_outputs{
-        result.speed_magnitude, result.tangent_response, result.target_response,
+    const std::array<float, 6> finite_outputs{
+        result.speed_magnitude, result.tangent_response,
         result.wheel_values_0xe0[0], result.wheel_values_0xe0[1],
         result.wheel_values_0xe0[2], result.wheel_values_0xe0[3]};
     if (!std::all_of(finite_outputs.begin(), finite_outputs.end(),
             [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+    // Native 0x432170 compares the x87 target against a threshold and skips
+    // its stores when that comparison is unordered. At zero geometry width
+    // and zero steering tangent, the intermediate is NaN (0/0); that is a
+    // valid callback path with the original seed values, not missing state.
+    if (!std::isfinite(result.target_response) &&
+        !(std::isnan(result.target_response) &&
+          !result.response_gate_passed)) {
         return std::nullopt;
     }
 

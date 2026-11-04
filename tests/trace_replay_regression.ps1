@@ -7,11 +7,14 @@ $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_trace_$([guid]::NewGu
 New-Item -ItemType Directory -Path $root | Out-Null
 $capture = Join-Path $root 'capture.csv'
 $rightCapture = Join-Path $root 'right-capture.csv'
+$yawDataDir = Join-Path $root 'YawData'
 $replay = Join-Path $root 'replay.csv'
 $rightReplay = Join-Path $root 'right-replay.csv'
+$yawReplay = Join-Path $root 'yaw-replay.csv'
 $repeat = Join-Path $root 'repeat.csv'
 $replayTicks = Join-Path $root 'replay-ticks.csv'
 $rightReplayTicks = Join-Path $root 'right-replay-ticks.csv'
+$yawReplayTicks = Join-Path $root 'yaw-replay-ticks.csv'
 $repeatTicks = Join-Path $root 'repeat-ticks.csv'
 try {
     # Author a repeatable fixed-step driver input fixture. Route motion is
@@ -70,8 +73,28 @@ try {
         --record-trace $rightReplay --record-tick-trace $rightReplayTicks
     if ($LASTEXITCODE -ne 0) { throw "Mirrored steering replay exited with $LASTEXITCODE" }
 
+    # Exercise the optional native yaw-response selector against an isolated
+    # data copy. Never edit the user's supplied installation for this case.
+    Copy-Item -LiteralPath $DataDir -Destination $yawDataDir -Recurse
+    $yawOptionsPath = Join-Path $yawDataDir 'options.def'
+    if (-not (Test-Path -LiteralPath $yawOptionsPath)) {
+        throw 'Temporary yaw-control data copy omitted options.def'
+    }
+    $yawOptions = [System.IO.File]::ReadAllText($yawOptionsPath)
+    $yawPattern = '(?m)^yaw_control\s+[-+]?\d+\s*$'
+    if (-not [regex]::IsMatch($yawOptions, $yawPattern)) {
+        throw 'Temporary options.def has no integer yaw_control setting'
+    }
+    $yawOptions = [regex]::Replace($yawOptions, $yawPattern, 'yaw_control 1', 1)
+    [System.IO.File]::WriteAllText($yawOptionsPath, $yawOptions)
+    & $GameExe --data-dir $yawDataDir --track bemidji --car viper --software `
+        --diagnostics-only -grid --play-trace $capture `
+        --record-trace $yawReplay --record-tick-trace $yawReplayTicks
+    if ($LASTEXITCODE -ne 0) { throw "Yaw-control fixed-step replay exited with $LASTEXITCODE" }
+
     $replayedLines = [System.IO.File]::ReadAllLines($replay)
     $rightReplayedLines = [System.IO.File]::ReadAllLines($rightReplay)
+    $yawReplayedLines = [System.IO.File]::ReadAllLines($yawReplay)
     $repeatedLines = [System.IO.File]::ReadAllLines($repeat)
     if ($inputLines.Count -lt 2) { throw 'Capture trace has no frame rows' }
     if ($inputLines.Count -ne $replayedLines.Count -or
@@ -80,6 +103,7 @@ try {
     }
     $replayedTickLines = [System.IO.File]::ReadAllLines($replayTicks)
     $rightReplayedTickLines = [System.IO.File]::ReadAllLines($rightReplayTicks)
+    $yawReplayedTickLines = [System.IO.File]::ReadAllLines($yawReplayTicks)
     $repeatedTickLines = [System.IO.File]::ReadAllLines($repeatTicks)
     if ($replayedTickLines.Count -lt 2 -or
         $replayedTickLines.Count -ne $repeatedTickLines.Count -or
@@ -90,6 +114,11 @@ try {
         $rightReplayedTickLines.Count -ne $replayedTickLines.Count -or
         $rightReplayedTickLines[0] -cne $replayedTickLines[0]) {
         throw 'Mirrored steering trace row counts or fixed-step schemas differ'
+    }
+    if ($yawReplayedLines.Count -ne $replayedLines.Count -or
+        $yawReplayedTickLines.Count -ne $replayedTickLines.Count -or
+        $yawReplayedTickLines[0] -cne $replayedTickLines[0]) {
+        throw 'Yaw-control trace row counts or fixed-step schemas differ'
     }
     $tickHeader = $replayedTickLines[0].Split(',')
     $tickIndexColumn = [Array]::IndexOf($tickHeader, 'tick_index')
@@ -1162,17 +1191,69 @@ try {
             throw 'Mirrored diagnostics-only replay called the ideal-line route motion adapter'
         }
     }
+    $yawTickHeader = $yawReplayedTickLines[0].Split(',')
+    $yawSelectorColumn = [Array]::IndexOf(
+        $yawTickHeader, 'integrator_wheel_scalar_selector_nonzero')
+    $yawTargetColumn = [Array]::IndexOf(
+        $yawTickHeader, 'integrator_wheel_scalar_target_response')
+    $yawBodyPositionColumn = [Array]::IndexOf($yawTickHeader, 'body_pos_x')
+    if ($yawSelectorColumn -lt 0 -or $yawTargetColumn -lt 0 -or
+        $yawBodyPositionColumn -lt 0) {
+        throw 'Yaw-control replay omitted selector, response, or body-motion fields'
+    }
+    $yawBodyPositions = [System.Collections.Generic.List[single]]::new()
+    for ($index = 1; $index -lt $yawReplayedTickLines.Count; ++$index) {
+        $fields = $yawReplayedTickLines[$index].Split(',')
+        if ($fields[$yawSelectorColumn] -cne '1') {
+            throw "Yaw-control selector did not remain active at physics tick $($index - 1)"
+        }
+        $targetResponse = [single]::Parse(
+            $fields[$yawTargetColumn], [cultureinfo]::InvariantCulture)
+        if ([single]::IsNaN($targetResponse) -or
+            [single]::IsInfinity($targetResponse)) {
+            throw "Yaw-control response was non-finite at physics tick $($index - 1)"
+        }
+        $yawBodyPositions.Add([single]::Parse(
+            $fields[$yawBodyPositionColumn], [cultureinfo]::InvariantCulture))
+    }
+    $yawBodyRange = ($yawBodyPositions | Measure-Object -Minimum -Maximum)
+    if (($yawBodyRange.Maximum - $yawBodyRange.Minimum) -lt 0.001) {
+        throw 'Yaw-control route-free replay did not advance physical body position'
+    }
+    $yawFrameHeader = $yawReplayedLines[0].Split(',')
+    $yawRouteMotionColumn = [Array]::IndexOf(
+        $yawFrameHeader, 'route_motion_step_count')
+    if ($yawRouteMotionColumn -lt 0) {
+        throw 'Yaw-control replay omitted the route-motion acceptance field'
+    }
+    foreach ($line in $yawReplayedLines | Select-Object -Skip 1) {
+        $fields = $line.Split(',')
+        if ([uint32]::Parse($fields[$yawRouteMotionColumn],
+                [cultureinfo]::InvariantCulture) -ne 0) {
+            throw 'Yaw-control diagnostics-only replay called the ideal-line route motion adapter'
+        }
+    }
 
     $modeForceSummary = if ($observedSupportedModeForce) {
         'supported mode-force outputs were finite and gate-checked'
     } else {
         'mode-force branch was traced as unsupported for this race mode'
     }
-    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; mirrored steering reached opposite wheel +0xDC values and changed body motion while route motion stayed at zero. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
+    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; mirrored steering reached opposite wheel +0xDC values and changed body motion. The yaw_control=1 route-free replay completed with finite wheel-response values and physical body movement. Route motion stayed at zero in all cases. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
     Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,
-        $repeat, $replayTicks, $rightReplayTicks, $repeatTicks -Force `
+        $yawReplay, $repeat, $replayTicks, $rightReplayTicks, $yawReplayTicks,
+        $repeatTicks -Force `
         -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $yawDataDir) {
+        $rootFullPath = [System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
+        $yawDataFullPath = [System.IO.Path]::GetFullPath($yawDataDir)
+        if ($yawDataFullPath.StartsWith(
+                $rootFullPath, [StringComparison]::OrdinalIgnoreCase)) {
+            Remove-Item -LiteralPath $yawDataFullPath -Recurse -Force `
+                -ErrorAction SilentlyContinue
+        }
+    }
     Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
 }
