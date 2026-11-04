@@ -37,6 +37,19 @@
   was made from these diagnostic results.
 # Reconstruction progress
 
+- **2026-11-04, mirrored route-free steering reaches wheel forward geometry:**
+  Extended `game_fixed_step_trace_replay_regression` to compare the paired
+  left/right route-disabled replays through wheel `+0xDC`, basis angle/sine/
+  cosine, world forward axis, and body motion. It also checks that traced
+  basis sine/cosine match the basis angle. The Release game target and all
+  regression targets rebuilt; the focused CTest passed 1/1 and the full Release
+  suite passed 72/72 using the external GameData tree. Route-motion steps
+  remained zero. Source inspection confirms the basis-angle model uses
+  `+0xDC` plus contact and wheel terms, then writes `+0xB0/+0xB8`; the live
+  contact projection transforms that local axis into world space. This closes
+  the route-free steering-to-forward-geometry implementation/test gap, but does
+  not establish original numeric parity, tire-force parity, or a complete race.
+
 - **2026-11-04, runtime track/car matrix:** Extended
   `game_track_car_asset_compatibility_matrix` beyond resource parsing. Against
   the separately extracted GameData directory, the Windows Release runtime
@@ -2491,30 +2504,25 @@ original-runtime fidelity.
   instrumentation, resolving that junction explicitly. Its 47 files are
   recorded with source/copy SHA-256 values in
   `../../analysis/reference_captures/silent_reference_copy_20261104/silent_copy_manifest.json`;
-  45 are unchanged and only the copied `options.def`/`options.cfg` were muted
-  (`enabled no`, zero effects/music, CD audio off). The supplied installation
-  and previous captures remain untouched. The game was not launched, so
-  runtime silence, first-tick capture, and source provenance remain
-  unverified; this copy is for physics capture only, not audio comparison.
+  45 are unchanged and only the copied `options.def`/`options.cfg` have altered
+  sound settings. The supplied installation and previous captures remain
+  untouched. Initial runs used `enabled no`; the current profile uses
+  `enabled yes`, zero effects/music, and CD audio off. No run yielded a PCAR
+  sample; runtime inaudibility and source provenance remain unverified. This
+  copy is for physics capture only, not audio comparison.
 
 - **2026-11-04, bounded original PCAR capture runner:** Added
   `tools/run_original_pcar_capture.py` and a process-local startup video-memory
-  agent. The host requires the hash-verified ISO `race.bin`, validates both
-  staged sound configs are disabled, installs the startup/PCAR/control agents
-  before resuming its own suspended direct-spawn process, writes JSONL outside
-  Git, and kills only that process at agent completion or a 135-second host
-  deadline. Increased the exact-write agent window to 120 seconds for menu
-  navigation and tested its timeout bound in the mock. Python syntax and the
-  staged silent-config preflight, JavaScript syntax, exact-watch mock, focused
-  CTest (1/1), and `git diff --check` pass. One run of the initial direct-spawn
-  runner launched verified PID 12528 with both copied sound configs disabled;
-  Frida loaded all three agents, but the game stopped at its MGI “Sneaky user!
-  Where is my canary!” dialog. The controlled agent timed out with zero PCAR
-  callbacks, so the JSONL is invalid for physics inference. The process was
-  terminated and no game remains. Static analysis ties the dialog to engine
-  gate `0x412050`, which requires the named Canary semaphore to pre-exist. The
-  host runner now holds that named object for its run and has passed a
-  Windows named-semaphore self-test; retrying that environment change awaits a
-  clear desktop because Windows Security owned the foreground modal. No
-  runtime-silence or PCAR-field provenance claim is made.
+  agent. The host checks the official engine and launcher hashes, requires the
+  isolated zero-volume sound profile, holds the named canary semaphore, writes
+  JSONL externally, and cleans up only its own game/launcher PIDs. It supports
+  direct engine startup and the official-launcher child bridge. Eleven
+  instrumented attempts produced no video-memory query or PCAR callbacks. A
+  normal visible launcher start reached the original video-driver error; the
+  isolated game processes were closed. The CloneCD Mode 1 `.img` was converted
+  to a standard ISO with the `VIPER` label and mounted at `F:`; the original
+  `.img` was unchanged. The external manifest records all attempts, image
+  hashes and copied-file hashes. Current syntax, the field-watch mock, and
+  `git diff --check` pass. Runtime silence, first-tick field provenance, and
+  controlled original behavior remain unverified.
 

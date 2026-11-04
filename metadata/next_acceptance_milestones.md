@@ -1034,12 +1034,16 @@ A source/disassembly audit confirms the live PCAR control callback updates body
 `+0x500` from the smoothed, speed-scaled steering request. The shared-integrator
 callback `0x432170` consumes that value and writes wheel `+0xE0`, which the
 `0x442530` spin-response stage consumes. Wheel `+0xAC` remains sourced from
-`+0x124 * 0x4C88DC` and its single-step wrap. No evidence maps steering into
-wheel angle or forward geometry, so the runtime does not inject a guessed angle. The next valid
-physics comparison remains a clean matched original/reconstruction grid-start
-capture for the four wheel anchors and contact projections; retain inactive
-state for negative signed depths until that upstream comparison resolves the
-mismatch.
+`+0x124 * 0x4C88DC` and its single-step wrap. The reconstructed route-free path
+also connects callback outputs at wheel `+0xDC` to the wheel basis angle and
+`+0xB0/+0xB8`, then transforms that local forward axis for tire contact
+projection. A paired left/right Viper/Bemidji replay verifies that chain with
+route-motion steps disabled. Original numeric parity and whether the basis
+coefficient model matches the native selector-specific path remain unverified.
+The next valid physics comparison remains a clean matched original/reconstruction
+grid-start capture for the four wheel anchors and contact projections; retain
+inactive state for negative signed depths until that upstream comparison
+resolves the mismatch.
 
 ### Next powered-driving capture gate
 
@@ -1065,17 +1069,21 @@ watchpoints now stay active after constructor return through setup callbacks,
 so writes before the first selected integrator tick are observable. The mock
 asserts a second field write after constructor return and rejects a capture if
 the watch is not retained; native/original behavior remains unverified. The
-new `tools/run_original_pcar_capture.py` enforces the official ISO engine hash,
-requires both staged sound configs disabled, installs the video-memory hook
-and both bounded capture agents before resuming the isolated game, and kills
-only its own game process at completion or timeout. Its PCAR exact-write window
-is two minutes to allow menu navigation; the host runner is capped at 135
-seconds. The first direct-spawn attempt reached the MGI canary warning before
-PCAR callbacks and was invalid. Static analysis shows the engine requires the
-named canary semaphore to pre-exist; the runner now holds that named object for
-the capture lifetime. This environment setup has only a named-object self-test,
-not an original-game retry. A Windows Security-owned foreground window blocked
-further menu interaction, so no retry was attempted.
+`tools/run_original_pcar_capture.py` enforces the official ISO engine hash,
+requires sound initialized with effects/music volume zero and CD audio off,
+holds the expected canary semaphore, writes JSONL externally, and kills only
+the exact process IDs it launched. The `--direct-engine` path loads the
+video-memory hook and bounded PCAR agents before resuming `race.bin`; the
+launcher path attaches a child bridge before resuming the official launcher.
+Eleven instrumented attempts produced no video-memory query or PCAR callbacks.
+The raw logs and data-copy hashes are in the external
+`silent_reference_copy_20261104` directory. The raw CloneCD image could not be
+mounted directly; its Mode 1 sectors were converted to an ISO with volume label
+`VIPER`, mounted at `F:`, with the source image unchanged. A normal visible
+launcher run still reached the original video-driver error before gameplay.
+The launch/capture workflow therefore remains unverified, and no physics
+inference is drawn from these runs. All reconstruction driving checks continue
+to keep ideal-line motion disabled.
 
 The controlled state probe now reads configured throttle/brake type and
 selector values from PCAR records `0x509328/0x509368`. It schedules neutral,

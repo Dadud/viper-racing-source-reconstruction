@@ -1420,16 +1420,31 @@ try {
     $rightSteeringColumn = [Array]::IndexOf($rightTickHeader, 'steering')
     $rightWheelSteeringColumn = [Array]::IndexOf(
         $rightTickHeader, 'wheel0_steering_0xdc')
+    $rightBasisAngleColumn = [Array]::IndexOf(
+        $rightTickHeader, 'wheel0_basis_angle_0xd4')
+    $rightBasisSineColumn = [Array]::IndexOf(
+        $rightTickHeader, 'wheel0_basis_sine_0xb0')
+    $rightBasisCosineColumn = [Array]::IndexOf(
+        $rightTickHeader, 'wheel0_basis_cosine_0xb8')
+    $rightForwardAxisColumns = @(
+        [Array]::IndexOf($rightTickHeader, 'wheel0_forward_axis_world_x'),
+        [Array]::IndexOf($rightTickHeader, 'wheel0_forward_axis_world_y'),
+        [Array]::IndexOf($rightTickHeader, 'wheel0_forward_axis_world_z'))
     $rightBodyMotionColumns = @(
         [Array]::IndexOf($rightTickHeader, 'body_pos_x'),
         [Array]::IndexOf($rightTickHeader, 'body_pos_z'),
         [Array]::IndexOf($rightTickHeader, 'body_ang_y'))
     if ($rightSteeringColumn -lt 0 -or $rightWheelSteeringColumn -lt 0 -or
+        $rightBasisAngleColumn -lt 0 -or $rightBasisSineColumn -lt 0 -or
+        $rightBasisCosineColumn -lt 0 -or $rightForwardAxisColumns -contains -1 -or
         $rightBodyMotionColumns -contains -1) {
-        throw 'Mirrored steering replay omitted driver, wheel-steering, or body-motion trace fields'
+        throw 'Mirrored steering replay omitted driver, wheel-basis, forward-axis, or body-motion trace fields'
     }
     $observedNegativeWheelSteering = $false
     $observedPositiveWheelSteering = $false
+    $observedWheelBasisTrigonometry = $false
+    $oppositeSteeringChangedWheelBasis = $false
+    $oppositeSteeringChangedForwardAxis = $false
     $oppositeSteeringChangedBodyMotion = $false
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         $leftFields = $replayedTickLines[$index].Split(',')
@@ -1445,6 +1460,36 @@ try {
                 $rightFields[$rightWheelSteeringColumn], [cultureinfo]::InvariantCulture)
             if ($leftWheelSteering -lt -0.0001) { $observedNegativeWheelSteering = $true }
             if ($rightWheelSteering -gt 0.0001) { $observedPositiveWheelSteering = $true }
+            $leftBasis = [single[]]::new(3)
+            $rightBasis = [single[]]::new(3)
+            $basisColumns = @(
+                $rightBasisAngleColumn, $rightBasisSineColumn, $rightBasisCosineColumn)
+            foreach ($lane in 0..2) {
+                $leftBasis[$lane] = [single]::Parse(
+                    $leftFields[$basisColumns[$lane]], [cultureinfo]::InvariantCulture)
+                $rightBasis[$lane] = [single]::Parse(
+                    $rightFields[$basisColumns[$lane]], [cultureinfo]::InvariantCulture)
+            }
+            foreach ($basis in @($leftBasis, $rightBasis)) {
+                if ([Math]::Abs($basis[1] - [Math]::Sin($basis[0])) -lt 0.0001 -and
+                    [Math]::Abs($basis[2] - [Math]::Cos($basis[0])) -lt 0.0001) {
+                    $observedWheelBasisTrigonometry = $true
+                }
+            }
+            if ([Math]::Abs($leftBasis[0] - $rightBasis[0]) -gt 0.0001 -or
+                [Math]::Abs($leftBasis[1] - $rightBasis[1]) -gt 0.0001 -or
+                [Math]::Abs($leftBasis[2] - $rightBasis[2]) -gt 0.0001) {
+                $oppositeSteeringChangedWheelBasis = $true
+            }
+            foreach ($column in $rightForwardAxisColumns) {
+                $leftValue = [single]::Parse(
+                    $leftFields[$column], [cultureinfo]::InvariantCulture)
+                $rightValue = [single]::Parse(
+                    $rightFields[$column], [cultureinfo]::InvariantCulture)
+                if ([Math]::Abs($leftValue - $rightValue) -gt 0.001) {
+                    $oppositeSteeringChangedForwardAxis = $true
+                }
+            }
             foreach ($column in $rightBodyMotionColumns) {
                 $leftValue = [single]::Parse(
                     $leftFields[$column], [cultureinfo]::InvariantCulture)
@@ -1458,6 +1503,15 @@ try {
     }
     if (-not $observedNegativeWheelSteering -or -not $observedPositiveWheelSteering) {
         throw "Mirrored driver steering did not produce opposite wheel +0xDC values: left=$observedNegativeWheelSteering right=$observedPositiveWheelSteering"
+    }
+    if (-not $observedWheelBasisTrigonometry) {
+        throw 'Traced wheel basis sine/cosine did not match the traced basis angle'
+    }
+    if (-not $oppositeSteeringChangedWheelBasis) {
+        throw 'Opposite wheel steering did not change the traced wheel basis angle or sine/cosine'
+    }
+    if (-not $oppositeSteeringChangedForwardAxis) {
+        throw 'Opposite wheel steering did not change the route-free world forward axis'
     }
     if (-not $oppositeSteeringChangedBodyMotion) {
         throw 'Opposite wheel steering did not change route-free body motion'
@@ -1535,7 +1589,7 @@ try {
     } else {
         'mode-force branch was traced as unsupported for this race mode'
     }
-    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; matched 32-update longitudinal means: neutral=$neutralAverageForwardSpeed throttle=$throttleInputAverage (response=$throttleForwardResponseObserved), neutralMagnitude=$brakeNeutralAverage brakeMagnitude=$brakeCompare (response=$brakeResponseObserved). Mirrored steering reached opposite wheel +0xDC values and changed body motion. The yaw_control=1 route-free replay completed with finite wheel-response values, physical body movement, and measurable body angular response during steering. Route motion stayed at zero in all cases. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
+    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; matched 32-update longitudinal means: neutral=$neutralAverageForwardSpeed throttle=$throttleInputAverage (response=$throttleForwardResponseObserved), neutralMagnitude=$brakeNeutralAverage brakeMagnitude=$brakeCompare (response=$brakeResponseObserved). Mirrored steering reached opposite wheel +0xDC values, changed the traced wheel basis and world forward axis, and changed body motion; basis sine/cosine matched their traced angle. The yaw_control=1 route-free replay completed with finite wheel-response values, physical body movement, and measurable body angular response during steering. Route motion stayed at zero in all cases. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
     Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,

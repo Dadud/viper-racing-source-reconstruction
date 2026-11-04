@@ -128,33 +128,41 @@ for a future constructor-to-first-tick PCAR capture. The source install's
 files. Per-file source/copy hashes are in the adjacent
 `silent_copy_manifest.json`: 45 files match byte-for-byte, and only the copied
 `Data/options.def` and `Config/options.cfg` differ. In both copied files,
-`[SOUND] enabled` is `no`, effects/music volumes are zero, and CD audio is
-disabled. The supplied install and prior captures were not modified. No game
-process was started, so runtime silence and capture behavior are unverified.
-Use this copy for physics instrumentation only after verifying it produces no
-audible output; do not use its muted settings for audio acceptance.
+`[SOUND] enabled` is `yes`, effects/music volumes are zero, and CD audio is
+disabled. Keeping sound initialized avoids an unverified subsystem-off startup
+path while setting configured outputs to zero. This is a zero-volume
+configuration, not proof that the process is inaudible. The supplied install
+and prior captures were not modified. Do not use this copy for audio acceptance.
 
-The bounded host runner `tools/run_original_pcar_capture.py` now validates the
-ISO `race.bin` hash and both silent config files, spawns the staged `race.bin`
-with `-1`, installs the video-memory workaround plus the exact-write and
-controlled wheel-state agents before resuming, writes private JSONL, and kills
-only the process it spawned after both agents finish or the 135-second host
-deadline. The exact-write agent has a two-minute bound so the operator can
-reach Quick Race from the initial menu. The controlled agent applies its
-documented synthetic keyboard schedule only after selecting the PCAR.
+The bounded host runner `tools/run_original_pcar_capture.py` validates the
+official engine and launcher hashes, checks both zero-volume config files,
+holds the canary semaphore, and writes private JSONL outside Git. Its default
+launcher mode installs a child bridge before resuming the launcher; the
+`--direct-engine` mode installs the video-memory, exact-write, controlled
+wheel-state, and exit-status agents before resuming `race.bin`. It kills only
+the exact PIDs it starts at completion or the 180-second host deadline. The
+exact-write agent has a two-minute bound for menu navigation. The controlled
+agent applies its documented synthetic keyboard schedule only after selecting
+the PCAR. Neither launch mode has yielded valid PCAR callbacks yet.
 
-The first direct-spawn attempt on 2026-11-04 stopped at the original MGI dialog
-“Sneaky user! Where is my canary!” before video-memory queries or PCAR callbacks.
-The controlled agent timed out with zero selected-PCAR callbacks; this is an
-invalid capture, not gameplay evidence. Static code at `0x412050` confirms the
-engine's gate expects the named `MGI Viper Racing 1998 Canary` semaphore to
-already exist. The host runner now holds that named object for its bounded
-process lifetime and closes its handle after the capture process ends; it does
-not patch the executable. This matches the gate's observed existing-object
-branch, but a retry has not validated the workaround. The target was stopped
-and no game process remains. Runtime silence, PCAR provenance, and controlled
-field capture remain unverified. The raw failed JSONL and its host manifest are
-external under `silent_reference_copy_20261104`.
+Initial direct-spawn attempts on 2026-11-04 stopped at the MGI canary dialog or
+terminated before the video-memory query. The canary gate at `0x412050` expects
+the named `MGI Viper Racing 1998 Canary` semaphore to pre-exist; the bounded
+runner holds it without patching game files. The isolated copy now keeps sound
+initialized, sets both output volumes to zero, disables CD audio, uses the
+official ISO engine and launcher hashes, and runs with the `VIPER` CD volume
+mounted as `F:`. The CloneCD Mode 1 image was converted to a standard ISO by
+extracting each 2048-byte sector payload; the source `.img` was left unchanged.
+
+Across 11 instrumented attempts, none produced a video-memory query or PCAR
+callback. A normal visible launch of the isolated launcher reached its
+“Your video card returned an error” dialog; its exact launcher/engine processes
+were then closed. Current host runner modes include the launcher-child bridge
+and `--direct-engine`, but neither path has yet captured a controlled race.
+Every JSONL attempt and the derived-disc/hash details are external under
+`silent_reference_copy_20261104/silent_copy_manifest.json`. Configured zero
+volume has not been verified as inaudible, and no physics inference is valid
+from these failed runs.
 
 ## Pairing a scenario
 
