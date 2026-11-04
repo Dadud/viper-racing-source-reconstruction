@@ -2955,7 +2955,7 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         conditional_tire_input.tire_scalar_0x10 =
             curve_factor_input.curves.quadratic.quadratic;
         conditional_tire_input.corrected_tire_vector_0x100 =
-            result.wheel_tire_basis_updates[wheel].corrected_vector_0x100_0x108;
+            result.wheel_body_forces[wheel].secondary_force.force_vector;
         conditional_tire_input.body_center_0x5c =
             collision_input.body_center;
         conditional_tire_input.body_velocity_0x234 =

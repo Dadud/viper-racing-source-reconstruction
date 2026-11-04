@@ -887,19 +887,20 @@ vector. Its slip-curve input uses wheel animation offset `+0xD8`, the
 contact-normal/forward cross product, and the body basis row at `+0x44..+0x4C`;
 it is distinct from rolling-speed mismatch. The portable four-wheel
 composition now derives these operands accordingly, with focused regression
-coverage. The live session now executes active-contact tire-filter and
-accumulator updates and clears filter history on confirmed inactive contact;
-response vectors now persist for active contact, while tire forces remain
-disconnected; the corrected `local_90` now feeds active-contact wheel-rate
-stores at `+0x120/+0x124/+0x128`. Next, source the remaining force-call
-operands and integrate them in native order, then compare controlled
-no-ideal-line runs against the original.
+coverage. The live session executes active-contact tire-filter and accumulator
+updates, clears filter history on confirmed inactive contact, persists
+active-contact response vectors, applies the corrected `local_90` wheel-rate
+tail, and integrates all three `0x43E6F0` force calls before body kinematics.
+The route-disabled replay checks deterministic force vectors and contact reset
+on terrain misses. Next compare controlled no-ideal-line state traces against
+the original and correct divergences in steering, collision, and full race
+progression.
 
 The route-disabled live path now derives finite curve inputs, advances the
 active-contact tire filters, and persists `+0xA4/+0x10C/+0xEC/+0xF0` from the
 same-tick accumulator model. Its `+0xEC` divisor is the native forward-curve
 product. The inactive-contact filter reset now clears
-`+0x180/+0x174/+0x170/+0x178/+0x11C` when wheel `+0x168` is zero. The
-remaining immediate gap is the complete per-wheel `0x43E6F0` operands/order.
-Keep force application gated until those pass source-backed regression and
-no-ideal-line replay.
+`+0x180/+0x174/+0x170/+0x178/+0x11C` when wheel `+0x168` is zero. The remaining
+immediate gap is controlled no-ideal-line parity against the original and
+correct steering-to-wheel behavior, followed by collision and complete
+Viper/Bemidji race acceptance.

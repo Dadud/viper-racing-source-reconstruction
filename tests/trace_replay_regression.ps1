@@ -159,6 +159,8 @@ try {
     $wheelTireAccumulatorColumns = @()
     $wheelTireVectorColumns = @()
     $wheelRateFinalizeColumns = @()
+    $wheelTireForceColumns = @()
+    $wheelTireFollowupForceColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
@@ -261,6 +263,29 @@ try {
                 $tickHeader, "wheel${wheel}_$($wheelRateFinalizeNames[$lane])")
         }
         $wheelRateFinalizeColumns += ,$wheelRateFinalizeLaneColumns
+        $tireForceNames = @(
+            'tire_force_call_reached', 'tire_force_accumulated',
+            'tire_force_x', 'tire_force_y', 'tire_force_z')
+        $tireForceColumns = [int[]]::new($tireForceNames.Count)
+        for ($lane = 0; $lane -lt $tireForceNames.Count; ++$lane) {
+            $tireForceColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($tireForceNames[$lane])")
+        }
+        $wheelTireForceColumns += ,$tireForceColumns
+        $tireFollowupForceNames = @(
+            'tire_secondary_evaluated', 'tire_secondary_accumulated',
+            'tire_secondary_force_x', 'tire_secondary_force_y',
+            'tire_secondary_force_z', 'tire_conditional_evaluated',
+            'tire_conditional_gate_reached', 'tire_conditional_accumulated',
+            'tire_conditional_force_x', 'tire_conditional_force_y',
+            'tire_conditional_force_z')
+        $tireFollowupForceColumns = [int[]]::new(
+            $tireFollowupForceNames.Count)
+        for ($lane = 0; $lane -lt $tireFollowupForceNames.Count; ++$lane) {
+            $tireFollowupForceColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($tireFollowupForceNames[$lane])")
+        }
+        $wheelTireFollowupForceColumns += ,$tireFollowupForceColumns
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $spinColumns = [int[]]::new(5)
@@ -349,6 +374,12 @@ try {
         @($wheelRateFinalizeColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelTireForceColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
+        @($wheelTireFollowupForceColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelSpinColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
@@ -375,6 +406,7 @@ try {
     $observedTireAccumulatorStage = $false
     $observedTireVectorStage = $false
     $observedWheelRateFinalization = $false
+    $observedTireForceAccumulation = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
@@ -531,6 +563,43 @@ try {
                         throw "Wheel $wheel tire response vector output is non-finite at line $($index + 1)"
                     }
                 }
+                $tireForceColumns = $wheelTireForceColumns[$wheel]
+                if ($fields[$tireForceColumns[0]] -ne '1') {
+                    throw "Wheel $wheel corrected tire vector did not reach the 0x43E6F0 force call at line $($index + 1)"
+                }
+                foreach ($column in $tireForceColumns[2..4]) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel tire force vector is missing at line $($index + 1)"
+                    }
+                    $forceValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($forceValue) -or
+                        [single]::IsInfinity($forceValue)) {
+                        throw "Wheel $wheel applied tire force is non-finite at line $($index + 1)"
+                    }
+                }
+                if ($fields[$tireForceColumns[1]] -eq '1') {
+                    $observedTireForceAccumulation = $true
+                }
+                $followupColumns = $wheelTireFollowupForceColumns[$wheel]
+                if ($fields[$followupColumns[0]] -ne '1' -or
+                    $fields[$followupColumns[5]] -ne '1') {
+                    throw "Wheel $wheel tire vector did not reach both later native force calls at line $($index + 1)"
+                }
+                foreach ($column in @(
+                    $followupColumns[2], $followupColumns[3],
+                    $followupColumns[4], $followupColumns[8],
+                    $followupColumns[9], $followupColumns[10])) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel later tire force vector is missing at line $($index + 1)"
+                    }
+                    $forceValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($forceValue) -or
+                        [single]::IsInfinity($forceValue)) {
+                        throw "Wheel $wheel later tire force is non-finite at line $($index + 1)"
+                    }
+                }
             }
             $rateFinalizeColumns = $wheelRateFinalizeColumns[$wheel]
             $rateFinalized = $fields[$rateFinalizeColumns[0]]
@@ -613,7 +682,11 @@ try {
         }
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
             if ($fields[$wheelQuerySucceededColumns[$wheel]] -ne '1') {
-                throw "Wheel $wheel terrain query did not return a sample at line $($index + 1)"
+                if ($fields[$wheelActiveColumns[$wheel]] -ne '0' -or
+                    $fields[$wheelSuspensionResetColumns[$wheel]] -ne '1') {
+                    throw "Wheel $wheel terrain miss did not clear contact and reset suspension at line $($index + 1)"
+                }
+                continue
             }
             $depthLimit = [single]::Parse(
                 $fields[$wheelContactDepthLimitColumns[$wheel]],
@@ -940,7 +1013,7 @@ try {
         throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
     }
     if (-not $observedBodyIntegration) {
-        throw 'Fixed-step replay did not transfer gravity/suspension force into body velocity'
+        throw 'Fixed-step replay did not transfer gravity, suspension, and tire force into body velocity'
     }
     if (-not $observedSuspensionForce) {
         throw 'Fixed-step replay never produced a nonzero finalized wheel suspension force'
@@ -963,8 +1036,11 @@ try {
     if (-not $observedWheelRateFinalization) {
         throw 'Fixed-step replay never entered finite final wheel-rate stores'
     }
+    if (-not $observedTireForceAccumulation) {
+        throw 'Fixed-step replay never accumulated a nonzero tire force into body force/moment state'
+    }
 
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Active-contact tire filters and accumulator state were derived and persisted; tire forces remain outside body integration."
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity, suspension, and all three reconstructed tire-force call sites reached body integration while route motion ran zero steps. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

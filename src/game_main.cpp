@@ -2075,8 +2075,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 4> wheel_surface_motion_projections{};
     std::array<std::optional<float>, 4> wheel_surface_adjusted_responses{};
     // Source-owned wheel response operands captured after the reconstructed
-    // suspension/contact prefix. They feed tire filters on active contact;
-    // response vectors and tire forces are not applied to the body.
+    // suspension/contact prefix. The corrected response vector now feeds the
+    // first 0x43E6F0 force/moment accumulation before body integration.
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_body_point_velocities_0x130{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
@@ -2097,6 +2097,14 @@ struct PlayerPhysicsTickContext {
         wheel_tire_response_vector_store_results{};
     std::array<std::optional<viper::WheelRateFinalizationResult>, 4>
         wheel_rate_finalization_results{};
+    std::array<bool, 4> wheel_tire_force_call_reached{};
+    std::array<bool, 4> wheel_tire_force_accumulated{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_tire_force_vectors{};
+    std::array<std::optional<viper::WheelSecondaryBodyForceResult>, 4>
+        wheel_tire_secondary_force_results{};
+    std::array<std::optional<viper::WheelConditionalTireForceResult>, 4>
+        wheel_tire_conditional_force_results{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x170{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x174{};
     std::array<std::optional<float>, 4> wheel_tire_instantaneous_0x180{};
@@ -3185,7 +3193,8 @@ struct WindowState {
         player_wheel_pair_differential_producer_applied = true;
     }
 
-    bool advance_player_body_kinematics_from_suspension()
+    bool advance_player_body_kinematics_from_forces(
+        PlayerPhysicsTickContext& tick)
     {
         const auto diagnostics =
             viper::read_ncar_body_integration_kinematics_input_diagnostic(
@@ -3238,6 +3247,95 @@ struct WindowState {
             const std::array<float, 3> body_center{center.x, center.y, center.z};
             static_cast<void>(viper::accumulate_ncar_force_moment(
                 accumulator, force_vector, application_point, body_center));
+
+            const auto& tire_vectors =
+                tick.wheel_tire_response_vector_store_results[wheel];
+            if (tire_vectors) {
+                const auto tire_force = tire_vectors->corrected_vector_0x100_0x108;
+                if (!std::isfinite(tire_force.x) ||
+                    !std::isfinite(tire_force.y) ||
+                    !std::isfinite(tire_force.z)) {
+                    return false;
+                }
+                viper::WheelTireBasisUpdateResult tire_response{};
+                tire_response.corrected_vector_0x100_0x108 = tire_force;
+                const viper::PhysicsVector3 tire_application_point{*x, *y, *z};
+                tick.wheel_tire_force_vectors[wheel] = tire_force;
+                tick.wheel_tire_force_call_reached[wheel] = true;
+                tick.wheel_tire_force_accumulated[wheel] =
+                    viper::accumulate_wheel_tire_body_force(
+                        accumulator, tire_response, tire_application_point, center);
+            }
+
+            const auto& point_velocity =
+                tick.wheel_body_point_velocities_0x130[wheel];
+            const auto& tire_derivation =
+                tick.wheel_tire_response_derivations[wheel];
+            const auto& tire_curves = player_tire_response_curves[wheel];
+            if (point_velocity && tire_derivation && tire_curves) {
+                constexpr float point_velocity_scale = 0.017F;
+                constexpr float point_velocity_limit = 10000.0F;
+                auto secondary_source = viper::PhysicsVector3{
+                    point_velocity->x * point_velocity_scale,
+                    point_velocity->y * point_velocity_scale,
+                    point_velocity->z * point_velocity_scale};
+                const auto source_length_squared =
+                    (secondary_source.x * secondary_source.x +
+                     secondary_source.y * secondary_source.y) +
+                    secondary_source.z * secondary_source.z;
+                if (!std::isfinite(source_length_squared)) return false;
+                if (source_length_squared > 1.0F) {
+                    const auto inverse_length = 1.0F /
+                        std::sqrt(source_length_squared);
+                    secondary_source = {
+                        secondary_source.x * inverse_length * point_velocity_limit,
+                        secondary_source.y * inverse_length * point_velocity_limit,
+                        secondary_source.z * inverse_length * point_velocity_limit};
+                }
+
+                viper::WheelSecondaryBodyForceInput secondary_input{};
+                secondary_input.source_vector_0x10_0x18 = secondary_source;
+                secondary_input.factor_0x74 =
+                    tire_derivation->factors.low_speed_weight;
+                secondary_input.factor_0x48 =
+                    tire_derivation->factors.curve_input;
+                secondary_input.factor_0x78 =
+                    player_wheel_update_results[wheel]
+                        .feature_profile.secondary_response;
+                secondary_input.wheel_point_0xc8 =
+                    { *x, *y, *z };
+                secondary_input.body_center_0x5c = center;
+                secondary_input.wheel_point_weight = 0.3F;
+                secondary_input.body_center_weight = 0.7F;
+                tick.wheel_tire_secondary_force_results[wheel] =
+                    viper::accumulate_wheel_secondary_body_force(
+                        accumulator, secondary_input);
+
+                const auto mode_bits = viper::read_ncar_body_object_u32(
+                    player_runtime_state.body_object, 0x4f4U);
+                if (!mode_bits) return false;
+                const auto& body_basis =
+                    diagnostics.input->orientation_matrix_0x0e;
+                viper::WheelConditionalTireForceInput conditional_input{};
+                conditional_input.feature_gate_0x168 =
+                    player_wheel_contact_states[wheel].contact_active_0x168 != 0U;
+                conditional_input.tire_scalar_0x10 =
+                    tire_curves->quadratic.quadratic;
+                conditional_input.low_traction_flag_0x19c =
+                    player_wheel_contact_states[wheel].contact_feature_0x19c != 0;
+                conditional_input.response_scale = 1.0F;
+                conditional_input.corrected_tire_vector_0x100 =
+                    tick.wheel_tire_secondary_force_results[wheel]->force_vector;
+                conditional_input.forward_axis_0x38 =
+                    {body_basis[0], body_basis[1], body_basis[2]};
+                conditional_input.body_velocity_0x234 =
+                    diagnostics.input->linear_velocity;
+                conditional_input.body_center_0x5c = center;
+                tick.wheel_tire_conditional_force_results[wheel] =
+                    viper::apply_wheel_conditional_tire_force(
+                        accumulator, std::bit_cast<std::int32_t>(*mode_bits),
+                        conditional_input);
+            }
         }
 
         viper::BodyIntegrationTailState tail_state{};
@@ -3722,7 +3820,7 @@ struct WindowState {
         }
             if (player_wheel_contact_states[wheel].contact_active_0x168 == 0U &&
                 viper::read_ncar_wheel_object_u8(wheel_object, 0x168U) ==
-                    std::optional<std::uint8_t>{0U}) {
+                    std::optional<std::uint8_t>{std::uint8_t{0U}}) {
                 const auto wheel_object_offset = static_cast<std::uint32_t>(
                     0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
                 tick.wheel_tire_dynamics_reset_applied[wheel] =
@@ -4044,7 +4142,8 @@ struct WindowState {
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
             if (!player_constructor_inputs_ready ||
-                !advance_player_body_kinematics_from_suspension()) {
+                !advance_player_body_kinematics_from_forces(
+                    player_physics_ticks_this_update.back())) {
                 return false;
             }
             if (this->route_motion_enabled) {
@@ -5485,6 +5584,22 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_wheel_rate_finalized"
                 << ",wheel" << wheel << "_wheel_rate_final_0x124"
                 << ",wheel" << wheel << "_wheel_rate_final_0x128"
+                << ",wheel" << wheel << "_tire_force_call_reached"
+                << ",wheel" << wheel << "_tire_force_accumulated"
+                << ",wheel" << wheel << "_tire_force_x"
+                << ",wheel" << wheel << "_tire_force_y"
+                << ",wheel" << wheel << "_tire_force_z"
+                << ",wheel" << wheel << "_tire_secondary_evaluated"
+                << ",wheel" << wheel << "_tire_secondary_accumulated"
+                << ",wheel" << wheel << "_tire_secondary_force_x"
+                << ",wheel" << wheel << "_tire_secondary_force_y"
+                << ",wheel" << wheel << "_tire_secondary_force_z"
+                << ",wheel" << wheel << "_tire_conditional_evaluated"
+                << ",wheel" << wheel << "_tire_conditional_gate_reached"
+                << ",wheel" << wheel << "_tire_conditional_accumulated"
+                << ",wheel" << wheel << "_tire_conditional_force_x"
+                << ",wheel" << wheel << "_tire_conditional_force_y"
+                << ",wheel" << wheel << "_tire_conditional_force_z"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
                 << ",wheel" << wheel << "_wheel_state_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
@@ -5973,6 +6088,49 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << ',';
                         if (rate_finalization)
                             physics_tick_trace << rate_finalization->auxiliary_rate_0x128;
+                        physics_tick_trace << ','
+                            << (tick.wheel_tire_force_call_reached[wheel] ? 1 : 0)
+                            << ',' << (tick.wheel_tire_force_accumulated[wheel] ? 1 : 0)
+                            << ',';
+                        if (tick.wheel_tire_force_vectors[wheel])
+                            physics_tick_trace <<
+                                tick.wheel_tire_force_vectors[wheel]->x;
+                        physics_tick_trace << ',';
+                        if (tick.wheel_tire_force_vectors[wheel])
+                            physics_tick_trace <<
+                                tick.wheel_tire_force_vectors[wheel]->y;
+                        physics_tick_trace << ',';
+                        if (tick.wheel_tire_force_vectors[wheel])
+                            physics_tick_trace <<
+                                tick.wheel_tire_force_vectors[wheel]->z;
+                        const auto& secondary_force =
+                            tick.wheel_tire_secondary_force_results[wheel];
+                        physics_tick_trace << ',' << (secondary_force ? 1 : 0)
+                            << ',' << (secondary_force && secondary_force->accumulated
+                                ? 1 : 0) << ',';
+                        if (secondary_force)
+                            physics_tick_trace << secondary_force->force_vector.x;
+                        physics_tick_trace << ',';
+                        if (secondary_force)
+                            physics_tick_trace << secondary_force->force_vector.y;
+                        physics_tick_trace << ',';
+                        if (secondary_force)
+                            physics_tick_trace << secondary_force->force_vector.z;
+                        const auto& conditional_force =
+                            tick.wheel_tire_conditional_force_results[wheel];
+                        physics_tick_trace << ',' << (conditional_force ? 1 : 0)
+                            << ',' << (conditional_force && conditional_force->gate_reached
+                                ? 1 : 0)
+                            << ',' << (conditional_force && conditional_force->accumulated
+                                ? 1 : 0) << ',';
+                        if (conditional_force)
+                            physics_tick_trace << conditional_force->force_vector.x;
+                        physics_tick_trace << ',';
+                        if (conditional_force)
+                            physics_tick_trace << conditional_force->force_vector.y;
+                        physics_tick_trace << ',';
+                        if (conditional_force)
+                            physics_tick_trace << conditional_force->force_vector.z;
                         physics_tick_trace << ',';
                         if (tick.wheel_surface_adjusted_responses[wheel]) {
                             physics_tick_trace <<

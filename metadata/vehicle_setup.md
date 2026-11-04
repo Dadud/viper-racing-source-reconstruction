@@ -1206,17 +1206,16 @@ the wheel object and PCAR body. It rejects absent/non-finite operands and stages
 all eight output lanes before atomically writing `+0xD4`, `+0xB0/+0xB4/+0xB8`,
 `+0xD8`, and `+0x110..+0x118`. The player update invokes it after current
 contact/history processing and records outputs in the fixed-step trace. The
-live path still omits native collision handling and tire-response/force stages;
-these basis results are not presented as force or full per-wheel ordering
-parity.
+live path still omits native collision handling. The derived axes now feed the
+tire-response and force stages documented below; complete per-wheel order and
+original numeric parity are still unverified.
 
 The fixed-step diagnostic now transforms current wheel axis `+0xB0..+0xB8`
 through the body basis with `transform_wheel_local_axis_0x422f30`, then records
 the point-velocity projection onto that axis and onto
 `query_normal × forward_axis`. A query miss uses the native `(0,1,0)` normal
-fallback. The projection helper rejects non-finite inputs/results and leaves
-all outputs unconnected to tire forces until the remaining response state is
-owned. Native axis-transform evidence is
+fallback. The projection helper rejects non-finite inputs/results. Native
+axis-transform evidence is
 `ev_85b06e95b3134f859a52c9817b70d691eaa55e8dae49cd70bb7996c2acd6d26a`.
 
 With contact composition enabled, the same body step now sends the finalized
@@ -1235,11 +1234,11 @@ damage byte and basis-update response scalar; coefficients, current rate,
 blend, wheel scalar, and existing animation flags remain explicit inputs.
 Evidence: `0x442530` assembly `0x00443E6C..0x00443EAF`.
 
-The first tire force application is now connected across modules by
+The first tire force application is connected across modules by
 `accumulate_wheel_tire_body_force`. It passes the projection-corrected
 `+0x100..+0x108` vector, transformed application point `+0xC8..+0xD0`, and body
 center `+0x5C..+0x64` to `accumulate_ncar_force_moment`, matching the call to
-`0x43E6F0` at `0x00443BBD..0x00443C09`. That shared helper retains its observed
+`0x43E6F0` at `0x00443C04..0x00443C09`. That shared helper retains its observed
 near-zero vector gate and force/moment accumulation.
 
 `accumulate_wheel_secondary_body_force` connects the next unconditional
@@ -1252,6 +1251,27 @@ caller inputs. Evidence: `0x442530` assembly
 `accumulate_wheel_body_force_sequence` now applies both calls in their observed
 order against one mutable `NcarForceMomentAccumulator` and reuses the same
 transformed point and body center for both.
+
+The second force call's ordered operands are source-mapped: its source is the
+transformed wheel point velocity scaled by `0.017`, conditionally normalized
+to magnitude `10000` when its squared magnitude exceeds `1`; factors are the
+low-speed weight, `curve_input`, and contact-profile `secondary_response`; its
+application point is `0.3 * wheel +0xC8 + 0.7 * body +0x5C`. The conditional
+third call at `0x443E67` consumes that second force vector, projects it onto
+body axis `+0x38..+0x40`, applies the gated traction weight and velocity
+correction, and accumulates at the body center. Its gates are wheel
+`+0x168 != 0` and body `+0x4F4 == 0`.
+
+The live Windows fixed-step path now applies all three `0x43E6F0` stages in
+the current reconstructed wheel-response path before body kinematics, after
+the per-wheel suspension force. Byte-backed wheel point and contact state,
+body velocity/axis/mode, retained tire curves, and tire response factors
+supply their mapped operands. Tick traces record reachability, gate and
+threshold outcomes, and all three force vectors; route-disabled replay checks
+finite deterministic call outputs and requires a nonzero tire force to reach
+the body accumulator. The source-backed input composition is integrated, but
+controlled original numeric parity, steering-to-wheel coupling, collision,
+AI body motion, and a completed race remain unverified.
 
 `advance_wheel_tire_accumulators` applies two additional persistent writes
 after the forward/lateral response locals are formed. It updates `+0xA4` from
@@ -1368,10 +1388,10 @@ four-wheel composition enables its contact pipeline, it now sources the tire
 filter gate from that `surface.adjusted_response` local and contact activity
 from the updated `+0x168` state. Regression uses contradictory caller values to
 check both sources. The Windows live session now advances the stateful tire
-filter stage for active contacts and clears `+0x180/+0x174/+0x170/+0x178/+0x11C`
-for inactive contact. Response-vector writes and force accumulation remain
-open; the shared random stream's full native call inventory and exact `BL`
-history remain unresolved.
+filter stage for active contacts, clears `+0x180/+0x174/+0x170/+0x178/+0x11C`
+for inactive contact, writes response vectors, and collects the three modeled
+tire forces into body force/moment state. The shared random stream's full
+native call inventory and exact `BL` history remain unresolved.
 
 `classify_wheel_contact_feature` models the following contact-feature switch
 in `0x442530`. It preserves raw feature codes, strict signed-bit gates at
