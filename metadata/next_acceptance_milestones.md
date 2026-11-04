@@ -80,7 +80,7 @@ present in the physics tick CSV. The live player now accumulates finalized
 suspension forces at byte-backed wheel application points, adds sourced gravity,
 consumes initialized point-impulse accumulators, and runs the existing body
 kinematics/orientation/basis integrator. The resulting PCAR position and yaw now
-drive the player renderer with route motion disabled. All three mapped\nper-wheel tire-force calls now contribute force and moment to the live body\nintegration. Numeric parity, embedded/virtual-record effects, live collision\nresponse, damage, steering-angle/forward-geometry coupling, AI body physics, and complete race\nacceptance remain open. The terrain plane sampler
+drive the player renderer with route motion disabled. All three mapped\nper-wheel tire-force calls now contribute force and moment to the live body\nintegration. The recovered collision impulse is also connected, with its\nstandard-session gate sourced from the frontend zero option byte. Engine/gear\ntorque production, embedded/virtual-record effects, collision numeric parity,\nalternate-mode damage-gate values, steering-angle/forward-geometry coupling,\nAI body physics, and complete race acceptance remain open. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches

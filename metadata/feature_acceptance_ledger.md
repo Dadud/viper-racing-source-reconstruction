@@ -16,9 +16,10 @@ prototype lifecycle by itself does not establish playable or original-matched
 behavior. Normal startup disables route-kinematic motion; the explicit
 `--route-motion-prototype` option is a manual demo only. With route motion
 disabled, the player render pose comes from the integrated PCAR body state; the
-live integrator currently accumulates finalized suspension forces but does not
-yet include accepted tire response forces. This mode is not an accepted driving
-simulation.
+live step accumulates finalized suspension and three tire-response force calls,
+gravity, supported mode force, and source-backed wheel collision impulses. The
+engine/gear-to-wheel torque producer and original numeric parity remain
+unresolved, so this mode is not an accepted driving simulation.
 No required system below is accepted as complete.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
