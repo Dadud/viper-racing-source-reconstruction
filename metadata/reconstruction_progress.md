@@ -1,5 +1,19 @@
 # Reconstruction progress
 
+- **2026-11-04, runtime track/car matrix:** Extended
+  `game_track_car_asset_compatibility_matrix` beyond resource parsing. Against
+  the separately extracted GameData directory, the Windows Release runtime
+  now starts all 40 combinations (8 concrete tracks × 5 supplied cars) in
+  silent software-rendered, diagnostics-only sessions, records fixed-step body
+  and frame traces, requires at least one complete finite body tick, and checks
+  every recorded frame used zero route-motion steps. The Release game target
+  rebuilt and the full configured CTest suite passed 72/72; the matrix took
+  20.97 seconds. This verifies session construction and tick readiness
+  across the supplied asset matrix; it does not prove powered driving,
+  original parity, complete races, or that all five cars are original-selectable.
+  Temporary traces are kept outside the repository and removed after each
+  successful pair.
+
 - **2026-11-03, PCAR curve getter to `+0xD70`:** The checked-in x86 listing
   at `0x4313F2..0x4313FC` shows `0x431150` calling virtual slot `+0` on the
   object at parent `+0xBFC` after its four `0x442530` calls, then storing the
