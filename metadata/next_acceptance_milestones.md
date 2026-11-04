@@ -54,7 +54,7 @@ present in the physics tick CSV. The live player now accumulates finalized
 suspension forces at byte-backed wheel application points, adds sourced gravity,
 consumes initialized point-impulse accumulators, and runs the existing body
 kinematics/orientation/basis integrator. The resulting PCAR position and yaw now
-drive the player renderer with route motion disabled. All three mapped\nper-wheel tire-force calls now contribute force and moment to the live body\nintegration. Numeric parity, embedded/virtual-record effects, live collision\nresponse, damage, steering-to-wheel coupling, AI body physics, and complete race\nacceptance remain open. The terrain plane sampler
+drive the player renderer with route motion disabled. All three mapped\nper-wheel tire-force calls now contribute force and moment to the live body\nintegration. Numeric parity, embedded/virtual-record effects, live collision\nresponse, damage, steering-angle/forward-geometry coupling, AI body physics, and complete race\nacceptance remain open. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches
@@ -900,7 +900,7 @@ same-tick accumulator model. Its `+0xEC` divisor is the native forward-curve
 product. The inactive-contact filter reset now clears
 `+0x180/+0x174/+0x170/+0x178/+0x11C` when wheel `+0x168` is zero. The remaining
 immediate gap is controlled no-ideal-line parity against the original and
-correct steering-to-wheel behavior, followed by collision and complete
+native steering-angle/forward-geometry behavior, followed by collision and complete
 Viper/Bemidji race acceptance.
 
 ### 2026-11-03 validation re-run: live tire-force milestone
@@ -917,10 +917,11 @@ deprecation warnings; there were no build errors. These checks verify source
 buildability and automated smokes, not a completed race or native numeric parity.
 
 A source/disassembly audit confirms the live PCAR control callback updates body
-`+0x500` from the smoothed, speed-scaled steering request, while the wheel
-`+0xAC` update in `0x442530` remains sourced from `+0x124 * 0x4C88DC` and its
-single-step wrap. No evidence yet maps the player steering request into wheel
-steering state, so the runtime does not inject a guessed angle. The next valid
+`+0x500` from the smoothed, speed-scaled steering request. The shared-integrator
+callback `0x432170` consumes that value and writes wheel `+0xE0`, which the
+`0x442530` spin-response stage consumes. Wheel `+0xAC` remains sourced from
+`+0x124 * 0x4C88DC` and its single-step wrap. No evidence maps steering into
+wheel angle or forward geometry, so the runtime does not inject a guessed angle. The next valid
 physics comparison remains a clean matched original/reconstruction grid-start
 capture for the four wheel anchors and contact projections; retain inactive
 state for negative signed depths until that upstream comparison resolves the
