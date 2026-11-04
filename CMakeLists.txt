@@ -259,6 +259,12 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    find_program(VIPER_NODE_EXECUTABLE NAMES node node.exe)
+    if(VIPER_NODE_EXECUTABLE)
+        add_test(NAME pcar_source_field_watch_mock
+            COMMAND "${VIPER_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/pcar_source_field_watch_mock.js")
+    endif()
     add_executable(viper_network_session_regression tests/network_session_regression.cpp)
     target_link_libraries(viper_network_session_regression PRIVATE viper_network_session)
     add_test(NAME network_session_regression COMMAND viper_network_session_regression)

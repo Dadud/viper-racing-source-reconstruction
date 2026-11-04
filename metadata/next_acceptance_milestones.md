@@ -87,7 +87,10 @@ selected-player identity, or observed input response. The watch now arms on
 `0x431150`; reject the capture unless those object identities match. Run the
 source-field watch on the original before integrating the unresolved
 multiplier path; retain route motion disabled in all reconstruction
-acceptance checks.
+acceptance checks. Added optional CTest `pcar_source_field_watch_mock` when
+Node is present; this checks the probe's script flow without claiming native
+watchpoint or original-game validation. The configured Release suite now
+passes 70/70.
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent

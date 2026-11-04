@@ -200,6 +200,10 @@ the game or modify input. Its syntax passes `node --check`, but a live original
 capture has not validated watchpoint setup, exception handling, or selection of
 the intended player object. Results must be rejected unless the body matches
 the selected callback object and the writer address resolves inside `race.bin`.
+The deterministic mock in `tests/pcar_source_field_watch_mock.js` exercises
+constructor arming, changed-field events, re-arming, selected-object tick
+sampling, and cleanup. CMake registers it when Node is available; the mock
+validates the agent's control flow only, not Frida's native watchpoint support.
 
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,
