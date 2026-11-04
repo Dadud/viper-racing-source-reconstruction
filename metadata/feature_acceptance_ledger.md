@@ -74,14 +74,14 @@ with other unmodeled callsites, so these forces are not parity evidence. The
 portable four-wheel tire-factor composition now propagates its
 terrain-feature-derived mode scale to both the low-speed cutoff and
 forward/lateral tire-curve multipliers; regression covers a feature-code
-result of `0.9`. Tire-response force generation and accumulation are not
-connected to the Windows body step. The remaining data gap is
-fixed-seed/shared-stream parity and sourcing every frame-dependent wheel input
-into the runtime session. The immediate behavioral gap is a controlled
-per-wheel/body capture
-including `+0x24C/+0x258` accumulator deltas under coast, throttle, steering,
-and braking. The bounded original capture documents synthetic key reads, not
-normal keyboard delivery or a force law.
+result of `0.9`. The live Windows body step now accumulates the mapped
+tire-response forces, though upstream engine/gear torque remains unresolved.
+The remaining data gap includes fixed-seed/shared-stream parity and sourcing
+every frame-dependent wheel input into the runtime session. The immediate
+behavioral gap is a controlled original per-wheel/body capture including
+`+0x24C/+0x258` accumulator deltas under coast, throttle, steering, and braking.
+The bounded original capture documents synthetic key reads, not normal keyboard
+delivery or a force law.
 Keep unresolved fields fail-closed; do not promote constructor state, contact
 observations, route traces, WARP smoke or startup captures into claims of
 accepted gameplay.
