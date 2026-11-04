@@ -1977,6 +1977,8 @@ struct PlayerPhysicsTickContext {
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::optional<float> pcar_curve_getter_0xc0c_after_tick;
     std::optional<float> pcar_body_sample_0xd70_after_tick;
+    std::optional<std::uint8_t> pcar_sound_getter_gate_0x508a40_after_tick;
+    std::optional<float> pcar_sound_getter_0x44_selected_value_after_tick;
     std::optional<std::uint8_t> integrator_wheel_scalar_callback_reached;
     std::optional<std::uint8_t> integrator_wheel_scalar_selector_nonzero;
     std::optional<std::uint8_t> integrator_wheel_scalar_response_gate_passed;
@@ -3135,7 +3137,8 @@ struct WindowState {
         player_wheel_pair_differential_producer_applied = true;
     }
 
-    bool sample_player_integrator_curve_getter(PlayerPhysicsTickContext& tick)
+    bool sample_player_integrator_curve_getter(
+        PlayerPhysicsTickContext& tick, const bool sound_getter_gate_0x508a40)
     {
         // 0x431150 calls virtual slot +0 on the embedded object at +0xBFC
         // after the four 0x442530 wheel calls, then stores its x87 result at
@@ -3147,6 +3150,17 @@ struct WindowState {
             !std::isfinite(std::bit_cast<float>(*getter_bits))) {
             return false;
         }
+        // The PCAR +0x44 getter selects body +0xDE0 when DAT_00508A40 is true
+        // and +0xC34 otherwise. The ordinary elapsed-scheduler path uses the
+        // same gate. Keep this value diagnostic-only while sound is muted.
+        const auto sound_activity_bits = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object,
+            sound_getter_gate_0x508a40 ? 0xde0U : 0xc34U);
+        if (!sound_activity_bits ||
+            !std::isfinite(std::bit_cast<float>(*sound_activity_bits))) {
+            return false;
+        }
+
         const std::array<viper::NcarObjectFieldWrite, 1> writes{{
             {0xd70U, 4U, *getter_bits},
         }};
@@ -3158,6 +3172,10 @@ struct WindowState {
             std::bit_cast<float>(*getter_bits);
         tick.pcar_body_sample_0xd70_after_tick =
             std::bit_cast<float>(*getter_bits);
+        tick.pcar_sound_getter_gate_0x508a40_after_tick =
+            static_cast<std::uint8_t>(sound_getter_gate_0x508a40);
+        tick.pcar_sound_getter_0x44_selected_value_after_tick =
+            std::bit_cast<float>(*sound_activity_bits);
         return true;
     }
 
@@ -4128,7 +4146,8 @@ struct WindowState {
             update_player_wheel_contacts_from_body();
             if (!player_constructor_inputs_ready ||
                 !sample_player_integrator_curve_getter(
-                    player_physics_ticks_this_update.back())) {
+                    player_physics_ticks_this_update.back(),
+                    scheduler_input.gate_0x508a40)) {
                 return false;
             }
             capture_player_tick_physics_state(
@@ -5603,7 +5622,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",integrator_mode_force_z";
         for (std::size_t lane = 0U; lane < 3U; ++lane)
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
-        physics_tick_trace << ",pcar_curve_getter_0xc0c,pcar_body_sample_0xd70";
+        physics_tick_trace << ",pcar_curve_getter_0xc0c,pcar_body_sample_0xd70"
+            ",pcar_sound_getter_gate_0x508a40"
+            ",pcar_sound_getter_0x44_selected_value";
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_suspension_reset_contact"
@@ -5992,6 +6013,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (tick.pcar_body_sample_0xd70_after_tick)
                         physics_tick_trace <<
                             *tick.pcar_body_sample_0xd70_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.pcar_sound_getter_gate_0x508a40_after_tick)
+                        physics_tick_trace << static_cast<unsigned>(
+                            *tick.pcar_sound_getter_gate_0x508a40_after_tick);
+                    physics_tick_trace << ',';
+                    if (tick.pcar_sound_getter_0x44_selected_value_after_tick)
+                        physics_tick_trace <<
+                            *tick.pcar_sound_getter_0x44_selected_value_after_tick;
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_active_after_tick[wheel]) {

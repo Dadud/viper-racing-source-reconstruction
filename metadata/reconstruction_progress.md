@@ -12,9 +12,13 @@
   the full Release CTest suite passed 68/68. The first replay caught a
   trace-row ownership error that was corrected before the passing rerun. The
   getter and its stored sample now match and remain finite across replay rows.
-  Sound playback remains muted; selected
-  `+0xDE0`/`+0xC34` source mapping, mixing, and original audio comparison remain
-  open. This does not establish driving parity.
+  The `+0x44` getter now selects its source from the same
+  `DAT_00508A40` gate passed to the elapsed scheduler: the route-free path
+  selects `+0xC34` (curve child `+0x38`), initialized to zero, and trace replay
+  checks both the gate and selected value. The alternate true-gate `+0xDE0`
+  path, mixing, and original audio comparison remain open, so playback stays
+  muted.
+  This does not establish driving parity.
 
 - **2026-11-03, all shipped track/car asset combinations:** Added the Windows
   `game_track_car_asset_compatibility_matrix` CTest. It invokes the existing

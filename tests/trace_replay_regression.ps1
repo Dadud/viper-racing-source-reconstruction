@@ -134,6 +134,10 @@ try {
         $tickHeader, 'pcar_curve_getter_0xc0c')
     $pcarBodySampleColumn = [Array]::IndexOf(
         $tickHeader, 'pcar_body_sample_0xd70')
+    $pcarSoundGetterGateColumn = [Array]::IndexOf(
+        $tickHeader, 'pcar_sound_getter_gate_0x508a40')
+    $pcarSoundGetterColumn = [Array]::IndexOf(
+        $tickHeader, 'pcar_sound_getter_0x44_selected_value')
     $bodyTimerColumn = [Array]::IndexOf($tickHeader, 'body_timer_0xe44')
     $bodyWheelPairScaleColumns = @(
         [Array]::IndexOf($tickHeader, 'body_wheel_pair_scale_0xdd4'),
@@ -387,6 +391,7 @@ try {
         $tickSteeringInputColumn -lt 0 -or $tickThrottleInputColumn -lt 0 -or
         $tickBrakeInputColumn -lt 0 -or
         $pcarCurveGetterColumn -lt 0 -or $pcarBodySampleColumn -lt 0 -or
+        $pcarSoundGetterGateColumn -lt 0 -or $pcarSoundGetterColumn -lt 0 -or
         $bodyTimerColumn -lt 0 -or
         @($bodyWheelPairScaleColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         $bodyKinematicsReadyColumn -lt 0 -or
@@ -490,19 +495,27 @@ try {
             throw "Fixed-step trace field count is invalid at line $($index + 1)"
         }
         if ([string]::IsNullOrWhiteSpace($fields[$pcarCurveGetterColumn]) -or
-            [string]::IsNullOrWhiteSpace($fields[$pcarBodySampleColumn])) {
+            [string]::IsNullOrWhiteSpace($fields[$pcarBodySampleColumn]) -or
+            [string]::IsNullOrWhiteSpace($fields[$pcarSoundGetterGateColumn]) -or
+            [string]::IsNullOrWhiteSpace($fields[$pcarSoundGetterColumn])) {
             throw "PCAR curve getter/body sample is missing at line $($index + 1)"
         }
         $curveGetterValue = [single]::Parse(
             $fields[$pcarCurveGetterColumn], [cultureinfo]::InvariantCulture)
         $bodySampleValue = [single]::Parse(
             $fields[$pcarBodySampleColumn], [cultureinfo]::InvariantCulture)
+        $soundGetterValue = [single]::Parse(
+            $fields[$pcarSoundGetterColumn], [cultureinfo]::InvariantCulture)
         if ([single]::IsNaN($curveGetterValue) -or
             [single]::IsInfinity($curveGetterValue) -or
             [single]::IsNaN($bodySampleValue) -or
             [single]::IsInfinity($bodySampleValue) -or
-            $curveGetterValue -ne $bodySampleValue) {
-            throw "PCAR curve callback result does not match the body +0xD70 sample at line $($index + 1)"
+            [single]::IsNaN($soundGetterValue) -or
+            [single]::IsInfinity($soundGetterValue) -or
+            $fields[$pcarSoundGetterGateColumn] -ne '0' -or
+            $curveGetterValue -ne $bodySampleValue -or
+            $soundGetterValue -ne 0.0) {
+            throw "PCAR sound inputs are invalid or the curve callback result does not match the body +0xD70 sample at line $($index + 1)"
         }
         if ($fields[$integratorModeForceColumns[0]] -ne '1') {
             throw "Shared-integrator mode-force branch result is missing at line $($index + 1)"

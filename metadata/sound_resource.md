@@ -47,8 +47,12 @@ virtual offsets `+0x48` and `+0x44`, then applies per-band data through
 models the `+0xD70` producer: after its four-wheel contact/history pass it reads
 the configured curve object's getter value at parent `+0xC0C` and copies the
 same bits into body `+0xD70`, with both values included in the fixed-step trace.
-The selected `+0xDE0`/`+0xC34` source and the downstream ESFX-to-DirectSound
-mixing behavior remain unresolved, so audio playback remains muted.
+For the ordinary elapsed-scheduler path, the shared `DAT_00508A40` gate is
+false, so the `+0x44` getter selects `+0xC34`. That field is curve-object
+`+0x38`, initialized to zero by `0x440100`; fixed-step traces now record this
+selected getter value as a diagnostic input. The alternate true-gate `+0xDE0`
+path and downstream ESFX-to-DirectSound mixing remain unverified, so audio
+playback remains muted.
 `--smoke-audio --smoke-frames 30` initializes DirectSound and exercises resource
 and PCM-buffer creation only. Current runs load Viper's four resources (idle plus
 three bands), and Exotic, Plane, Sedan, and Sports' three resources each (idle
@@ -87,7 +91,9 @@ targets `0x43F970`, which returns curve-object `+0x10` (parent `+0xC0C`).
 Constructor `0x4401D0` initializes that field to `1000.0`. The fixed-step
 runtime now models this concrete getter and store, and the route-free trace
 regression requires the observed getter and stored sample to match and remain
-finite. It does not yet establish the meaning/units of this sample or the
-selected `+0xDE0`/`+0xC34` getter source. Audio remains muted; the runtime must
-not feed route speed or keyboard throttle directly into ESFX tuning on this
-evidence alone.
+finite. The `+0x44` callback's current false-gate source is also mapped to
+curve child `+0x38` (parent `+0xC34`), initialized to zero; the trace requires
+that value for this scheduler mode. The alternate true-gate `+0xDE0` branch,
+meaning/units of either getter, and ESFX mixing remain unverified. Audio remains
+muted; the runtime must not feed route speed or keyboard throttle directly
+into ESFX tuning on this evidence alone.

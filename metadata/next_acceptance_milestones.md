@@ -13,8 +13,10 @@ their recovered child offsets: getter value `1000` at parent `+0xC0C`, derived
 value at `+0xC2C`, and one-byte mode flags. Its regression checks the absolute
 parent offsets and widths. The PCAR fixed-step path now models `0x431150`'s
 virtual curve getter and its `+0xD70` store, and trace replay requires finite,
-matching getter/store values. The selected PCAR `+0xDE0`/`+0xC34` source and
-downstream sound mixing remain unresolved, so engine playback stays muted.
+matching getter/store values. The `+0x44` getter's false-gate `+0xC34` value is
+now traced as the constructor-initialized zero for the ordinary
+elapsed-scheduler path. The alternate true-gate `+0xDE0` path and downstream
+sound mixing remain unresolved, so engine playback stays muted.
 Release `viper_game` build and route-free fixed-step replay passed on
 2026-11-03; the complete configured Release CTest suite subsequently passed
 68/68. These are implementation/regression checks, not original-game parity or

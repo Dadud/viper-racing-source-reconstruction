@@ -596,8 +596,11 @@ The current runtime parses this setup, requires the idle sample, loads each
 declared band using the native name/fallback order, and retains its seven
 floats beside the DirectSound buffer. Those buffers are kept stopped and muted;
 the previous route-speed/throttle band selector was removed because the native
-manager reads body `+0xD70` and `+0xDE0` or `+0xC34`, whose runtime sources are
-not yet connected. All five cars pass bounded DirectSound resource/buffer
+manager reads body `+0xD70` and `+0xDE0` or `+0xC34`. The route-free PCAR path
+now models the `+0xD70` curve getter and, for its false `DAT_00508A40`
+elapsed-scheduler gate, traces the selected `+0xC34` curve field initialized
+to zero. The alternate true-gate `+0xDE0` branch and ESFX mixer remain
+unverified. All five cars pass bounded DirectSound resource/buffer
 initialization smoke, which does not start playback or establish audible
 parity. Evidence IDs:
 `ev_f5ee7b4ebd6c8e0d68ffdb0224d85bf883046a27e5b16642e7fb67ac89e34236`
