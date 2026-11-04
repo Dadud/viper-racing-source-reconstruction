@@ -78,6 +78,14 @@ D-block endpoints plus wheel `+0xE4/+0x124/+0x128` around `0x431150`,
 `0x442530`, and `0x443E9D`. Do not add a guessed torque law; keep ideal-line
 motion disabled.
 
+The exact-write capture is prepared as `tools/pcar_source_field_watch.js` and
+the controlled state-correlation probe now includes the related PCAR/wheel
+fields. Both scripts pass Node syntax checks, but no original game process was
+running to validate the Frida APIs, allocation filter, exception handler, or
+observed input response. Run the source-field watch on the original before
+integrating the unresolved multiplier path; retain route motion disabled in
+all reconstruction acceptance checks.
+
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
 safe-follow policy, standings, and a return-to-setup path. Normal startup now

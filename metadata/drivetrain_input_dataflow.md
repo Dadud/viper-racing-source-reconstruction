@@ -189,6 +189,19 @@ instruction wrote a field between samples. Probe syntax was checked with
 `node --check`; a new controlled original run has not yet validated the added
 memory reads.
 
+An exact-write probe, `tools/pcar_source_field_watch.js`, now arms x86 hardware
+write watchpoints for both fields as the known `0xEF0` PCAR allocation returns
+at `0x4226E0`. It records the post-write instruction address, field values,
+changed fields, and fuzzy backtrace, and also samples both fields around the
+selected `0x431150` tick. If the simulation uses another thread, it arms that
+thread when the selected PCAR integrator is entered. The script is deliberately
+separate from the control-intervention probe; it does not launch the game or
+modify input. Its syntax passes `node --check`, but the installed Frida runtime
+and a live original capture have not validated watchpoint setup, exception
+handling, or the candidate allocation match. Results must be rejected if the
+armed event does not report the expected body/addresses and a valid instruction
+inside the engine module.
+
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,
 selector and `0x4C7D48` scale all explicit. Regression covers both interpolation
