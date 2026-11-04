@@ -6,9 +6,12 @@ param(
 $root = Join-Path ([System.IO.Path]::GetTempPath()) "viper_trace_$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $root | Out-Null
 $capture = Join-Path $root 'capture.csv'
+$rightCapture = Join-Path $root 'right-capture.csv'
 $replay = Join-Path $root 'replay.csv'
+$rightReplay = Join-Path $root 'right-replay.csv'
 $repeat = Join-Path $root 'repeat.csv'
 $replayTicks = Join-Path $root 'replay-ticks.csv'
+$rightReplayTicks = Join-Path $root 'right-replay-ticks.csv'
 $repeatTicks = Join-Path $root 'repeat-ticks.csv'
 try {
     # Author a repeatable fixed-step driver input fixture. Route motion is
@@ -41,6 +44,19 @@ try {
     }
     [System.IO.File]::WriteAllLines($capture, $inputLines)
 
+    # Mirror only steering while preserving timing, throttle, and brake.
+    $rightInputLines = [System.Collections.Generic.List[string]]::new()
+    [void]$rightInputLines.Add($inputLines[0])
+    foreach ($line in $inputLines | Select-Object -Skip 1) {
+        $fields = $line.Split(',')
+        $steerLeft = $fields[3]
+        $fields[3] = $fields[4]
+        $fields[4] = $steerLeft
+        if ($fields[7] -ceq 'steer-left') { $fields[7] = 'steer-right' }
+        [void]$rightInputLines.Add(($fields -join ','))
+    }
+    [System.IO.File]::WriteAllLines($rightCapture, $rightInputLines)
+
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
         --diagnostics-only -grid --play-trace $capture --record-trace $replay `
         --record-tick-trace $replayTicks
@@ -49,8 +65,13 @@ try {
         --diagnostics-only -grid --play-trace $capture --record-trace $repeat `
         --record-tick-trace $repeatTicks
     if ($LASTEXITCODE -ne 0) { throw "Repeated trace replay exited with $LASTEXITCODE" }
+    & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
+        --diagnostics-only -grid --play-trace $rightCapture `
+        --record-trace $rightReplay --record-tick-trace $rightReplayTicks
+    if ($LASTEXITCODE -ne 0) { throw "Mirrored steering replay exited with $LASTEXITCODE" }
 
     $replayedLines = [System.IO.File]::ReadAllLines($replay)
+    $rightReplayedLines = [System.IO.File]::ReadAllLines($rightReplay)
     $repeatedLines = [System.IO.File]::ReadAllLines($repeat)
     if ($inputLines.Count -lt 2) { throw 'Capture trace has no frame rows' }
     if ($inputLines.Count -ne $replayedLines.Count -or
@@ -58,11 +79,17 @@ try {
         throw 'Trace row counts differ across input and replay runs'
     }
     $replayedTickLines = [System.IO.File]::ReadAllLines($replayTicks)
+    $rightReplayedTickLines = [System.IO.File]::ReadAllLines($rightReplayTicks)
     $repeatedTickLines = [System.IO.File]::ReadAllLines($repeatTicks)
     if ($replayedTickLines.Count -lt 2 -or
         $replayedTickLines.Count -ne $repeatedTickLines.Count -or
         $replayedTickLines[0] -cne $repeatedTickLines[0]) {
         throw 'Fixed-step trace is empty or has inconsistent replay row counts'
+    }
+    if ($rightReplayedLines.Count -ne $replayedLines.Count -or
+        $rightReplayedTickLines.Count -ne $replayedTickLines.Count -or
+        $rightReplayedTickLines[0] -cne $replayedTickLines[0]) {
+        throw 'Mirrored steering trace row counts or fixed-step schemas differ'
     }
     $tickHeader = $replayedTickLines[0].Split(',')
     $tickIndexColumn = [Array]::IndexOf($tickHeader, 'tick_index')
@@ -1078,15 +1105,74 @@ try {
         throw 'Fixed-step replay did not record the shared-integrator mode-force dispatch'
     }
 
+    # Opposite driver steering must reach wheel +0xDC (the recovered input to
+    # the wheel-basis updater) and produce different body motion. Route motion
+    # stays disabled in both runs, so this cannot pass through ideal-line pose
+    # advancement.
+    $rightTickHeader = $rightReplayedTickLines[0].Split(',')
+    $rightSteeringColumn = [Array]::IndexOf($rightTickHeader, 'steering')
+    $rightWheelSteeringColumn = [Array]::IndexOf(
+        $rightTickHeader, 'wheel0_steering_0xdc')
+    $rightBodyMotionColumns = @(
+        [Array]::IndexOf($rightTickHeader, 'body_pos_x'),
+        [Array]::IndexOf($rightTickHeader, 'body_pos_z'),
+        [Array]::IndexOf($rightTickHeader, 'body_ang_y'))
+    if ($rightSteeringColumn -lt 0 -or $rightWheelSteeringColumn -lt 0 -or
+        $rightBodyMotionColumns -contains -1) {
+        throw 'Mirrored steering replay omitted driver, wheel-steering, or body-motion trace fields'
+    }
+    $observedNegativeWheelSteering = $false
+    $observedPositiveWheelSteering = $false
+    $oppositeSteeringChangedBodyMotion = $false
+    for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
+        $leftFields = $replayedTickLines[$index].Split(',')
+        $rightFields = $rightReplayedTickLines[$index].Split(',')
+        $leftSteering = [single]::Parse(
+            $leftFields[$rightSteeringColumn], [cultureinfo]::InvariantCulture)
+        $rightSteering = [single]::Parse(
+            $rightFields[$rightSteeringColumn], [cultureinfo]::InvariantCulture)
+        if ($leftSteering -lt -0.05 -and $rightSteering -gt 0.05) {
+            $leftWheelSteering = [single]::Parse(
+                $leftFields[$rightWheelSteeringColumn], [cultureinfo]::InvariantCulture)
+            $rightWheelSteering = [single]::Parse(
+                $rightFields[$rightWheelSteeringColumn], [cultureinfo]::InvariantCulture)
+            if ($leftWheelSteering -lt -0.0001) { $observedNegativeWheelSteering = $true }
+            if ($rightWheelSteering -gt 0.0001) { $observedPositiveWheelSteering = $true }
+            foreach ($column in $rightBodyMotionColumns) {
+                $leftValue = [single]::Parse(
+                    $leftFields[$column], [cultureinfo]::InvariantCulture)
+                $rightValue = [single]::Parse(
+                    $rightFields[$column], [cultureinfo]::InvariantCulture)
+                if ([Math]::Abs($leftValue - $rightValue) -gt 0.001) {
+                    $oppositeSteeringChangedBodyMotion = $true
+                }
+            }
+        }
+    }
+    if (-not $observedNegativeWheelSteering -or -not $observedPositiveWheelSteering) {
+        throw "Mirrored driver steering did not produce opposite wheel +0xDC values: left=$observedNegativeWheelSteering right=$observedPositiveWheelSteering"
+    }
+    if (-not $oppositeSteeringChangedBodyMotion) {
+        throw 'Opposite wheel steering did not change route-free body motion'
+    }
+    foreach ($line in $rightReplayedLines | Select-Object -Skip 1) {
+        $fields = $line.Split(',')
+        if ([uint32]::Parse($fields[$routeMotionStepColumn],
+                [cultureinfo]::InvariantCulture) -ne 0) {
+            throw 'Mirrored diagnostics-only replay called the ideal-line route motion adapter'
+        }
+    }
+
     $modeForceSummary = if ($observedSupportedModeForce) {
         'supported mode-force outputs were finite and gate-checked'
     } else {
         'mode-force branch was traced as unsupported for this race mode'
     }
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity, suspension, and all three reconstructed tire-force call sites reached body integration while route motion ran zero steps. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
+    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; mirrored steering reached opposite wheel +0xDC values and changed body motion while route motion stayed at zero. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
-    Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,
-        $repeatTicks -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,
+        $repeat, $replayTicks, $rightReplayTicks, $repeatTicks -Force `
+        -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
 }

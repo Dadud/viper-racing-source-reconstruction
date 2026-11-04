@@ -1,5 +1,23 @@
 # Reconstruction progress
 
+- **2026-11-03, route-free steering reaches wheel orientation and body motion:**
+  The initial mirrored probe found that the PCAR callback updated parent
+  `+0x630/+0x7D4` steering outputs while the session stored wheel objects in
+  separate byte-backed arrays. The wheel-basis updater therefore kept reading
+  stale `+0xDC` values. The live callback now projects only the selected native
+  pair into the corresponding wheel-local `+0xDC` fields, transactionally,
+  before the wheel update. The fixed-step regression now runs matched
+  left/right schedules and requires opposite wheel steering plus differing
+  body motion while route-motion steps remain zero. In the Viper/Bemidji pulse,
+  wheel 0 `+0xDC` was `-0.296471626/+0.298186064`, wheel basis angle `+0xD4` was
+  `-0.292194933/+0.303876966`, and the body traces diverged during steering.
+  Visual Studio 18 Release build succeeded and all 66 configured CTests passed.
+  This demonstrates the reconstructed input-to-body path only, not numeric
+  parity or a complete race. The earlier temporary `yaw_control 1` probe still
+  fails before a physics tick; native floating-point behavior for that setting
+  remains unresolved. Original assets were untouched; both schedules avoided
+  ideal-line route motion.
+
 - **2026-10-29, persistent wheel application points:** The player runtime now
   rebuilds wheel `+0xC8..+0xD0` from initialized wheel `+0x04..+0x0C`, copied
   reference-vector `+0x14..+0x1C`, and the byte-backed body transform using the

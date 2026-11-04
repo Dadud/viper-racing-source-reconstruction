@@ -1971,6 +1971,7 @@ struct PlayerPhysicsTickContext {
     std::optional<viper::NcarIntegratorModeForceResult> integrator_mode_force;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_suspension_reset_contact{};
+    std::array<std::optional<float>, 4> wheel_steering_0xdc_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xe0_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xa8_after_tick{};
     std::array<std::optional<viper::WheelSpinPreprojectionResult>, 4>
@@ -3788,6 +3789,7 @@ struct WindowState {
                 if (!bits) return std::nullopt;
                 return std::bit_cast<float>(*bits);
             };
+            tick.wheel_steering_0xdc_after_tick[wheel] = read_wheel_float(0x0dcU);
             tick.wheel_value_0xe0_after_tick[wheel] = read_wheel_float(0x0e0U);
             tick.wheel_value_0xa8_after_tick[wheel] = read_wheel_float(0x0a8U);
             tick.wheel_angle_0xac_after_tick[wheel] = read_wheel_float(0x0acU);
@@ -4337,6 +4339,36 @@ struct WindowState {
                 player_runtime_state.body_object, pcar_callback_writes)) {
             return false;
         }
+        // The native PCAR is one allocation: its callback writes wheel-local
+        // +0xDC steering values through parent offsets +0x630/+0x7D4 or
+        // +0x978/+0xB1C. The reconstructed session keeps each wheel in its
+        // own byte-backed object, so project those exact stores before the
+        // wheel basis updater consumes +0xDC later in this tick.
+        auto updated_wheel_objects = player_runtime_state.wheel_objects;
+        const std::array<std::uint32_t, 2> parent_steering_offsets =
+            callback_state.smoother.mode_0xbe4
+                ? std::array<std::uint32_t, 2>{0x978U, 0xb1cU}
+                : std::array<std::uint32_t, 2>{0x630U, 0x7d4U};
+        const std::array<std::size_t, 2> steering_wheel_indices =
+            callback_state.smoother.mode_0xbe4
+                ? std::array<std::size_t, 2>{2U, 3U}
+                : std::array<std::size_t, 2>{0U, 1U};
+        for (std::size_t lane = 0U; lane < parent_steering_offsets.size(); ++lane) {
+            const auto value = body_word(parent_steering_offsets[lane]);
+            if (!value) return false;
+            const auto wheel = steering_wheel_indices[lane];
+            const auto wheel_offset = static_cast<std::uint32_t>(
+                0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+            const viper::NcarObjectFieldWrite steering_write{
+                wheel_offset + 0xdcU, 4U, *value};
+            if (!viper::apply_ncar_wheel_object_writes(
+                    updated_wheel_objects[wheel], wheel_offset,
+                    std::span<const viper::NcarObjectFieldWrite>(
+                        &steering_write, 1U))) {
+                return false;
+            }
+        }
+        player_runtime_state.wheel_objects = std::move(updated_wheel_objects);
 
         const auto auto_shift = viper::read_ncar_body_object_u8(
             player_runtime_state.body_object, 0xec8U);
@@ -5531,6 +5563,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_suspension_reset_contact"
+                << ",wheel" << wheel << "_steering_0xdc"
                 << ",wheel" << wheel << "_value_0xe0"
                 << ",wheel" << wheel << "_value_0xa8"
                 << ",wheel" << wheel << "_spin_rate_0x124"
@@ -5918,6 +5951,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace << static_cast<unsigned>(
                                 *tick.wheel_suspension_reset_contact[wheel]);
                         }
+                        physics_tick_trace << ',';
+                        if (tick.wheel_steering_0xdc_after_tick[wheel])
+                            physics_tick_trace <<
+                                *tick.wheel_steering_0xdc_after_tick[wheel];
                         physics_tick_trace << ',';
                         if (tick.wheel_value_0xe0_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_value_0xe0_after_tick[wheel];
