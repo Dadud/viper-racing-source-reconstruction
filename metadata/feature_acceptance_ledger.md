@@ -22,6 +22,13 @@ engine/gear-to-wheel torque producer and original numeric parity remain
 unresolved, so this mode is not an accepted driving simulation.
 No required system below is accepted as complete.
 
+The 2026-11-03 route-disabled fixed-step regression was strengthened to require
+the `yaw_control=1` authored steering interval to produce measurable PCAR body
+angular response (`body_ang_y`), in addition to finite sourced wheel-response
+values and body translation. The focused Windows Release replay passes. This
+closes a self-consistency coverage gap only; original-matched response and a
+complete race remain open.
+
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
 keep route motion disabled. In that mode, tests may verify input delivery,

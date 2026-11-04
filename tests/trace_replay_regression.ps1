@@ -1360,12 +1360,15 @@ try {
         $yawTickHeader, 'integrator_wheel_scalar_selector_nonzero')
     $yawTargetColumn = [Array]::IndexOf(
         $yawTickHeader, 'integrator_wheel_scalar_target_response')
+    $yawBodyAngularVelocityColumn = [Array]::IndexOf(
+        $yawTickHeader, 'body_ang_y')
     $yawBodyPositionColumn = [Array]::IndexOf($yawTickHeader, 'body_pos_x')
     if ($yawSelectorColumn -lt 0 -or $yawTargetColumn -lt 0 -or
-        $yawBodyPositionColumn -lt 0) {
+        $yawBodyPositionColumn -lt 0 -or $yawBodyAngularVelocityColumn -lt 0) {
         throw 'Yaw-control replay omitted selector, response, or body-motion fields'
     }
     $yawBodyPositions = [System.Collections.Generic.List[single]]::new()
+    $yawSteeringAngularVelocities = [System.Collections.Generic.List[single]]::new()
     for ($index = 1; $index -lt $yawReplayedTickLines.Count; ++$index) {
         $fields = $yawReplayedTickLines[$index].Split(',')
         if ($fields[$yawSelectorColumn] -cne '1') {
@@ -1379,10 +1382,25 @@ try {
         }
         $yawBodyPositions.Add([single]::Parse(
             $fields[$yawBodyPositionColumn], [cultureinfo]::InvariantCulture))
+        $steering = [single]::Parse(
+            $fields[$tickSteeringInputColumn], [cultureinfo]::InvariantCulture)
+        if ([Math]::Abs($steering) -gt 0.05) {
+            $yawSteeringAngularVelocities.Add([single]::Parse(
+                $fields[$yawBodyAngularVelocityColumn],
+                [cultureinfo]::InvariantCulture))
+        }
     }
     $yawBodyRange = ($yawBodyPositions | Measure-Object -Minimum -Maximum)
     if (($yawBodyRange.Maximum - $yawBodyRange.Minimum) -lt 0.001) {
         throw 'Yaw-control route-free replay did not advance physical body position'
+    }
+    if ($yawSteeringAngularVelocities.Count -eq 0) {
+        throw 'Yaw-control replay did not sample the authored steering interval'
+    }
+    $yawRateRange = ($yawSteeringAngularVelocities | Measure-Object -Minimum -Maximum)
+    if (($yawRateRange.Maximum - $yawRateRange.Minimum) -lt 0.001 -and
+        [Math]::Abs($yawSteeringAngularVelocities[$yawSteeringAngularVelocities.Count - 1]) -lt 0.001) {
+        throw 'Yaw-control steering interval produced no measurable body angular response'
     }
     $yawFrameHeader = $yawReplayedLines[0].Split(',')
     $yawRouteMotionColumn = [Array]::IndexOf(
@@ -1403,7 +1421,7 @@ try {
     } else {
         'mode-force branch was traced as unsupported for this race mode'
     }
-    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; mirrored steering reached opposite wheel +0xDC values and changed body motion. The yaw_control=1 route-free replay completed with finite wheel-response values and physical body movement. Route motion stayed at zero in all cases. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
+    Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; mirrored steering reached opposite wheel +0xDC values and changed body motion. The yaw_control=1 route-free replay completed with finite wheel-response values, physical body movement, and measurable body angular response during steering. Route motion stayed at zero in all cases. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
     Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,
