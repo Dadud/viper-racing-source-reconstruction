@@ -32,6 +32,29 @@ viper::WheelCollisionImpulseInput make_input()
 
 int main()
 {
+    std::array<std::byte, 0x6cU> signal_runtime_record{};
+    constexpr std::uint32_t signal_source_bits = 0x40000000U; // 2.0f
+    for (std::size_t byte = 0U; byte < sizeof(signal_source_bits); ++byte) {
+        signal_runtime_record[0x68U + byte] = static_cast<std::byte>(
+            (signal_source_bits >> (byte * 8U)) & 0xffU);
+    }
+    const auto signal_constructor_state =
+        viper::make_ncar_integrator_signal_state_from_runtime_record(
+            signal_runtime_record);
+    require(signal_constructor_state.has_value());
+    require(signal_constructor_state->value_bits_0xc7c == 0U);
+    require(signal_constructor_state->limit_scale_0xc8c == 8.0F);
+    require(signal_constructor_state->callback_scale_0xc90 == 0.02F);
+    require(signal_constructor_state->smoothed_value_0xc94 == 0.0F);
+    require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
+        std::span<const std::byte>(signal_runtime_record.data(), 0x6bU)));
+    signal_runtime_record[0x68U] = std::byte{0U};
+    signal_runtime_record[0x69U] = std::byte{0U};
+    signal_runtime_record[0x6aU] = std::byte{0xc0U};
+    signal_runtime_record[0x6bU] = std::byte{0x7fU};
+    require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
+        signal_runtime_record));
+
     auto input = make_input();
     auto response = viper::prepare_wheel_collision_impulse(input);
     require(response.applied);

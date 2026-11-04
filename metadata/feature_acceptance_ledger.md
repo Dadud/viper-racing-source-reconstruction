@@ -64,6 +64,13 @@ and the getter's exact runtime value remain open.
 This closes a wheel-spin response writer seam, not the engine/gear torque
 producer or a playable powered race.
 
+The PCAR constructor now also projects the `0x43F830` signal block's two
+record-derived scales: parent `+0xC8C = runtime[+0x68] * 4.0` and
+`+0xC90 = runtime[+0x68] * 0.01`, while retaining the initial zero accumulator.
+The source-backed constructor helper has bounds and nonfinite-value regression
+coverage. It does not yet source the controller getter state or invoke the
+signal update in the player tick, so powered driving remains unaccepted.
+
 After this model was added, the Visual Studio 18 Release build and configured
 CTest suite passed again on 2026-11-04 (69/69). These checks cover the local
 selector and byte-writer regressions plus the existing route-disabled replay;

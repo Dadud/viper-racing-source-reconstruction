@@ -383,6 +383,40 @@ NcarIntegratorCurveGateResult advance_ncar_integrator_curve_gate(
     return result;
 }
 
+std::optional<NcarIntegratorSignalState>
+make_ncar_integrator_signal_state_from_runtime_record(
+    const std::span<const std::byte> runtime_record) noexcept
+{
+    constexpr std::size_t source_offset = 0x68U;
+    constexpr std::size_t required_size = source_offset + sizeof(std::uint32_t);
+    if (runtime_record.size() < required_size) return std::nullopt;
+    std::uint32_t source_bits{};
+    for (std::size_t byte = 0U; byte < sizeof(source_bits); ++byte) {
+        source_bits |= static_cast<std::uint32_t>(
+            std::to_integer<std::uint8_t>(runtime_record[source_offset + byte]))
+            << (byte * 8U);
+    }
+    const auto source_value = std::bit_cast<float>(source_bits);
+    if (!std::isfinite(source_value)) return std::nullopt;
+
+    // 0x434674..0x43468A scales runtime-record +0x68 by 4.0 before passing
+    // it to 0x43F7F0. That initializer stores the value at +0x10 and its
+    // 0.0025f product at +0x14.
+    constexpr float constructor_scale = std::bit_cast<float>(0x40800000U);
+    constexpr float callback_scale = std::bit_cast<float>(0x3b23d70aU);
+    const auto limit_scale = source_value * constructor_scale;
+    const auto response_scale = limit_scale * callback_scale;
+    if (!std::isfinite(limit_scale) || !std::isfinite(response_scale)) {
+        return std::nullopt;
+    }
+    NcarIntegratorSignalState result{};
+    result.value_bits_0xc7c = 0U;
+    result.limit_scale_0xc8c = limit_scale;
+    result.callback_scale_0xc90 = response_scale;
+    result.smoothed_value_0xc94 = 0.0F;
+    return result;
+}
+
 NcarIntegratorSignalResult advance_ncar_integrator_signal(
     NcarIntegratorSignalState& state,
     const NcarIntegratorSignalInput& input,

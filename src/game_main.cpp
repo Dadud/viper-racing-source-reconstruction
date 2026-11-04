@@ -1901,6 +1901,8 @@ struct MaterializedNcarRuntimeState {
     // ordinal-record producer is still unavailable, so retain only this known
     // constructor value in the byte-backed object.
     std::optional<float> constructor_field_0xe44;
+    std::optional<viper::NcarIntegratorSignalState>
+        integrator_signal_constructor_state;
     std::array<std::optional<viper::NcarWheelConstructorPlan>, 4>
         wheel_constructor_plans{};
     std::array<viper::NcarWheelRuntimeObjectState, 4>
@@ -2294,6 +2296,7 @@ struct WindowState {
         player_tire_response_curves = {};
         player_tire_trigonometric_terms = {};
         player_wheel_tire_setups = {};
+        player_runtime_state.integrator_signal_constructor_state.reset();
         bool host_fdiv_compatibility = false;
 #if defined(_M_X64) || defined(__x86_64__) || defined(_M_ARM64)
 #else
@@ -2342,6 +2345,14 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
+        const auto integrator_signal_state =
+            viper::make_ncar_integrator_signal_state_from_runtime_record(
+                player_runtime_car_record);
+        if (!integrator_signal_state.has_value()) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
         // 0x433C00 initializes the shared integrator's +0xD7C..+0xD90
         // geometry from this mapped runtime record. +0xD80/+0xD8C each copy
         // runtime-record +0x128 scaled by 0.0174; +0xD7C/+0xD88 are zero.
@@ -2360,7 +2371,7 @@ struct WindowState {
             return false;
         }
         const float scaled_body_shift = body_shift * 0.0174F;
-        const std::array<viper::NcarObjectFieldWrite, 9> callback_control_defaults{{
+        const std::array<viper::NcarObjectFieldWrite, 11> callback_control_defaults{{
             {0x500U, 4U, 0U},
             {0xd7cU, 4U, 0U},
             {0xd80U, 4U, std::bit_cast<std::uint32_t>(scaled_body_shift)},
@@ -2370,6 +2381,10 @@ struct WindowState {
             {0xd90U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd90)},
             {0xdccU, 4U, std::bit_cast<std::uint32_t>(callback_setup->angle_0xdcc)},
             {0xbe4U, 1U, 0U},
+            {0xc8cU, 4U, std::bit_cast<std::uint32_t>(
+                integrator_signal_state->limit_scale_0xc8c)},
+            {0xc90U, 4U, std::bit_cast<std::uint32_t>(
+                integrator_signal_state->callback_scale_0xc90)},
         }};
         if (!viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object, callback_control_defaults)) {
@@ -2377,6 +2392,8 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
+        player_runtime_state.integrator_signal_constructor_state =
+            *integrator_signal_state;
         // The derived ACAR constructor configures its embedded curve and
         // selector from the same mapped runtime car record. Persist the
         // numeric fields consumed by the recovered PCAR callback branch.

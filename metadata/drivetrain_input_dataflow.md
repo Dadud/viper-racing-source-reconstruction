@@ -113,6 +113,19 @@ per-step record copying at `0x438770`; the checked listing shows no direct
 are outside this bounded conclusion. This makes the selector path a concrete
 next investigation target, not a source-backed torque formula.
 
+The `0x43F830` signal block's constructor scales are now projected from the
+PCAR runtime record: `0x434674..0x43468A` passes `runtime[+0x68] * 4.0` to
+`0x43F7F0`, which stores that at parent `+0xC8C` and stores its product with
+`0.0025` at parent `+0xC90` (equivalently `runtime[+0x68] * 0.01`). The signal
+state at parent `+0xC7C` starts at zero; its accumulator at `+0xC94` also starts
+at zero. The curve child at `+0xC80` is parent `+0xBFC`, and the controller
+child at `+0xC84` is parent `+0xC98`. The helper's differential, clamp,
+smoothing, and opposite setter arguments are modeled, and the constructor now
+writes the two record-derived scales into the session-owned body bytes. The
+controller getter's state inputs and both getter values' semantic units remain
+unresolved, so the helper output is not yet wired into the fixed-step wheel
+pair update.
+
 ## Live wheel-rate writer and decoy writer
 
 The live PCAR wheel objects are updated by four calls from `0x431150` to

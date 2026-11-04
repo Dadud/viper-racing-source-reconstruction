@@ -719,12 +719,13 @@ regression no longer advances a synthetic car along a route and instead checks
 state transitions and fixed-snapshot projection. Route-opponent policy tests
 remain isolated prototype-model checks.
 
-**Immediate work:** Trace the source-backed value through the live
-`0x43F830` → `0x43FFC0` curve/controller setter path, then feed its sourced
-setter argument through the new selected-pair `+0xE4` adapter in the fixed
-player tick. The `+0xCE4` producer and selected getter dispatch are resolved;
-trace the returned endpoint values and their units. Trace the update argument
-further upstream to engine/gear/clutch state and compare
+**Immediate work:** Complete source-backed inputs to `0x43F830`: resolve the
+post-`0x43FAE0` controller getter state and its child getter values, while
+preserving their unknown units. The `+0xCE4` producer and selected getter
+dispatch are resolved, and the `+0xC8C/+0xC90` signal scales now project from
+runtime-record `+0x68`. Once the resulting `0x43FFC0` argument is sourced,
+apply it through the selected-pair `+0xE4` adapter in the fixed player tick.
+Trace the update argument further upstream to engine/gear/clutch state and compare
 controlled throttle, coast, steering, and braking captures against the
 original process. Then close physical lap/checkpoint progression from
 supported native geometry and verify finish/results transitions. Do not treat

@@ -648,6 +648,12 @@ struct NcarIntegratorSignalInput {
     float callback_value_0xc80{};
 };
 
+// Reconstructs the numeric constructor setup from 0x43468A/0x43F7F0.
+// The opaque native child links at +0xC80/+0xC84 are kept outside this state.
+[[nodiscard]] std::optional<NcarIntegratorSignalState>
+make_ncar_integrator_signal_state_from_runtime_record(
+    std::span<const std::byte> runtime_record) noexcept;
+
 struct NcarIntegratorSignalResult {
     bool ramp_setter_0x43f8e0_reached{};
     bool helper_0x43f830_reached{};
