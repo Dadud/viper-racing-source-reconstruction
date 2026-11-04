@@ -1077,7 +1077,10 @@ synthesized before that selected-player gate. If no selected PCAR appears
 within 60 seconds, the probe detaches and emits an invalid timeout result.
 For an accepted JSONL capture, `node tools/controlled_capture_to_trace.js
 <capture.jsonl> <replay.csv>` emits the same five-phase controls on the
-reconstruction's 16 ms `play-trace` clock. The converter rejects invalid
+reconstruction's 16 ms `play-trace` clock and writes a `replay.csv.json`
+sidecar with input/capture hashes, selected PCAR and module identity, binding
+and response evidence, sample counts, and frame-boundary quantization. The
+converter rejects invalid
 captures, insufficient phase/wheel samples, identity mismatch, unsupported
 bindings, or absent phase-matched control response. This carries the input
 schedule only; state and force parity still require separate trace comparison.

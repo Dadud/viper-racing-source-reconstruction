@@ -5,6 +5,7 @@
 "use strict";
 
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 
 const fail = message => {
     console.error(message);
@@ -29,9 +30,17 @@ if (process.argv.length !== 4) {
             });
 
         const selected = rows.find(event => event.event === "pcar_selected_player");
+        const ready = rows.find(event => event.event === "controlled_pcar_capture_ready");
+        const armed = rows.find(event => event.event === "controlled_pcar_capture_armed");
         const completion = rows.find(event => event.event === "controlled_pcar_capture_done");
         const samples = rows.filter(event => event.event === "pcar_integrator_sample");
-        if (!selected || !completion) throw new Error("capture is missing selection or completion evidence");
+        if (!selected || !ready || !armed || !completion) {
+            throw new Error("capture is missing ready, selected-player, armed, or completion evidence");
+        }
+        if (ready.startCondition !== "first_selected_pcar_callback_0x4384d0" ||
+            armed.body !== selected.body) {
+            throw new Error("capture did not arm on the selected PCAR identity");
+        }
         if (completion.captureValid !== true) throw new Error("capture is marked invalid");
         if (!completion.configuredBindings ||
             completion.configuredBindings.throttle?.type !== 1 ||
@@ -52,18 +61,34 @@ if (process.argv.length !== 4) {
         ];
         const counts = completion.sampledIntegratorsByPhase || {};
         for (const phase of requiredPhases) {
-            if (!Number.isInteger(counts[phase]) || counts[phase] < 4) {
+            const observed = samples.filter(sample => sample.phase === phase).length;
+            if (!Number.isInteger(counts[phase]) || counts[phase] < 4 ||
+                observed < 4 || observed !== counts[phase]) {
                 throw new Error(`capture lacks required ${phase} samples`);
             }
         }
         if (samples.length === 0 || samples.some(sample => sample.body !== selected.body)) {
             throw new Error("integrator sample body does not match selected PCAR identity");
         }
+        const observedWheelRows = samples.reduce((sum, sample) =>
+            sum + (Array.isArray(sample.wheels) ? sample.wheels.length : 0), 0);
+        if (observedWheelRows < 20 || observedWheelRows !== completion.capturedWheelRows) {
+            throw new Error("wheel sample rows do not match the completion summary");
+        }
         const windows = completion.phaseWindowsMs;
         if (!Array.isArray(windows) || windows.length !== requiredPhases.length) {
             throw new Error("capture is missing its five-phase schedule");
         }
         const byPhase = new Map(windows.map(window => [window.phase, window]));
+        if (byPhase.size !== requiredPhases.length ||
+            windows.some((window, index) => index > 0 &&
+                window.start < windows[index - 1].end)) {
+            throw new Error("capture phase windows are duplicated, overlapping, or unordered");
+        }
+        if (!Array.isArray(armed.phaseWindowsMs) ||
+            JSON.stringify(armed.phaseWindowsMs) !== JSON.stringify(windows)) {
+            throw new Error("armed and completed phase schedules do not match");
+        }
         for (const phase of requiredPhases) {
             const window = byPhase.get(phase);
             if (!window || !Number.isFinite(window.start) || !Number.isFinite(window.end) ||
@@ -99,9 +124,51 @@ if (process.argv.length !== 4) {
                 phase,
             ].join(","));
         }
-        fs.writeFileSync(outputPath, `${lines.join("\n")}\n`, "utf8");
+        const csvText = `${lines.join("\n")}\n`;
+        const sourceText = fs.readFileSync(inputPath, "utf8");
+        const sha256 = value => crypto.createHash("sha256").update(value).digest("hex");
+        const frameForMs = value => Math.ceil(value / (frameDuration * 1000));
+        const sidecar = {
+            schema: "viper-controlled-capture-trace-v1",
+            sourceCaptureSha256: sha256(sourceText),
+            replayTraceSha256: sha256(csvText),
+            sourceModule: {
+                name: ready.module,
+                base: ready.base,
+                imageSize: ready.imageSize,
+            },
+            selectedPcar: {
+                body: selected.body,
+                ordinal: selected.ordinal_0x510 ?? null,
+            },
+            inputEvidence: {
+                syntheticInput: true,
+                routeMotionInput: false,
+                configuredBindings: completion.configuredBindings,
+                controlResponseComparedToNeutral: completion.controlResponseComparedToNeutral,
+                sampledIntegratorsByPhase: completion.sampledIntegratorsByPhase,
+                capturedWheelRows: completion.capturedWheelRows,
+            },
+            replaySchedule: {
+                origin: "first-selected-pcar-callback",
+                frameDeltaSeconds: frameDuration,
+                durationMs,
+                windows: windows.map(window => ({
+                    phase: window.phase,
+                    inputMs: { start: window.start, end: window.end },
+                    frameRangeExclusive: {
+                        start: frameForMs(window.start),
+                        end: frameForMs(window.end),
+                    },
+                })),
+                stateOrPhysicsParityClaimed: false,
+            },
+        };
+        fs.writeFileSync(outputPath, csvText, "utf8");
+        fs.writeFileSync(`${outputPath}.json`, `${JSON.stringify(sidecar, null, 2)}\n`, "utf8");
         console.log(JSON.stringify({
             output: outputPath,
+            sidecar: `${outputPath}.json`,
             selectedBody: selected.body,
             frameCount: lastFrame + 1,
             durationMs,
