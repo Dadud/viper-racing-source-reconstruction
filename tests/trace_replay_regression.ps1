@@ -233,6 +233,7 @@ try {
     $wheelTireVectorColumns = @()
     $wheelRateFinalizeColumns = @()
     $wheelTireForceColumns = @()
+    $wheelSpinMomentColumns = @()
     $wheelTireFollowupForceColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
@@ -346,6 +347,15 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireForceNames[$lane])")
         }
         $wheelTireForceColumns += ,$tireForceColumns
+        $spinMomentNames = @(
+            'spin_moment_accumulated', 'spin_moment_x',
+            'spin_moment_y', 'spin_moment_z', 'spin_history_0x13c')
+        $spinMomentColumns = [int[]]::new($spinMomentNames.Count)
+        for ($lane = 0; $lane -lt $spinMomentNames.Count; ++$lane) {
+            $spinMomentColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($spinMomentNames[$lane])")
+        }
+        $wheelSpinMomentColumns += ,$spinMomentColumns
         $tireFollowupForceNames = @(
             'tire_secondary_evaluated', 'tire_secondary_accumulated',
             'tire_secondary_force_x', 'tire_secondary_force_y',
@@ -463,6 +473,9 @@ try {
         @($wheelTireForceColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelSpinMomentColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelTireFollowupForceColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
@@ -496,6 +509,7 @@ try {
     $observedTireVectorStage = $false
     $observedWheelRateFinalization = $false
     $observedTireForceAccumulation = $false
+    $observedSpinMomentAccumulation = $false
     $observedModeForceDispatch = $false
     $observedSupportedModeForce = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
@@ -718,6 +732,32 @@ try {
                 if ($fields[$tireForceColumns[1]] -eq '1') {
                     $observedTireForceAccumulation = $true
                 }
+                $spinMomentFields = $wheelSpinMomentColumns[$wheel]
+                if ($spinMomentFields -contains -1 -or
+                    $fields[$spinMomentFields[0]] -ne '1') {
+                    throw "Wheel $wheel spin moment did not reach the body accumulator at line $($index + 1)"
+                }
+                foreach ($column in $spinMomentFields[1..3]) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel spin moment vector is missing at line $($index + 1)"
+                    }
+                    $momentValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($momentValue) -or
+                        [single]::IsInfinity($momentValue)) {
+                        throw "Wheel $wheel spin moment is non-finite at line $($index + 1)"
+                    }
+                    if ($momentValue -ne 0.0) { $observedSpinMomentAccumulation = $true }
+                }
+                $spinRate = [single]::Parse(
+                    $fields[$wheelSpinColumns[$wheel][0]],
+                    [cultureinfo]::InvariantCulture)
+                $spinHistory = [single]::Parse(
+                    $fields[$spinMomentFields[4]],
+                    [cultureinfo]::InvariantCulture)
+                if ([Math]::Abs($spinRate - $spinHistory) -gt 0.000001) {
+                    throw "Wheel $wheel +0x13C history does not match current +0x124 spin at line $($index + 1)"
+                }
                 $followupColumns = $wheelTireFollowupForceColumns[$wheel]
                 if ($fields[$followupColumns[0]] -ne '1' -or
                     $fields[$followupColumns[5]] -ne '1') {
@@ -867,7 +907,8 @@ try {
             $measuredDepth = [single]::Parse(
                 $fields[$wheelDepthColumns[$wheel]],
                 [cultureinfo]::InvariantCulture)
-            if ([Math]::Abs($recomputedDepth - $measuredDepth) -gt 0.00001) {
+            if ($fields[$wheelGateColumns[$wheel]] -eq '1' -and
+                [Math]::Abs($recomputedDepth - $measuredDepth) -gt 0.00001) {
                 throw "Wheel $wheel projected depth differs from its recorded query geometry at line $($index + 1)"
             }
             $localAnchor = [single[]]::new(3)
@@ -1194,6 +1235,9 @@ try {
     }
     if (-not $observedTireForceAccumulation) {
         throw 'Fixed-step replay never accumulated a nonzero tire force into body force/moment state'
+    }
+    if (-not $observedSpinMomentAccumulation) {
+        throw 'Fixed-step replay never accumulated a nonzero wheel spin moment into body state'
     }
     if (-not $observedModeForceDispatch) {
         throw 'Fixed-step replay did not record the shared-integrator mode-force dispatch'

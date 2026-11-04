@@ -169,6 +169,20 @@ int main()
                 "tire response scalar must subtract the independent +0x58 projection");
         }
 
+        const viper::WheelMomentVectorInput spin_moment_input{
+            {1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F},
+            {1.0F, 0.0F, 0.0F}, 3.0F, 1.0F,
+            {2.0F, 3.0F, 4.0F}, 2.5F};
+        const auto spin_moment =
+            viper::derive_wheel_moment_vector_0x43e7f0(spin_moment_input);
+        if (spin_moment.moment_vector_0x258.x != -62.5F ||
+            spin_moment.moment_vector_0x258.y != -93.75F ||
+            spin_moment.moment_vector_0x258.z != -31.25F ||
+            spin_moment.next_spin_rate_0x13c != 3.0F) {
+            throw std::runtime_error(
+                "wheel spin/contact moment and +0x13C history must follow the mapped accumulator formula");
+        }
+
         for (const auto& sample : captured_wheel_writes) {
             viper::NcarForceMomentAccumulator accumulator{
                 sample.before_force, sample.before_moment};

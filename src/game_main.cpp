@@ -2057,6 +2057,11 @@ struct PlayerPhysicsTickContext {
     std::array<bool, 4> wheel_tire_force_accumulated{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_tire_force_vectors{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_spin_moment_vectors_0x258{};
+    std::array<bool, 4> wheel_spin_moment_accumulated{};
+    std::array<std::optional<float>, 4>
+        wheel_spin_history_0x13c_after_update{};
     std::array<std::optional<viper::WheelSecondaryBodyForceResult>, 4>
         wheel_tire_secondary_force_results{};
     std::array<std::optional<viper::WheelConditionalTireForceResult>, 4>
@@ -2812,7 +2817,7 @@ struct WindowState {
         return true;
     }
 
-    void update_player_wheel_contacts_from_body()
+    void update_player_wheel_contacts_from_body(PlayerPhysicsTickContext& tick)
     {
         player_wheel_pair_differential_producer_applied = false;
         player_wheel_pair_history_derived_from_updates = false;
@@ -2908,6 +2913,54 @@ struct WindowState {
                 return;
             }
             player_wheel_spin_preprojection_results[wheel] = *spin_preprojection;
+            const auto read_wheel_float = [wheel = &player_runtime_state.wheel_objects[wheel]](
+                const std::uint32_t offset) -> std::optional<float> {
+                const auto bits = viper::read_ncar_wheel_object_u32(*wheel, offset);
+                if (!bits) return std::nullopt;
+                const auto value = std::bit_cast<float>(*bits);
+                return std::isfinite(value) ? std::optional<float>{value}
+                                            : std::nullopt;
+            };
+            constexpr std::array<std::uint32_t, 9> moment_offsets{
+                0x0b0U, 0x0b4U, 0x0b8U, 0x124U, 0x13cU,
+                0x140U, 0x144U, 0x148U, 0x034U};
+            std::array<float, 9> moment_values{};
+            for (std::size_t lane = 0U; lane < moment_offsets.size(); ++lane) {
+                const auto value = read_wheel_float(moment_offsets[lane]);
+                if (!value) {
+                    player_constructor_inputs_ready = false;
+                    return;
+                }
+                moment_values[lane] = *value;
+            }
+            const viper::WheelMomentVectorInput wheel_moment_input{
+                body_basis,
+                {moment_values[0], moment_values[1], moment_values[2]},
+                moment_values[3], moment_values[4],
+                {moment_values[5], moment_values[6], moment_values[7]},
+                moment_values[8]};
+            const auto wheel_moment =
+                viper::derive_wheel_moment_vector_0x43e7f0(wheel_moment_input);
+            if (!std::isfinite(wheel_moment.moment_vector_0x258.x) ||
+                !std::isfinite(wheel_moment.moment_vector_0x258.y) ||
+                !std::isfinite(wheel_moment.moment_vector_0x258.z)) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            tick.wheel_spin_moment_vectors_0x258[wheel] =
+                wheel_moment.moment_vector_0x258;
+            const viper::NcarObjectFieldWrite spin_history_write{
+                wheel_object_offset + 0x13cU, 4U,
+                std::bit_cast<std::uint32_t>(wheel_moment.next_spin_rate_0x13c)};
+            if (!viper::apply_ncar_wheel_object_writes(
+                    player_runtime_state.wheel_objects[wheel], wheel_object_offset,
+                    std::span<const viper::NcarObjectFieldWrite>(
+                        &spin_history_write, 1U))) {
+                player_constructor_inputs_ready = false;
+                return;
+            }
+            tick.wheel_spin_history_0x13c_after_update[wheel] =
+                read_wheel_float(0x13cU);
             const auto wheel_world_point =
                 viper::update_ncar_wheel_application_point_0xc8(
                     player_runtime_state.wheel_objects[wheel],
@@ -2918,9 +2971,8 @@ struct WindowState {
             }
 
             // This terrain query starts from the PCAR's byte-backed pose and
-            // full basis. Its result feeds the recovered suspension/history
-            // stages below; tire force collection and body integration remain
-            // separate session seams.
+            // full basis. Its result feeds the reconstructed suspension,
+            // collision, tire-response, and body-integration stages below.
             viper::WheelContactObservation observation{};
             observation.body_query_enabled = true;
             observation.reset_feature_hook_active = false;
@@ -3056,9 +3108,8 @@ struct WindowState {
             update.contact = contact;
             update.suspension = *suspension;
             // Native 0x443F60 follows the wheel's contact/suspension update.
-            // Collision response is not yet modeled, so the byte-backed
-            // damage field remains whatever its current runtime owner wrote;
-            // this stage is deliberately not used to synthesize force.
+            // Collision impulse is applied later from this successful terrain
+            // observation in the body force-collection stage.
             const auto animation_basis =
                 viper::advance_ncar_wheel_animation_basis_in_objects(
                     player_runtime_state.wheel_objects[wheel],
@@ -3220,7 +3271,7 @@ struct WindowState {
              std::bit_cast<float>(impulse_bits[4]),
              std::bit_cast<float>(impulse_bits[5])}};
         for (std::size_t wheel = 0U; wheel < player_wheel_update_results.size(); ++wheel) {
-            const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
+            auto& wheel_object = player_runtime_state.wheel_objects[wheel];
             const auto read_float = [&wheel_object](const std::uint32_t offset)
                 -> std::optional<float> {
                 const auto bits = viper::read_ncar_wheel_object_u32(
@@ -3239,6 +3290,15 @@ struct WindowState {
                 !std::isfinite(force.y) || !std::isfinite(force.z)) {
                 return false;
             }
+            const auto& wheel_moment = tick.wheel_spin_moment_vectors_0x258[wheel];
+            if (!wheel_moment ||
+                !std::isfinite(wheel_moment->x) ||
+                !std::isfinite(wheel_moment->y) ||
+                !std::isfinite(wheel_moment->z)) return false;
+            viper::accumulate_ncar_moment_vector(
+                accumulator, {wheel_moment->x, wheel_moment->y,
+                    wheel_moment->z});
+            tick.wheel_spin_moment_accumulated[wheel] = true;
             const std::array<float, 3> force_vector{force.x, force.y, force.z};
             const std::array<float, 3> application_point{*x, *y, *z};
             const std::array<float, 3> body_center{center.x, center.y, center.z};
@@ -4187,7 +4247,8 @@ struct WindowState {
             // wheel +0xE0 values before the per-wheel update pass.
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             if (!update_player_integrator_wheel_scalars()) return false;
-            update_player_wheel_contacts_from_body();
+            update_player_wheel_contacts_from_body(
+                player_physics_ticks_this_update.back());
             if (!player_constructor_inputs_ready ||
                 !sample_player_integrator_curve_getter(
                     player_physics_ticks_this_update.back(),
@@ -5724,6 +5785,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_force_x"
                 << ",wheel" << wheel << "_tire_force_y"
                 << ",wheel" << wheel << "_tire_force_z"
+                << ",wheel" << wheel << "_spin_moment_accumulated"
+                << ",wheel" << wheel << "_spin_moment_x"
+                << ",wheel" << wheel << "_spin_moment_y"
+                << ",wheel" << wheel << "_spin_moment_z"
+                << ",wheel" << wheel << "_spin_history_0x13c"
                 << ",wheel" << wheel << "_tire_secondary_evaluated"
                 << ",wheel" << wheel << "_tire_secondary_accumulated"
                 << ",wheel" << wheel << "_tire_secondary_force_x"
@@ -6275,6 +6341,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         if (tick.wheel_tire_force_vectors[wheel])
                             physics_tick_trace <<
                                 tick.wheel_tire_force_vectors[wheel]->z;
+                        const auto& spin_moment =
+                            tick.wheel_spin_moment_vectors_0x258[wheel];
+                        physics_tick_trace << ','
+                            << (tick.wheel_spin_moment_accumulated[wheel] ? 1 : 0)
+                            << ',';
+                        if (spin_moment) physics_tick_trace << spin_moment->x;
+                        physics_tick_trace << ',';
+                        if (spin_moment) physics_tick_trace << spin_moment->y;
+                        physics_tick_trace << ',';
+                        if (spin_moment) physics_tick_trace << spin_moment->z;
+                        physics_tick_trace << ',';
+                        if (tick.wheel_spin_history_0x13c_after_update[wheel])
+                            physics_tick_trace <<
+                                *tick.wheel_spin_history_0x13c_after_update[wheel];
                         const auto& secondary_force =
                             tick.wheel_tire_secondary_force_results[wheel];
                         physics_tick_trace << ',' << (secondary_force ? 1 : 0)

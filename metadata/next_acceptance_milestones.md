@@ -28,7 +28,10 @@ the collision solver runs exactly when terrain queries succeed, returns finite
 responses, and reports the known standard-session gate value. A separate
 disassembly audit found no source-backed throttle/gear-to-wheel torque producer;
 the existing `+0x124` writer is in the contact/tire-response tail, so powertrain
-force remains a fidelity gap rather than a guessed formula.
+force remains a fidelity gap rather than a guessed formula. The sourced
+`0x43E7F0` per-wheel spin/contact moment is now read from byte-backed basis and
+wheel fields, accumulated in body moment state, and writes current spin to wheel
+`+0x13C`; fixed-step replay checks all four calls and finite/nonzero output.
 Release `viper_game` build and route-free fixed-step replay passed on
 2026-11-03; the complete configured Release CTest suite subsequently passed
 69/69. These are implementation/regression checks, not original-game parity or
