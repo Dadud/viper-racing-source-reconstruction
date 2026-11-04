@@ -299,3 +299,16 @@ brake captures must first report a supported key-binding type, then use its
 recorded selector and demonstrate matching `0x509320` response before being
 accepted. Synthetic intervention remains distinct from physical keyboard
 delivery.
+
+Static inspection resolves the runtime record path: `0x43B030` calls
+`0x44F00` with the brake setting name at `0x4D5A94`, then `0x447000` matches
+that descriptor against a registered device entry and `0x447060` copies its
+type and value at `+0x0C` into the runtime record. The evaluator at `0x46F60`
+dispatches on type; type 1 reads the configured selector byte through
+`0x413190`, while other types take separate device paths. Therefore the
+probe's `type` and `selector` fields describe the resolved record, but the
+selector is a keyboard index only when the observed type is 1. Its Node mock
+checks script wiring only. No original-client brake capture yet proves the
+live type, selector, or matching `0x509320` response. Keep intervention
+throttle-only until that native evidence exists; synthetic input remains
+distinct from physical keyboard delivery.
