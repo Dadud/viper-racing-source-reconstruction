@@ -136,8 +136,14 @@ and prior captures were not modified. Do not use this copy for audio acceptance.
 
 The bounded host runner `tools/run_original_pcar_capture.py` validates the
 official engine and launcher hashes, checks both zero-volume config files,
-holds the canary semaphore, and writes private JSONL outside Git. Its default
-launcher mode installs a child bridge before resuming the launcher; the
+requires the selected disc drive (default `F:`) to report volume label `VIPER`,
+holds the canary semaphore, and writes private JSONL outside Git. Mount the
+hash-verified external ISO before launch; the runner only reads the mounted
+volume label and does not mount or modify the disc. Its default
+launcher mode uses the hash-verified launcher inside the isolated `GameRoot`
+and starts its primary thread with `GameRoot\Data` as the working directory,
+matching the successful 2026-10-25 suspended-child reference run. It installs
+a child bridge before resuming the launcher; the
 `--direct-engine` mode installs the video-memory, exact-write, controlled
 wheel-state, and exit-status agents before resuming `race.bin`. It kills only
 the exact PIDs it starts at completion or the 180-second host deadline. The

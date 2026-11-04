@@ -50,6 +50,31 @@ def sound_settings(path: Path) -> dict[str, str]:
     return settings
 
 
+def mounted_volume_label(root: str) -> str:
+    """Read a mounted Windows volume label without changing mount state."""
+    volume_root = root.rstrip("\\/") + "\\"
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_info = kernel32.GetVolumeInformationW
+    get_info.argtypes = (
+        wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD),
+        ctypes.POINTER(wintypes.DWORD), wintypes.LPWSTR, wintypes.DWORD,
+    )
+    get_info.restype = wintypes.BOOL
+    label = ctypes.create_unicode_buffer(261)
+    if not get_info(volume_root, label, len(label), None, None, None, None, 0):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return label.value
+
+
+def validate_disc_volume_label(drive: str, label: str) -> str:
+    """Require the disc label expected by the official ISO launcher path."""
+    if label.casefold() != "viper":
+        raise SystemExit(
+            f"Expected the original VIPER disc mounted at {drive}; found label {label!r}")
+    return label
+
+
 def hold_canary_semaphore(name: str = CANARY_SEMAPHORE_NAME) -> tuple[object, int, bool]:
     """Supply the named-object precondition expected by engine startup."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -115,16 +140,27 @@ def create_launcher_suspended(launcher: Path, cwd: Path) -> tuple[object, int, i
             int(process.dwProcessId), int(process.dwThreadId))
 
 
+def select_launcher_paths(game_root: Path,
+                          launcher_path: Path | None = None) -> tuple[Path, Path]:
+    """Select the staged official launcher and its historically verified cwd."""
+    root = game_root.resolve(strict=True)
+    launcher = (launcher_path or (root / "Viper Racing.exe")).resolve(strict=True)
+    launcher_cwd = (root / "Data").resolve(strict=True)
+    return launcher, launcher_cwd
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--game-root", required=True, type=Path,
                         help="isolated GameRoot containing Data/race.bin")
     parser.add_argument("--launcher-path", type=Path,
-                        help="official installed launcher; defaults to the extracted install")
+                        help="verified official launcher; defaults to the staged GameRoot copy")
     parser.add_argument("--frida-python-path", required=True, type=Path,
                         help="directory containing the installed frida Python package")
     parser.add_argument("--capture-dir", required=True, type=Path,
                         help="external directory for private JSONL output")
+    parser.add_argument("--disc-drive", default="F:",
+                        help="drive holding the hash-verified VIPER ISO (default: F:)")
     parser.add_argument("--expected-sha256", default=EXPECTED_ISO_RACE_SHA256)
     parser.add_argument("--direct-engine", action="store_true",
                         help="spawn race.bin directly instead of the official launcher")
@@ -132,14 +168,11 @@ def main() -> int:
 
     game_root = args.game_root.resolve(strict=True)
     race_bin = (game_root / "Data" / "race.bin").resolve(strict=True)
-    launcher_path = args.launcher_path or (
-        Path(__file__).resolve().parents[2] / "game_install" / "GameRoot" / "Viper Racing.exe")
-    launcher = launcher_path.resolve(strict=True)
-    # Use the extracted installation's launcher (the copied launcher exits
-    # before child creation), while keeping its cwd and the child's cwd inside
-    # the isolated staging tree.
+    # The successful suspended-child reference capture launched the verified
+    # official launcher with GameRoot\Data as its working directory. Preserve
+    # that process setup while keeping all staged settings and data isolated.
+    launcher, launcher_cwd = select_launcher_paths(game_root, args.launcher_path)
     expected_cwd = race_bin.parent
-    launcher_cwd = game_root
     capture_dir = args.capture_dir.resolve()
     if not race_bin.is_file() or race_bin.parent != (game_root / "Data").resolve():
         raise SystemExit("race.bin must be a file directly inside the staged Data directory")
@@ -150,6 +183,8 @@ def main() -> int:
     launcher_hash = sha256(launcher)
     if launcher_hash.lower() != EXPECTED_LAUNCHER_SHA256:
         raise SystemExit(f"Launcher SHA-256 mismatch: {launcher_hash}")
+    disc_label = validate_disc_volume_label(
+        args.disc_drive, mounted_volume_label(args.disc_drive))
 
     required_sound = {
         "enabled": "yes",
@@ -230,6 +265,8 @@ def main() -> int:
         "launcher": str(launcher),
         "launcher_sha256": launcher_hash,
         "launcher_working_directory": str(launcher_cwd),
+        "disc_drive": args.disc_drive,
+        "disc_volume_label": disc_label,
         "working_directory": str(expected_cwd),
         "sound_settings": checked_sound,
         "frida_version": frida.__version__,

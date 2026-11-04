@@ -1083,14 +1083,23 @@ the exact process IDs it launched. The `--direct-engine` path loads the
 video-memory hook and bounded PCAR agents before resuming `race.bin`; the
 launcher path attaches a child bridge before resuming the official launcher.
 Eleven instrumented attempts produced no video-memory query or PCAR callbacks.
+The external manifest records the VIPER disc mounted in six attempts,
+unmounted in two, and mount state unavailable in three; the mounted attempts
+still ended before a PCAR sample. Of the six launcher-mode
+attempts, four used `GameRoot` as the launcher process working directory and
+two used `GameRoot\Data`; both `Data` attempts exited before child creation.
+The successful 2026-10-25 suspended-child harness used the verified launcher
+with the disc mounted and `GameRoot\Data` as its working directory. The host
+runner now matches that setup and checks the mounted volume label before
+launching; this exact retry has not yet been exercised.
 The raw logs and data-copy hashes are in the external
 `silent_reference_copy_20261104` directory. The raw CloneCD image could not be
 mounted directly; its Mode 1 sectors were converted to an ISO with volume label
 `VIPER`, mounted at `F:`, with the source image unchanged. A normal visible
 launcher run still reached the original video-driver error before gameplay.
-The launch/capture workflow therefore remains unverified, and no physics
-inference is drawn from these runs. All reconstruction driving checks continue
-to keep ideal-line motion disabled.
+The current launch/capture workflow remains unverified, and no physics
+inference is drawn from the failed attempts. All reconstruction driving checks
+continue to keep ideal-line motion disabled.
 
 The controlled state probe now reads configured throttle/brake type and
 selector values from PCAR records `0x509328/0x509368`. It schedules neutral,

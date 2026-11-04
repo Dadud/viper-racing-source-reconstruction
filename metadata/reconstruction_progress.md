@@ -37,6 +37,24 @@
   was made from these diagnostic results.
 # Reconstruction progress
 
+- **2026-11-04, original capture launcher setup aligned to successful run:**
+  Compared the bounded capture runner with the external Quick Race and
+  wheel-history manifests. The verified launcher hash is identical in the
+  staged and extracted copies, and the successful suspended-child run started
+  the launcher with `GameRoot\Data` as its working directory. The runner had
+  used `GameRoot`; it now defaults to the hash-verified staged launcher and
+  uses the historical `Data` working directory while keeping all capture
+  assets isolated. The 2026-11-04 manifest records the VIPER disc mounted in
+  six attempts, unmounted in two, and mount state unavailable in three; even
+  the mounted attempts ended before a PCAR sample. The disc is a necessary
+  launch condition but not a sufficient explanation. The
+  runner now also requires and records a read-only `VIPER` volume-label check
+  before launch. `original_capture_runner_config_regression` covers launcher
+  selection and disc-label rejection. Python and JavaScript syntax checks pass;
+  the focused runner regression passed 1/1 and the full Release CTest suite
+  passed 73/73. The corrected launch path has not been rerun; native PCAR field
+  provenance remains unverified.
+
 - **2026-11-04, mirrored route-free steering reaches wheel forward geometry:**
   Extended `game_fixed_step_trace_replay_regression` to compare the paired
   left/right route-disabled replays through wheel `+0xDC`, basis angle/sine/

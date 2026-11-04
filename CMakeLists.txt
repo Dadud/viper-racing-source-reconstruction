@@ -259,6 +259,12 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    find_program(VIPER_PYTHON_EXECUTABLE NAMES python python3 python.exe)
+    if(VIPER_PYTHON_EXECUTABLE)
+        add_test(NAME original_capture_runner_config_regression
+            COMMAND "${VIPER_PYTHON_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_capture_runner_config_regression.py")
+    endif()
     find_program(VIPER_NODE_EXECUTABLE NAMES node node.exe)
     if(VIPER_NODE_EXECUTABLE)
         add_test(NAME pcar_source_field_watch_mock
