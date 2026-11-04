@@ -122,8 +122,12 @@ function runScenario(options = {}) {
                 ? { address: body.add(0x5b0), operation: "read" }
                 : undefined;
         triggerWrite(0x5b0, 12.5, firstMemory);
-        if (!options.rearmFailure) triggerWrite(0x8f8, 24.5);
         hooks.get(0x381e0).onLeave.call(constructorInvocation);
+        if (!options.rearmFailure) {
+            assert.equal(watchedThread.watchpoints.size, 2,
+                "constructor watchpoints remain active after constructor return");
+            triggerWrite(0x8f8, 24.5);
+        }
     }
 
     hooks.get(0x384d0).onEnter.call({ context: { ecx: body } });
@@ -150,6 +154,9 @@ const valid = runScenario();
 assert.equal(valid.done.capture_valid, true);
 assert.equal(valid.done.write_events, 2);
 assert.equal(valid.done.selected_constructor_matched, true);
+const constructorRow = valid.done.constructor_rows.find(row =>
+    row.body === valid.done.selected_body);
+assert.equal(constructorRow.watch_retained_after_return, true);
 assert(valid.emitted.some(event => event.event === "pcar_source_field_write" &&
     event.target_offset === 0x5b0));
 assert(valid.emitted.some(event => event.event === "pcar_source_field_write" &&
@@ -174,6 +181,8 @@ assert.equal(runScenario({ spuriousEvent: true }).done.unclassified_events, 1);
 assert(runScenario({ ambiguousCandidate: true }).done.invalid_reasons.includes(
     "player_callback_identity_not_unique"));
 assert(runScenario({ skipConstructor: true }).done.invalid_reasons.includes(
-    "selected_constructor_watch_missing"));
+    "selected_constructor_watch_missing_or_not_retained"));
+const failedRearm = runScenario({ rearmFailure: true });
+assert.equal(failedRearm.done.constructor_rows[0].watch_retained_after_return, false);
 
 console.log("PCAR field watch mock passed (valid and fail-closed scenarios).");

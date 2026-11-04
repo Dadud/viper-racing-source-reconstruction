@@ -191,12 +191,15 @@ memory reads.
 
 An exact-write probe, `tools/pcar_source_field_watch.js`, arms x86 hardware
 write watchpoints for both fields at PCAR constructor `0x4381E0`, using its
-`ECX` body pointer, and retains them through that constructor's return. It
-records every callback body with PCAR vtable `0x4C8188` and its `+0x510`
-ordinal; the first body is only provisional. The completion event marks the
-capture valid only if exactly one callback body was observed, it matches a
-constructor watch, a selected integrator sample exists, and no watch errors or
-unclassified events occurred. A watch event counts as a write only when exactly
+`ECX` body pointer. The constructor-thread watchpoints remain armed after
+constructor return and through setup callbacks until selected-integrator
+sampling or capture cleanup, covering writes between construction and the
+first tick. It records every callback body with PCAR vtable `0x4C8188` and its
+`+0x510` ordinal; the first body is only provisional. The completion event
+marks the capture valid only if exactly one callback body was observed, it
+matches a constructor watch retained after return, a selected integrator sample
+exists, and no watch errors or unclassified events occurred. A watch event
+counts as a write only when exactly
 one watched field changed, any supplied Frida memory details agree with that
 write, and the post-write instruction resolves inside `race.bin`. The script
 does not launch the game or modify input. Syntax and mock coverage pass, but a

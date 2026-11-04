@@ -2473,3 +2473,15 @@ original-runtime fidelity.
   process remains running. Applying the watchpoint to original `race.bin`,
   capturing PCAR field provenance, and tracing propulsion remain open.
 
+- **2026-11-04, PCAR exact-write capture window:** Found that the prepared
+  `tools/pcar_source_field_watch.js` removed its constructor-thread hardware
+  watchpoints at constructor return and only re-armed at selected-integrator
+  entry, leaving setup-time field writes unobserved. It now retains the
+  constructor watch through return and setup callbacks, records whether that
+  watch remains registered, and requires the selected object's constructor
+  watch to have survived return for a valid capture. The mock now writes the
+  second source field after constructor return and covers re-arm failure as an
+  invalid capture. Node syntax checks, direct mock execution, focused CTest
+  (1/1), and `git diff --check` pass. No original process was launched, so
+  native capture and PCAR source provenance remain unverified.
+

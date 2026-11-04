@@ -1060,7 +1060,11 @@ body velocity, wheel state, and force traces before implementing the sourced
 upstream behavior. Until that evidence exists, powered longitudinal response
 and complete Viper/Bemidji race acceptance remain open. The committed
 `pcar_source_field_watch_mock` CTest only checks agent script control flow; it
-is not a substitute for this original-client capture.
+is not a substitute for this original-client capture. The constructor-thread
+watchpoints now stay active after constructor return through setup callbacks,
+so writes before the first selected integrator tick are observable. The mock
+asserts a second field write after constructor return and rejects a capture if
+the watch is not retained; native/original behavior remains unverified.
 
 The controlled state probe now reads configured throttle/brake type and
 selector values from PCAR records `0x509328/0x509368`. It schedules neutral,

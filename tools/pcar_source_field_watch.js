@@ -168,6 +168,9 @@ const constructor = Interceptor.attach(at(0x4381e0), {
   },
   onLeave() {
     if (!this.body) return;
+    const watched = state.watchedThreads.get(this.threadId);
+    const watchRetainedAfterReturn = this.watchInstalled && watched !== undefined &&
+      watched.body.equals(this.body);
     const row = {
       body: this.body.toString(),
       thread_id: this.threadId,
@@ -175,12 +178,11 @@ const constructor = Interceptor.attach(at(0x4381e0), {
       after: readValues(this.body),
       final_state: snapshotState(this.body),
       watch_installed: this.watchInstalled,
+      watch_retained_after_return: watchRetainedAfterReturn,
     };
     state.constructorRows.push(row);
-    if (this.watchInstalled && state.watchedThreads.has(this.threadId)) {
-      fields.forEach((_, index) => safe(() =>
-        this.thread.unsetHardwareWatchpoint(index)));
-      state.watchedThreads.delete(this.threadId);
+    if (!watchRetainedAfterReturn) {
+      state.errors.push(`constructor_watch_not_retained_thread_${this.threadId}`);
     }
     send({ event: "pcar_constructor_watch_done", ...row });
   },
@@ -260,14 +262,15 @@ setTimeout(() => {
   Process.setExceptionHandler(null);
   const selectedBody = state.selected ? state.selected.toString() : null;
   const selectedConstructor = state.constructorRows.find(row =>
-    row.body === selectedBody && row.watch_installed);
+    row.body === selectedBody && row.watch_installed &&
+    row.watch_retained_after_return);
   const uniqueCandidate = state.callbackCandidates.size === 1;
   const captureValid = uniqueCandidate && selectedConstructor !== undefined &&
     state.tickSamples > 0 && state.errors.length === 0 &&
     state.unclassifiedEvents === 0;
   const invalidReasons = [];
   if (!uniqueCandidate) invalidReasons.push("player_callback_identity_not_unique");
-  if (!selectedConstructor) invalidReasons.push("selected_constructor_watch_missing");
+  if (!selectedConstructor) invalidReasons.push("selected_constructor_watch_missing_or_not_retained");
   if (state.tickSamples === 0) invalidReasons.push("selected_integrator_not_observed");
   if (state.errors.length > 0) invalidReasons.push("watch_errors_present");
   if (state.unclassifiedEvents > 0) invalidReasons.push("unclassified_watch_events_present");
@@ -290,7 +293,7 @@ setTimeout(() => {
     capture_valid: captureValid,
     invalid_reasons: invalidReasons,
     limitations: [
-      "hardware watchpoints are per-thread; threads are armed at PCAR construction or integrator entry",
+      "hardware watchpoints are per-thread; the constructor thread remains watched after return and is re-armed at selected integrator entry",
       "capture_valid is false unless exactly one PCAR callback candidate was observed",
       "a debugger/hypervisor restriction may prevent hardware watchpoint installation",
     ],
