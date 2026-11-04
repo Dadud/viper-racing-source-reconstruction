@@ -126,6 +126,41 @@ ConfiguredUpdateCurve configure_acar_update_curve(
         fdiv_compatibility_enabled);
 }
 
+std::array<ConfiguredUpdateCurveObjectWrite, 16>
+make_configured_update_curve_object_writes(
+    const ConfiguredUpdateCurve& configured,
+    const std::uint32_t parent_subobject_offset) noexcept
+{
+    const auto float_bits = [](const float value) noexcept {
+        return std::bit_cast<std::uint32_t>(value);
+    };
+    const auto field = [parent_subobject_offset](const std::uint32_t offset,
+                            const std::uint8_t width,
+                            const std::uint32_t value_bits) noexcept {
+        return ConfiguredUpdateCurveObjectWrite{
+            parent_subobject_offset + offset, width, value_bits};
+    };
+    const auto& curve = configured.scoring;
+    return {{
+        field(0x08U, 4U, float_bits(configured.value_0x08)),
+        field(0x0cU, 4U, float_bits(configured.reciprocal_0x0c)),
+        field(0x10U, 4U, float_bits(configured.getter_value_0x10)),
+        field(0x14U, 4U, float_bits(curve.subtract_scale_0x14)),
+        field(0x30U, 4U, float_bits(configured.derived_value_0x30)),
+        field(0x34U, 4U, float_bits(curve.gate_value_0x34)),
+        field(0x38U, 4U, float_bits(curve.blend_value_0x38)),
+        field(0x3cU, 4U, float_bits(curve.cutoff_0x3c)),
+        field(0x40U, 1U, curve.mode_0x40),
+        field(0x41U, 1U, curve.mode_0x41),
+        field(0x44U, 4U, float_bits(curve.quadratic_0x44)),
+        field(0x48U, 4U, float_bits(curve.linear_0x48)),
+        field(0x4cU, 4U, float_bits(curve.intercept_0x4c)),
+        field(0x50U, 4U, float_bits(curve.coefficient_0x50)),
+        field(0x54U, 4U, float_bits(curve.offset_0x54)),
+        field(0x58U, 4U, float_bits(curve.penalty_0x58)),
+    }};
+}
+
 float evaluate_update_curve(
     const UpdateCurveFields& curve,
     const float x,

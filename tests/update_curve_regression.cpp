@@ -56,6 +56,26 @@ int main()
                 configured.scoring.offset_0x54 == 5000.0F &&
                 configured.scoring.penalty_0x58 != 0.0F,
             "ACAR constructor curve configuration must consume the retained source fields");
+        const auto curve_writes =
+            viper::make_configured_update_curve_object_writes(configured, 0xbfcU);
+        const auto find_curve_write = [&curve_writes](const std::uint32_t offset)
+            -> const viper::ConfiguredUpdateCurveObjectWrite* {
+            for (const auto& write : curve_writes)
+                if (write.offset == offset) return &write;
+            return nullptr;
+        };
+        const auto* getter_write = find_curve_write(0xc0cU);
+        const auto* derived_write = find_curve_write(0xc2cU);
+        const auto* getter_mode_write = find_curve_write(0xc3cU);
+        require(getter_write != nullptr && getter_write->width == 4U &&
+                std::bit_cast<float>(getter_write->value_bits) == 1000.0F,
+            "0x4401D0 must initialize curve +0x10 to the native +0 getter value");
+        require(derived_write != nullptr && derived_write->width == 4U &&
+                std::bit_cast<float>(derived_write->value_bits) ==
+                    configured.derived_value_0x30,
+            "0x4401D0 derived value must land at curve +0x30, separate from getter +0x10");
+        require(getter_mode_write != nullptr && getter_mode_write->width == 1U,
+            "0x4401D0 mode writes must preserve their byte width");
 
         auto pcar_record = make_car_record(0x50434152U);
         require(viper::read_car_curve_source_record(pcar_record).has_value(),

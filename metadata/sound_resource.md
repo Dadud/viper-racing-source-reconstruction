@@ -78,7 +78,12 @@ its ESFX interpolation/update path is `0x46CA10`
 `ev_97d1dbf313edcc14af9f77ccfe7f45c328151d27e3d5eab2a78f66ac4dc0e993`.
 
 These observations establish the native source fields and gate, but not their
-semantic meanings or units. In particular, `+0xD70` has a writer elsewhere in
-the physics update path, and neither `+0xDE0` nor `+0xC34` is yet tied to a
-known reconstruction state. The runtime must not feed route speed or the
-current keyboard throttle directly into ESFX tuning on this evidence alone.
+semantic meanings or units. In particular, `0x431150` writes `+0xD70` only
+after four wheel updates by calling a virtual callback through the curve
+subobject at `+0xBFC`; that callback's native producer/result is not modeled by
+the PCAR runtime yet. The curve constructor's virtual `+0` getter returns its
+field `+0x10`, initialized by `0x4401D0` to `1000`, but this alone does not
+prove it is the integrator's callback target or justify writing `1000` into
+`+0xD70`. Neither `+0xDE0` nor `+0xC34` is tied to a known reconstruction
+state. The runtime must not feed route speed or keyboard throttle directly
+into ESFX tuning on this evidence alone.

@@ -8,6 +8,17 @@ requirements and final gates remain in [`completion_ledger.md`](completion_ledge
 
 ## Current evidence snapshot
 
+The ACAR constructor projection now serializes the `0x4401D0` curve writes at
+their recovered child offsets: getter value `1000` at parent `+0xC0C`, derived
+value at `+0xC2C`, and one-byte mode flags. Its regression checks the absolute
+parent offsets and widths. This fixes a constructor mapping error; it does not
+establish ESFX playback inputs. The integrator's later `+0xD70` callback result
+and the selected PCAR `+0xDE0` source remain unresolved, so engine playback
+stays muted. Release build and all 67 configured CTest checks passed on
+2026-11-03, including fixed-step replay, render smoke, all track/car asset
+checks, and shipped sound resources. These are implementation/regression
+checks, not original-game parity or complete race acceptance.
+
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
 safe-follow policy, standings, and a return-to-setup path. Normal startup now

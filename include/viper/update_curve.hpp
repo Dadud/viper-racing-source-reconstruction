@@ -35,6 +35,12 @@ struct ConfiguredUpdateCurve {
     UpdateCurveFields scoring{};
 };
 
+struct ConfiguredUpdateCurveObjectWrite {
+    std::uint32_t offset{};
+    std::uint8_t width{};
+    std::uint32_t value_bits{};
+};
+
 struct AcarCurveSourceRecord {
     float value_0x68{};
     float value_0x6c{};
@@ -69,6 +75,14 @@ read_car_curve_source_record(std::span<const std::byte> runtime_record) noexcept
     std::uintptr_t parent_object,
     const AcarCurveSourceRecord& record,
     bool fdiv_compatibility_enabled = false) noexcept;
+
+// Serializes the direct stores made by 0x4401D0 into the curve subobject.
+// The native opaque pointer at +0x04 is intentionally excluded because its
+// constructor-time target remains caller-owned.
+[[nodiscard]] std::array<ConfiguredUpdateCurveObjectWrite, 16>
+make_configured_update_curve_object_writes(
+    const ConfiguredUpdateCurve& configured,
+    std::uint32_t parent_subobject_offset = 0U) noexcept;
 
 // Reconstructs the piecewise arithmetic observed at 0x4404A0 for ordinary
 // finite inputs. It does not infer the curve's application-level meaning.

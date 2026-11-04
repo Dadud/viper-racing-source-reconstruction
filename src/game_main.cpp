@@ -2364,7 +2364,7 @@ struct WindowState {
         const auto runtime_float = [&](const std::uint32_t offset) {
             return std::bit_cast<float>(runtime_word(offset));
         };
-        std::array<viper::NcarObjectFieldWrite, 25> embedded_numeric_writes{};
+        std::array<viper::NcarObjectFieldWrite, 32> embedded_numeric_writes{};
         std::size_t embedded_write_count{};
         const auto write_embedded = [&](const std::uint32_t offset,
                                         const std::uint8_t width,
@@ -2375,21 +2375,12 @@ struct WindowState {
                                            const float value) {
             write_embedded(offset, 4U, std::bit_cast<std::uint32_t>(value));
         };
-        write_curve_float(0xc04U, configured_curve.value_0x08);
-        write_curve_float(0xc08U, configured_curve.reciprocal_0x0c);
-        write_curve_float(0xc0cU, configured_curve.derived_value_0x30);
-        write_curve_float(0xc10U, configured_curve.scoring.subtract_scale_0x14);
-        write_curve_float(0xc30U, configured_curve.scoring.gate_value_0x34);
-        write_curve_float(0xc34U, configured_curve.scoring.blend_value_0x38);
-        write_curve_float(0xc38U, configured_curve.scoring.cutoff_0x3c);
-        write_embedded(0xc3cU, 1U, configured_curve.scoring.mode_0x40);
-        write_embedded(0xc3dU, 1U, configured_curve.scoring.mode_0x41);
-        write_curve_float(0xc40U, configured_curve.scoring.quadratic_0x44);
-        write_curve_float(0xc44U, configured_curve.scoring.linear_0x48);
-        write_curve_float(0xc48U, configured_curve.scoring.intercept_0x4c);
-        write_curve_float(0xc4cU, configured_curve.scoring.coefficient_0x50);
-        write_curve_float(0xc50U, configured_curve.scoring.offset_0x54);
-        write_curve_float(0xc54U, configured_curve.scoring.penalty_0x58);
+        for (const auto& curve_write :
+             viper::make_configured_update_curve_object_writes(
+                 configured_curve, 0xbfcU)) {
+            write_embedded(curve_write.offset, curve_write.width,
+                curve_write.value_bits);
+        }
 
         constexpr float selector_epsilon = std::bit_cast<float>(0x34000000U);
         constexpr float selector_scale = std::bit_cast<float>(0x3facfe73U);
