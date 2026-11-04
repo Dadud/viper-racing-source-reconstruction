@@ -42,6 +42,24 @@ Release `viper_game` build and route-free fixed-step replay passed on
 69/69. These are implementation/regression checks, not original-game parity or
 complete race acceptance.
 
+The 2026-11-04 controller-getter continuation models the enabled
+`0x43FF90` result as selected D-block getter times controller `+0x18`, and its
+disabled result as controller `+0x10`; selector child `+0x24` now has its
+constructor zero projected. This helper is not yet called by the production
+tick. The full listing confirms `0x431150` invokes controller update, stores
+the selected-pair getter product in `+0xDDC`, runs `0x43F830`, then calls the
+selected pair setter before four wheel updates. Constructor `0x434700` derives
+the `+0xDD0` product multiplier from body `+0x5B0/+0x8F8`, selector
+`+0xDC4`, runtime-record `+0x90`, and a constant. The two body source fields
+have no other direct displacement references in the checked listing; their
+provenance remains open, including possible copies or aliases. The route-free
+neutral/throttle test still has identical measured forward-speed means.
+Therefore, do not wire the modeled signal into the player tick or claim powered
+driving until those sources and callback inputs are resolved. The immediate
+source target is to trace constructor writes/copies for `+0x5B0/+0x8F8`, then
+continue upstream to the engine/gear torque producer; all driving checks keep
+ideal-line route motion disabled.
+
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent
 safe-follow policy, standings, and a return-to-setup path. Normal startup now

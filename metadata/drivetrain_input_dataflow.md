@@ -126,6 +126,48 @@ controller getter's state inputs and both getter values' semantic units remain
 unresolved, so the helper output is not yet wired into the fixed-step wheel
 pair update.
 
+## PCAR constructor and tick boundary follow-up (2026-11-04)
+
+The full checked-in `engine_.text.asm` listing was searched for direct body
+displacements `+0x5B0`, `+0x8F8`, and `+0xDD0`, and for the `0x431150` call
+sequence. Constructor `0x434700..0x434756` forms the `+0xDD0` multiplier from
+the selector DWORD copied from runtime-record `+0xB4` into body `+0xDC4`:
+
+```
+dd0 = (((1.0 - body[0xDC4]) * body[0x5B0]
+        + body[0x8F8] * body[0xDC4]) / runtime_record[0x90])
+      * 0x4C7D48
+```
+
+The two source body offsets `+0x5B0` and `+0x8F8` have no other direct
+displacement references in the checked listing; `+0xDD0` is read at
+`0x4312CF` after controller update and written by the constructor above.
+This is bounded exact-address/displacement evidence. It does not rule out
+register-based aliases, block copies, or writes through a subobject/base
+pointer, so the source fields are unresolved rather than zero or constructor
+constants. Do not project the `+0xDDC` product until their provenance is found.
+
+The full `0x431150` ordering is also explicit in the listing: set selector
+`+0x64/+0x5C` from PCAR `+0xDE0/+0xDEC`; invoke selector update `0x43FAE0`;
+read selected pair getter `+0xCE4`, multiply by `+0xDD0`, and store `+0xDDC`;
+copy parent flag `+0xC3C` to `+0xE49`; conditionally raise signal `+0xC7C`;
+run `0x43F830`; pass `max(+0xDE4,+0xDE8)` to the selected pair setter;
+copy the two per-wheel scalar results; then call `0x442530` four times.
+The selector and signal helper models now exist, but the session-owned game tick
+still does not execute this full chain. In particular, unresolved constructor
+inputs and callback child state prevent a faithful end-to-end invocation. The
+wheel-pair setter can affect `+0xE4`, a spin-response input, but neither the
+static call sequence nor the route-free comparison establishes that this is
+the engine torque producer. Powered longitudinal control remains the first
+race acceptance blocker.
+
+Next bounded source target: trace writes/copies feeding body `+0x5B0` and
+`+0x8F8` during all PCAR construction paths, including helper arguments and
+base-pointer changes around `0x42FF90 -> 0x43E490 -> 0x433C00`. If the listing
+cannot resolve them, record the exact native runtime observation needed before
+integrating this call chain. Continue to keep route motion disabled in physics
+acceptance runs.
+
 ## Live wheel-rate writer and decoy writer
 
 The live PCAR wheel objects are updated by four calls from `0x431150` to
