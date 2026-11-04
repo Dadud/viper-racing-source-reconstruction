@@ -202,6 +202,11 @@ Evidence: mapper `0x45E4B0` `ev_520f4b2d9aec343dddb2f2127431bfe0c6d4c25a99ab20ff
 constructor `0x433C00` `ev_a957a079d7cb019a7d9f11b607222893011d8db06a2f29fc193137619c0e6eeb`.
 The direct `+0x128 <- CARF[0x66]` store is visible in dossier
 `ev_472e5bfc79a705e4af49ea09d44a0d3d3c3d05308100792e1c336237ca9ca4ff` (`0x45E4B0`).
+The same `0x433C00` helper initializes the adjacent PCAR body fields: `+0xD7C`
+and `+0xD88` to zero, and both `+0xD80` and `+0xD8C` to the float at runtime
+record `+0x128` multiplied by `0.0174`. The Windows runtime now retains these
+four constructor writes and traces all six fields from `+0xD7C` through
+`+0xD90`; the raw `+0x128` field remains semantically unnamed.
 
 The `0x4509B0` call in `0x433C00` is a separate model-extents scan, not a
 steering transform. It obtains the model vertex count and pointer through

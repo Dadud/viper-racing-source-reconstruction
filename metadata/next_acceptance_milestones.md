@@ -714,10 +714,13 @@ regression no longer advances a synthetic car along a route and instead checks
 state transitions and fixed-snapshot projection. Route-opponent policy tests
 remain isolated prototype-model checks.
 
-**Immediate work:** Carry physical state through one complete update frame
-without observation-only substitution; then harden stability and scenario
-replay before extending mode behavior. Keep all outstanding native behaviors
-visible in the ledger.
+**Immediate work:** Source the remaining drivetrain torque and gear-selection
+inputs from the ordered runtime records and compare controlled throttle,
+coast, steering, and braking captures against the original process. Then close
+physical lap/checkpoint progression from supported native geometry and verify
+finish/results transitions. Do not treat route motion as acceptance evidence;
+all replay checks remain route-disabled. Keep unresolved original parity and
+the required manual race path visible in the ledger.
 
 **Current dependency:** The throttle-aligned original capture supplies eight
 selected PCAR updates and 32 ordered wheel observations, including downstream

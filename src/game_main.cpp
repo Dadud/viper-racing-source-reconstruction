@@ -1977,6 +1977,7 @@ struct PlayerPhysicsTickContext {
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::optional<float> pcar_curve_getter_0xc0c_after_tick;
     std::optional<float> pcar_body_sample_0xd70_after_tick;
+    std::array<std::optional<float>, 6> body_constructor_wheel_geometry_after_tick{};
     std::optional<std::uint8_t> pcar_sound_getter_gate_0x508a40_after_tick;
     std::optional<float> pcar_sound_getter_0x44_selected_value_after_tick;
     std::optional<std::uint8_t> integrator_wheel_scalar_callback_reached;
@@ -2341,12 +2342,31 @@ struct WindowState {
             player_body_constructor_plan.reset();
             return false;
         }
-        // 0x433C00 derives the shared integrator's +0xD84/+0xD90/+0xDCC
-        // geometry from this mapped runtime record. 0x433AA0 initializes the
+        // 0x433C00 initializes the shared integrator's +0xD7C..+0xD90
+        // geometry from this mapped runtime record. +0xD80/+0xD8C each copy
+        // runtime-record +0x128 scaled by 0.0174; +0xD7C/+0xD88 are zero.
+        // It also derives +0xD84/+0xD90/+0xDCC. 0x433AA0 initializes the
         // smoother accumulator, and the PCAR constructor defaults +0xBE4.
-        const std::array<viper::NcarObjectFieldWrite, 5> callback_control_defaults{{
+        std::uint32_t body_shift_bits{};
+        for (std::uint32_t byte = 0U; byte < 4U; ++byte) {
+            body_shift_bits |= static_cast<std::uint32_t>(
+                std::to_integer<std::uint8_t>(player_runtime_car_record[0x128U + byte]))
+                << (byte * 8U);
+        }
+        const float body_shift = std::bit_cast<float>(body_shift_bits);
+        if (!std::isfinite(body_shift)) {
+            player_runtime_car_record.clear();
+            player_body_constructor_plan.reset();
+            return false;
+        }
+        const float scaled_body_shift = body_shift * 0.0174F;
+        const std::array<viper::NcarObjectFieldWrite, 9> callback_control_defaults{{
             {0x500U, 4U, 0U},
+            {0xd7cU, 4U, 0U},
+            {0xd80U, 4U, std::bit_cast<std::uint32_t>(scaled_body_shift)},
             {0xd84U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd84)},
+            {0xd88U, 4U, 0U},
+            {0xd8cU, 4U, std::bit_cast<std::uint32_t>(scaled_body_shift)},
             {0xd90U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd90)},
             {0xdccU, 4U, std::bit_cast<std::uint32_t>(callback_setup->angle_0xdcc)},
             {0xbe4U, 1U, 0U},
@@ -3614,6 +3634,16 @@ struct WindowState {
                 player_runtime_state.body_object, offset);
             if (bits.has_value())
                 tick.body_state_after_tick[index] = std::bit_cast<float>(*bits);
+        }
+        for (std::size_t index = 0U; index <
+                tick.body_constructor_wheel_geometry_after_tick.size(); ++index) {
+            const std::uint32_t offset = 0xd7cU +
+                static_cast<std::uint32_t>(index * sizeof(float));
+            if (const auto bits = viper::read_ncar_body_object_u32(
+                    player_runtime_state.body_object, offset)) {
+                tick.body_constructor_wheel_geometry_after_tick[index] =
+                    std::bit_cast<float>(*bits);
+            }
         }
         if (const auto bits = viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, 0x50cU)) {
@@ -5842,6 +5872,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_collision_impulse_accumulated"
                 << ",wheel" << wheel << "_collision_damage_gate_unresolved";
         }
+        physics_tick_trace << ",body_constructor_0xd7c,body_constructor_0xd80"
+            ",body_constructor_0xd84,body_constructor_0xd88"
+            ",body_constructor_0xd8c,body_constructor_0xd90";
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
         if (!physics_tick_trace) {
@@ -6464,6 +6497,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             << (tick.wheel_collision_impulse_accumulated[wheel] ? 1 : 0)
                             << ','
                             << (tick.wheel_collision_damage_gate_unresolved[wheel] ? 1 : 0);
+                    }
+                    for (const auto& value :
+                            tick.body_constructor_wheel_geometry_after_tick) {
+                        physics_tick_trace << ',';
+                        if (value.has_value()) physics_tick_trace << *value;
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {
