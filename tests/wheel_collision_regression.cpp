@@ -57,6 +57,15 @@ int main()
     require(damage_flag == 0U);
     require(application.point_impulse_accumulated);
 
+    input.query_flag_nonzero_0x50878c = false;
+    accumulator = {};
+    application = viper::apply_wheel_collision_impulse(
+        accumulator, damage_flag, input);
+    require(application.response.damage_gate_input_known);
+    require(!application.damage_gate_input_unresolved);
+    require(!application.damage_flag_written);
+    require(damage_flag == 0U);
+
     input.query_flag_nonzero_0x50878c = true;
     accumulator = {};
     application = viper::apply_wheel_collision_impulse(

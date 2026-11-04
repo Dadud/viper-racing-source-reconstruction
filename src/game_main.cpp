@@ -3246,8 +3246,8 @@ struct WindowState {
                 accumulator, force_vector, application_point, body_center));
 
             // 0x442530's collision callback feeds 0x42F100 after a successful
-            // terrain query. The global 0x50878C damage gate is still unknown;
-            // leave it absent so the solver cannot fabricate a wheel damage write.
+            // terrain query. This standard frontend session initializes the
+            // shared physics-options +0x24 byte to zero (global 0x50878C).
             if (player_wheel_terrain_queries_succeeded[wheel]) {
                 const auto& contact = player_wheel_contact_observations[wheel];
                 const auto& suspension = player_wheel_update_results[wheel]
@@ -3257,7 +3257,8 @@ struct WindowState {
                         player_runtime_state.body_object, wheel_object,
                         contact.query_contact_normal,
                         player_wheel_update_results[wheel].contact.clamped_contact_depth,
-                        suspension.threshold_adjustment);
+                        suspension.threshold_adjustment,
+                        std::optional<bool>{false});
                 if (!collision_input) return false;
                 const auto prior_damage = viper::read_ncar_wheel_object_u8(
                     wheel_object, 0x20U);
