@@ -1082,16 +1082,36 @@ holds the expected canary semaphore, writes JSONL externally, and kills only
 the exact process IDs it launched. The `--direct-engine` path loads the
 video-memory hook and bounded PCAR agents before resuming `race.bin`; the
 launcher path attaches a child bridge before resuming the official launcher.
-Eleven instrumented attempts produced no video-memory query or PCAR callbacks.
-The external manifest records the VIPER disc mounted in six attempts,
+Twelve instrumented attempts produced no video-memory query or PCAR callbacks.
+The external manifest records the VIPER disc mounted in seven attempts,
 unmounted in two, and mount state unavailable in three; the mounted attempts
-still ended before a PCAR sample. Of the six launcher-mode
+still ended before a PCAR sample. Of the seven launcher-mode
 attempts, four used `GameRoot` as the launcher process working directory and
-two used `GameRoot\Data`; both `Data` attempts exited before child creation.
+three used `GameRoot\Data`; all three `Data` attempts exited before child
+creation.
 The successful 2026-10-25 suspended-child harness used the verified launcher
 with the disc mounted and `GameRoot\Data` as its working directory. The host
-runner now matches that setup and checks the mounted volume label before
-launching; this exact retry has not yet been exercised.
+runner matched that setup and checked the mounted volume label before its
+2026-11-04 retry, which still exited before child creation. That retry used
+Frida 17.24.3 (the version recorded for the successful 2026-10-25 launch),
+the isolated zero-volume settings, the mounted `VIPER` ISO, the staged
+official launcher, and `GameRoot\Data` as both launcher and expected child
+working directory. The launcher process exited normally with code 0 after
+the bridge hooks loaded; no `race.bin` child, exit-API event, or message-box
+event was recorded. The new JSONL is
+`../../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T115002Z.jsonl`.
+The identical configuration must not be retried as a proposed fix. The next
+capture task is to instrument the launcher's branch inputs and alternate
+process-creation paths, or reconcile the staged copy against the successful
+2026-10-25 launch environment. A recursive hash comparison with the successful
+`wheel_history_probe_20261025\GameRoot` stage found identical file names and
+bytes except `Data\options.def` and `Config\options.cfg`: those two files in
+the successful stage had effects/music volume 1 and CD audio enabled, while
+the current stage has zero volume and CD audio disabled. This is the only
+observed staged-file difference, but it does not prove the sound settings
+caused the early exit. Any follow-up using the original settings needs
+process-specific playback suppression before resuming the engine. The ISO was
+detached after this attempt and no game process remains running.
 The raw logs and data-copy hashes are in the external
 `silent_reference_copy_20261104` directory. The raw CloneCD image could not be
 mounted directly; its Mode 1 sectors were converted to an ISO with volume label
