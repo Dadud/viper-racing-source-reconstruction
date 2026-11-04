@@ -53,6 +53,21 @@ int main()
     const auto created_load = viper::load_career_slot(root, 0);
     check(created_load.file.returns_success,
         "newly created career slot reloads through native validation");
+    const auto opened_session = viper::make_career_slot_session(0, created_load);
+    check(opened_session.has_value(),
+        "opens a runtime career session only after native slot validation");
+    if (opened_session) {
+        check(opened_session->slot == 0 &&
+            opened_session->path == created_load.path &&
+            opened_session->player_name == "Alex",
+            "session owns the selected slot identity and observed player name");
+        check(opened_session->decoded_payload == created_load.file.decoded_payload,
+            "session retains every decoded payload byte without interpretation");
+    }
+    check(!viper::make_career_slot_session(-1, created_load),
+        "rejects a negative slot when opening a runtime career session");
+    check(!viper::make_career_slot_session(0, missing),
+        "does not create a runtime career session from a missing slot");
     if (created_load.file.returns_success) {
         const auto& created_payload = created_load.file.decoded_payload;
         const auto read_u32 = [&created_payload](const std::size_t offset) {

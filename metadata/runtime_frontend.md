@@ -42,8 +42,10 @@ return to setup; explicit CLI asset selections retain bounded replay behavior.
 
 `game_frontend_launch_smoke` is a Windows CTest that launches the actual
 interactive executable with an isolated temporary Config directory. It checks
-career-slot validation, deletion cancellation and confirmation, native career
-file creation, and refusal to overwrite valid or invalid occupied files. It
+career-slot validation and in-memory session opening, verifies the visible
+player identity and byte-for-byte native save preservation, deletion
+cancellation and confirmation, native career file creation, and refusal to
+overwrite valid or invalid occupied files. It
 then changes the opponent profile, starts a race, and checks the saved profile.
 A second scenario selects Random, verifies that setup resolves it to one of
 the eight installed tracks, confirms the concrete track is persisted, and
@@ -99,8 +101,13 @@ remain open.
 Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to
 show slots 1–5 as empty/invalid or display the stored player-name bytes for a
-valid slot. Enter repeats header, payload, XOR, and checksum validation and
-reports whether the slot passed. Press N to create a native-format career file
+valid slot. Enter repeats header, payload, XOR, and checksum validation; on
+success it opens an in-memory career session retaining the selected slot,
+resolved file path, player name from the bounded first 0x10 payload bytes, and
+the complete validated 0x674-byte decoded payload. All other payload bytes
+remain opaque and are kept verbatim. The window title and career screen identify
+the open player. Opening the session does not alter the save file. Press N to
+create a native-format career file
 in the selected empty slot; creation refuses to overwrite either a valid or
 invalid occupied slot. Press D and confirm with Y to delete only the
 selected slot; N or Escape cancels, and the row refreshes to empty after

@@ -678,6 +678,7 @@ struct SetupWindowState {
     std::array<std::string, 5> career_rows{};
     int career_slot{};
     bool career_screen{};
+    std::optional<viper::CareerSlotSession> career_session;
     bool controls_screen{};
     std::array<std::string, 13> control_bindings{};
     std::array<std::string, 13> default_control_bindings{};
@@ -713,6 +714,16 @@ std::wstring binding_label(const std::string_view binding)
     if (binding.empty()) return L"UNBOUND";
     if (binding.starts_with("Key_")) return ascii_to_wide(binding.substr(4U));
     return ascii_to_wide(binding);
+}
+
+void refresh_setup_window_title(HWND hwnd, const SetupWindowState& state)
+{
+    std::wstring title = state.career_screen
+        ? L"Viper Racing — Career Slots" : L"Viper Racing — Race Setup";
+    if (state.career_session) {
+        title += L" — " + ascii_to_wide(state.career_session->player_name);
+    }
+    SetWindowTextW(hwnd, title.c_str());
 }
 
 void draw_setup_window(HWND hwnd, const SetupWindowState& state)
@@ -792,10 +803,15 @@ void draw_setup_window(HWND hwnd, const SetupWindowState& state)
             write(L"DELETE THIS SLOT?  Y: DELETE   N / ESC: CANCEL", 100, 430, 30);
         } else {
             write(L"UP / DOWN: SELECT   ENTER: VALIDATE   N: NEW SLOT   D: DELETE", 100, 430, 25);
-            write(L"ESC: BACK", 100, 500, 30);
+            write(L"ESC: BACK", 100, 520, 26);
         }
         if (!state.career_message.empty())
             write(ascii_to_wide(state.career_message), 100, 462, 30);
+        if (state.career_session) {
+            write(L"OPEN SESSION: SLOT " +
+                std::to_wstring(state.career_session->slot + 1) + L"  PLAYER " +
+                ascii_to_wide(state.career_session->player_name), 100, 492, 26);
+        }
     }
     SelectObject(dc, old_font);
     EndPaint(hwnd, &paint);
@@ -877,6 +893,11 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                         if (deleted.error.empty()) {
                             state->career_rows[static_cast<std::size_t>(state->career_slot)] =
                                 "EMPTY OR INVALID";
+                            if (state->career_session &&
+                                state->career_session->slot == state->career_slot) {
+                                state->career_session.reset();
+                                refresh_setup_window_title(hwnd, *state);
+                            }
                             state->career_message = deleted.deleted
                                 ? "CAREER SLOT DELETED"
                                 : "SLOT WAS ALREADY EMPTY";
@@ -900,18 +921,23 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
                 }
                 if (wparam == VK_ESCAPE) {
                     state->career_screen = false;
+                    refresh_setup_window_title(hwnd, *state);
                     InvalidateRect(hwnd, nullptr, FALSE);
                     return 0;
                 }
                 if (wparam == VK_RETURN) {
                     const auto loaded = viper::load_career_slot(
                         state->config_directory, state->career_slot);
-                    if (loaded.file.returns_success) {
-                        state->career_message = "VALID FILE - native career loop pending";
+                    state->career_session = viper::make_career_slot_session(
+                        state->career_slot, loaded);
+                    if (state->career_session) {
+                        state->career_message = "CAREER SESSION LOADED: " +
+                            state->career_session->player_name;
                     } else {
                         state->career_rows[static_cast<std::size_t>(state->career_slot)] = "EMPTY OR INVALID";
                         state->career_message = "SLOT FAILED NATIVE VALIDATION";
                     }
+                    refresh_setup_window_title(hwnd, *state);
                     InvalidateRect(hwnd, nullptr, FALSE);
                     return 0;
                 }
@@ -990,6 +1016,7 @@ LRESULT CALLBACK setup_window_proc(HWND hwnd, const UINT message,
             } else if (wparam == 'C' &&
                        !state->config_directory.empty()) {
                 state->career_screen = true;
+                refresh_setup_window_title(hwnd, *state);
                 InvalidateRect(hwnd, nullptr, FALSE);
                 return 0;
             } else if (wparam == VK_ESCAPE) {

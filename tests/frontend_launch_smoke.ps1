@@ -49,6 +49,12 @@ function Wait-ProcessWindow([Diagnostics.Process]$Process, [string]$ClassName, [
     throw "Timed out waiting for window class $ClassName"
 }
 
+function Read-WindowTitle([IntPtr]$Window) {
+    $title = [System.Text.StringBuilder]::new(512)
+    [void][ViperFrontendWin32]::GetWindowText($Window, $title, $title.Capacity)
+    return $title.ToString()
+}
+
 $process = $null
 $configDir = Join-Path $env:TEMP ("viper-frontend-config-" + [Guid]::NewGuid().ToString('N'))
 try {
@@ -84,6 +90,20 @@ try {
         throw 'Could not submit C to open the career slot screen'
     }
     Start-Sleep -Milliseconds 250
+    if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]13, [IntPtr]::Zero)) {
+        throw 'Could not submit Enter to open the validated career slot'
+    }
+    Start-Sleep -Milliseconds 200
+    $careerTitle = Read-WindowTitle $setup
+    if ($careerTitle -notmatch 'Career Slots.*QA Delete Test') {
+        throw "Opening a valid career slot did not expose its session player: $careerTitle"
+    }
+    $openedBytes = [System.IO.File]::ReadAllBytes($careerPath)
+    if (-not (Test-Path -LiteralPath $careerPath) -or
+        [Convert]::ToBase64String($careerImage.ToArray()) -ne
+        [Convert]::ToBase64String($openedBytes)) {
+        throw 'Opening a career session changed the native slot file'
+    }
     if (-not [ViperFrontendWin32]::PostMessage($setup, 0x0100, [IntPtr]68, [IntPtr]::Zero)) {
         throw 'Could not request deletion of the selected career slot'
     }

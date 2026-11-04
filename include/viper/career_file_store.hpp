@@ -3,6 +3,7 @@
 #include "viper/career_file.hpp"
 
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -13,6 +14,15 @@ struct CareerSlotLoadResult {
     CareerFileLoadResult file;
     std::filesystem::path path;
     std::string error;
+};
+
+struct CareerSlotSession {
+    int slot{};
+    std::filesystem::path path;
+    std::string player_name;
+    // Preserve the complete validated payload. Fields without recovered
+    // meanings remain opaque and are not rewritten by opening a session.
+    std::vector<std::uint8_t> decoded_payload;
 };
 
 struct CareerSlotSaveResult {
@@ -32,6 +42,12 @@ struct CareerSlotDeleteResult {
 // reconstructed header, XOR, and checksum validation.
 [[nodiscard]] CareerSlotLoadResult load_career_slot(
     const std::filesystem::path& config_directory, int slot);
+
+// Creates an in-memory session only from a successfully validated native
+// slot. The observed player name occupies at most the first 0x10 payload
+// bytes; all remaining payload bytes are preserved verbatim.
+[[nodiscard]] std::optional<CareerSlotSession> make_career_slot_session(
+    int slot, const CareerSlotLoadResult& loaded);
 
 // Writes a complete native-format career image. The destination is replaced
 // only after the new image has been fully written to a sibling temporary file.

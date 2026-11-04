@@ -1,8 +1,10 @@
 #include "viper/career_file_store.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <stdexcept>
@@ -105,6 +107,27 @@ CareerSlotLoadResult load_career_slot(
         result.error = "career slot failed native format validation: " +
             result.path.string();
     return result;
+}
+
+std::optional<CareerSlotSession> make_career_slot_session(
+    const int slot, const CareerSlotLoadResult& loaded)
+{
+    if (slot < 0 || !loaded.file.returns_success ||
+        loaded.file.decoded_payload.size() != career_file_payload_size) {
+        return std::nullopt;
+    }
+
+    constexpr std::size_t player_name_storage_size = 0x10U;
+    const auto& payload = loaded.file.decoded_payload;
+    const auto name_end = std::find(payload.begin(),
+        payload.begin() + static_cast<std::ptrdiff_t>(player_name_storage_size),
+        std::uint8_t{0});
+    CareerSlotSession session{};
+    session.slot = slot;
+    session.path = loaded.path;
+    session.player_name.assign(payload.begin(), name_end);
+    session.decoded_payload = payload;
+    return session;
 }
 
 CareerSlotSaveResult save_career_slot(
