@@ -34,6 +34,14 @@ const events = [
         phase: window.phase,
         body: "0x101000",
         integrator: index,
+        controls: {
+            throttle: window.phase === "throttle" ? 0.8 :
+                window.phase === "neutral_before" || window.phase === "neutral_mid" ||
+                window.phase === "neutral_after" ? 0.02 : 0,
+            brake: window.phase === "brake" ? 0.7 :
+                window.phase === "neutral_before" || window.phase === "neutral_mid" ||
+                window.phase === "neutral_after" ? 0.01 : 0,
+        },
         wheels: [{}],
     }))),
     {
@@ -42,6 +50,10 @@ const events = [
         configuredBindings: {
             throttle: { type: 1, selector: 0xc8 },
             brake: { type: 1, selector: 0xd0 },
+        },
+        keyStats: {
+            throttle: { binding_type: 1, selector: 0xc8, reads: 8, patched: 8 },
+            brake: { binding_type: 1, selector: 0xd0, reads: 8, patched: 8 },
         },
         capturedWheelRows: 20,
         sampledIntegratorsByPhase: Object.fromEntries(
@@ -77,6 +89,22 @@ try {
         digest(fs.readFileSync(capturePath, "utf8")));
     assert.equal(sidecar.replayTraceSha256,
         digest(fs.readFileSync(tracePath, "utf8")));
+
+    const mismatchedSummary = [...events];
+    mismatchedSummary[mismatchedSummary.length - 1] = {
+        ...mismatchedSummary[mismatchedSummary.length - 1],
+        controlResponseComparedToNeutral: {
+            throttle: { active: 0.9, neutral: 0.02 },
+            brake: { active: 0.7, neutral: 0.01 },
+        },
+    };
+    fs.writeFileSync(capturePath,
+        mismatchedSummary.map(event => JSON.stringify(event)).join("\n"));
+    const mismatched = spawnSync(process.execPath, [converter, capturePath, tracePath], {
+        encoding: "utf8",
+    });
+    assert.notEqual(mismatched.status, 0);
+    assert.match(mismatched.stderr, /phase response does not match sampled PCAR controls/);
 
     const gameExe = process.env.VIPER_GAME_EXE;
     const dataDir = process.env.VIPER_DATA_DIR;

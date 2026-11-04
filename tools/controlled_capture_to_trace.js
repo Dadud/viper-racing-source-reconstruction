@@ -47,14 +47,17 @@ if (process.argv.length !== 4) {
             completion.configuredBindings.brake?.type !== 1) {
             throw new Error("capture does not contain two verified type-1 keyboard bindings");
         }
+        for (const control of ["throttle", "brake"]) {
+            const binding = completion.configuredBindings[control];
+            const key = completion.keyStats?.[control];
+            if (!Number.isInteger(binding.selector) || binding.selector < 0 ||
+                binding.selector > 0xff || !key || key.binding_type !== 1 ||
+                key.selector !== binding.selector || key.reads < 1 || key.patched < 1) {
+                throw new Error(`${control} binding lacks matching keyboard-read evidence`);
+            }
+        }
         if (!Number.isInteger(completion.capturedWheelRows) || completion.capturedWheelRows < 20) {
             throw new Error("capture lacks the required wheel sample coverage");
-        }
-        const response = completion.controlResponseComparedToNeutral;
-        if (!response ||
-            !(response.throttle?.active > response.throttle?.neutral + 1.0e-4) ||
-            !(response.brake?.active > response.brake?.neutral + 1.0e-4)) {
-            throw new Error("capture does not show phase-matched throttle and brake responses");
         }
         const requiredPhases = [
             "neutral_before", "throttle", "neutral_mid", "brake", "neutral_after",
@@ -69,6 +72,40 @@ if (process.argv.length !== 4) {
         }
         if (samples.length === 0 || samples.some(sample => sample.body !== selected.body)) {
             throw new Error("integrator sample body does not match selected PCAR identity");
+        }
+        const phaseMean = (phase, control) => {
+            const values = samples.filter(sample => sample.phase === phase)
+                .map(sample => sample.controls?.[control]);
+            if (values.length === 0 || values.some(value => !Number.isFinite(value))) return null;
+            return values.reduce((sum, value) => sum + value, 0) / values.length;
+        };
+        const neutralMean = control => {
+            const values = ["neutral_before", "neutral_mid", "neutral_after"]
+                .map(phase => phaseMean(phase, control));
+            return values.some(value => value === null)
+                ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
+        };
+        const observedResponse = {
+            throttle: {
+                active: phaseMean("throttle", "throttle"),
+                neutral: neutralMean("throttle"),
+            },
+            brake: {
+                active: phaseMean("brake", "brake"),
+                neutral: neutralMean("brake"),
+            },
+        };
+        const response = completion.controlResponseComparedToNeutral;
+        for (const control of ["throttle", "brake"]) {
+            const reported = response?.[control];
+            const observed = observedResponse[control];
+            if (observed.active === null || observed.neutral === null ||
+                !(observed.active > observed.neutral + 1.0e-4) ||
+                !Number.isFinite(reported?.active) || !Number.isFinite(reported?.neutral) ||
+                Math.abs(reported.active - observed.active) > 1.0e-6 ||
+                Math.abs(reported.neutral - observed.neutral) > 1.0e-6) {
+                throw new Error(`${control} phase response does not match sampled PCAR controls`);
+            }
         }
         const observedWheelRows = samples.reduce((sum, sample) =>
             sum + (Array.isArray(sample.wheels) ? sample.wheels.length : 0), 0);
@@ -145,7 +182,7 @@ if (process.argv.length !== 4) {
                 syntheticInput: true,
                 routeMotionInput: false,
                 configuredBindings: completion.configuredBindings,
-                controlResponseComparedToNeutral: completion.controlResponseComparedToNeutral,
+                controlResponseComparedToNeutral: observedResponse,
                 sampledIntegratorsByPhase: completion.sampledIntegratorsByPhase,
                 capturedWheelRows: completion.capturedWheelRows,
             },
