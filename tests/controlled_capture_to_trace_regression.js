@@ -8,6 +8,8 @@ const path = require("node:path");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "viper-capture-trace-"));
 const capturePath = path.join(root, "capture.jsonl");
 const tracePath = path.join(root, "replay.csv");
+const gameReplayPath = path.join(root, "game-replay.csv");
+const tickTracePath = path.join(root, "game-ticks.csv");
 const converter = path.join(__dirname, "..", "tools", "controlled_capture_to_trace.js");
 const sidecarPath = `${tracePath}.json`;
 const windows = [
@@ -75,6 +77,27 @@ try {
         digest(fs.readFileSync(capturePath, "utf8")));
     assert.equal(sidecar.replayTraceSha256,
         digest(fs.readFileSync(tracePath, "utf8")));
+
+    const gameExe = process.env.VIPER_GAME_EXE;
+    const dataDir = process.env.VIPER_DATA_DIR;
+    if (gameExe && dataDir) {
+        const game = spawnSync(gameExe, [
+            "--data-dir", dataDir,
+            "--track", "bemidji",
+            "--car", "viper",
+            "--software",
+            "--diagnostics-only",
+            "-grid",
+            "--play-trace", tracePath,
+            "--record-trace", gameReplayPath,
+            "--record-tick-trace", tickTracePath,
+        ], { encoding: "utf8", timeout: 45000, windowsHide: true });
+        assert.equal(game.error, undefined, game.error?.message);
+        assert.equal(game.status, 0,
+            `viper_game rejected generated schedule: ${game.stderr || game.stdout}`);
+        const tickLines = fs.readFileSync(tickTracePath, "utf8").trimEnd().split(/\r?\n/);
+        assert(tickLines.length > 1, "viper_game produced no tick records from generated schedule");
+    }
 
     const invalid = [...events];
     invalid[invalid.length - 1] = {

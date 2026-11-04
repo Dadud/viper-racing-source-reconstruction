@@ -395,6 +395,11 @@ if(BUILD_TESTING)
             endif()
         endif()
         if(EXISTS "${VIPER_EXTERNAL_DATA_DIR}/common.res")
+            if(VIPER_NODE_EXECUTABLE)
+                set_tests_properties(controlled_capture_to_trace_regression PROPERTIES
+                    ENVIRONMENT "VIPER_GAME_EXE=$<TARGET_FILE:viper_game>;VIPER_DATA_DIR=${VIPER_EXTERNAL_DATA_DIR}"
+                    TIMEOUT 60)
+            endif()
             add_test(NAME game_asset_root_discovery
                 COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
                     "${CMAKE_SOURCE_DIR}/tests/asset_root_discovery_smoke.ps1"
