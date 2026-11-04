@@ -31,6 +31,13 @@ integrator passes `+0xDE4/+0xDE8` through virtual slot `+0x4C` at
 Those values feed steering/low-speed wheel response. The reviewed path does
 not carry a gear, engine RPM, clutch torque, or differential torque operand.
 
+A literal-address search across the checked-in instruction listing finds
+references to `0x5093F4`, `0x509320`, and `0x5093B8` only in global
+initialization at `0x43AFBE..0x43AFD0`, their ramp/copy sequence in
+`0x43B290`, and the three accessors above. This rules out additional direct
+absolute references to these globals in this listing, but does not exclude
+computed aliases, copied control state, or a separate input-to-powertrain path.
+
 ## Live wheel-rate writer and decoy writer
 
 The live PCAR wheel objects are updated by four calls from `0x431150` to
