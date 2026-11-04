@@ -2,6 +2,25 @@
 
 ## 2026-11-04 update
 
+The latest launcher capture attempts with active effects/music settings
+(`effects=1`, `music=1`, CD audio disabled) exited normally before creating
+`race.bin`. The DirectSound silencer was therefore not loaded into an original
+game process. Separately, its process-local hooks were validated against a
+disposable native x86 DirectSound probe: buffer creation and duplication were
+observed, volume was clamped to minimum, and Play forwarding succeeded without
+audible output. The launcher bridge and configuration regressions pass, but
+the new bridge call/path diagnostics emitted no events before launcher exit.
+This provides no original gameplay/audio trace and leaves the launcher
+preflight exit unresolved. The external capture manifest records attempts 13
+and 14; see `../analysis/reference_captures/silent_reference_copy_20261104/`.
+
+The existing Visual Studio Release tree passed all 72 configured CTests on
+2026-11-04; after reconfiguration, the three launcher/audio-tool focused CTests
+also passed. The 72-test run used the prior generated test list, so it did not
+include the two newly registered JS mocks; those are covered by the focused
+3/3 run. These checks validate instrumentation and local regressions only,
+not original launcher behavior or game completeness.
+
 The route-free player now has a persistent body pose and runs the integrated
 terrain/contact, suspension, tire-response, force/moment, and body-kinematics
 stages described in the feature ledger. Its controlled local diagnostic still

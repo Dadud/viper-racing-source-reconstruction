@@ -9,6 +9,7 @@ runner = Path(__file__).resolve().parents[1] / "tools" / "run_original_pcar_capt
 runner_functions = runpy.run_path(str(runner))
 select_launcher_paths = runner_functions["select_launcher_paths"]
 validate_disc_volume_label = runner_functions["validate_disc_volume_label"]
+required_capture_sound_settings = runner_functions["required_capture_sound_settings"]
 
 with tempfile.TemporaryDirectory(prefix="viper_capture_paths_") as temporary:
     root = Path(temporary) / "GameRoot"
@@ -36,4 +37,17 @@ except SystemExit as error:
 else:
     raise AssertionError("capture runner accepted an unmounted or wrong-label disc")
 
-print("capture launcher path and Data working-directory checks passed")
+assert required_capture_sound_settings() == {
+    "enabled": "yes",
+    "effects_volume": "0.000000",
+    "music_volume": "0.000000",
+    "cd_audio": "no",
+}
+assert required_capture_sound_settings(process_silent_audio=True) == {
+    "enabled": "yes",
+    "effects_volume": "1.000000",
+    "music_volume": "1.000000",
+    "cd_audio": "no",
+}
+
+print("capture launcher path and muted/process-silent audio profiles passed")

@@ -75,6 +75,25 @@ def validate_disc_volume_label(drive: str, label: str) -> str:
     return label
 
 
+def required_capture_sound_settings(process_silent_audio: bool = False) -> dict[str, str]:
+    if process_silent_audio:
+        # Keep CD playback disabled. DirectSound buffers are silenced in the
+        # target process before the engine resumes, while the game's effects
+        # and music configuration remains at its known active values.
+        return {
+            "enabled": "yes",
+            "effects_volume": "1.000000",
+            "music_volume": "1.000000",
+            "cd_audio": "no",
+        }
+    return {
+        "enabled": "yes",
+        "effects_volume": "0.000000",
+        "music_volume": "0.000000",
+        "cd_audio": "no",
+    }
+
+
 def hold_canary_semaphore(name: str = CANARY_SEMAPHORE_NAME) -> tuple[object, int, bool]:
     """Supply the named-object precondition expected by engine startup."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -164,6 +183,8 @@ def main() -> int:
     parser.add_argument("--expected-sha256", default=EXPECTED_ISO_RACE_SHA256)
     parser.add_argument("--direct-engine", action="store_true",
                         help="spawn race.bin directly instead of the official launcher")
+    parser.add_argument("--process-silent-audio", action="store_true",
+                        help="allow active effects/music settings only with the in-process DirectSound volume clamp")
     args = parser.parse_args()
 
     game_root = args.game_root.resolve(strict=True)
@@ -186,12 +207,7 @@ def main() -> int:
     disc_label = validate_disc_volume_label(
         args.disc_drive, mounted_volume_label(args.disc_drive))
 
-    required_sound = {
-        "enabled": "yes",
-        "effects_volume": "0.000000",
-        "music_volume": "0.000000",
-        "cd_audio": "no",
-    }
+    required_sound = required_capture_sound_settings(args.process_silent_audio)
     checked_sound: dict[str, dict[str, str]] = {}
     for relative in (Path("Data/options.def"), Path("Config/options.cfg")):
         path = game_root / relative
@@ -215,6 +231,9 @@ def main() -> int:
         "pcar_source_watch": repo_tools / "pcar_source_field_watch.js",
         "controlled_wheel_capture": repo_tools / "original_pcar_controlled_wheel_capture.js",
     }
+    if args.process_silent_audio:
+        agents["directsound_silencer"] = (
+            repo_tools / "original_directsound_process_silencer.js")
     missing_agents = [str(path) for path in [launcher_bridge, *agents.values()]
                       if not path.is_file()]
     if missing_agents:
@@ -227,6 +246,7 @@ def main() -> int:
     child_ready = threading.Event()
     launcher_detached = threading.Event()
     child_detached = threading.Event()
+    audio_silencer_ready = threading.Event()
     done_agents: set[str] = set()
     child_info: dict[str, int] = {}
     output_lock = threading.Lock()
@@ -269,6 +289,7 @@ def main() -> int:
         "disc_volume_label": disc_label,
         "working_directory": str(expected_cwd),
         "sound_settings": checked_sound,
+        "process_silent_audio": args.process_silent_audio,
         "frida_version": frida.__version__,
         "launcher_bridge": str(launcher_bridge),
         "launch_mode": "direct_engine" if args.direct_engine else "official_launcher",
@@ -291,6 +312,8 @@ def main() -> int:
                     done_agents.add(agent_name)
                 if agent_name == "controlled_wheel_capture" and row.get("event") == "controlled_pcar_capture_done":
                     done_agents.add(agent_name)
+                if agent_name == "directsound_silencer" and row.get("event") == "directsound_process_silencer_ready":
+                    audio_silencer_ready.set()
                 if done_agents == {"pcar_source_watch", "controlled_wheel_capture"}:
                     finished.set()
             else:
@@ -373,7 +396,11 @@ def main() -> int:
             script.on("message", on_message(name))
             script.load()
             child_scripts.append(script)
+        if args.process_silent_audio and not audio_silencer_ready.is_set():
+            raise RuntimeError(
+                "DirectSound process silencer did not report ready before engine resume")
         record({"event": "capture_agents_loaded", "pid": child_pid,
+                "process_silent_audio": args.process_silent_audio,
                 "host_utc": datetime.now(timezone.utc).isoformat()})
         if args.direct_engine:
             device.resume(child_pid)
@@ -381,7 +408,10 @@ def main() -> int:
                     "cwd": str(expected_cwd),
                     "host_utc": datetime.now(timezone.utc).isoformat()})
         print(f"Capture running via {'direct engine' if args.direct_engine else 'isolated launcher'}; race.bin pid={child_pid}", flush=True)
-        print("Select Quick Race > Bemidji > RACE in the game window; output volumes are zero and the host closes both launched processes at completion or timeout.", flush=True)
+        if args.process_silent_audio:
+            print("Select Quick Race > Bemidji > RACE; DirectSound buffers are clamped to minimum volume in race.bin and CD audio is disabled. Other output APIs are not suppressed.", flush=True)
+        else:
+            print("Select Quick Race > Bemidji > RACE; effects/music volumes are zero, CD audio is disabled, and the host closes launched processes at completion or timeout.", flush=True)
         deadline = time.monotonic() + HOST_TIMEOUT_SECONDS
         while (time.monotonic() < deadline and not finished.is_set()
                and not child_detached.is_set()):

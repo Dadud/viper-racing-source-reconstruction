@@ -267,6 +267,12 @@ if(BUILD_TESTING)
     endif()
     find_program(VIPER_NODE_EXECUTABLE NAMES node node.exe)
     if(VIPER_NODE_EXECUTABLE)
+        add_test(NAME original_launcher_child_bridge_mock
+            COMMAND "${VIPER_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_launcher_child_bridge_mock.js")
+        add_test(NAME original_directsound_process_silencer_mock
+            COMMAND "${VIPER_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_directsound_process_silencer_mock.js")
         add_test(NAME pcar_source_field_watch_mock
             COMMAND "${VIPER_NODE_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/pcar_source_field_watch_mock.js")
