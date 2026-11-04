@@ -521,6 +521,20 @@ try {
     $observedModeForceDispatch = $false
     $observedSupportedModeForce = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
+    $bodyForwardAxisColumns = @(
+        [Array]::IndexOf($tickHeader, 'body_basis_3'),
+        [Array]::IndexOf($tickHeader, 'body_basis_4'),
+        [Array]::IndexOf($tickHeader, 'body_basis_5'))
+    $bodyVelocityColumns = @(
+        [Array]::IndexOf($tickHeader, 'body_vel_x'),
+        [Array]::IndexOf($tickHeader, 'body_vel_y'),
+        [Array]::IndexOf($tickHeader, 'body_vel_z'))
+    if ($bodyForwardAxisColumns -contains -1 -or $bodyVelocityColumns -contains -1) {
+        throw 'Fixed-step trace is missing the PCAR forward axis or linear velocity'
+    }
+    $preThrottleForwardSpeed = $null
+    $throttleForwardSpeeds = [System.Collections.Generic.List[single]]::new()
+    $brakeForwardSpeeds = [System.Collections.Generic.List[single]]::new()
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
             throw "Repeated fixed-step trace differs at CSV line $($index + 1)"
@@ -612,6 +626,27 @@ try {
         if ($outerUpdate -ge 240 -and $outerUpdate -lt 288 -and
             $tickBrake -gt 0.2) {
             $observedScheduledBrake = $true
+        }
+        $bodyVelocity = [single[]]::new(3)
+        $bodyForwardAxis = [single[]]::new(3)
+        for ($axis = 0; $axis -lt 3; ++$axis) {
+            $bodyVelocity[$axis] = [single]::Parse(
+                $fields[$bodyVelocityColumns[$axis]], [cultureinfo]::InvariantCulture)
+            $bodyForwardAxis[$axis] = [single]::Parse(
+                $fields[$bodyForwardAxisColumns[$axis]], [cultureinfo]::InvariantCulture)
+        }
+        $forwardSpeed = [single](
+            $bodyVelocity[0] * $bodyForwardAxis[0] +
+            $bodyVelocity[1] * $bodyForwardAxis[1] +
+            $bodyVelocity[2] * $bodyForwardAxis[2])
+        if ($outerUpdate -eq 0) {
+            $preThrottleForwardSpeed = $forwardSpeed
+        }
+        if ($outerUpdate -lt 96 -and $tickThrottle -gt 0.2) {
+            $throttleForwardSpeeds.Add($forwardSpeed)
+        }
+        if ($outerUpdate -ge 240 -and $outerUpdate -lt 288 -and $tickBrake -gt 0.2) {
+            $brakeForwardSpeeds.Add([Math]::Abs($forwardSpeed))
         }
         $stepIndex = [int]::Parse($fields[$tickStepColumn], [cultureinfo]::InvariantCulture)
         $stepCount = [int]::Parse($fields[$tickStepCountColumn], [cultureinfo]::InvariantCulture)
@@ -1263,6 +1298,18 @@ try {
     if (-not $observedScheduledThrottle -or -not $observedScheduledSteering -or
         -not $observedScheduledBrake) {
         throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
+    }
+    if ($null -eq $preThrottleForwardSpeed -or $throttleForwardSpeeds.Count -eq 0 -or
+        $brakeForwardSpeeds.Count -eq 0) {
+        throw 'Fixed-step replay did not sample forward speed in coast, throttle, and brake phases'
+    }
+    $throttleAverageForwardSpeed = ($throttleForwardSpeeds |
+        Measure-Object -Average).Average
+    if (($throttleAverageForwardSpeed - $preThrottleForwardSpeed) -lt 0.01) {
+        throw "Throttle phase did not increase PCAR forward speed above coast baseline: coast=$preThrottleForwardSpeed throttle-average=$throttleAverageForwardSpeed"
+    }
+    if (($brakeForwardSpeeds[0] - $brakeForwardSpeeds[$brakeForwardSpeeds.Count - 1]) -lt 0.01) {
+        throw "Brake phase did not reduce PCAR forward speed magnitude: start=$($brakeForwardSpeeds[0]) end=$($brakeForwardSpeeds[$brakeForwardSpeeds.Count - 1])"
     }
     if (-not $observedBodyIntegration) {
         throw 'Fixed-step replay did not transfer gravity, suspension, and tire force into body velocity'

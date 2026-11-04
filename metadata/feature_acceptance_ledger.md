@@ -29,6 +29,13 @@ values and body translation. The focused Windows Release replay passes. This
 closes a self-consistency coverage gap only; original-matched response and a
 complete race remain open.
 
+The same route-free authored replay now also projects PCAR velocity onto the
+recovered forward basis (`+0x50..+0x58`) and requires throttle to increase
+forward speed from the initial zero-velocity sample and braking to reduce
+forward-speed magnitude within the brake phase. The focused replay passes. This
+verifies input-sensitive longitudinal movement inside the reconstructed model;
+it does not establish original acceleration/braking parity or a complete race.
+
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
 keep route motion disabled. In that mode, tests may verify input delivery,
