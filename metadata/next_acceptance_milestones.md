@@ -1062,3 +1062,12 @@ upstream behavior. Until that evidence exists, powered longitudinal response
 and complete Viper/Bemidji race acceptance remain open. The committed
 `pcar_source_field_watch_mock` CTest only checks agent script control flow; it
 is not a substitute for this original-client capture.
+
+The controlled state probe now reads configured throttle/brake type and
+selector values from PCAR records `0x509328/0x509368`. It schedules neutral,
+throttle, neutral, brake, and neutral phases, and synthesizes a key only for a
+record whose resolved type is 1. Unsupported types remain untouched and
+invalidate the capture. Acceptance also requires observed changes in both
+throttle `0x5093F4` and brake `0x509320`, at least four selected-PCAR samples
+per phase, and at least 20 wheel rows. Its Node mock checks the script path and
+fail-closed behavior only; actual original-client delivery remains unverified.

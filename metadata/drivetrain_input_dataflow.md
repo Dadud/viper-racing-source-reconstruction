@@ -288,17 +288,17 @@ with the selector passed by its caller and returns that byte's high bit. The
 brake signal is fed from configured binding record `0x509368` through
 `0x446F90` in `0x43B290`; the active selector is therefore configuration
 state, not safely assumed to be DIK_DOWN (`0xD0`). No checked-in original
-capture in this audit proves the selected brake key byte. Keep the probe
-throttle-only until the configured record layout and active selector have
-been recovered or directly observed. The controlled probe now samples the
-first DWORD and selector byte at `0x509328` and `0x509368` into each PCAR event;
-its Node mock verifies the emitted record fields with a simulated key binding.
-This does not establish that those native record bytes are a key selector for
-every binding type, or that a brake intervention reaches `0x509320`. Future
-brake captures must first report a supported key-binding type, then use its
-recorded selector and demonstrate matching `0x509320` response before being
-accepted. Synthetic intervention remains distinct from physical keyboard
-delivery.
+capture in this audit proves the selected brake key byte. The controlled probe
+samples the type DWORD and selector byte at `0x509328` and `0x509368` into each
+PCAR event. Its current controlled schedule derives each key dynamically from
+that record and patches only type-1 keyboard bindings; other types are left
+untouched and invalidate the capture. It samples neutral, throttle, neutral,
+brake, and neutral phases and requires both `0x5093F4` and `0x509320` to change
+along with adequate per-phase PCAR and wheel coverage. This is a stricter
+script-level gate, not original-client evidence: the probe has not been run
+against the game in this session, and the Node mock cannot validate native
+record bytes or input response. Synthetic intervention remains distinct from
+physical keyboard delivery.
 
 Static inspection resolves the runtime record path: `0x43B030` calls
 `0x44F00` with the brake setting name at `0x4D5A94`, then `0x447000` matches
@@ -307,8 +307,15 @@ type and value at `+0x0C` into the runtime record. The evaluator at `0x46F60`
 dispatches on type; type 1 reads the configured selector byte through
 `0x413190`, while other types take separate device paths. Therefore the
 probe's `type` and `selector` fields describe the resolved record, but the
-selector is a keyboard index only when the observed type is 1. Its Node mock
-checks script wiring only. No original-client brake capture yet proves the
-live type, selector, or matching `0x509320` response. Keep intervention
-throttle-only until that native evidence exists; synthetic input remains
-distinct from physical keyboard delivery.
+selector is a keyboard index only when the observed type is 1. The updated
+probe enforces that condition independently for throttle and brake. Its Node
+mock checks script wiring and fail-closed behavior only. No original-client
+brake capture yet proves the live type, selector, or matching `0x509320`
+response; reject captures unless those native responses and phase coverage are
+actually observed. Synthetic input remains distinct from physical keyboard
+delivery.
+
+The capture completion event reports per-phase throttle/brake means and compares
+`throttle` against the mean of all three neutral phases and `brake` against the
+same neutral baseline. A whole-run range change alone cannot make the capture
+valid.

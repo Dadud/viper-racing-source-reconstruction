@@ -1,7 +1,6 @@
 // Bounded Frida capture for the original 32-bit race.bin client.
-// Applies a synthetic DIK_UP return-value window through the game's own
-// 0x413170 key-read wrapper, then correlates PCAR callback controls with
-// selected 0x431150 body updates and their four 0x442530 wheel calls.
+// Applies short synthetic throttle/brake windows only when the game's
+// resolved binding record identifies a keyboard input (type 1).
 // This is a controlled input intervention, not physical keyboard delivery.
 const engine = Process.findModuleByName("race.bin");
 if (!engine) throw new Error("race.bin is not mapped");
@@ -72,19 +71,36 @@ const snapshotWheel = wheel => ({
 const thread = () => Process.getCurrentThreadId();
 const now = () => Date.now();
 const t0 = now();
-const inputStart = t0 + 2000;
-const inputEnd = inputStart + 1500;
-const stopAt = t0 + 7000;
-const phases = { coast_before: 0, throttle: 0, coast_after: 0 };
-const phaseSamples = { coast_before: 0, throttle: 0, coast_after: 0 };
+const phaseWindows = [
+  { phase: "neutral_before", start: t0 + 1000, end: t0 + 2500, control: null },
+  { phase: "throttle", start: t0 + 2500, end: t0 + 4000, control: "throttle" },
+  { phase: "neutral_mid", start: t0 + 4000, end: t0 + 5500, control: null },
+  { phase: "brake", start: t0 + 5500, end: t0 + 7000, control: "brake" },
+  { phase: "neutral_after", start: t0 + 7000, end: t0 + 8500, control: null },
+];
+const stopAt = phaseWindows[phaseWindows.length - 1].end + 1000;
+const phases = Object.fromEntries(phaseWindows.map(window => [window.phase, 0]));
+const phaseSamples = Object.fromEntries(phaseWindows.map(window => [window.phase, 0]));
+const controlSamplesByPhase = Object.fromEntries(phaseWindows.map(window => [
+  window.phase,
+  {
+    throttle: { sum: 0, count: 0 },
+    brake: { sum: 0, count: 0 },
+  },
+]));
 const active = new Map();
 let selectedPcar = null;
 let callbackCount = 0;
 let integratorCount = 0;
 let wheelRows = 0;
-let sampledThrottleMinimum = Number.POSITIVE_INFINITY;
-let sampledThrottleMaximum = Number.NEGATIVE_INFINITY;
-const keyStats = { selector: 0xc8, reads: 0, patched: 0 };
+const sampledControlRanges = {
+  throttle: { minimum: Number.POSITIVE_INFINITY, maximum: Number.NEGATIVE_INFINITY },
+  brake: { minimum: Number.POSITIVE_INFINITY, maximum: Number.NEGATIVE_INFINITY },
+};
+const keyStats = {
+  throttle: { reads: 0, patched: 0, binding_type: null, selector: null },
+  brake: { reads: 0, patched: 0, binding_type: null, selector: null },
+};
 const controls = {
   steering: at(0x509358),
   throttle: at(0x5093f4),
@@ -94,18 +110,25 @@ const bindingRecords = {
   throttle: at(0x509328),
   brake: at(0x509368),
 };
-const phaseAt = t => t < inputStart ? "coast_before" :
-  (t < inputEnd ? "throttle" : "coast_after");
+const phaseAt = t => phaseWindows.find(window => t >= window.start && t < window.end) || null;
 
 const keyListener = Interceptor.attach(at(0x413170), {
   onEnter(args) { this.selector = args[0].toUInt32(); },
   onLeave(retval) {
-    if (this.selector !== keyStats.selector) return;
-    keyStats.reads++;
     const t = now();
-    if (t >= inputStart && t < inputEnd && retval.toInt32() === 0) {
+    const phase = phaseAt(t);
+    if (!phase || !phase.control) return;
+    const stats = keyStats[phase.control];
+    const binding = bindingRecords[phase.control];
+    const bindingType = readU32(binding, 0);
+    const selector = bindingType === 1 ? readU8(binding, 4) : null;
+    stats.binding_type = bindingType;
+    stats.selector = selector;
+    if (selector !== this.selector) return;
+    stats.reads++;
+    if (bindingType === 1 && retval.toInt32() === 0) {
       retval.replace(1);
-      keyStats.patched++;
+      stats.patched++;
     }
   }
 });
@@ -124,11 +147,13 @@ const integratorListener = Interceptor.attach(at(0x431150), {
     const body = this.context.ecx;
     if (!selectedPcar || !body.equals(selectedPcar)) return;
     const t = now();
-    const phase = phaseAt(t);
+    const phaseWindow = phaseAt(t);
+    if (!phaseWindow) return;
+    const phase = phaseWindow.phase;
     phases[phase]++;
     integratorCount++;
     // Sample every sixth PCAR integrator call, with bounded coverage of all
-    // three control phases. The wheel hook records the four calls per sample.
+    // five control phases. The wheel hook records four calls per sample.
     const sample = phases[phase] % 6 === 1 && phaseSamples[phase] < 16;
     if (!sample) return;
     phaseSamples[phase]++;
@@ -154,10 +179,16 @@ const integratorListener = Interceptor.attach(at(0x431150), {
       before: snapshotBody(body),
       wheels: [],
     };
-    const sampledThrottle = this.sample.controls.throttle;
-    if (Number.isFinite(sampledThrottle)) {
-      sampledThrottleMinimum = Math.min(sampledThrottleMinimum, sampledThrottle);
-      sampledThrottleMaximum = Math.max(sampledThrottleMaximum, sampledThrottle);
+    for (const control of ["throttle", "brake"]) {
+      const value = this.sample.controls[control];
+      if (Number.isFinite(value)) {
+        controlSamplesByPhase[phase][control].sum += value;
+        controlSamplesByPhase[phase][control].count++;
+        sampledControlRanges[control].minimum = Math.min(
+          sampledControlRanges[control].minimum, value);
+        sampledControlRanges[control].maximum = Math.max(
+          sampledControlRanges[control].maximum, value);
+      }
     }
     active.set(thread(), { body, sample: this.sample, nextWheel: 0 });
   },
@@ -200,8 +231,12 @@ send({
   module: engine.name,
   base: engine.base.toString(),
   imageSize: engine.size,
-  keySelector: keyStats.selector,
-  throttleWindowMs: [inputStart - t0, inputEnd - t0],
+  phaseWindowsMs: phaseWindows.map(window => ({
+    phase: window.phase,
+    start: window.start - t0,
+    end: window.end - t0,
+    control: window.control,
+  })),
   sampleEveryPlayerIntegrators: 6,
   maximumSamplesPerPhase: 16,
   stopAfterMs: stopAt - t0,
@@ -215,18 +250,43 @@ setTimeout(() => {
   integratorListener.detach();
   wheelListener.detach();
   const phaseCoverage = Object.values(phaseSamples).every(count => count >= 4);
-  const inputObserved = keyStats.reads > 0 && keyStats.patched > 0 &&
-    sampledThrottleMaximum > sampledThrottleMinimum + 1.0e-4;
-  const captureValid = phaseCoverage && inputObserved && wheelRows >= 12;
+  const phaseMean = (phase, control) => {
+    const sample = controlSamplesByPhase[phase][control];
+    return sample.count > 0 ? sample.sum / sample.count : null;
+  };
+  const neutralMean = control => {
+    const names = ["neutral_before", "neutral_mid", "neutral_after"];
+    const means = names.map(name => phaseMean(name, control)).filter(value => value !== null);
+    return means.length === names.length
+      ? means.reduce((sum, value) => sum + value, 0) / means.length : null;
+  };
+  const neutralThrottle = neutralMean("throttle");
+  const neutralBrake = neutralMean("brake");
+  const throttleDuringThrottle = phaseMean("throttle", "throttle");
+  const brakeDuringBrake = phaseMean("brake", "brake");
+  const throttleObserved = keyStats.throttle.binding_type === 1 &&
+    keyStats.throttle.reads > 0 && keyStats.throttle.patched > 0 &&
+    throttleDuringThrottle !== null && neutralThrottle !== null &&
+    throttleDuringThrottle > neutralThrottle + 1.0e-4;
+  const brakeObserved = keyStats.brake.binding_type === 1 &&
+    keyStats.brake.reads > 0 && keyStats.brake.patched > 0 &&
+    brakeDuringBrake !== null && neutralBrake !== null &&
+    brakeDuringBrake > neutralBrake + 1.0e-4;
+  const captureValid = phaseCoverage && throttleObserved && brakeObserved && wheelRows >= 20;
   send({
     event: "controlled_pcar_capture_done",
     captureValid,
     invalidReasons: [
-      ...(keyStats.reads === 0 ? ["selected_key_wrapper_not_reached"] : []),
-      ...(keyStats.reads > 0 && keyStats.patched === 0 ? ["no_key_return_patched"] : []),
-      ...(sampledThrottleMaximum <= sampledThrottleMinimum + 1.0e-4 ? ["throttle_response_not_observed"] : []),
+      ...(keyStats.throttle.binding_type !== 1 ? ["throttle_binding_not_keyboard_type_1"] : []),
+      ...(keyStats.throttle.reads === 0 ? ["throttle_key_wrapper_not_reached"] : []),
+      ...(keyStats.throttle.patched === 0 ? ["no_throttle_key_return_patched"] : []),
+      ...(!throttleObserved && keyStats.throttle.patched > 0 ? ["throttle_response_not_observed"] : []),
+      ...(keyStats.brake.binding_type !== 1 ? ["brake_binding_not_keyboard_type_1"] : []),
+      ...(keyStats.brake.reads === 0 ? ["brake_key_wrapper_not_reached"] : []),
+      ...(keyStats.brake.patched === 0 ? ["no_brake_key_return_patched"] : []),
+      ...(!brakeObserved && keyStats.brake.patched > 0 ? ["brake_response_not_observed"] : []),
       ...(!phaseCoverage ? ["insufficient_phase_sample_coverage"] : []),
-      ...(wheelRows < 12 ? ["insufficient_wheel_rows"] : []),
+      ...(wheelRows < 20 ? ["insufficient_wheel_rows"] : []),
     ],
     elapsed_ms: now() - t0,
     pcarCallbacks: callbackCount,
@@ -234,8 +294,27 @@ setTimeout(() => {
     sampledIntegratorsByPhase: phaseSamples,
     capturedWheelRows: wheelRows,
     keyStats,
-    sampledThrottleRange: Number.isFinite(sampledThrottleMinimum)
-      ? [sampledThrottleMinimum, sampledThrottleMaximum] : null,
-    inputWindowMs: [inputStart - t0, inputEnd - t0],
+    configuredBindings: Object.fromEntries(Object.entries(bindingRecords).map(
+      ([name, record]) => [name, {
+        type: readU32(record, 0),
+        selector: readU8(record, 4),
+      }])),
+    sampledControlRanges: Object.fromEntries(Object.entries(sampledControlRanges).map(
+      ([name, range]) => [name, Number.isFinite(range.minimum)
+        ? [range.minimum, range.maximum] : null])),
+    meanControlByPhase: Object.fromEntries(phaseWindows.map(window => [window.phase, {
+      throttle: phaseMean(window.phase, "throttle"),
+      brake: phaseMean(window.phase, "brake"),
+    }])),
+    controlResponseComparedToNeutral: {
+      throttle: { active: throttleDuringThrottle, neutral: neutralThrottle },
+      brake: { active: brakeDuringBrake, neutral: neutralBrake },
+    },
+    phaseWindowsMs: phaseWindows.map(window => ({
+      phase: window.phase,
+      start: window.start - t0,
+      end: window.end - t0,
+      control: window.control,
+    })),
   });
 }, stopAt - t0);

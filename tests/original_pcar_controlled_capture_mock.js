@@ -89,6 +89,30 @@ keyReturn.value = 0;
 keyHook.onLeave.call(keyInvocation, keyReturn);
 assert.equal(keyReturn.value, 1, "synthetic throttle return is patched");
 
+clock = 7000;
+memory.set(brakeBinding.value, 2);
+const unsupportedBrakeInvocation = { selector: 0x39 };
+keyHook.onEnter.call(unsupportedBrakeInvocation,
+    [{ toUInt32: () => unsupportedBrakeInvocation.selector }]);
+const unsupportedBrakeReturn = {
+    value: 0,
+    toInt32() { return this.value; },
+    replace(value) { this.value = value; },
+};
+keyHook.onLeave.call(unsupportedBrakeInvocation, unsupportedBrakeReturn);
+assert.equal(unsupportedBrakeReturn.value, 0,
+    "non-keyboard binding types are not synthesized as key presses");
+memory.set(brakeBinding.value, 1);
+const brakeInvocation = { selector: 0x39 };
+keyHook.onEnter.call(brakeInvocation, [{ toUInt32: () => brakeInvocation.selector }]);
+const brakeReturn = {
+    value: 0,
+    toInt32() { return this.value; },
+    replace(value) { this.value = value; },
+};
+keyHook.onLeave.call(brakeInvocation, brakeReturn);
+assert.equal(brakeReturn.value, 1, "configured type-1 brake key is patched");
+
 hooks.get(0x384d0).onEnter.call({ context: { ecx: body } });
 const integrator = hooks.get(0x31150);
 const invocation = { context: { ecx: body } };
@@ -106,6 +130,7 @@ assert.equal(sample.configuredBindings.throttle.type, 1);
 assert.equal(sample.configuredBindings.throttle.selector, 0xc8);
 assert.equal(sample.configuredBindings.brake.type, 1);
 assert.equal(sample.configuredBindings.brake.selector, 0x39);
+assert.equal(emitted[0].event, "controlled_pcar_capture_ready");
 const done = emitted.find(event => event.event === "controlled_pcar_capture_done");
 assert(done && done.captureValid === false,
     "one sample must fail closed on inadequate phase and wheel coverage");
