@@ -434,6 +434,13 @@ if(BUILD_TESTING)
             set(VIPER_SHIPPED_TRACKS
                 bemidji dundas hastings heaven kenyon limbo nfield uptown)
             set(VIPER_SHIPPED_CARS viper exotic plane sedan sports)
+            add_test(NAME game_track_car_asset_compatibility_matrix
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${CMAKE_SOURCE_DIR}/tests/track_car_asset_matrix.ps1"
+                    -GameExe "$<TARGET_FILE:viper_game>"
+                    -DataDir "${VIPER_EXTERNAL_DATA_DIR}")
+            set_tests_properties(game_track_car_asset_compatibility_matrix
+                PROPERTIES TIMEOUT 120)
             foreach(track IN LISTS VIPER_SHIPPED_TRACKS)
                 add_test(NAME game_track_${track}_asset_validation
                     COMMAND viper_game --data-dir "${VIPER_EXTERNAL_DATA_DIR}"

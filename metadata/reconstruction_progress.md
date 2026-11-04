@@ -1,5 +1,17 @@
 # Reconstruction progress
 
+- **2026-11-03, all shipped track/car asset combinations:** Added the Windows
+  `game_track_car_asset_compatibility_matrix` CTest. It invokes the existing
+  asset-validation path across the eight currently enumerated track bundles
+  and five currently enumerated car bundles, checking that each requested
+  track/car bundle loads and its terrain/CARF records parse. The test passed
+  all 40 combinations against the external extracted game data. The game
+  Release target rebuilt and the full Release CTest suite passed 68/68,
+  including the new matrix check. This closes a
+  resource cross-compatibility gap between the former track-with-Viper and
+  car-on-Bemidji checks; it does not establish the original selectable roster
+  or show that any new combination is drivable.
+
 - **2026-11-03, neutral grid contact trace:** Ran the Release Viper/Bemidji
   runtime with route motion disabled and all sampled controls at zero, writing
   the trace outside the repository to

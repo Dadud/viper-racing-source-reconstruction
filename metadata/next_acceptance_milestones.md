@@ -128,8 +128,9 @@ different pose and lacks surface-normal/selected-vertex provenance, so the
 matched clean grid capture remains the next parity gate. Native powertrain-to-
 wheel torque is also still missing; dashboard gear rendering and the `+0xE0`
 geometric callback do not source an engine torque law. The 2026-11-03 Release
-build and all 67 configured CTests passed after the curve-constructor
-correction. Trace and hash are recorded in `reconstruction_progress.md`.
+build and all 68 configured Release CTests passed on 2026-11-03, including a
+new all-combinations asset compatibility check. Trace and hash are recorded in
+`reconstruction_progress.md`.
 
 This is explicitly
 recorded as incomplete in the physics, AI, and race-mode rows of
