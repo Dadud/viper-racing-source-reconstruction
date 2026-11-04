@@ -1975,6 +1975,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<float>, 27> body_state_after_tick{};
     std::optional<float> body_integrator_ramp_0x50c_after_tick;
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
+    std::optional<float> pcar_curve_getter_0xc0c_after_tick;
+    std::optional<float> pcar_body_sample_0xd70_after_tick;
     std::optional<std::uint8_t> integrator_wheel_scalar_callback_reached;
     std::optional<std::uint8_t> integrator_wheel_scalar_selector_nonzero;
     std::optional<std::uint8_t> integrator_wheel_scalar_response_gate_passed;
@@ -3133,6 +3135,32 @@ struct WindowState {
         player_wheel_pair_differential_producer_applied = true;
     }
 
+    bool sample_player_integrator_curve_getter(PlayerPhysicsTickContext& tick)
+    {
+        // 0x431150 calls virtual slot +0 on the embedded object at +0xBFC
+        // after the four 0x442530 wheel calls, then stores its x87 result at
+        // body +0xD70. The configured 0x4401D0 object uses 0x43F970, which
+        // returns curve +0x10 (parent +0xC0C).
+        const auto getter_bits = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object, 0xc0cU);
+        if (!getter_bits ||
+            !std::isfinite(std::bit_cast<float>(*getter_bits))) {
+            return false;
+        }
+        const std::array<viper::NcarObjectFieldWrite, 1> writes{{
+            {0xd70U, 4U, *getter_bits},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, writes)) {
+            return false;
+        }
+        tick.pcar_curve_getter_0xc0c_after_tick =
+            std::bit_cast<float>(*getter_bits);
+        tick.pcar_body_sample_0xd70_after_tick =
+            std::bit_cast<float>(*getter_bits);
+        return true;
+    }
+
     bool advance_player_body_kinematics_from_forces(
         PlayerPhysicsTickContext& tick)
     {
@@ -4098,6 +4126,11 @@ struct WindowState {
             if (!dispatch_player_pcar_callback_projection(tick_context)) return false;
             if (!update_player_integrator_wheel_scalars()) return false;
             update_player_wheel_contacts_from_body();
+            if (!player_constructor_inputs_ready ||
+                !sample_player_integrator_curve_getter(
+                    player_physics_ticks_this_update.back())) {
+                return false;
+            }
             capture_player_tick_physics_state(
                 player_physics_ticks_this_update.back());
             if (!player_constructor_inputs_ready ||
@@ -5570,6 +5603,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",integrator_mode_force_z";
         for (std::size_t lane = 0U; lane < 3U; ++lane)
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
+        physics_tick_trace << ",pcar_curve_getter_0xc0c,pcar_body_sample_0xd70";
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_suspension_reset_contact"
@@ -5950,6 +5984,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 << tick.body_integrator_timer_missing_offsets[lane]
                                 << std::dec;
                     }
+                    physics_tick_trace << ',';
+                    if (tick.pcar_curve_getter_0xc0c_after_tick)
+                        physics_tick_trace <<
+                            *tick.pcar_curve_getter_0xc0c_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.pcar_body_sample_0xd70_after_tick)
+                        physics_tick_trace <<
+                            *tick.pcar_body_sample_0xd70_after_tick;
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_active_after_tick[wheel]) {

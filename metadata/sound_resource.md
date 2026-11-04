@@ -43,10 +43,12 @@ route-speed/throttle band selector and route-speed pitch scaling were removed:
 these are not the native ESFX inputs. `0x46C7A0` reads vehicle values through
 virtual offsets `+0x48` and `+0x44`, then applies per-band data through
 `0x46CA10`. The PCAR getters map `+0x48` to body `+0xD70` and `+0x44` to
-`+0xDE0` or `+0xC34` depending on global `DAT_00508A40`; the reconstruction
-still lacks those correctly sourced runtime values and the live `+0xD70`
-producer. Audio resources load, but engine playback remains muted pending that
-mapping.
+`+0xDE0` or `+0xC34` depending on global `DAT_00508A40`. The runtime now
+models the `+0xD70` producer: after its four-wheel contact/history pass it reads
+the configured curve object's getter value at parent `+0xC0C` and copies the
+same bits into body `+0xD70`, with both values included in the fixed-step trace.
+The selected `+0xDE0`/`+0xC34` source and the downstream ESFX-to-DirectSound
+mixing behavior remain unresolved, so audio playback remains muted.
 `--smoke-audio --smoke-frames 30` initializes DirectSound and exercises resource
 and PCM-buffer creation only. Current runs load Viper's four resources (idle plus
 three bands), and Exotic, Plane, Sedan, and Sports' three resources each (idle
@@ -78,12 +80,14 @@ its ESFX interpolation/update path is `0x46CA10`
 `ev_97d1dbf313edcc14af9f77ccfe7f45c328151d27e3d5eab2a78f66ac4dc0e993`.
 
 These observations establish the native source fields and gate, but not their
-semantic meanings or units. In particular, `0x431150` writes `+0xD70` only
-after four wheel updates by calling a virtual callback through the curve
-subobject at `+0xBFC`; that callback's native producer/result is not modeled by
-the PCAR runtime yet. The curve constructor's virtual `+0` getter returns its
-field `+0x10`, initialized by `0x4401D0` to `1000`, but this alone does not
-prove it is the integrator's callback target or justify writing `1000` into
-`+0xD70`. Neither `+0xDE0` nor `+0xC34` is tied to a known reconstruction
-state. The runtime must not feed route speed or keyboard throttle directly
-into ESFX tuning on this evidence alone.
+semantic meanings or units. At `0x4313F2..0x4313FC`, `0x431150` calls virtual
+slot `+0` through the curve subobject at parent `+0xBFC` and stores the x87
+return at `+0xD70`. The configured object has vtable `0x4C8780`; slot `+0`
+targets `0x43F970`, which returns curve-object `+0x10` (parent `+0xC0C`).
+Constructor `0x4401D0` initializes that field to `1000.0`. The fixed-step
+runtime now models this concrete getter and store, and the route-free trace
+regression requires the observed getter and stored sample to match and remain
+finite. It does not yet establish the meaning/units of this sample or the
+selected `+0xDE0`/`+0xC34` getter source. Audio remains muted; the runtime must
+not feed route speed or keyboard throttle directly into ESFX tuning on this
+evidence alone.

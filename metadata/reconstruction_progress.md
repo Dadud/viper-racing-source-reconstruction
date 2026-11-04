@@ -1,5 +1,21 @@
 # Reconstruction progress
 
+- **2026-11-03, PCAR curve getter to `+0xD70`:** The checked-in x86 listing
+  at `0x4313F2..0x4313FC` shows `0x431150` calling virtual slot `+0` on the
+  object at parent `+0xBFC` after its four `0x442530` calls, then storing the
+  x87 return at parent `+0xD70`. Constructor `0x440100` installs vtable
+  `0x4C8780`, slot `+0` targets `0x43F970`, and that getter returns curve
+  `+0x10` (parent `+0xC0C`), initialized to `1000.0` by `0x4401D0`. The
+  route-free runtime now models that getter and store after its four-wheel
+  contact/history pass and records both values in fixed-step traces. Release
+  `viper_game` built, `game_fixed_step_trace_replay_regression` passed 1/1, and
+  the full Release CTest suite passed 68/68. The first replay caught a
+  trace-row ownership error that was corrected before the passing rerun. The
+  getter and its stored sample now match and remain finite across replay rows.
+  Sound playback remains muted; selected
+  `+0xDE0`/`+0xC34` source mapping, mixing, and original audio comparison remain
+  open. This does not establish driving parity.
+
 - **2026-11-03, all shipped track/car asset combinations:** Added the Windows
   `game_track_car_asset_compatibility_matrix` CTest. It invokes the existing
   asset-validation path across the eight currently enumerated track bundles
