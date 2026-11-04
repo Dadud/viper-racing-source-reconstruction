@@ -33,13 +33,14 @@ The route-free longitudinal diagnostic compares fresh neutral, throttle, and
 brake runs from the same placement over the same simulation updates (32–63).
 Earlier versions compared different update windows and their positive throttle
 result is withdrawn. The corrected capture shows neutral and throttle have
-identical forward-speed mean (`-0.499623`, magnitude `1.53`); braking changes
-the mean slightly (`-0.535571`, magnitude `1.49`). The trace reports these
-measurements but does not assert they constitute powered driving. Static audit
-identified wheel `+0x124`'s active-contact update at `0x443E9D`, but no
-engine/gear-to-wheel producer in the bounded callback/integrator/wheel path.
-This does not prove a producer is absent elsewhere. Powered longitudinal
-control and matched original traces remain open; first-race physics is partial.
+identical forward-speed mean (`-0.499623`, magnitude `1.528561`); braking
+changes the mean slightly (`-0.535571`, magnitude `1.492704`). The trace reports
+these measurements but does not assert they constitute powered driving. The
+bounded [`drivetrain_input_dataflow.md`](drivetrain_input_dataflow.md) audit
+traces throttle/brake ramps through PCAR control setters and finds no link to
+the active wheel `+0x124` writer at `0x443E9D` in that call chain. This does not
+prove a producer is absent elsewhere. Powered longitudinal control and matched
+original traces remain open; first-race physics is partial.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
