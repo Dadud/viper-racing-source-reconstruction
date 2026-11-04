@@ -278,3 +278,19 @@ torque producer. Continue with a constructor/first-tick write watch for PCAR
 at `0x443E9D`. Record caller identity, child pointers/vtables, endpoint values,
 and wheel state before adapting discovered behavior into the C++20 session.
 No direct throttle-to-force formula should be introduced from current traces.
+
+## Controlled key selector evidence boundary
+
+The controlled original-client probe currently intervenes only on DIK_UP
+(`0xC8`), the throttle key used by the retained historical capture. The
+disassembly for `0x413170` confirms it indexes the internal keyboard snapshot
+with the selector passed by its caller and returns that byte's high bit. The
+brake signal is fed from configured binding record `0x509368` through
+`0x446F90` in `0x43B290`; the active selector is therefore configuration
+state, not safely assumed to be DIK_DOWN (`0xD0`). No checked-in original
+capture in this audit proves the selected brake key byte. Keep the probe
+throttle-only until the configured record layout and active selector have
+been recovered or directly observed. Future brake captures must report the
+selector read from the original binding record and demonstrate matching
+`0x509320` response before being accepted. The synthetic intervention remains
+distinct from physical keyboard delivery.
