@@ -1956,6 +1956,7 @@ struct PlayerPhysicsTickContext {
     std::optional<std::uint8_t> integrator_wheel_scalar_response_gate_passed;
     std::optional<std::uint8_t> integrator_wheel_scalar_negative_pair_gate_passed;
     std::optional<float> integrator_wheel_scalar_target_response;
+    std::optional<viper::NcarIntegratorModeForceResult> integrator_mode_force;
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_suspension_reset_contact{};
     std::array<std::optional<float>, 4> wheel_value_0xe0_after_tick{};
@@ -3260,6 +3261,17 @@ struct WindowState {
                         conditional_input);
             }
         }
+
+        // 0x431150's mode 0/1 force branch runs after all four wheel callbacks
+        // and before the body integrator. All operands are read from the
+        // session-owned byte objects; unknown constructor state fails closed.
+        const auto mode_force_input =
+            viper::make_ncar_integrator_mode_force_input_from_objects(
+                player_runtime_state.body_object,
+                player_runtime_state.wheel_objects);
+        if (!mode_force_input) return false;
+        tick.integrator_mode_force = viper::apply_ncar_integrator_mode_force(
+            accumulator, *mode_force_input);
 
         viper::BodyIntegrationTailState tail_state{};
         tail_state.running_accumulators_0x93_to_0x98 = {
@@ -5453,7 +5465,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",integrator_wheel_scalar_selector_nonzero"
             ",integrator_wheel_scalar_response_gate_passed"
             ",integrator_wheel_scalar_negative_pair_gate_passed"
-            ",integrator_wheel_scalar_target_response";
+            ",integrator_wheel_scalar_target_response"
+            ",integrator_mode_force_evaluated"
+            ",integrator_mode_force_supported"
+            ",integrator_mode_force_contact_gate"
+            ",integrator_mode_force_forward_gate"
+            ",integrator_mode_force_accumulated"
+            ",integrator_mode_force_x,integrator_mode_force_y"
+            ",integrator_mode_force_z";
         for (std::size_t lane = 0U; lane < 3U; ++lane)
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
@@ -5816,6 +5835,18 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     physics_tick_trace << ',';
                     if (tick.integrator_wheel_scalar_target_response)
                         physics_tick_trace << *tick.integrator_wheel_scalar_target_response;
+                    const auto& mode_force = tick.integrator_mode_force;
+                    physics_tick_trace << ',' << (mode_force ? 1 : 0)
+                        << ',' << (mode_force && mode_force->supported_mode ? 1 : 0)
+                        << ',' << (mode_force && mode_force->contact_gate_passed ? 1 : 0)
+                        << ',' << (mode_force && mode_force->forward_gate_passed ? 1 : 0)
+                        << ',' << (mode_force && mode_force->accumulated ? 1 : 0)
+                        << ',';
+                    if (mode_force) physics_tick_trace << mode_force->force_vector.x;
+                    physics_tick_trace << ',';
+                    if (mode_force) physics_tick_trace << mode_force->force_vector.y;
+                    physics_tick_trace << ',';
+                    if (mode_force) physics_tick_trace << mode_force->force_vector.z;
                     for (std::size_t lane = 0U; lane < 3U; ++lane) {
                         physics_tick_trace << ',';
                         if (lane < tick.body_integrator_timer_missing_count)

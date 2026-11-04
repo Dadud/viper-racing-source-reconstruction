@@ -12,6 +12,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -35,6 +36,121 @@ void write_u32_le(std::vector<std::byte>& bytes, const std::size_t offset,
 int main()
 {
     try {
+        {
+            viper::NcarForceMomentAccumulator mode_zero_accumulator{};
+            viper::NcarIntegratorModeForceInput mode_zero{};
+            mode_zero.mode_0x4f4 = 0;
+            mode_zero.contact_bytes = {1U, 1U, 1U, 0U};
+            mode_zero.angular_velocity_0x240 = {0.0F, 0.0F, 0.0F};
+            mode_zero.body_axis_0x44 = {0.0F, 0.0F, 1.0F};
+            mode_zero.linear_velocity_0x234 = {0.0F, 0.0F, 10.0F};
+            mode_zero.body_axis_0x50 = {0.0F, 0.0F, 1.0F};
+            mode_zero.force_axis_0x38 = {1.0F, 0.0F, 0.0F};
+            mode_zero.force_scale_0xdcc = 1.0F;
+            mode_zero.force_scale_0x500 = 1.0F;
+            mode_zero.application_point = {0.0F, 70.0F, 0.0F};
+            const auto mode_zero_result = viper::apply_ncar_integrator_mode_force(
+                mode_zero_accumulator, mode_zero);
+            require(mode_zero_result.supported_mode &&
+                    mode_zero_result.contact_gate_passed &&
+                    mode_zero_result.forward_gate_passed &&
+                    mode_zero_result.accumulated &&
+                    std::isfinite(mode_zero_result.force_vector.x) &&
+                    mode_zero_result.force_vector.x > 0.0F,
+                "mode-zero shared-integrator force must pass mapped contact and forward gates");
+
+            viper::NcarForceMomentAccumulator mode_one_accumulator{};
+            auto mode_one = mode_zero;
+            mode_one.mode_0x4f4 = 1;
+            mode_one.angular_velocity_0x240 = {0.0F, 0.0F, 0.2F};
+            mode_one.application_point = {0.0F, 0.0F, 35.0F};
+            const auto mode_one_result = viper::apply_ncar_integrator_mode_force(
+                mode_one_accumulator, mode_one);
+            require(mode_one_result.supported_mode &&
+                    mode_one_result.contact_gate_passed &&
+                    mode_one_result.forward_gate_passed &&
+                    mode_one_result.accumulated &&
+                    std::isfinite(mode_one_result.force_vector.x) &&
+                    mode_one_result.force_vector.x > 0.0F,
+                "mode-one shared-integrator force must pass mapped contact and forward gates");
+
+            mode_one.contact_bytes = {1U, 1U, 0U, 0U};
+            const auto contact_rejected = viper::apply_ncar_integrator_mode_force(
+                mode_one_accumulator, mode_one);
+            require(contact_rejected.supported_mode &&
+                    !contact_rejected.contact_gate_passed &&
+                    !contact_rejected.accumulated,
+                "shared-integrator mode force must reject fewer than three contacts");
+        }
+        {
+            viper::NcarBodyRuntimeObjectState body{};
+            std::vector<viper::NcarObjectFieldWrite> body_writes;
+            const auto write_float = [&body_writes](const std::uint32_t offset,
+                                                     const float value) {
+                body_writes.push_back({offset, 4U,
+                    std::bit_cast<std::uint32_t>(value)});
+            };
+            body_writes.push_back({0x4f4U, 4U, 0U});
+            write_float(0xdccU, 1.0F);
+            write_float(0x500U, 1.0F);
+            for (const auto& [offset, value] : std::array<std::pair<std::uint32_t, float>, 18>{{
+                     {0x038U, 1.0F}, {0x03cU, 0.0F}, {0x040U, 0.0F},
+                     {0x044U, 0.0F}, {0x048U, 0.0F}, {0x04cU, 1.0F},
+                     {0x050U, 0.0F}, {0x054U, 1.0F}, {0x058U, 0.0F},
+                     {0x05cU, 10.0F}, {0x060U, 20.0F}, {0x064U, 30.0F},
+                     {0x234U, 0.0F}, {0x238U, 10.0F}, {0x23cU, 0.0F},
+                     {0x240U, 0.0F}, {0x244U, 0.0F}, {0x248U, 0.2F}}}) {
+                write_float(offset, value);
+            }
+            require(viper::apply_ncar_body_object_writes(body, body_writes),
+                "mode-force PCAR source fields must be initialized byte-backed");
+            std::array<viper::NcarWheelRuntimeObjectState, 4> wheels{};
+            for (std::size_t wheel = 0U; wheel < wheels.size(); ++wheel) {
+                const auto base = 0x554U + 0x1a4U *
+                    static_cast<std::uint32_t>(wheel);
+                const std::array<viper::NcarObjectFieldWrite, 3> wheel_writes{{
+                    {base + 0x168U, 1U, 1U},
+                    {base + 0x11cU, 4U, std::bit_cast<std::uint32_t>(0.0F)},
+                    {base + 0x020U, 1U, 0U},
+                }};
+                require(viper::apply_ncar_wheel_object_writes(
+                            wheels[wheel], base, wheel_writes),
+                    "mode-force wheel source fields must be initialized byte-backed");
+            }
+            const auto mode_zero_input =
+                viper::make_ncar_integrator_mode_force_input_from_objects(
+                    body, wheels);
+            require(mode_zero_input && mode_zero_input->mode_0x4f4 == 0 &&
+                    mode_zero_input->contact_bytes ==
+                        std::array<std::uint8_t, 4>{1U, 1U, 1U, 1U} &&
+                    mode_zero_input->application_point.x == 10.0F &&
+                    mode_zero_input->application_point.y == 90.0F &&
+                    mode_zero_input->application_point.z == 30.0F,
+                "mode-zero byte adapter must derive the native 70-unit body-axis point");
+            const std::array<viper::NcarObjectFieldWrite, 1> mode_one_write{{
+                {0x4f4U, 4U, 1U}}};
+            require(viper::apply_ncar_body_object_writes(body, mode_one_write),
+                "mode-one selector must update its byte-backed source");
+            const auto mode_one_input =
+                viper::make_ncar_integrator_mode_force_input_from_objects(
+                    body, wheels);
+            require(mode_one_input && mode_one_input->mode_0x4f4 == 1 &&
+                    mode_one_input->application_point.x == 10.0F &&
+                    mode_one_input->application_point.y == 55.0F &&
+                    mode_one_input->application_point.z == 30.0F,
+                "mode-one byte adapter must apply the clamped angular scale to its application point");
+            auto unknown_wheels = wheels;
+            unknown_wheels[2] = {};
+            require(viper::read_ncar_wheel_object_u32(unknown_wheels[2], 0x11cU) ==
+                        std::nullopt &&
+                    !viper::make_ncar_integrator_mode_force_input_from_objects(
+                        body, unknown_wheels),
+                "mode-force byte adapter must reject unknown wheel history inputs");
+            viper::NcarBodyRuntimeObjectState unknown_body{};
+            require(!viper::make_ncar_integrator_mode_force_input_from_objects(
+                        unknown_body, wheels),
+                "mode-force byte adapter must reject an unknown PCAR mode field");
+        }
         {
             const viper::WheelTireAccumulatorInput defaults{};
             require(std::bit_cast<std::uint32_t>(

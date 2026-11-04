@@ -106,6 +106,15 @@ try {
         $tickHeader, 'integrator_wheel_scalar_negative_pair_gate_passed')
     $integratorWheelScalarTargetColumn = [Array]::IndexOf(
         $tickHeader, 'integrator_wheel_scalar_target_response')
+    $integratorModeForceColumns = @(
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_evaluated'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_supported'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_contact_gate'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_forward_gate'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_accumulated'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_x'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_y'),
+        [Array]::IndexOf($tickHeader, 'integrator_mode_force_z'))
     $bodyIntegratorTimerMissingOffsets = [int[]]::new(3)
     for ($lane = 0; $lane -lt 3; ++$lane) {
         $bodyIntegratorTimerMissingOffsets[$lane] = [Array]::IndexOf(
@@ -337,6 +346,7 @@ try {
         throw 'Fixed-step trace header is missing required input/timing fields'
     }
     if (@($bodyBasisColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($integratorModeForceColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($bodyPositionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($bodyMotionColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelActiveColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
@@ -407,6 +417,8 @@ try {
     $observedTireVectorStage = $false
     $observedWheelRateFinalization = $false
     $observedTireForceAccumulation = $false
+    $observedModeForceDispatch = $false
+    $observedSupportedModeForce = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
@@ -415,6 +427,29 @@ try {
         $fields = $replayedTickLines[$index].Split(',')
         if ($fields.Count -ne $tickHeader.Count) {
             throw "Fixed-step trace field count is invalid at line $($index + 1)"
+        }
+        if ($fields[$integratorModeForceColumns[0]] -ne '1') {
+            throw "Shared-integrator mode-force branch result is missing at line $($index + 1)"
+        }
+        $observedModeForceDispatch = $true
+        if ($fields[$integratorModeForceColumns[1]] -eq '1') {
+            $observedSupportedModeForce = $true
+            foreach ($column in $integratorModeForceColumns[5..7]) {
+                if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                    throw "Supported shared-integrator mode-force output is missing at line $($index + 1)"
+                }
+                $forceValue = [single]::Parse(
+                    $fields[$column], [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($forceValue) -or
+                    [single]::IsInfinity($forceValue)) {
+                    throw "Supported shared-integrator mode-force output is non-finite at line $($index + 1)"
+                }
+            }
+            if ($fields[$integratorModeForceColumns[4]] -eq '1' -and
+                ($fields[$integratorModeForceColumns[2]] -ne '1' -or
+                 $fields[$integratorModeForceColumns[3]] -ne '1')) {
+                throw "Shared-integrator mode force accumulated without both native gates at line $($index + 1)"
+            }
         }
         $outerUpdate = [long]::Parse($fields[0], [cultureinfo]::InvariantCulture)
         $tickSteering = [single]::Parse(
@@ -1039,8 +1074,16 @@ try {
     if (-not $observedTireForceAccumulation) {
         throw 'Fixed-step replay never accumulated a nonzero tire force into body force/moment state'
     }
+    if (-not $observedModeForceDispatch) {
+        throw 'Fixed-step replay did not record the shared-integrator mode-force dispatch'
+    }
 
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity, suspension, and all three reconstructed tire-force call sites reached body integration while route motion ran zero steps. Terrain misses cleared contact and reset suspension deterministically."
+    $modeForceSummary = if ($observedSupportedModeForce) {
+        'supported mode-force outputs were finite and gate-checked'
+    } else {
+        'mode-force branch was traced as unsupported for this race mode'
+    }
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity, suspension, and all three reconstructed tire-force call sites reached body integration while route motion ran zero steps. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

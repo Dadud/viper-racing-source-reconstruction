@@ -1471,8 +1471,9 @@ float of the wheel's `+0x8C` tire object, which is the quadratic coefficient
 written at tire-object `+0x00` by `0x435580`; the composition therefore takes
 `TireResponseCurveSet::quadratic.quadratic`. Only the standalone force helper
 requires the caller to provide this value. Evidence: `0x442530`
-`ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7` and
-the TIRE initializer/setter mapping above.
+`ev_6759c726d8701068a83e1faac987ee5a6eead35b89062328d7cc81b4c2174ad7` and`r`nthe TIRE initializer/setter mapping above.
+
+The live `0x431150` mode-force branch is now composed after the four wheel updates and before body integration. `make_ncar_integrator_mode_force_input_from_objects` reads mode `+0x4F4`, scales `+0xDCC/+0x500`, body transform/position/velocities, wheel contact `+0x168`, wheel history `+0x11C`, and the leading wheel damage bytes `+0x20` through initialization-aware readers. Unknown or non-finite supported-mode operands reject the input; modes other than 0 and 1 need only their initialized selector and produce no force. The body application point uses axis `+0x50` times native global `0x4C7DD4 = 70.0` (verified in the matching ISO `race.bin`, SHA-256 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`). Mode 1 scales that offset by `clamp(abs(dot(angular_velocity,+0x44))*2.5, 0.4, 1.0)` with the native projection operand grouping. Regressions cover mode 0/1 application points, force gates, and unavailable byte rejection. The selected eight-entrant Viper/Bemidji session carries mode 8 and correctly skips this branch; that route-free trace confirms dispatch selection, not a mode 0/1 live force.
 
 The four-wheel body-step API can now accept the four raw parsed `TireDefinition`
 records directly. With `derive_wheel_tire_setup` enabled, each wheel derives its

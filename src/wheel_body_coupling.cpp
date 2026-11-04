@@ -2375,6 +2375,86 @@ NcarAttachedObjectForceResult apply_ncar_attached_object_force(
     return result;
 }
 
+std::optional<NcarIntegratorModeForceInput>
+make_ncar_integrator_mode_force_input_from_objects(
+    const NcarBodyRuntimeObjectState& body,
+    const std::array<NcarWheelRuntimeObjectState, 4>& wheels) noexcept
+{
+    const auto read_body_float = [&body](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto mode_bits = read_ncar_body_object_u32(body, 0x4f4U);
+    if (!mode_bits) return std::nullopt;
+
+    NcarIntegratorModeForceInput input{};
+    input.mode_0x4f4 = std::bit_cast<std::int32_t>(*mode_bits);
+    if (input.mode_0x4f4 != 0 && input.mode_0x4f4 != 1) return input;
+
+    const auto force_scale = read_body_float(0xdccU);
+    const auto steering_scale = read_body_float(0x500U);
+    if (!force_scale || !steering_scale) return std::nullopt;
+    input.force_scale_0xdcc = *force_scale;
+    input.force_scale_0x500 = *steering_scale;
+
+    const auto read_body_vector = [&read_body_float](const std::uint32_t offset,
+                                                      PhysicsVector3& destination) {
+        const auto x = read_body_float(offset);
+        const auto y = read_body_float(offset + 4U);
+        const auto z = read_body_float(offset + 8U);
+        if (!x || !y || !z) return false;
+        destination = {*x, *y, *z};
+        return true;
+    };
+    if (!read_body_vector(0x234U, input.linear_velocity_0x234) ||
+        !read_body_vector(0x240U, input.angular_velocity_0x240) ||
+        !read_body_vector(0x038U, input.force_axis_0x38) ||
+        !read_body_vector(0x044U, input.body_axis_0x44) ||
+        !read_body_vector(0x050U, input.body_axis_0x50) ||
+        !read_body_vector(0x05cU, input.body_center)) {
+        return std::nullopt;
+    }
+    input.application_point = input.body_center;
+
+    for (std::size_t wheel = 0U; wheel < wheels.size(); ++wheel) {
+        const auto contact = read_ncar_wheel_object_u8(wheels[wheel], 0x168U);
+        const auto wear = read_ncar_wheel_object_u32(wheels[wheel], 0x11cU);
+        if (!contact || !wear ||
+            !std::isfinite(std::bit_cast<float>(*wear))) {
+            return std::nullopt;
+        }
+        input.contact_bytes[wheel] = *contact;
+        input.wear_value_bits[wheel] = *wear;
+        if (wheel < input.leading_wheel_damage_bytes.size()) {
+            const auto damage = read_ncar_wheel_object_u8(wheels[wheel], 0x20U);
+            if (!damage) return std::nullopt;
+            input.leading_wheel_damage_bytes[wheel] = *damage;
+        }
+    }
+
+    constexpr float native_application_point_scale = 70.0F;
+    auto application_point_scale = native_application_point_scale;
+    if (input.mode_0x4f4 == 1) {
+        // Match the x87 operand grouping at 0x431443..0x431455 before its
+        // single-precision local store, then the clamped scale at 0x431521.
+        const auto angular_projection =
+            (input.angular_velocity_0x240.x * input.body_axis_0x44.x +
+             input.angular_velocity_0x240.z * input.body_axis_0x44.z) +
+            input.angular_velocity_0x240.y * input.body_axis_0x44.y;
+        if (!std::isfinite(angular_projection)) return std::nullopt;
+        application_point_scale *= std::clamp(
+            std::fabs(angular_projection) * 2.5F, 0.4F, 1.0F);
+    }
+    input.application_point = {
+        input.body_center.x + input.body_axis_0x50.x * application_point_scale,
+        input.body_center.y + input.body_axis_0x50.y * application_point_scale,
+        input.body_center.z + input.body_axis_0x50.z * application_point_scale};
+    return input;
+}
+
 NcarIntegratorModeForceResult apply_ncar_integrator_mode_force(
     NcarForceMomentAccumulator& accumulator,
     const NcarIntegratorModeForceInput& input) noexcept

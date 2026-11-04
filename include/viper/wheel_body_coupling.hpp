@@ -401,6 +401,14 @@ struct NcarIntegratorModeForceResult {
     bool accumulated{};
 };
 
+// Builds the mode-force call inputs from the session-owned PCAR/wheel bytes.
+// Unsupported modes require only their initialized mode field; supported
+// modes fail closed when any native operand is unknown or non-finite.
+[[nodiscard]] std::optional<NcarIntegratorModeForceInput>
+make_ncar_integrator_mode_force_input_from_objects(
+    const NcarBodyRuntimeObjectState& body,
+    const std::array<NcarWheelRuntimeObjectState, 4>& wheels) noexcept;
+
 // Reconstructs the mode-0/mode-1 force branch in 0x431150; raw wear bit
 // comparisons and the call-site application point remain explicit.
 [[nodiscard]] NcarIntegratorModeForceResult apply_ncar_integrator_mode_force(
