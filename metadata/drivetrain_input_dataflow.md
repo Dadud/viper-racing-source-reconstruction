@@ -290,7 +290,12 @@ brake signal is fed from configured binding record `0x509368` through
 state, not safely assumed to be DIK_DOWN (`0xD0`). No checked-in original
 capture in this audit proves the selected brake key byte. Keep the probe
 throttle-only until the configured record layout and active selector have
-been recovered or directly observed. Future brake captures must report the
-selector read from the original binding record and demonstrate matching
-`0x509320` response before being accepted. The synthetic intervention remains
-distinct from physical keyboard delivery.
+been recovered or directly observed. The controlled probe now samples the
+first DWORD and selector byte at `0x509328` and `0x509368` into each PCAR event;
+its Node mock verifies the emitted record fields with a simulated key binding.
+This does not establish that those native record bytes are a key selector for
+every binding type, or that a brake intervention reaches `0x509320`. Future
+brake captures must first report a supported key-binding type, then use its
+recorded selector and demonstrate matching `0x509320` response before being
+accepted. Synthetic intervention remains distinct from physical keyboard
+delivery.

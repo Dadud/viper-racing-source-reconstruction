@@ -264,6 +264,9 @@ if(BUILD_TESTING)
         add_test(NAME pcar_source_field_watch_mock
             COMMAND "${VIPER_NODE_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/pcar_source_field_watch_mock.js")
+        add_test(NAME original_pcar_controlled_capture_mock
+            COMMAND "${VIPER_NODE_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/original_pcar_controlled_capture_mock.js")
     endif()
     add_executable(viper_network_session_regression tests/network_session_regression.cpp)
     target_link_libraries(viper_network_session_regression PRIVATE viper_network_session)

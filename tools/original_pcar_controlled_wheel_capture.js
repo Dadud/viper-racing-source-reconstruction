@@ -11,6 +11,7 @@ const at = va => engine.base.add(va - 0x400000);
 const safe = fn => { try { return fn(); } catch (_) { return null; } };
 const readFloat = (p, o) => safe(() => p.add(o).readFloat());
 const readU8 = (p, o) => safe(() => p.add(o).readU8());
+const readU32 = (p, o) => safe(() => p.add(o).readU32());
 const readPointer = (p, o) => safe(() => p.add(o).readPointer().toString());
 const vector = (p, o) => [readFloat(p, o), readFloat(p, o + 4), readFloat(p, o + 8)];
 const snapshotPairBlock = (body, offset, wheelEndpoints) => {
@@ -89,6 +90,10 @@ const controls = {
   throttle: at(0x5093f4),
   brake: at(0x509320),
 };
+const bindingRecords = {
+  throttle: at(0x509328),
+  brake: at(0x509368),
+};
 const phaseAt = t => t < inputStart ? "coast_before" :
   (t < inputEnd ? "throttle" : "coast_after");
 
@@ -140,6 +145,12 @@ const integratorListener = Interceptor.attach(at(0x431150), {
         throttle: readFloat(controls.throttle, 0),
         brake: readFloat(controls.brake, 0),
       },
+      configuredBindings: Object.fromEntries(Object.entries(bindingRecords).map(
+        ([name, record]) => [name, {
+          record: record.toString(),
+          type: readU32(record, 0),
+          selector: readU8(record, 4),
+        }])),
       before: snapshotBody(body),
       wheels: [],
     };
