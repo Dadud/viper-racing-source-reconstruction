@@ -1964,24 +1964,28 @@ PhysicsTrackServicePlan plan_physics_track_service(
         plan.allocation_bytes = 0x7dcU;
         plan.constructor_address = 0x0043c870U;
         plan.vtable_address = 0x004c84d8U;
+        plan.checkpoint_virtual_0x34_target = 0x0043cb10U;
         plan.post_load_virtual_0x0c_target = 0x0043cb20U;
         break;
     case 1:
         plan.allocation_bytes = 0x68U;
         plan.constructor_address = 0x0043bd10U;
         plan.vtable_address = 0x004c7810U;
+        plan.checkpoint_virtual_0x34_target = 0x0043be80U;
         plan.post_load_virtual_0x0c_target = 0x0043bee0U;
         break;
     case 3:
         plan.allocation_bytes = 0x68U;
         plan.constructor_address = 0x0043bd10U;
         plan.vtable_address = 0x004c7880U;
+        plan.checkpoint_virtual_0x34_target = 0x0043be80U;
         plan.post_load_virtual_0x0c_target = 0x0043bee0U;
         break;
     case 5:
         plan.allocation_bytes = 0x48U;
         plan.constructor_address = 0x0043c360U;
         plan.vtable_address = 0x004c8420U;
+        plan.checkpoint_virtual_0x34_target = 0x0043c3b0U;
         plan.post_load_virtual_0x0c_target = 0x0043c3c0U;
         break;
     default:
@@ -2015,6 +2019,67 @@ PhysicsTrackServicePlan plan_physics_track_service(
 
     plan.virtual_0x14_called = true;
     plan.status = PhysicsTrackServiceStatus::constructed;
+    return plan;
+}
+
+PhysicsTrackCheckpointDispatchPlan plan_physics_track_checkpoint_dispatch(
+    const PhysicsTrackCheckpointDispatchObservation& observation)
+{
+    PhysicsTrackCheckpointDispatchPlan plan{};
+    switch (observation.selector) {
+    case 0U:
+        plan.callback_address = 0x0043cb10U;
+        break;
+    case 1U:
+    case 3U:
+        plan.callback_address = 0x0043be80U;
+        break;
+    case 5U:
+        plan.callback_address = 0x0043c3b0U;
+        break;
+    default:
+        return plan;
+    }
+
+    if (!observation.receiver_nonnull) {
+        plan.status = PhysicsTrackCheckpointDispatchStatus::null_receiver_fault;
+        return plan;
+    }
+    plan.virtual_0x34_called = true;
+
+    if (observation.selector == 0U) {
+        // 0x43CB10 ignores its explicit checkpoint argument and only bumps
+        // the service object's DWORD at +0x34.
+        const auto count_after = observation.prior_service_count + 1U;
+        plan.service_count_after = count_after;
+        plan.object_writes.push_back({0x34U, count_after});
+    } else if (observation.selector == 1U || observation.selector == 3U) {
+        // 0x43BE80 stores the pointer in the next of three slots, then bumps
+        // the index at +0x50. Its overflow path formats a diagnostic first.
+        if (observation.prior_service_count < 3U) {
+            const auto pointer_offset = 0x44U +
+                observation.prior_service_count * 4U;
+            plan.object_writes.push_back(
+                {pointer_offset, observation.checkpoint_object_address});
+            plan.checkpoint_pointer_stored = true;
+        } else {
+            plan.formatted_reporter_called = true;
+            plan.formatted_reporter_address = 0x00410ea0U;
+            plan.format_string_address = 0x004d5b78U;
+            if (!observation.formatted_reporter_returned) {
+                plan.status = PhysicsTrackCheckpointDispatchStatus::
+                    formatted_reporter_did_not_return;
+                plan.formatted_reporter_did_not_return = true;
+                return plan;
+            }
+        }
+
+        const auto count_after = observation.prior_service_count + 1U;
+        plan.service_count_after = count_after;
+        plan.object_writes.push_back({0x50U, count_after});
+    }
+    // Selector 5's 0x43C3B0 callback is just `ret 4`.
+    plan.status = PhysicsTrackCheckpointDispatchStatus::dispatched;
     return plan;
 }
 

@@ -32,6 +32,11 @@ force remains a fidelity gap rather than a guessed formula. The sourced
 `0x43E7F0` per-wheel spin/contact moment is now read from byte-backed basis and
 wheel fields, accumulated in body moment state, and writes current spin to wheel
 `+0x13C`; fixed-step replay checks all four calls and finite/nonzero output.
+The CHKP constructor's virtual `+0x34` callback is now resolved through the
+selector-created service vtables: selector 0 increments service `+0x34`,
+selectors 1/3 retain up to three checkpoint pointers and increment `+0x50`,
+and selector 5's callback is a no-op. The service registrations still have no
+identified body-position, lap, or results consumer.
 Release `viper_game` build and route-free fixed-step replay passed on
 2026-11-03; the complete configured Release CTest suite subsequently passed
 69/69. These are implementation/regression checks, not original-game parity or

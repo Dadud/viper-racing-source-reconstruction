@@ -986,6 +986,7 @@ struct PhysicsTrackServicePlan {
     std::uint32_t allocation_bytes{};
     std::uint32_t constructor_address{};
     std::uint32_t vtable_address{};
+    std::uint32_t checkpoint_virtual_0x34_target{};
     std::uint32_t post_load_virtual_0x0c_target{};
     bool allocation_attempted{};
     bool constructor_called{};
@@ -993,6 +994,40 @@ struct PhysicsTrackServicePlan {
     bool continued_after_panic{};
     bool virtual_0x14_called{};
     bool virtual_call_has_null_object{};
+};
+
+struct PhysicsTrackObjectWrite {
+    std::uint32_t byte_offset{};
+    std::uint32_t value{};
+};
+
+enum class PhysicsTrackCheckpointDispatchStatus {
+    dispatched,
+    null_receiver_fault,
+    unsupported_selector,
+    formatted_reporter_did_not_return,
+};
+
+struct PhysicsTrackCheckpointDispatchObservation {
+    std::uint32_t selector{};
+    bool receiver_nonnull{};
+    std::uint32_t checkpoint_object_address{};
+    std::uint32_t prior_service_count{};
+    bool formatted_reporter_returned{};
+};
+
+struct PhysicsTrackCheckpointDispatchPlan {
+    PhysicsTrackCheckpointDispatchStatus status{
+        PhysicsTrackCheckpointDispatchStatus::unsupported_selector};
+    std::uint32_t callback_address{};
+    std::uint32_t formatted_reporter_address{};
+    std::uint32_t format_string_address{};
+    std::optional<std::uint32_t> service_count_after;
+    std::vector<PhysicsTrackObjectWrite> object_writes;
+    bool virtual_0x34_called{};
+    bool checkpoint_pointer_stored{};
+    bool formatted_reporter_called{};
+    bool formatted_reporter_did_not_return{};
 };
 
 enum class PhysicsTrackPostLoadStatus {
@@ -1006,11 +1041,6 @@ struct PhysicsTrackPostLoadObservation {
     std::uint32_t selector{};
     bool receiver_nonnull{};
     std::optional<std::array<std::uint32_t, 3>> fields_0x44_0x48_0x4c;
-};
-
-struct PhysicsTrackObjectWrite {
-    std::uint32_t byte_offset{};
-    std::uint32_t value{};
 };
 
 struct PhysicsTrackPostLoadPlan {
@@ -1067,6 +1097,13 @@ struct PhysicsTaskTableInitPlan {
     bool allocation_succeeded,
     bool constructor_returned_object,
     bool panic_reporter_returned) noexcept;
+
+// Projects the selector-specific virtual +0x34 call made by the CHKP
+// constructor. The callback's pointer/count stores are recovered; downstream
+// checkpoint and lap semantics remain outside this projection.
+[[nodiscard]] PhysicsTrackCheckpointDispatchPlan
+plan_physics_track_checkpoint_dispatch(
+    const PhysicsTrackCheckpointDispatchObservation& observation);
 
 // Each byte represents the low-byte success value returned by 0x4224D0 for
 // successive calls. The first false value ends the loop; the reader is called

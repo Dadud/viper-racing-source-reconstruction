@@ -77,6 +77,115 @@ std::uint32_t read_u32_le(const std::span<const std::byte> bytes,
 int main()
 {
     try {
+        const auto default_track_service = viper::plan_physics_track_service(
+            0U, true, true, true);
+        const auto alternate_track_service = viper::plan_physics_track_service(
+            1U, true, true, true);
+        const auto alternate_track_service_three = viper::plan_physics_track_service(
+            3U, true, true, true);
+        const auto auxiliary_track_service = viper::plan_physics_track_service(
+            5U, true, true, true);
+        require(default_track_service.vtable_address == 0x004c84d8U &&
+                    default_track_service.checkpoint_virtual_0x34_target ==
+                        0x0043cb10U &&
+                    alternate_track_service.vtable_address == 0x004c7810U &&
+                    alternate_track_service.checkpoint_virtual_0x34_target ==
+                        0x0043be80U &&
+                    alternate_track_service_three.vtable_address ==
+                        0x004c7880U &&
+                    alternate_track_service_three.checkpoint_virtual_0x34_target ==
+                        0x0043be80U &&
+                    auxiliary_track_service.vtable_address == 0x004c8420U &&
+                    auxiliary_track_service.checkpoint_virtual_0x34_target ==
+                        0x0043c3b0U,
+                "track service factory lost its recovered checkpoint callback targets");
+
+        const auto default_checkpoint_dispatch =
+            viper::plan_physics_track_checkpoint_dispatch({0U, true,
+                0x12345678U, 2U, false});
+        require(default_checkpoint_dispatch.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::dispatched &&
+                    default_checkpoint_dispatch.callback_address == 0x0043cb10U &&
+                    default_checkpoint_dispatch.service_count_after == 3U &&
+                    default_checkpoint_dispatch.object_writes.size() == 1U &&
+                    default_checkpoint_dispatch.object_writes[0].byte_offset == 0x34U &&
+                    default_checkpoint_dispatch.object_writes[0].value == 3U &&
+                    !default_checkpoint_dispatch.checkpoint_pointer_stored,
+                "selector-0 checkpoint callback must only increment service +0x34");
+
+        const auto alternate_checkpoint_first =
+            viper::plan_physics_track_checkpoint_dispatch({1U, true,
+                0x12345678U, 0U, false});
+        const auto alternate_checkpoint_second =
+            viper::plan_physics_track_checkpoint_dispatch({1U, true,
+                0x56781234U, 1U, false});
+        const auto alternate_checkpoint_third =
+            viper::plan_physics_track_checkpoint_dispatch({3U, true,
+                0x87654321U, 2U, false});
+        require(alternate_checkpoint_first.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::dispatched &&
+                    alternate_checkpoint_first.callback_address == 0x0043be80U &&
+                    alternate_checkpoint_first.checkpoint_pointer_stored &&
+                    alternate_checkpoint_first.object_writes.size() == 2U &&
+                    alternate_checkpoint_first.object_writes[0].byte_offset == 0x44U &&
+                    alternate_checkpoint_first.object_writes[0].value == 0x12345678U &&
+                    alternate_checkpoint_first.object_writes[1].byte_offset == 0x50U &&
+                    alternate_checkpoint_first.object_writes[1].value == 1U &&
+                    alternate_checkpoint_second.checkpoint_pointer_stored &&
+                    alternate_checkpoint_second.object_writes[0].byte_offset == 0x48U &&
+                    alternate_checkpoint_second.object_writes[0].value == 0x56781234U &&
+                    alternate_checkpoint_second.object_writes[1].byte_offset == 0x50U &&
+                    alternate_checkpoint_second.object_writes[1].value == 2U &&
+                    alternate_checkpoint_third.checkpoint_pointer_stored &&
+                    alternate_checkpoint_third.object_writes[0].byte_offset == 0x4cU &&
+                    alternate_checkpoint_third.object_writes[0].value == 0x87654321U &&
+                    alternate_checkpoint_third.object_writes[1].byte_offset == 0x50U &&
+                    alternate_checkpoint_third.object_writes[1].value == 3U,
+                "selector-1/3 checkpoint callback must retain three ordered pointers");
+
+        const auto checkpoint_overflow =
+            viper::plan_physics_track_checkpoint_dispatch({1U, true,
+                0xabcdef01U, 3U, true});
+        const auto checkpoint_overflow_fault =
+            viper::plan_physics_track_checkpoint_dispatch({3U, true,
+                0xabcdef01U, 3U, false});
+        require(checkpoint_overflow.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::dispatched &&
+                    checkpoint_overflow.formatted_reporter_called &&
+                    checkpoint_overflow.formatted_reporter_address == 0x00410ea0U &&
+                    checkpoint_overflow.format_string_address == 0x004d5b78U &&
+                    checkpoint_overflow.object_writes.size() == 1U &&
+                    checkpoint_overflow.object_writes[0].byte_offset == 0x50U &&
+                    checkpoint_overflow.object_writes[0].value == 4U &&
+                    checkpoint_overflow_fault.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::
+                        formatted_reporter_did_not_return &&
+                    checkpoint_overflow_fault.object_writes.empty() &&
+                    !checkpoint_overflow_fault.service_count_after.has_value(),
+                "checkpoint pointer overflow must follow the observed report-then-increment path");
+
+        const auto auxiliary_checkpoint_dispatch =
+            viper::plan_physics_track_checkpoint_dispatch({5U, true,
+                0x12345678U, 7U, false});
+        const auto null_checkpoint_dispatch =
+            viper::plan_physics_track_checkpoint_dispatch({0U, false,
+                0x12345678U, 7U, false});
+        const auto unknown_checkpoint_dispatch =
+            viper::plan_physics_track_checkpoint_dispatch({2U, true,
+                0x12345678U, 0U, false});
+        require(auxiliary_checkpoint_dispatch.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::dispatched &&
+                    auxiliary_checkpoint_dispatch.callback_address == 0x0043c3b0U &&
+                    auxiliary_checkpoint_dispatch.object_writes.empty() &&
+                    !auxiliary_checkpoint_dispatch.service_count_after.has_value() &&
+                    null_checkpoint_dispatch.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::null_receiver_fault &&
+                    !null_checkpoint_dispatch.virtual_0x34_called &&
+                    unknown_checkpoint_dispatch.status ==
+                    viper::PhysicsTrackCheckpointDispatchStatus::unsupported_selector &&
+                    !unknown_checkpoint_dispatch.virtual_0x34_called,
+                "null, unsupported, or selector-5 checkpoint dispatch was misclassified");
+
         constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 10> sizes{{
             {0x00434152U, 0x18CU}, // RAC\0
             {0x47434152U, 0x190U}, // GCAR

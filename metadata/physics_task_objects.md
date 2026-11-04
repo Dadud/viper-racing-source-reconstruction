@@ -258,12 +258,11 @@ using the record's degree value at `+0x24`. It stores the endpoint midpoint at
 intermediate observations. At `0x43A865..0x43A86E`, it loads the receiver
 from global `0x508A04` and calls that object's vtable slot `+0x34` with the
 new CHKP pointer. The receiver is the selector-created track service from
-`0x426000`; it is not the CHKP object itself. The service factory installs
-different vtables for selectors 0, 1, 3, and 5, so the slot target depends on
-the selected service class. Its implementation and any registration or
-progression effects remain unresolved. A null receiver is reported after the
-preceding geometry writes. Host trigonometry, x87 rounding, and Pentium-FDIV
-behavior are approximations.
+`0x426000`; it is not the CHKP object itself. The callback's selector-specific
+count/pointer stores are reconstructed in the service callback section below.
+A null receiver faults after the preceding geometry writes. The dispatch does
+not establish lap or results semantics. Host trigonometry, x87 rounding, and
+Pentium-FDIV behavior are approximations.
 Evidence: `0x43A620`,
 `ev_28f1d49ae0dce63fb5c471cd65da48e9a4cd1a72b586c3932cbffb431e7d1bf2`;
 cross product `0x434BF0`,
@@ -448,6 +447,32 @@ virtual `+0x14` call. For selectors 1 and 3, the initializer is a void helper
 and the pointer is installed directly after it, so no constructor return value
 is inferred. Allocation/constructor outcomes remain observations. Evidence:
 `0x426000`, `ev_2b5d1097e10c597fa911959cea8832d4fc90daf1d5a108167731b95dc8c346ae`.
+
+The CHKP constructor's subsequent global-service virtual `+0x34` dispatch is
+resolved by the selected service vtable. Selector 0 targets `0x43CB10` and
+increments service DWORD `+0x34`, ignoring the checkpoint pointer; selectors
+1 and 3 target `0x43BE80`, store the pointer in the next slot at
+`+0x44/+0x48/+0x4C` according to the count at `+0x50`, then increment that
+count. At count 3 or greater, `0x43BE80` calls formatted-error helper
+`0x410EA0` with format address `0x4D5B78` and increments only if that helper
+returns. Selector 5 targets
+`0x43C3B0`, which returns after cleaning the pointer argument and writes no
+service state. `plan_physics_track_checkpoint_dispatch` and the focused task
+stream regression cover these per-selector effects and failure gates. This
+models constructor registration/count behavior only; no body-position-to-lap
+or results consumer has been established. The vtable bytes are from the
+matching shipped `race.bin` image (SHA-256
+`f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
+
+| Selector | Service vtable | `+0x34` file offset | Target |
+|---:|---:|---:|---:|
+| 0 | `0x4C84D8` | `0xC770C` | `0x43CB10` |
+| 1 | `0x4C7810` | `0xC6A44` | `0x43BE80` |
+| 3 | `0x4C7880` | `0xC6AB4` | `0x43BE80` |
+| 5 | `0x4C8420` | `0xC7654` | `0x43C3B0` |
+
+The file offsets use the PE `.rdata` mapping in `metadata/pe_report.md`;
+target instructions are in `disasm/engine_.text.asm` at the listed addresses.
 
 The array loop is projected by `plan_physics_task_array_population`. It records
 the fixed `0x800`-byte allocation, the unconditional first reader call, count
