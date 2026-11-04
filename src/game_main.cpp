@@ -1756,81 +1756,21 @@ public:
         for (auto& sound : sounds_) {
             sound.target_volume = DSBVOLUME_MIN;
             if (FAILED(sound.buffer->SetVolume(DSBVOLUME_MIN)) ||
-                FAILED(sound.buffer->SetCurrentPosition(0U)) ||
-                FAILED(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING))) {
+                FAILED(sound.buffer->SetCurrentPosition(0U))) {
                 return false;
             }
         }
-        sounds_[idle_index_].target_volume = -850;
-        static_cast<void>(sounds_[idle_index_].buffer->SetVolume(-850));
         initialized_ = true;
         return true;
-    }
-
-    void update(const float speed, const bool accelerating) noexcept
-    {
-        if (!initialized_ || paused_ || sounds_.empty()) return;
-        const auto absolute_speed = std::abs(speed);
-        std::size_t desired = idle_index_;
-        // Temporary player-only speed band selection. The ESFX record is
-        // retained with each buffer, but its vehicle inputs remain unmapped.
-        if (accelerating || absolute_speed > 0.5F) {
-            const auto provisional_band = absolute_speed < 12.0F ? 0U :
-                absolute_speed < 25.0F ? 1U : 2U;
-            const auto band = std::min(provisional_band,
-                declared_band_count_ == 0U ? 0U : declared_band_count_ - 1U);
-            if (const auto found = band_indices_.find(band);
-                found != band_indices_.end()) {
-                desired = found->second;
-            } else if (!band_indices_.empty()) {
-                desired = band_indices_.rbegin()->second;
-            }
-        }
-
-        const float pitch = 1.0F + std::clamp(absolute_speed / 38.0F, 0.0F, 1.0F) * 0.45F;
-        const auto frequency = static_cast<DWORD>(std::clamp(
-            std::lround(static_cast<double>(sounds_[desired].sample_rate) * pitch),
-            static_cast<long>(DSBFREQUENCY_MIN), static_cast<long>(DSBFREQUENCY_MAX)));
-        for (std::size_t index = 0; index < sounds_.size(); ++index) {
-            const LONG volume = index == desired ? -850 : DSBVOLUME_MIN;
-            auto& sound = sounds_[index];
-            sound.target_volume = volume;
-            const auto volume_result = sound.buffer->SetVolume(volume);
-            if (volume_result == DSERR_BUFFERLOST) {
-                static_cast<void>(restore_and_play(sound));
-            }
-            if (index == desired) {
-                sound.target_frequency = frequency;
-                const auto frequency_result = sound.buffer->SetFrequency(frequency);
-                if (frequency_result == DSERR_BUFFERLOST) {
-                    static_cast<void>(restore_and_play(sound));
-                }
-            }
-        }
     }
 
     void set_paused(const bool paused) noexcept
     {
         if (!initialized_ || paused_ == paused) return;
         paused_ = paused;
-        for (auto& sound : sounds_) {
-            if (!sound.buffer) continue;
-            if (paused_) {
-                static_cast<void>(sound.buffer->Stop());
-            } else {
-                auto result = sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING);
-                if (result == DSERR_BUFFERLOST) {
-                    static_cast<void>(restore_and_play(sound));
-                    continue;
-                }
-                if (SUCCEEDED(result)) {
-                    static_cast<void>(sound.buffer->SetVolume(sound.target_volume));
-                    if (sound.target_frequency != 0U)
-                        static_cast<void>(sound.buffer->SetFrequency(
-                            sound.target_frequency));
-                }
-            }
-        }
+        if (!paused_) return;
+        for (auto& sound : sounds_)
+            if (sound.buffer) static_cast<void>(sound.buffer->Stop());
     }
 
     [[nodiscard]] std::size_t sound_count() const noexcept
@@ -1877,23 +1817,6 @@ private:
                 second_bytes);
         return SUCCEEDED(sound.buffer->Unlock(first_region, first_bytes,
             second_region, second_bytes));
-    }
-
-    static bool restore_buffer(Sound& sound) noexcept
-    {
-        if (!sound.buffer || FAILED(sound.buffer->Restore())) return false;
-        return copy_pcm_to_buffer(sound);
-    }
-
-    static bool restore_and_play(Sound& sound) noexcept
-    {
-        if (!restore_buffer(sound) ||
-            FAILED(sound.buffer->SetVolume(sound.target_volume)) ||
-            (sound.target_frequency != 0U &&
-             FAILED(sound.buffer->SetFrequency(sound.target_frequency)))) {
-            return false;
-        }
-        return SUCCEEDED(sound.buffer->Play(0U, 0U, DSBPLAY_LOOPING));
     }
 
     bool load_sound(const viper::ResourceBundle& bundle,
@@ -4219,8 +4142,6 @@ struct WindowState {
                 pose_buffer[player_car_index] = *player_simulated_pose;
         }
         if (update_graphics && !graphics.set_car_poses(pose_buffer)) return false;
-        audio.update(motion.race.finished ? 0.0F : motion.speed,
-            !motion.race.finished && accelerate);
         refresh_title();
         return true;
     }
@@ -5731,9 +5652,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::cerr << "DirectSound initialization or engine sample loading failed; "
                      "running without audio.\n";
     } else if (!smoke_frames || smoke_audio) {
-        std::cout << "DirectSound initialized with " << state.audio.sound_count()
-                  << " parsed SFX0 PCM engine resources ("
-                  << state.audio.band_count() << " ESFX bands).\n";
+        std::cout << "DirectSound loaded " << state.audio.sound_count()
+                  << " SFX0 PCM engine resources across "
+                  << state.audio.band_count()
+                  << " ESFX bands; playback is muted until native engine sound inputs are mapped.\n";
     }
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);

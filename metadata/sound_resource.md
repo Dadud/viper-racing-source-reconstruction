@@ -37,29 +37,24 @@ The Win32 runtime now requires the selected car's `%se.ens` `ESFX` setup and
 loads its idle `%si.sfx` resource plus exactly the declared band count. Each
 band tries `%s%d.sfx` first and `engine%d.sfx` second, matching the recovered
 native resource-name path. Every DirectSound band buffer retains its matching
-seven-float setup record. Band selection still uses provisional route-speed
-and throttle thresholds, and pitch still scales with route speed; native ESFX
-gain/frequency updates are not connected. The parser retains the declared
-count and opaque bytes after the records; Viper has three records and 140 tail
-bytes, while the other four cars have two records and 168 tail bytes. Missing
-setup, idle, or any declared band leaves audio disabled while the race can
-continue. `0x46C7A0` reads two values through vehicle virtual offsets `+0x48`
-and `+0x44`, then applies per-band data through `0x46CA10`. The PCAR getters
-map `+0x48` to body `+0xD70` and `+0x44` to `+0xDE0` or `+0xC34` depending on
-global `DAT_00508A40`; these sources' semantics and units are not fully tied to
-the reconstructed runtime. `+0xD70` still lacks a live producer, so the native
-update cannot yet replace the provisional playback path.
-`--smoke-audio --smoke-frames 30` initializes the DirectSound device and
-exercises buffer creation/play calls. On the current Windows setup, this smoke
-initialized Viper with four buffers (idle plus three bands) and Exotic, Plane,
-Sedan, and Sports with three each (idle plus two bands); all five commands
-returned successfully. If a playback operation reports `DSERR_BUFFERLOST`, the
-runtime now restores the buffer's PCM, reapplies its last requested volume and
-frequency, and restarts looping playback. Pause/resume also reapplies those
-cached settings. This recovery path has build and general-suite coverage but
-does not yet have a simulated lost-buffer test. Existing smoke runs do not
-capture speaker output or compare timing and pitch against the original. The separate top-level
-`trk2.sfx` file's `MGI!` payload remains unparsed.
+seven-float setup record, but
+none is started and all volumes remain at the DirectSound minimum. The previous
+route-speed/throttle band selector and route-speed pitch scaling were removed:
+these are not the native ESFX inputs. `0x46C7A0` reads vehicle values through
+virtual offsets `+0x48` and `+0x44`, then applies per-band data through
+`0x46CA10`. The PCAR getters map `+0x48` to body `+0xD70` and `+0x44` to
+`+0xDE0` or `+0xC34` depending on global `DAT_00508A40`; the reconstruction
+still lacks those correctly sourced runtime values and the live `+0xD70`
+producer. Audio resources load, but engine playback remains muted pending that
+mapping.
+`--smoke-audio --smoke-frames 30` initializes DirectSound and exercises resource
+and PCM-buffer creation only. Current runs load Viper's four resources (idle plus
+three bands), and Exotic, Plane, Sedan, and Sports' three resources each (idle
+plus two bands); these checks do not start playback or establish audible
+behavior. Previous looped playback and its buffer-loss recovery were removed
+with the unsupported route-speed/throttle heuristic. Speaker output capture and
+comparison remain open. The separate top-level `trk2.sfx` file's `MGI!` payload
+remains unparsed.
 
 ### Native vehicle values used by ESFX playback
 

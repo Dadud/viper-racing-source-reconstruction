@@ -594,12 +594,12 @@ two bands and 168 trailing bytes. Native `0x46C410` copies the seven
 record values into manager state in this order: fields 3, 4, 5, 6, 1, 2, 0.
 The current runtime parses this setup, requires the idle sample, loads each
 declared band using the native name/fallback order, and retains its seven
-floats beside the DirectSound buffer. Its band selection and pitch still use
-provisional route speed/throttle inputs; the native vehicle values are not yet
-connected. In particular, `+0xD70` has no live producer in the reconstruction,
-and the native getter's `+0xDE0`/`+0xC34` selection still needs correct runtime
-state ownership. All five cars have passed bounded DirectSound startup smoke,
-which verifies resource/buffer initialization but not audible parity. Evidence IDs:
+floats beside the DirectSound buffer. Those buffers are kept stopped and muted;
+the previous route-speed/throttle band selector was removed because the native
+manager reads body `+0xD70` and `+0xDE0` or `+0xC34`, whose runtime sources are
+not yet connected. All five cars pass bounded DirectSound resource/buffer
+initialization smoke, which does not start playback or establish audible
+parity. Evidence IDs:
 `ev_f5ee7b4ebd6c8e0d68ffdb0224d85bf883046a27e5b16642e7fb67ac89e34236`
 (`0x46C410`), `ev_f86b4719b9039a7866207664763dbe8a6fbda6300526ef0b1ab25dc20f5de927`
 (`0x46C7A0`), `ev_92cd5da97ed44864efc27dc372f8558d6815fc2f90583ddc019bf39e83564583`
@@ -613,14 +613,15 @@ accepts only consistent integer PCM headers and returns the declared sample
 span separately from remaining opaque bytes. Every `SFX0` entry in the five
 shipped car bundles passes the check; each has a 4,098-byte opaque tail.
 `viper.car` is tied to SHA-256
-`840AE64A76DAB82D81CDCDD91547664CCAC25FD265A21220CAC4F43A4F8D175A`. The
-current Win32 runtime creates DirectSound PCM buffers for the selected car's
-idle and available numbered engine samples, loops them, selects a sample band
-using provisional speed/throttle thresholds, and changes pitch with speed.
-The `vipere.ens` seven-float setup values are not yet parsed or used by the
-runtime. DirectSound startup and buffer-play calls succeeded in a 30-frame
-Viper/Bemidji audio smoke run; audible output, native band mixing, other sound
-classes, and original-versus-reconstruction capture remain unverified.
+`840AE64A76DAB82D81CDCDD91547664CCAC25FD265A21220CAC4F43A4F8D175A`.
+The current Win32 runtime creates DirectSound PCM buffers for the selected
+car's idle and available numbered engine samples, fills them from the parsed PCM
+resources, and leaves them stopped at minimum volume. The `vipere.ens`
+seven-float setup values are parsed and retained with each band, but the native
+vehicle inputs and mixer are not yet connected. A Viper/Bemidji audio smoke run
+confirmed resource loading and buffer creation only; it did not play or capture
+speaker output. Other sound classes and original-versus-reconstruction capture
+remain unverified.
 
 The car vtable at `0x4C7F20` has `0x431150` at byte offset `+8`. The entity
 iteration in `0x45BD20` dispatches the `+8` method for each listed entity. In
