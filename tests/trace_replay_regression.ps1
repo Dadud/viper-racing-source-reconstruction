@@ -142,6 +142,13 @@ try {
     $bodyWheelPairScaleColumns = @(
         [Array]::IndexOf($tickHeader, 'body_wheel_pair_scale_0xdd4'),
         [Array]::IndexOf($tickHeader, 'body_wheel_pair_scale_0xdd8'))
+    $bodyConstructorGeometryColumns = @(
+        [Array]::IndexOf($tickHeader, 'body_constructor_0xd7c'),
+        [Array]::IndexOf($tickHeader, 'body_constructor_0xd80'),
+        [Array]::IndexOf($tickHeader, 'body_constructor_0xd84'),
+        [Array]::IndexOf($tickHeader, 'body_constructor_0xd88'),
+        [Array]::IndexOf($tickHeader, 'body_constructor_0xd8c'),
+        [Array]::IndexOf($tickHeader, 'body_constructor_0xd90'))
     $bodyKinematicsReadyColumn = [Array]::IndexOf(
         $tickHeader, 'body_kinematics_input_ready')
     $bodyKinematicsNonFiniteColumn = [Array]::IndexOf(
@@ -490,7 +497,8 @@ try {
         }).Count -gt 0 -or
         @($wheelContactGeometryColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
-        }).Count -gt 0) {
+        }).Count -gt 0 -or
+        @($bodyConstructorGeometryColumns | Where-Object { $_ -lt 0 }).Count -gt 0) {
         throw 'Fixed-step trace header is missing body or wheel state fields'
     }
     $expectedTick = 0
@@ -520,6 +528,26 @@ try {
         $fields = $replayedTickLines[$index].Split(',')
         if ($fields.Count -ne $tickHeader.Count) {
             throw "Fixed-step trace field count is invalid at line $($index + 1)"
+        }
+        $constructorValues = [single[]]::new($bodyConstructorGeometryColumns.Count)
+        for ($constructorIndex = 0;
+             $constructorIndex -lt $bodyConstructorGeometryColumns.Count;
+             ++$constructorIndex) {
+            $constructorText = $fields[$bodyConstructorGeometryColumns[$constructorIndex]]
+            if ([string]::IsNullOrWhiteSpace($constructorText)) {
+                throw "PCAR constructor field +0x$('{0:X}' -f (0xd7c + 4 * $constructorIndex)) is unavailable at line $($index + 1)"
+            }
+            $constructorValues[$constructorIndex] = [single]::Parse(
+                $constructorText, [cultureinfo]::InvariantCulture)
+            if ([single]::IsNaN($constructorValues[$constructorIndex]) -or
+                [single]::IsInfinity($constructorValues[$constructorIndex])) {
+                throw "PCAR constructor field +0x$('{0:X}' -f (0xd7c + 4 * $constructorIndex)) is non-finite at line $($index + 1)"
+            }
+        }
+        if ($constructorValues[0] -ne 0.0 -or
+            $constructorValues[3] -ne 0.0 -or
+            $constructorValues[1] -ne $constructorValues[4]) {
+            throw "PCAR constructor body fields do not match recovered 0x433C00 stores at line $($index + 1)"
         }
         if ([string]::IsNullOrWhiteSpace($fields[$pcarCurveGetterColumn]) -or
             [string]::IsNullOrWhiteSpace($fields[$pcarBodySampleColumn]) -or
