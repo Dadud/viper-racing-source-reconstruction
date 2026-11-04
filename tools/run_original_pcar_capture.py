@@ -24,6 +24,8 @@ from pathlib import Path
 EXPECTED_ISO_RACE_SHA256 = "f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56"
 EXPECTED_LAUNCHER_SHA256 = "d75b38228d4b68b2c5ef39252b95e43a9de16976005c26fab4491d05ce3d32d4"
 HOST_TIMEOUT_SECONDS = 180
+DEFAULT_STARTUP_WINDOW_SECONDS = 15
+MAX_STARTUP_WINDOW_SECONDS = 300
 CANARY_SEMAPHORE_NAME = "MGI Viper Racing 1998 Canary"
 
 
@@ -146,6 +148,52 @@ def query_process_exit_status(process_id: int) -> dict[str, object]:
                 "process_still_active": value.value == 259}
     finally:
         kernel32.CloseHandle(handle)
+
+
+def active_capture_target_names(processes: list[object],
+                                status_query=query_process_exit_status) -> list[str]:
+    """Ignore stale Frida process entries after verifying OS exit status.
+
+    A detached session can leave a terminated target in Frida's enumeration
+    briefly. Unknown status remains a refusal so the runner never attaches to
+    a target whose liveness could not be checked.
+    """
+    names = []
+    for process in processes:
+        name = str(getattr(process, "name", ""))
+        if name.lower() not in {"race.bin", "viper racing.exe"}:
+            continue
+        process_id = int(getattr(process, "pid"))
+        status = status_query(process_id)
+        if status.get("process_still_active") is not False:
+            names.append(name)
+    return names
+
+
+def cleanup_capture_instrumentation(sessions: list[object | None],
+                                   scripts: list[object]) -> None:
+    """Detach sessions before unloading scripts to avoid stale-session hangs."""
+    for session in sessions:
+        if session is None:
+            continue
+        try:
+            session.detach()
+        except Exception:
+            pass
+    for script in scripts:
+        try:
+            script.unload()
+        except Exception:
+            pass
+
+
+def capture_wait_seconds(startup_only: bool, startup_window_seconds: int) -> int:
+    if not startup_only:
+        return HOST_TIMEOUT_SECONDS
+    if not 1 <= startup_window_seconds <= MAX_STARTUP_WINDOW_SECONDS:
+        raise ValueError(
+            f"startup window must be between 1 and {MAX_STARTUP_WINDOW_SECONDS} seconds")
+    return startup_window_seconds
 
 
 def resume_thread_until_running(thread_id: int, maximum_calls: int = 16) -> dict[str, object]:
@@ -300,6 +348,9 @@ def main() -> int:
                         help="allow active effects/music settings only with the in-process DirectSound volume clamp")
     parser.add_argument("--startup-only", action="store_true",
                         help="load only startup video-memory and process-exit observers; omit PCAR probes")
+    parser.add_argument("--startup-window-seconds", type=int,
+                        default=DEFAULT_STARTUP_WINDOW_SECONDS,
+                        help="bounded --startup-only observation window (1..300 seconds; default 15)")
     parser.add_argument("--include-pcar-source-watch", action="store_true",
                         help="with --startup-only, add the exact PCAR constructor write watcher")
     parser.add_argument("--include-controlled-wheel-capture", action="store_true",
@@ -310,6 +361,11 @@ def main() -> int:
                         help="sample the launcher-created engine thread PC/SP at 10 Hz for 10 seconds")
     args = parser.parse_args()
     launcher_arguments = resolve_launcher_arguments(args.launcher_arg)
+    try:
+        wait_seconds = capture_wait_seconds(
+            args.startup_only, args.startup_window_seconds)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
 
     game_root = args.game_root.resolve(strict=True)
     race_bin = (game_root / "Data" / "race.bin").resolve(strict=True)
@@ -384,10 +440,8 @@ def main() -> int:
     shutdown_requested_processes: set[int] = set()
     output_lock = threading.Lock()
     device = frida.get_local_device()
-    existing_game_processes = [
-        process.name for process in device.enumerate_processes()
-        if process.name.lower() in {"race.bin", "viper racing.exe"}
-    ]
+    existing_game_processes = active_capture_target_names(
+        device.enumerate_processes())
     if existing_game_processes:
         raise SystemExit(
             "An original game process is already running; refusing to attach or launch: "
@@ -429,7 +483,7 @@ def main() -> int:
         "launch_mode": "direct_engine" if args.direct_engine else "official_launcher",
         "launcher_arguments": list(launcher_arguments),
         "agents": {name: str(path) for name, path in agents.items()},
-        "host_timeout_seconds": 15 if args.startup_only else HOST_TIMEOUT_SECONDS,
+        "host_timeout_seconds": wait_seconds,
     })
 
     def on_message(agent_name: str):
@@ -550,7 +604,6 @@ def main() -> int:
         record({"event": "capture_agents_loaded", "pid": child_pid,
                 "process_silent_audio": args.process_silent_audio,
                 "host_utc": datetime.now(timezone.utc).isoformat()})
-        wait_seconds = 15 if args.startup_only else HOST_TIMEOUT_SECONDS
         if args.direct_engine:
             device.resume(child_pid)
             record({"event": "direct_engine_resumed", "pid": child_pid,
@@ -597,21 +650,8 @@ def main() -> int:
                     "host_utc": datetime.now(timezone.utc).isoformat()})
             if still_active:
                 print(f"Stopped capture process pid={process_id}; terminated={stopped}", flush=True)
-        for script in child_scripts + launcher_scripts:
-            try:
-                script.unload()
-            except Exception:
-                pass
-        if child_session is not None:
-            try:
-                child_session.detach()
-            except Exception:
-                pass
-        if launcher_session is not None:
-            try:
-                launcher_session.detach()
-            except Exception:
-                pass
+        cleanup_capture_instrumentation(
+            [child_session, launcher_session], child_scripts + launcher_scripts)
         if launcher_handles is not None:
             kernel32, process_handle, thread_handle = launcher_handles
             for handle in (thread_handle, process_handle):

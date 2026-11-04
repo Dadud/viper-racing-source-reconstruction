@@ -51,13 +51,15 @@ function hookDirectDrawInterface(object, discoveredBy) {
     if (!hookedQueryInterfaceMethods.has(queryKey)) {
       Interceptor.attach(queryInterface, {
         onEnter(args) {
-          this.queryObject = this.context.ecx.toString();
+          // DirectDraw exposes COM's x86 STDMETHODCALLTYPE ABI: this is
+          // argument zero on the stack, not the ECX register.
+          this.queryObject = args[0].toString();
           if (!knownDirectDrawObjects.has(this.queryObject)) return;
-          this.output = args[1];
+          this.output = args[2];
           this.capture = true;
           send({ event: "directdraw_query_interface_enter",
             object: this.queryObject,
-            iid_words: readWords(args[0], 4) });
+            iid_words: readWords(args[1], 4) });
         },
         onLeave(result) {
           if (!this.capture) return;
@@ -83,16 +85,18 @@ function hookDirectDrawInterface(object, discoveredBy) {
     if (!hookedEnumDisplayModesMethods.has(enumKey)) {
       Interceptor.attach(enumDisplayModes, {
         onEnter(args) {
-          this.enumObject = this.context.ecx.toString();
+          // IDirectDraw methods also use STDMETHODCALLTYPE; stack args are
+          // [this, flags, descriptor, callback context, callback].
+          this.enumObject = args[0].toString();
           if (!knownDirectDrawObjects.has(this.enumObject)) return;
           this.capture = true;
           send({ event: "directdraw_enum_display_modes_enter",
             object: this.enumObject,
-            flags: args[0].toUInt32(),
-            descriptor: args[1].isNull() ? null : args[1].toString(),
-            descriptor_words: args[1].isNull() ? null : readWords(args[1], 27),
-            callback_context: args[2].toString(),
-            callback: args[3].toString() });
+            flags: args[1].toUInt32(),
+            descriptor: args[2].isNull() ? null : args[2].toString(),
+            descriptor_words: args[2].isNull() ? null : readWords(args[2], 27),
+            callback_context: args[3].toString(),
+            callback: args[4].toString() });
         },
         onLeave(result) {
           if (!this.capture) return;

@@ -172,16 +172,31 @@ only its launcher after the engine's natural exit and detached the ISO.
 These are original startup diagnostics only. They do not establish a completed
 original race or resolve reconstruction gameplay gaps.
 
-The `132548Z` trace also captured the complete `0x458D60` request descriptor:
+The `132548Z` trace captured the complete `0x458D60` request descriptor:
 size `0x6c`, flags `0x1001`, `DDPF_RGB` (`0x40`), 16 bits per pixel, no width or
-height filter, and caps `0x2000`. The trace proves the engine's `0x44EE00`
-callback was not entered in that run. It does not prove whether the COM
-`EnumDisplayModes` method ran, nor that Windows DirectDraw lacks a matching
-mode. The startup cause therefore remains unresolved. The passive trace now
-hooks `DirectDrawCreate`, follows its returned COM interface and instruments
-the verified `IDirectDraw::EnumDisplayModes` vtable slot; its mock checks that
-discovery path. A new original capture is pending because Frida is not
-available in the current Python environment.
+height filter, and caps `0x2000`. The corrected `134908Z` trace follows
+`DirectDrawCreate` and `QueryInterface` to the DirectDraw2 object, then records
+the actual `EnumDisplayModes` call with flags zero, that descriptor, null
+context, and callback `0x44EE00`. The method returns `S_OK` and invokes no
+callback. A matched x86 probe using the same interface, descriptor, and null
+context returns the same result. Its unfiltered call returns 23 modes, all 32
+bpp, with no 640x480x16 mode; the exact filtered call returns zero callbacks.
+Probe source and output remain external at
+`../../analysis/reference_captures/silent_reference_copy_20261104/ddraw_mode_probe/`.
+This explains the required 640x480 mode failure on the current host. Earlier
+2025 captures that enumerated 640x480x16 remain valid for their different host
+state.
+
+An earlier capture-only experiment invoked the engine's mode callback once
+using a copied 640x480 descriptor after the real `S_OK`/zero-callback result.
+In `135804Z`, the mode flag changed to one and `SetCooperativeLevel` returned
+`S_OK`, but the 15-second run produced no PCAR tick or video-memory query. The
+synthetic callback experiment was removed from the active capture toolchain:
+an older, independently validated trace already reaches the original main
+menu and race scene with a bounded first-query video-memory override. Keep
+that known-good capture path as the reference and record the DirectDraw mode
+list as a host limitation; do not interpret callback injection as native
+mode availability or original behavior.
 
 A child-only override probes
 `../../analysis/reference_captures/vidmem_override_20261025T031500Z.json`

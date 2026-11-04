@@ -15,24 +15,33 @@ The `0x458D60` EnumDisplayModes wrapper returned `S_OK` (`0`), but the engine's
 zero. The original child then exited naturally with code 5 before video-memory
 classification and before gameplay. In `132548Z`, the wrapper's request record
 was `0x6c` bytes with flags `0x1001`, `DDPF_RGB` (`0x40`), 16 bits per pixel,
-zero width/height filters, and surface caps `0x2000`. The capture observes the
-engine callback was not entered; it does not identify whether the underlying
-COM method was called or why no callback arrived. The required-resolution
-enumeration gate remains the startup boundary, while the cause is unresolved.
-Exact logs are
+zero width/height filters, and surface caps `0x2000`. The corrected
+`134908Z` capture hooks the actual `IDirectDraw2::EnumDisplayModes` method: it
+receives that descriptor, flags zero, context null, and callback `0x44EE00`,
+then returns `S_OK` without invoking the callback. A matched x86 DirectDraw2
+probe in `analysis/reference_captures/silent_reference_copy_20261104/ddraw_mode_probe`
+reproduces the request with zero callbacks; unfiltered enumeration returns 23
+modes, all 32 bpp and none 640x480x16. The required-mode failure on this host
+is therefore explained by its DirectDraw mode list, not a skipped engine call.
+The probe source and output are external to the repository. Exact logs are
 external: `../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T130830Z.jsonl`
 and `../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T131253Z.jsonl`.
-The full descriptor is in `132548Z`. A passive follow-up trace now starts at
-`DirectDrawCreate`, discovers the returned interface and hooks its verified
-`IDirectDraw::EnumDisplayModes` vtable slot, so a next capture can distinguish
-the COM call/return from the engine wrapper and callback. Its Node mock covers
-interface discovery and call-event wiring. The current host lacks an importable
-Frida Python package, so this new hook has not yet been exercised in another
-original-client run. The runner stopped the launcher it created and detached
-the ISO after the prior captures.
+The full descriptor is in `132548Z` and the actual COM call is in `134908Z`.
+A passive follow-up trace starts at `DirectDrawCreate`, discovers the returned
+interface and hooks its verified `IDirectDraw::EnumDisplayModes` vtable slot.
+Its Node mock covers interface discovery and call-event wiring. A research
+capture-only callback shim injected one 640x480 callback after the real
+S_OK/no-callback result; the mode flag changed and `SetCooperativeLevel`
+returned S_OK. That 15-second follow-up did not reach a PCAR constructor/tick
+or a video-memory query. It adds no path to the known-good earlier capture,
+which already reached the original race scene using a first-query video-memory
+override, so the unused shim and its test were removed from the active capture
+toolchain. The runner filters stale Frida process entries using OS liveness and
+detaches sessions before unloading scripts.
 
 The passive sampler and its runner wiring are covered by a Node mock and
-capture-config regression; all five focused capture CTests passed. This
+capture-config regression; all six active focused capture CTests passed after
+removing the unused synthetic callback mock. This
 validates the instrumentation path only.
 
 Two launcher capture attempts with active effects/music settings

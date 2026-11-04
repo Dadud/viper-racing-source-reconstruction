@@ -62,19 +62,33 @@ memory.set(0x1000n, 0x2000n); // DirectDrawCreate output -> IDirectDraw object
 memory.set(0x2000n, 0x3000n); // object -> vtable
 memory.set(0x3000n, 0x4000n); // IUnknown::QueryInterface
 memory.set(0x3020n, 0x5000n); // IDirectDraw::EnumDisplayModes (slot 8)
+memory.set(0x1100n, 0x2100n); // QueryInterface output -> IDirectDraw2 object
+memory.set(0x2100n, 0x3100n); // IDirectDraw2 object -> vtable
+memory.set(0x3100n, 0x4000n); // IUnknown::QueryInterface
+memory.set(0x3120n, 0x5100n); // IDirectDraw2::EnumDisplayModes (slot 8)
 const createContext = {};
 directDrawCreate.onEnter.call(createContext, [pointer(0n), pointer(0x1000n)]);
 directDrawCreate.onLeave.call(createContext, pointer(0n));
 assert(events.some(event => event.event === "directdraw_interface_observed" &&
     event.object === "0x2000" && event.enum_display_modes === "0x5000"));
-assert(hooks.has("0x4000"), "QueryInterface should be hooked on the discovered interface");
-const realEnum = hooks.get("0x5000");
-assert(realEnum, "EnumDisplayModes should be hooked on the discovered interface");
-const realEnumContext = { context: { ecx: pointer(0x2000n) } };
-realEnum.onEnter.call(realEnumContext,
-    [pointer(0n), pointer(0x6000n), pointer(0x7000n), pointer(0x44ee00n)]);
+const queryInterface = hooks.get("0x4000");
+assert(queryInterface, "QueryInterface should be hooked on the discovered interface");
+const queryContext = {};
+queryInterface.onEnter.call(queryContext,
+    [pointer(0x2000n), pointer(0x8000n), pointer(0x1100n)]);
+queryInterface.onLeave.call(queryContext, pointer(0n));
+assert(events.some(event => event.event === "directdraw_query_interface_return" &&
+    event.object === "0x2000" && event.returned_object === "0x2100"));
+assert(events.some(event => event.event === "directdraw_interface_observed" &&
+    event.object === "0x2100" && event.enum_display_modes === "0x5100"));
+const realEnum = hooks.get("0x5100");
+assert(realEnum, "EnumDisplayModes should be hooked on the queried interface");
+realEnum.onEnter.call({},
+    [pointer(0x2100n), pointer(0n), pointer(0x6000n),
+      pointer(0x7000n), pointer(0x44ee00n)]);
 assert(events.some(event => event.event === "directdraw_enum_display_modes_enter" &&
-    event.object === "0x2000" && event.descriptor === "0x6000" &&
+    event.object === "0x2100" && event.flags === 0 &&
+    event.descriptor === "0x6000" &&
     event.callback === "0x44ee00"));
 
 const modeEnumeration = hooks.get("0x44eeb0");

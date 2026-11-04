@@ -19,6 +19,52 @@ query_process_exit_status = runner_functions["query_process_exit_status"]
 terminate_owned_process = runner_functions["terminate_owned_process"]
 resume_thread_until_running = runner_functions["resume_thread_until_running"]
 resolve_launcher_arguments = runner_functions["resolve_launcher_arguments"]
+active_capture_target_names = runner_functions["active_capture_target_names"]
+cleanup_capture_instrumentation = runner_functions["cleanup_capture_instrumentation"]
+capture_wait_seconds = runner_functions["capture_wait_seconds"]
+
+class ProcessRecord:
+    def __init__(self, pid: int, name: str):
+        self.pid = pid
+        self.name = name
+
+process_records = [
+    ProcessRecord(10, "race.bin"),
+    ProcessRecord(11, "Viper Racing.exe"),
+    ProcessRecord(12, "explorer.exe"),
+]
+assert active_capture_target_names(
+    process_records,
+    lambda pid: {"process_still_active": pid == 11}) == ["Viper Racing.exe"]
+assert active_capture_target_names(
+    [process_records[0]], lambda _: {"query_error": 5}) == ["race.bin"]
+
+cleanup_calls = []
+class Session:
+    def __init__(self, name: str):
+        self.name = name
+    def detach(self):
+        cleanup_calls.append("detach:" + self.name)
+class Script:
+    def __init__(self, name: str):
+        self.name = name
+    def unload(self):
+        cleanup_calls.append("unload:" + self.name)
+cleanup_capture_instrumentation(
+    [Session("child"), None, Session("launcher")],
+    [Script("child-script"), Script("launcher-script")])
+assert cleanup_calls == [
+    "detach:child", "detach:launcher", "unload:child-script",
+    "unload:launcher-script"]
+assert capture_wait_seconds(False, 0) == 180
+assert capture_wait_seconds(True, 15) == 15
+assert capture_wait_seconds(True, 60) == 60
+try:
+    capture_wait_seconds(True, 301)
+except ValueError as error:
+    assert "between 1 and 300 seconds" in str(error)
+else:
+    raise AssertionError("capture runner accepted an unbounded startup window")
 
 with tempfile.TemporaryDirectory(prefix="viper_capture_paths_") as temporary:
     root = Path(temporary) / "GameRoot"
