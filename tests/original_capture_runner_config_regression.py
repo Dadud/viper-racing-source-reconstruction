@@ -59,6 +59,9 @@ assert cleanup_calls == [
 assert capture_wait_seconds(False, 0) == 180
 assert capture_wait_seconds(True, 15) == 15
 assert capture_wait_seconds(True, 60) == 60
+assert capture_wait_seconds(True, 15, include_pcar_source_watch=True) == 122
+assert capture_wait_seconds(True, 60, include_pcar_source_watch=True) == 122
+assert capture_wait_seconds(True, 180, include_pcar_source_watch=True) == 180
 try:
     capture_wait_seconds(True, 301)
 except ValueError as error:

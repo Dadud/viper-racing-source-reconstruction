@@ -194,7 +194,10 @@ write watchpoints for both fields at PCAR constructor `0x4381E0`, using its
 `ECX` body pointer. The constructor-thread watchpoints remain armed after
 constructor return and through setup callbacks until selected-integrator
 sampling or capture cleanup, covering writes between construction and the
-first tick. It records every callback body with PCAR vtable `0x4C8188` and its
+first tick. The probe's bounded observation is 120 seconds; when selected with
+`--startup-only --include-pcar-source-watch`, the capture runner now extends a
+shorter requested startup window to 122 seconds so it can receive the probe's
+completion event and tear down cleanly. It records every callback body with PCAR vtable `0x4C8188` and its
 `+0x510` ordinal; the first body is only provisional. The completion event
 marks the capture valid only if exactly one callback body was observed, it
 matches a constructor watch retained after return, a selected integrator sample

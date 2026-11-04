@@ -13,6 +13,14 @@ and unreported same-value single-step events. Its focused Release CTest passed
 1/1. This repairs probe classification only; native Frida watchpoint behavior
 and PCAR field provenance remain unverified.
 
+The startup capture runner now respects the exact-write agent's full
+120-second observation period: if `--include-pcar-source-watch` is selected
+with a shorter startup window, it waits 122 seconds, including a two-second
+completion margin. The runner regression covers both the enforced minimum and
+longer requested windows. This prevents a nominal 15-second startup capture
+from terminating the target before the constructor-to-first-tick watch can
+finish; it does not overcome the current host's DirectDraw startup limitation.
+
 The 15-second startup capture at `130140Z` did not execute the engine: the
 launcher bridge created the child suspended, while the host waited 15 seconds
 and the bridge fallback resume was 30 seconds. The 100 identical Frida thread

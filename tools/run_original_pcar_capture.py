@@ -26,6 +26,8 @@ EXPECTED_LAUNCHER_SHA256 = "d75b38228d4b68b2c5ef39252b95e43a9de16976005c26fab449
 HOST_TIMEOUT_SECONDS = 180
 DEFAULT_STARTUP_WINDOW_SECONDS = 15
 MAX_STARTUP_WINDOW_SECONDS = 300
+PCAR_SOURCE_WATCH_DURATION_SECONDS = 120
+CAPTURE_AGENT_FINISH_MARGIN_SECONDS = 2
 CANARY_SEMAPHORE_NAME = "MGI Viper Racing 1998 Canary"
 
 
@@ -187,13 +189,19 @@ def cleanup_capture_instrumentation(sessions: list[object | None],
             pass
 
 
-def capture_wait_seconds(startup_only: bool, startup_window_seconds: int) -> int:
+def capture_wait_seconds(startup_only: bool, startup_window_seconds: int,
+                         include_pcar_source_watch: bool = False) -> int:
     if not startup_only:
         return HOST_TIMEOUT_SECONDS
     if not 1 <= startup_window_seconds <= MAX_STARTUP_WINDOW_SECONDS:
         raise ValueError(
             f"startup window must be between 1 and {MAX_STARTUP_WINDOW_SECONDS} seconds")
-    return startup_window_seconds
+    wait_seconds = startup_window_seconds
+    if include_pcar_source_watch:
+        wait_seconds = max(
+            wait_seconds,
+            PCAR_SOURCE_WATCH_DURATION_SECONDS + CAPTURE_AGENT_FINISH_MARGIN_SECONDS)
+    return wait_seconds
 
 
 def resume_thread_until_running(thread_id: int, maximum_calls: int = 16) -> dict[str, object]:
@@ -363,7 +371,8 @@ def main() -> int:
     launcher_arguments = resolve_launcher_arguments(args.launcher_arg)
     try:
         wait_seconds = capture_wait_seconds(
-            args.startup_only, args.startup_window_seconds)
+            args.startup_only, args.startup_window_seconds,
+            args.include_pcar_source_watch)
     except ValueError as error:
         raise SystemExit(str(error)) from error
 
