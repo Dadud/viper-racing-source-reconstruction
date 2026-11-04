@@ -2459,3 +2459,15 @@ original-runtime fidelity.
 - **2026-10-25 continuation, original reset/throttle/body-motion capture:** On the verified original process, a bounded Frida intervention returned pressed for only zero DIK_SPACE/DIK_UP reads (300 ms/1.6 s); it cleared the reset prompt and observed the original throttle ramp, PCAR speed rising from near zero to 11.329, and continued coast-down. The post-pulse 640x480 frame shows Lap 1/3, 8/8, and 1 MPH. Full hashes, evidence IDs, selected PCAR samples, and causal limitations are documented in `metadata/original_physics_dispatch_capture.md`; raw captures remain outside Git. This establishes a controlled key-read and body-motion reference seam but does not derive force laws, complete a race, or validate reconstruction parity.
 - **2026-10-25 continuation, original callback-entry capture and wheel-writer audit:** A bounded Frida probe now records elapsed time with PCAR position/velocity and throttle/brake at callback entry across synthetic Space/Up key-read windows. It observed a post-pulse throttle tail and body motion, while retaining the already-running-race/reset confounds. A static re-audit distinguished serialized-row/constructor/garage/list/resource `+0x158` stores from the live wheel field; its producer remains unknown. The `+0xE44` current-time store is tied to pose rebuild/reset, so a per-tick write would invent a timer transition. Exact evidence IDs and capture hashes are in `metadata/original_physics_dispatch_capture.md`; production wheel/force integration remains gated.
 - **2026-10-25 continuation, controlled PCAR input-to-wheel/body capture:** Captured an 8.1-second bounded DIK-read schedule on the already-running original: reset, throttle, steering, and braking. Retained 85 PCAR integrator samples and 340 ordered wheel rows. Inputs correlate with native control globals, speed, per-wheel `+0xE8`, and body accumulators; `+0x158` remains stable within each wheel callback. This is not a clean start or parity result. Source wiring still awaits the `+0x158` producer and suspension/tire inputs. Evidence and caveats are in `metadata/original_physics_dispatch_capture.md`.
+- **2026-11-04, native Frida watchpoint API smoke check:** Installed Frida
+  17.25.2 into a temporary directory outside the repository and exercised an
+  x86 hardware write watchpoint against a disposable hidden PowerShell process.
+  The native target-thread watchpoint armed and reported a `single-step` at the
+  post-write PC; Frida supplied no `details.memory` for that event. The probe
+  mock now covers this observed case and passes directly under Node, while
+  supplied incorrect memory details remain fail-closed. The configured build
+  tree is present, but `ctest`/CMake are unavailable on this shell's PATH, so
+  the registered CTest could not be rerun here. No game or audio process was
+  launched; applying the watchpoint to original `race.bin`, capturing PCAR
+  field provenance, and tracing propulsion remain open.
+

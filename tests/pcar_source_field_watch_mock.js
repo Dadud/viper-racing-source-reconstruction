@@ -92,17 +92,19 @@ function runScenario(options = {}) {
 
     function triggerWrite(offset, value, memoryOverride) {
         memory.set(body.add(offset).value, value);
-        const memoryEvent = memoryOverride === undefined
-            ? { address: body.add(offset), operation: "write" }
-            : memoryOverride;
-        return exceptionHandler({
+        const event = {
             type: "single-step",
             context: {
                 pc: pointer(0x43470cn),
                 eip: pointer(0x43470cn),
             },
-            memory: memoryEvent,
-        });
+        };
+        if (memoryOverride !== null) {
+            event.memory = memoryOverride === undefined
+                ? { address: body.add(offset), operation: "write" }
+                : memoryOverride;
+        }
+        return exceptionHandler(event);
     }
 
     if (options.spuriousEvent) {
@@ -112,7 +114,9 @@ function runScenario(options = {}) {
         }), true);
     }
     if (!options.skipConstructor) {
-        const firstMemory = options.badMemory === "address"
+        const firstMemory = options.missingMemoryDetails
+            ? null
+            : options.badMemory === "address"
             ? { address: body.add(0x600), operation: "write" }
             : options.badMemory === "operation"
                 ? { address: body.add(0x5b0), operation: "read" }
@@ -150,6 +154,9 @@ assert(valid.emitted.some(event => event.event === "pcar_source_field_write" &&
     event.target_offset === 0x5b0));
 assert(valid.emitted.some(event => event.event === "pcar_source_field_write" &&
     event.target_offset === 0x8f8));
+const validWithoutMemoryDetails = runScenario({ missingMemoryDetails: true });
+assert.equal(validWithoutMemoryDetails.done.capture_valid, true);
+assert.equal(validWithoutMemoryDetails.done.write_events, 2);
 
 for (const scenario of [
     { spuriousEvent: true },
