@@ -1162,6 +1162,19 @@ advance_ncar_wheel_tire_dynamics_in_object(
         ? std::optional<WheelTireDynamicsResult>{result} : std::nullopt;
 }
 
+bool clear_ncar_wheel_tire_dynamics_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset) noexcept
+{
+    constexpr std::array<std::uint32_t, 5> local_offsets{
+        0x180U, 0x174U, 0x170U, 0x178U, 0x11cU};
+    std::array<NcarObjectFieldWrite, local_offsets.size()> writes{};
+    for (std::size_t index = 0U; index < local_offsets.size(); ++index) {
+        writes[index] = {wheel_object_offset + local_offsets[index], 4U, 0U};
+    }
+    return apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes);
+}
+
 std::optional<WheelTireAccumulatorResult>
 advance_ncar_wheel_tire_accumulators_in_object(
     NcarWheelRuntimeObjectState& wheel,

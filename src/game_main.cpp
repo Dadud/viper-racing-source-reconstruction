@@ -2090,6 +2090,7 @@ struct PlayerPhysicsTickContext {
         wheel_tire_response_derivations{};
     std::array<std::optional<viper::WheelTireDynamicsResult>, 4>
         wheel_tire_dynamics_results{};
+    std::array<bool, 4> wheel_tire_dynamics_reset_applied{};
     std::array<std::optional<viper::WheelTireAccumulatorResult>, 4>
         wheel_tire_accumulator_results{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x170{};
@@ -3644,11 +3645,9 @@ struct WindowState {
                                     std::isfinite(derivation.factors.lateral_curve_value)) {
                                     tick.wheel_tire_response_derivations[wheel] =
                                         derivation;
-                                    // The native reset branch is impossible on
-                                    // this path: active +0x168 is one of its
-                                    // negated predicates. Inactive contact does
-                                    // not identify the preserved BL predicate,
-                                    // so do not guess and mutate its filter state.
+                                    // Active contact reaches the keep-history
+                                    // branch on this sourced path. The inactive
+                                    // branch is persisted below.
                                     if (player_wheel_contact_states[wheel]
                                             .contact_active_0x168 != 0U &&
                                         player_tire_trigonometric_terms[wheel]) {
@@ -3698,6 +3697,16 @@ struct WindowState {
                 }
             }
         }
+            if (player_wheel_contact_states[wheel].contact_active_0x168 == 0U &&
+                viper::read_ncar_wheel_object_u8(wheel_object, 0x168U) ==
+                    std::optional<std::uint8_t>{0U}) {
+                const auto wheel_object_offset = static_cast<std::uint32_t>(
+                    0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
+                tick.wheel_tire_dynamics_reset_applied[wheel] =
+                    viper::clear_ncar_wheel_tire_dynamics_in_object(
+                        player_runtime_state.wheel_objects[wheel],
+                        wheel_object_offset);
+            }
             tick.wheel_tire_filter_0x170[wheel] = read_response_float(0x170U);
             tick.wheel_tire_filter_0x174[wheel] = read_response_float(0x174U);
             tick.wheel_tire_instantaneous_0x180[wheel] =
@@ -5432,6 +5441,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_lateral_curve_value"
                 << ",wheel" << wheel << "_tire_dynamics_division_valid"
                 << ",wheel" << wheel << "_tire_filter_applied"
+                << ",wheel" << wheel << "_tire_filter_reset_applied"
                 << ",wheel" << wheel << "_tire_filter_0x170"
                 << ",wheel" << wheel << "_tire_filter_0x174"
                 << ",wheel" << wheel << "_tire_instantaneous_0x180"
@@ -5862,6 +5872,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             (tire_derivation->dynamics_division_valid ? 1 : 0);
                         physics_tick_trace << ',' <<
                             (tick.wheel_tire_dynamics_results[wheel] ? 1 : 0);
+                        physics_tick_trace << ',' <<
+                            (tick.wheel_tire_dynamics_reset_applied[wheel] ? 1 : 0);
                         for (const auto value : {
                                 tick.wheel_tire_filter_0x170[wheel],
                                 tick.wheel_tire_filter_0x174[wheel],

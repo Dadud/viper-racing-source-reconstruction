@@ -118,6 +118,32 @@ int main()
                 "tire accumulator must fail closed on unknown +0x04/+0xA4/+0x10C inputs");
         }
         {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 5> history{{
+                {wheel_base + 0x180U, 4U,
+                    std::bit_cast<std::uint32_t>(4.0F)},
+                {wheel_base + 0x174U, 4U,
+                    std::bit_cast<std::uint32_t>(3.0F)},
+                {wheel_base + 0x170U, 4U,
+                    std::bit_cast<std::uint32_t>(2.0F)},
+                {wheel_base + 0x178U, 4U,
+                    std::bit_cast<std::uint32_t>(1.0F)},
+                {wheel_base + 0x11cU, 4U,
+                    std::bit_cast<std::uint32_t>(9.0F)},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, history) &&
+                    viper::clear_ncar_wheel_tire_dynamics_in_object(
+                        wheel, wheel_base),
+                "inactive tire-filter state must clear atomically");
+            for (const auto offset : {0x180U, 0x174U, 0x170U, 0x178U, 0x11cU}) {
+                require(viper::read_ncar_wheel_object_u32(wheel, offset) ==
+                            std::optional<std::uint32_t>{0U},
+                    "inactive tire-filter reset must zero native history and response lanes");
+            }
+        }
+        {
             viper::WheelTireDynamicsState state{};
             state.filtered_component_0x170 = 10.0F;
             state.filtered_component_0x174 = 10.0F;

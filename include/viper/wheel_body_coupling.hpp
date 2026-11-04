@@ -767,6 +767,11 @@ advance_ncar_wheel_tire_dynamics_in_object(
     bool contact_active,
     bool filter_reset_branch_observed) noexcept;
 
+// Persists the native inactive-contact filter reset and its zero response gate.
+[[nodiscard]] bool clear_ncar_wheel_tire_dynamics_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    std::uint32_t wheel_object_offset) noexcept;
+
 // Applies the active-contact 0x442530 accumulator stage to initialized wheel
 // bytes. Contact-active writes replace +0xEC/+0xF0, so their prior contents
 // are deliberately not treated as inputs.

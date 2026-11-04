@@ -1285,12 +1285,12 @@ weights are `0.6/0.2` at or below 10.0 and `0.4/0.0` above it. The model stores
 the post-reset instantaneous component at `+0x180`, smooths values into
 `+0x174` and `+0x170`, computes the combined magnitude, and writes the
 contact-gated nonnegative response scalar to `+0x11C`. The reset branch's
-condition depends on preserved `BL` and wheel `+0x168`; it clears the three
-filter fields only when both are zero. `BL` is initialized at `0x442BEB`, set
-on the active-contact branch at `0x442DE1`, stored to `+0x168` at `0x442DF7`,
-and can be changed by later history logic at `0x44305B`/`0x44306D`. Thus
-contact absence alone is not a complete reset predicate, and an invalid
-response denominator is not part of the observed gate.
+predicate is `BL != 0 || wheel[+0x168] == 0`; it clears the filter fields when
+either is true. `BL` is initialized at `0x442BEB`, set on the active-contact
+branch at `0x442DE1`, stored to `+0x168` at `0x442DF7`, and can be changed by
+later history logic at `0x44305B`/`0x44306D`. Paths that set `BL` also clear
+`+0x168` at `0x44306D`, so current inactive contact reaches the reset branch.
+An invalid response denominator is not part of the observed gate.
 
 The caller-frame `ESP+0x20` threshold value is built at `0x442E54..0x442E85`
 and receives another contribution at `0x442F5F..0x442F71`; the threshold reads
@@ -1345,9 +1345,10 @@ four-wheel composition enables its contact pipeline, it now sources the tire
 filter gate from that `surface.adjusted_response` local and contact activity
 from the updated `+0x168` state. Regression uses contradictory caller values to
 check both sources. The Windows live session now advances the stateful tire
-filter stage for active contacts. Response-vector writes and force accumulation
-remain open; the shared random stream's full native call inventory and the
-inactive-contact reset predicate remain unresolved.
+filter stage for active contacts and clears `+0x180/+0x174/+0x170/+0x178/+0x11C`
+for inactive contact. Response-vector writes and force accumulation remain
+open; the shared random stream's full native call inventory and exact `BL`
+history remain unresolved.
 
 `classify_wheel_contact_feature` models the following contact-feature switch
 in `0x442530`. It preserves raw feature codes, strict signed-bit gates at

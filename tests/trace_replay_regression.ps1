@@ -155,6 +155,7 @@ try {
     $wheelSlipRatioColumns = [int[]]::new(4)
     $wheelTireCurveColumns = @()
     $wheelTireDynamicsColumns = @()
+    $wheelTireResetColumns = @()
     $wheelTireAccumulatorColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
@@ -228,6 +229,8 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireDynamicsNames[$lane])")
         }
         $wheelTireDynamicsColumns += ,$tireDynamicsColumns
+        $wheelTireResetColumns += [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_tire_filter_reset_applied")
         $tireAccumulatorNames = @(
             'tire_accumulator_applied', 'tire_accumulator_0xa4',
             'tire_accumulator_0x10c', 'tire_state_0xec', 'tire_state_0xf0')
@@ -315,6 +318,7 @@ try {
         @($wheelTireDynamicsColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelTireResetColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelTireAccumulatorColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
@@ -340,6 +344,7 @@ try {
     $observedSuspensionForce = $false
     $observedTireCurveDerivation = $false
     $observedTireDynamicsStage = $false
+    $observedInactiveTireReset = $false
     $observedTireAccumulatorStage = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
@@ -437,6 +442,11 @@ try {
             $dynamicsColumns = $wheelTireDynamicsColumns[$wheel]
             $dynamicsApplied = $fields[$dynamicsColumns[0]]
             $wheelContactActive = $fields[$wheelActiveColumns[$wheel]] -eq '1'
+            $resetApplied = $fields[$wheelTireResetColumns[$wheel]]
+            if (-not $wheelContactActive -and $resetApplied -ne '1') {
+                throw "Wheel $wheel inactive-contact tire filter reset did not apply at line $($index + 1)"
+            }
+            if (-not $wheelContactActive) { $observedInactiveTireReset = $true }
             if ($wheelContactActive -and $tireCurveStatus -eq '1' -and
                 $dynamicsApplied -ne '1') {
                 throw "Wheel $wheel active-contact tire filter stage did not apply at line $($index + 1)"
@@ -873,6 +883,9 @@ try {
     }
     if (-not $observedTireDynamicsStage) {
         throw 'Fixed-step replay never entered the finite active-contact tire-filter stage'
+    }
+    if (-not $observedInactiveTireReset) {
+        throw 'Fixed-step replay never entered the inactive-contact tire-filter reset stage'
     }
     if (-not $observedTireAccumulatorStage) {
         throw 'Fixed-step replay never entered the finite active-contact tire accumulator stage'
