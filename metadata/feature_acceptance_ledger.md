@@ -29,15 +29,17 @@ values and body translation. The focused Windows Release replay passes. This
 closes a self-consistency coverage gap only; original-matched response and a
 complete race remain open.
 
-The route-free longitudinal regression compares fresh neutral, throttle, and
-brake runs from the same placement over the actual matched input windows
-(neutral updates 0–31; throttle/brake updates 32–63). A first comparator
-mistakenly re-used the neutral window for throttle and brake and falsely failed;
-that result was withdrawn. The corrected focused replay passes: throttle raises
-signed forward speed and braking lowers its absolute magnitude relative to
-neutral. This is reconstruction self-consistency, not native acceleration
-parity; the upstream engine/gear-to-wheel torque producer and matched original
-capture remain open, so first-race physics is still partial.
+The route-free longitudinal diagnostic compares fresh neutral, throttle, and
+brake runs from the same placement over the same simulation updates (32–63).
+Earlier versions compared different update windows and their positive throttle
+result is withdrawn. The corrected capture shows neutral and throttle have
+identical forward-speed mean (`-0.499623`, magnitude `1.53`); braking changes
+the mean slightly (`-0.535571`, magnitude `1.49`). The trace reports these
+measurements but does not assert they constitute powered driving. Static audit
+identified wheel `+0x124`'s active-contact update at `0x443E9D`, but no
+engine/gear-to-wheel producer in the bounded callback/integrator/wheel path.
+This does not prove a producer is absent elsewhere. Powered longitudinal
+control and matched original traces remain open; first-race physics is partial.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
