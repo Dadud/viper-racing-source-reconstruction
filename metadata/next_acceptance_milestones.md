@@ -909,9 +909,12 @@ Rebuilt `viper_game`, `viper_car_runtime_setup_regression`, and
 `viper_ncar_force_capture_regression` with Visual Studio 18 Release, then ran
 the configured CTest suite against the external `GameData` tree: 66/66 passed.
 The run includes fixed-step tire-force replay with route motion disabled and
-asset/WARP smokes for all eight tracks and five vehicle bundles. This verifies
-the current integrated source and tests; it does not establish native numeric
-parity or a completed race.
+asset/WARP smokes for all eight tracks and five vehicle bundles. A separate clean
+configure and full Release build from the committed tree in
+`build/goal-clean-20261103` passed, followed by another 66/66 CTest run against
+the external asset tree. MSVC reported existing unused-variable and CRT
+deprecation warnings; there were no build errors. These checks verify source
+buildability and automated smokes, not a completed race or native numeric parity.
 
 A source/disassembly audit confirms the live PCAR control callback updates body
 `+0x500` from the smoothed, speed-scaled steering request, while the wheel
