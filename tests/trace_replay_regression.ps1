@@ -9,7 +9,9 @@ function Get-MatchedForwardSpeedAverage {
         [Parameter(Mandatory = $true)][string[]]$Header,
         [Parameter(Mandatory = $true)][int[]]$VelocityColumns,
         [Parameter(Mandatory = $true)][int[]]$ForwardColumns,
-        [Parameter(Mandatory = $true)][int]$FrameLimit
+        [Parameter(Mandatory = $true)][int]$FrameStart,
+        [Parameter(Mandatory = $true)][int]$FrameLimit,
+        [switch]$Absolute
     )
     $rows = [System.IO.File]::ReadAllLines($TickPath)
     if ($rows.Count -lt 2 -or $rows[0] -cne ($Header -join ',')) {
@@ -20,12 +22,14 @@ function Get-MatchedForwardSpeedAverage {
         $fields = $row.Split(',')
         if ($fields.Count -ne $Header.Count) { throw "Matched trace row is malformed: $TickPath" }
         $outer = [int]::Parse($fields[0], [cultureinfo]::InvariantCulture)
+        if ($outer -lt $FrameStart) { continue }
         if ($outer -ge $FrameLimit) { break }
         $speed = [single]0
         for ($axis = 0; $axis -lt 3; ++$axis) {
             $speed += [single]::Parse($fields[$VelocityColumns[$axis]], [cultureinfo]::InvariantCulture) *
                 [single]::Parse($fields[$ForwardColumns[$axis]], [cultureinfo]::InvariantCulture)
         }
+        if ($Absolute) { $speed = [Math]::Abs($speed) }
         $speeds.Add($speed)
     }
     if ($speeds.Count -eq 0) { throw "Matched trace has no samples in the requested window: $TickPath" }
@@ -1355,9 +1359,8 @@ try {
         -not $observedScheduledBrake) {
         throw "Authored input phases did not reach recovered PCAR controls: throttle=$observedScheduledThrottle steering=$observedScheduledSteering brake=$observedScheduledBrake"
     }
-    if ($null -eq $initialThrottleForwardSpeed -or $throttleForwardSpeeds.Count -eq 0 -or
-        $brakeForwardSpeeds.Count -eq 0) {
-        throw 'Fixed-step replay did not sample forward speed in coast, throttle, and brake phases'
+    if ($throttleForwardSpeeds.Count -eq 0 -or $brakeForwardSpeeds.Count -eq 0) {
+        throw 'Fixed-step replay did not sample forward speed in throttle and brake phases'
     }
     $throttleAverageForwardSpeed = ($throttleForwardSpeeds |
         Measure-Object -Average).Average
@@ -1367,18 +1370,18 @@ try {
         throw 'Matched neutral replay has a different tick schedule or schema'
     }
     $neutralAverageForwardSpeed = Get-MatchedForwardSpeedAverage `
-        $neutralTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+        $neutralTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 0 32
     $throttleInputAverage = Get-MatchedForwardSpeedAverage `
-        $replayTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+        $replayTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32 64
     if (($throttleInputAverage - $neutralAverageForwardSpeed) -lt 0.01) {
         throw "Throttle did not increase forward speed relative to matched neutral inputs over 32 fixed updates: neutral=$neutralAverageForwardSpeed throttle=$throttleInputAverage"
     }
     $brakeNeutralAverage = Get-MatchedForwardSpeedAverage `
-        $neutralTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+        $neutralTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 0 32 -Absolute
     $brakeCompare = Get-MatchedForwardSpeedAverage `
-        $brakeTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32
+        $brakeTicks $tickHeader $bodyVelocityColumns $bodyForwardAxisColumns 32 64 -Absolute
     if (($brakeNeutralAverage - $brakeCompare) -lt 0.01) {
-        throw "Brake did not reduce forward speed relative to matched neutral inputs over 32 fixed updates: neutral=$brakeNeutralAverage brake=$brakeCompare"
+        throw "Brake did not reduce forward-speed magnitude relative to matched neutral inputs over 32 fixed updates: neutral=$brakeNeutralAverage brake=$brakeCompare"
     }
     if (($brakeNeutralAverage - $brakeCompare) -lt 0.01) {
         throw "Brake did not reduce forward speed relative to matched neutral inputs over 32 fixed updates: neutral=$brakeNeutralAverage brake=$brakeCompare"

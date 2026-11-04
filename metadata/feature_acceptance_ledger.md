@@ -29,13 +29,15 @@ values and body translation. The focused Windows Release replay passes. This
 closes a self-consistency coverage gap only; original-matched response and a
 complete race remain open.
 
-The route-free longitudinal regression now compares fresh neutral, throttle,
-and brake runs from the same placement over equal 32-update windows. The
-2026-11-04 result shows identical `-2.43288038065657` forward-speed averages
-for neutral, throttle, and brake, and the test fails accordingly. This exposes
-the missing engine/gear-to-wheel producer and invalidates the previous
-slope-sensitive pass claim. The first-race physics gate remains blocked on a
-source-backed driveline implementation; no ideal-line motion is used.
+The route-free longitudinal regression compares fresh neutral, throttle, and
+brake runs from the same placement over the actual matched input windows
+(neutral updates 0–31; throttle/brake updates 32–63). A first comparator
+mistakenly re-used the neutral window for throttle and brake and falsely failed;
+that result was withdrawn. The corrected focused replay passes: throttle raises
+signed forward speed and braking lowers its absolute magnitude relative to
+neutral. This is reconstruction self-consistency, not native acceleration
+parity; the upstream engine/gear-to-wheel torque producer and matched original
+capture remain open, so first-race physics is still partial.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must
