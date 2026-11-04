@@ -81,10 +81,13 @@ motion disabled.
 The exact-write capture is prepared as `tools/pcar_source_field_watch.js` and
 the controlled state-correlation probe now includes the related PCAR/wheel
 fields. Both scripts pass Node syntax checks, but no original game process was
-running to validate the Frida APIs, allocation filter, exception handler, or
-observed input response. Run the source-field watch on the original before
-integrating the unresolved multiplier path; retain route motion disabled in
-all reconstruction acceptance checks.
+running to validate the Frida APIs, constructor watch, exception handler,
+selected-player identity, or observed input response. The watch now arms on
+`0x4381E0`'s `ECX` object and follows the first `0x4C8188` PCAR callback through
+`0x431150`; reject the capture unless those object identities match. Run the
+source-field watch on the original before integrating the unresolved
+multiplier path; retain route motion disabled in all reconstruction
+acceptance checks.
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11
 scene/HUD, keyboard bindings, route-progress state, route-driven opponent

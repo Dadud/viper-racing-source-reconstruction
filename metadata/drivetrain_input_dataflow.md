@@ -190,17 +190,16 @@ instruction wrote a field between samples. Probe syntax was checked with
 memory reads.
 
 An exact-write probe, `tools/pcar_source_field_watch.js`, now arms x86 hardware
-write watchpoints for both fields as the known `0xEF0` PCAR allocation returns
-at `0x4226E0`. It records the post-write instruction address, field values,
-changed fields, and fuzzy backtrace, and also samples both fields around the
-selected `0x431150` tick. If the simulation uses another thread, it arms that
-thread when the selected PCAR integrator is entered. The script is deliberately
-separate from the control-intervention probe; it does not launch the game or
-modify input. Its syntax passes `node --check`, but the installed Frida runtime
-and a live original capture have not validated watchpoint setup, exception
-handling, or the candidate allocation match. Results must be rejected if the
-armed event does not report the expected body/addresses and a valid instruction
-inside the engine module.
+write watchpoints for both fields at PCAR constructor `0x4381E0`, using its
+`ECX` body pointer, and retains them through that constructor's return. It then
+selects the first callback object with PCAR vtable `0x4C8188`, verifies body
+identity at `0x431150`, and arms the integrator thread if it differs from the
+constructor thread. Each hit records the post-write instruction address,
+field values, changed fields, and fuzzy backtrace. The script does not launch
+the game or modify input. Its syntax passes `node --check`, but a live original
+capture has not validated watchpoint setup, exception handling, or selection of
+the intended player object. Results must be rejected unless the body matches
+the selected callback object and the writer address resolves inside `race.bin`.
 
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,

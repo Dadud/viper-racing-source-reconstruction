@@ -1,135 +1,201 @@
 // Exact field watch for the PCAR constructor inputs used by 0x434700.
 // Attaches to an already-running 32-bit race.bin process; it does not launch
-// the game or modify input. The PCAR factory's 0xEF0 allocation is identified
-// by its return site at 0x4226E0, then two per-thread hardware write watches
-// remain armed through the first race updates.
+// the game or modify input. The 0x4381E0 constructor supplies the PCAR body
+// directly, so both fields are watched through the constructor chain and then
+// through the selected player's first race updates.
 const engine = Process.findModuleByName("race.bin");
 if (!engine) throw new Error("race.bin is not mapped");
 if (Process.arch !== "ia32") throw new Error("expected 32-bit x86 race.bin");
 const at = va => engine.base.add(va - 0x400000);
-const safe = fn => { try { return fn(); } catch (e) { return { error: String(e) }; } };
 const fields = [0x5b0, 0x8f8];
 const state = {
-  body: null,
+  selected: null,
+  selectedOrdinal: null,
   watchedThreads: new Map(),
-  initial: null,
-  last: null,
-  armed: false,
-  writes: 0,
-  samples: 0,
+  constructorRows: [],
+  tickSamples: 0,
+  writeEvents: 0,
   errors: [],
 };
-const readValues = () => state.body ? fields.map(offset =>
-  safe(() => state.body.add(offset).readFloat())) : null;
+const safe = fn => { try { return fn(); } catch (e) { return { error: String(e) }; } };
+const readFloat = (body, offset) => safe(() => body.add(offset).readFloat());
+const readValues = body => fields.map(offset => safe(() => body.add(offset).readFloat()));
+const snapshotState = body => ({
+  body: body.toString(),
+  source_5b0: readFloat(body, 0x5b0),
+  source_8f8: readFloat(body, 0x8f8),
+  selector_dc4: readFloat(body, 0xdc4),
+  multiplier_dd0: readFloat(body, 0xdd0),
+  product_ddc: readFloat(body, 0xddc),
+  throttle_de0: readFloat(body, 0xde0),
+  brake_de4: readFloat(body, 0xde4),
+  clutch_de8: readFloat(body, 0xde8),
+  selector_dec: readFloat(body, 0xdec),
+  controller_c98: safe(() => body.add(0xc98).readPointer().toString()),
+  selected_block: safe(() => body.add(0xc98).readPointer().add(0x4c)
+    .readPointer().toString()),
+  controls: {
+    steering: safe(() => at(0x509358).readFloat()),
+    throttle: safe(() => at(0x5093f4).readFloat()),
+    brake: safe(() => at(0x509320).readFloat()),
+    clutch: safe(() => at(0x5093b8).readFloat()),
+  },
+  wheels: Array.from({ length: 4 }, (_, index) => {
+    const wheel = body.add(0x554 + index * 0x1a4);
+    return {
+      address: wheel.toString(),
+      spin_target_e4: readFloat(wheel, 0xe4),
+      angular_rate_124: readFloat(wheel, 0x124),
+      derived_rate_128: readFloat(wheel, 0x128),
+    };
+  }),
+});
 const formatAddress = address => {
   const module = Process.findModuleByAddress(address);
   return module ? `${module.name}+0x${address.sub(module.base).toString()}` : address.toString();
 };
-const armThread = thread => {
-  if (state.watchedThreads.has(thread.id)) return true;
+const armThread = (thread, body, purpose) => {
+  if (state.watchedThreads.has(thread.id)) {
+    const prior = state.watchedThreads.get(thread.id);
+    if (prior.body.equals(body)) return true;
+    fields.forEach((_, index) => safe(() => thread.unsetHardwareWatchpoint(index)));
+    state.watchedThreads.delete(thread.id);
+  }
+  const last = readValues(body);
   const results = fields.map((offset, index) => safe(() => {
-    thread.setHardwareWatchpoint(index, state.body.add(offset), 4, "w");
+    thread.setHardwareWatchpoint(index, body.add(offset), 4, "w");
     return true;
   }));
   if (results.some(result => result !== true)) {
-    state.errors.push(`watchpoint_arm_failed_thread_${thread.id}: ${JSON.stringify(results)}`);
+    state.errors.push(`watchpoint_arm_failed_${purpose}_thread_${thread.id}: ${JSON.stringify(results)}`);
     fields.forEach((_, index) => safe(() => thread.unsetHardwareWatchpoint(index)));
     return false;
   }
-  state.watchedThreads.set(thread.id, thread);
+  state.watchedThreads.set(thread.id, { thread, body, last, purpose });
   return true;
 };
-const writeRow = details => {
-  const current = readValues();
-  const changedOffsets = current ? fields.filter((_, index) =>
-    JSON.stringify(current[index]) !== JSON.stringify(state.last[index])) : [];
-  const row = {
+const writeRow = (details, watched) => {
+  const current = readValues(watched.body);
+  const changedOffsets = fields.filter((_, index) =>
+    JSON.stringify(current[index]) !== JSON.stringify(watched.last[index]));
+  state.writeEvents++;
+  send({
     event: "pcar_source_field_write",
     elapsed_ms: Date.now() - started,
+    purpose: watched.purpose,
     thread_id: Process.getCurrentThreadId(),
     exception_type: details.type,
     instruction: safe(() => details.context.pc.toString()),
     instruction_x86: safe(() => details.context.eip.toString()),
     watched_address: safe(() => details.memory.address.toString()),
     memory_operation: safe(() => details.memory.operation),
-    body: state.body.toString(),
+    body: watched.body.toString(),
     offsets: fields,
     changed_offsets: changedOffsets,
     values: current,
     backtrace: safe(() => Thread.backtrace(details.context, Backtracer.FUZZY)
       .map(formatAddress)),
-  };
-  state.last = current;
-  state.writes++;
-  send(row);
+  });
+  watched.last = current;
 };
 const started = Date.now();
 
 Process.setExceptionHandler(details => {
   const threadId = Process.getCurrentThreadId();
-  const thread = state.watchedThreads.get(threadId);
-  if (!state.armed || !thread ||
-      !["breakpoint", "single-step"].includes(details.type)) return false;
-  writeRow(details);
-  fields.forEach((_, index) => safe(() => thread.unsetHardwareWatchpoint(index)));
+  const watched = state.watchedThreads.get(threadId);
+  if (!watched || !["breakpoint", "single-step"].includes(details.type)) return false;
+  writeRow(details, watched);
+  fields.forEach((_, index) => safe(() => watched.thread.unsetHardwareWatchpoint(index)));
   state.watchedThreads.delete(threadId);
-  if (!armThread(thread)) state.watchedThreads.delete(threadId);
+  // Hardware watchpoints are one-shot in the exception handler. Re-arm after
+  // clearing the debug event so subsequent field writes remain observable.
+  armThread(watched.thread, watched.body, watched.purpose);
   return true;
 });
 
-const allocator = Interceptor.attach(at(0x414170), {
-  onEnter(args) {
-    this.callSite = this.returnAddress;
-    this.isPcarBody = this.returnAddress.equals(at(0x4226e0)) &&
-      args[0].toUInt32() === 0xef0;
-  },
-  onLeave(retval) {
-    if (!this.isPcarBody || retval.isNull() || state.body) return;
-    state.body = retval;
-    state.initial = readValues();
-    state.last = state.initial;
-    const thread = Process.enumerateThreads().find(
-      thread => thread.id === Process.getCurrentThreadId());
-    if (!thread) {
-      state.errors.push("allocator_thread_not_found");
+const constructor = Interceptor.attach(at(0x4381e0), {
+  onEnter() {
+    this.body = this.context.ecx;
+    this.threadId = Process.getCurrentThreadId();
+    this.thread = Process.enumerateThreads().find(thread => thread.id === this.threadId);
+    this.startValues = readValues(this.body);
+    this.startState = snapshotState(this.body);
+    if (!this.thread) {
+      state.errors.push("constructor_thread_not_found");
       return;
     }
-    if (!armThread(thread)) return;
-    state.armed = true;
+    this.watchInstalled = armThread(this.thread, this.body, "constructor");
     send({
-      event: "pcar_source_field_watch_armed",
-      body: state.body.toString(),
-      thread_id: thread.id,
-      initial_values: state.initial,
-      watched_addresses: fields.map(offset => state.body.add(offset).toString()),
-      allocator_return: this.callSite.toString(),
-      write_watchpoints: fields.length,
+      event: "pcar_constructor_watch_armed",
+      body: this.body.toString(),
+      thread_id: this.threadId,
+      starting_values: this.startValues,
+      starting_state: this.startState,
+      watch_installed: this.watchInstalled,
+    });
+  },
+  onLeave() {
+    if (!this.body) return;
+    const row = {
+      body: this.body.toString(),
+      thread_id: this.threadId,
+      before: this.startValues,
+      after: readValues(this.body),
+      final_state: snapshotState(this.body),
+      watch_installed: this.watchInstalled,
+    };
+    state.constructorRows.push(row);
+    if (this.watchInstalled && state.watchedThreads.has(this.threadId)) {
+      fields.forEach((_, index) => safe(() =>
+        this.thread.unsetHardwareWatchpoint(index)));
+      state.watchedThreads.delete(this.threadId);
+    }
+    send({ event: "pcar_constructor_watch_done", ...row });
+  },
+});
+
+const callback = Interceptor.attach(at(0x4384d0), {
+  onEnter() {
+    const body = this.context.ecx;
+    if (body.isNull() || safe(() => body.readU32()) !== 0x4c8188) return;
+    if (state.selected !== null) return;
+    state.selected = body;
+    state.selectedOrdinal = safe(() => body.add(0x510).readU32());
+    send({
+      event: "pcar_selected_player",
+      body: body.toString(),
+      ordinal_510: state.selectedOrdinal,
+      state: snapshotState(body),
     });
   },
 });
 
 const integrator = Interceptor.attach(at(0x431150), {
   onEnter() {
-    if (!state.body || !this.context.ecx.equals(state.body)) return;
+    if (state.selected === null || !this.context.ecx.equals(state.selected)) return;
     const threadId = Process.getCurrentThreadId();
-    const thread = state.watchedThreads.get(threadId) || Process.enumerateThreads().find(
-      item => item.id === threadId);
+    const thread = state.watchedThreads.get(threadId)?.thread || Process.enumerateThreads()
+      .find(item => item.id === threadId);
     if (!thread) return;
-    if (!state.armed) state.armed = true;
-    if (!state.watchedThreads.has(threadId)) armThread(thread);
-    this.body = state.body;
-    this.before = readValues();
-    state.samples++;
+    const watchInstalled = armThread(thread, state.selected, "selected_integrator");
+    this.body = state.selected;
+    this.before = readValues(this.body);
+    this.beforeState = snapshotState(this.body);
+    this.watchInstalled = watchInstalled;
+    state.tickSamples++;
   },
   onLeave() {
     if (!this.body) return;
     send({
       event: "pcar_source_field_tick_sample",
       elapsed_ms: Date.now() - started,
-      tick_sample: state.samples,
+      tick_sample: state.tickSamples,
       before: this.before,
-      after: readValues(),
+      after: readValues(this.body),
+      before_state: this.beforeState,
+      after_state: snapshotState(this.body),
       body: this.body.toString(),
+      watch_installed: this.watchInstalled,
     });
   },
 });
@@ -138,33 +204,35 @@ send({
   event: "pcar_source_field_watch_ready",
   module: engine.name,
   image_size: engine.size,
-  allocation_size: 0xef0,
-  allocation_return_site: "0x4226E0",
+  constructor: "0x4381E0",
+  selected_callback: "0x4384D0",
+  integrator: "0x431150",
+  watched_fields: fields,
   duration_ms: 15000,
   route_or_ideal_line_input: false,
 });
 
 setTimeout(() => {
-  for (const thread of state.watchedThreads.values()) {
-    fields.forEach((_, index) => safe(() => thread.unsetHardwareWatchpoint(index)));
+  for (const watched of state.watchedThreads.values()) {
+    fields.forEach((_, index) => safe(() => watched.thread.unsetHardwareWatchpoint(index)));
   }
-  state.armed = false;
-  allocator.detach();
+  state.watchedThreads.clear();
+  constructor.detach();
+  callback.detach();
   integrator.detach();
   Process.setExceptionHandler(null);
   send({
     event: "pcar_source_field_watch_done",
     elapsed_ms: Date.now() - started,
-    body: state.body ? state.body.toString() : null,
-    initial_values: state.initial,
-    final_values: readValues(),
-    integrator_samples: state.samples,
-    write_events: state.writes,
-    watched_thread_ids: Array.from(state.watchedThreads.keys()),
+    selected_body: state.selected ? state.selected.toString() : null,
+    selected_ordinal_510: state.selectedOrdinal,
+    constructor_rows: state.constructorRows,
+    integrator_samples: state.tickSamples,
+    write_events: state.writeEvents,
     errors: state.errors,
     limitations: [
-      "watchpoints are installed on the allocator thread and the selected PCAR integrator thread",
-      "the allocation return-site match identifies a candidate PCAR by size and call site",
+      "hardware watchpoints are per-thread; threads are armed at PCAR construction or integrator entry",
+      "the first 0x4C8188 PCAR callback is treated as the selected player candidate",
       "a debugger/hypervisor restriction may prevent hardware watchpoint installation",
     ],
   });
