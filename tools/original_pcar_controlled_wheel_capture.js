@@ -11,7 +11,24 @@ const at = va => engine.base.add(va - 0x400000);
 const safe = fn => { try { return fn(); } catch (_) { return null; } };
 const readFloat = (p, o) => safe(() => p.add(o).readFloat());
 const readU8 = (p, o) => safe(() => p.add(o).readU8());
+const readPointer = (p, o) => safe(() => p.add(o).readPointer().toString());
 const vector = (p, o) => [readFloat(p, o), readFloat(p, o + 4), readFloat(p, o + 8)];
+const snapshotPairBlock = (body, offset, wheelEndpoints) => {
+  const block = body.add(offset);
+  const endpoint1 = safe(() => block.add(4).readPointer());
+  const endpoint2 = safe(() => block.add(8).readPointer());
+  return {
+    address: block.toString(),
+    endpoint1: endpoint1 && !endpoint1.isNull() ? endpoint1.toString() : null,
+    endpoint2: endpoint2 && !endpoint2.isNull() ? endpoint2.toString() : null,
+    endpoint1_e4: wheelEndpoints && endpoint1 && !endpoint1.isNull()
+      ? readFloat(endpoint1, 0xe4) : null,
+    endpoint2_e4: wheelEndpoints && endpoint2 && !endpoint2.isNull()
+      ? readFloat(endpoint2, 0xe4) : null,
+    scale_18: readFloat(block, 0x18),
+    interval_1c: readFloat(block, 0x1c),
+  };
+};
 const snapshotBody = body => ({
   transform: safe(() => Array.from(new Uint8Array(body.add(0x38).readByteArray(0x30)))),
   position: vector(body, 0x5c),
@@ -19,8 +36,29 @@ const snapshotBody = body => ({
   angularVelocity: vector(body, 0x240),
   force: vector(body, 0x24c),
   moment: vector(body, 0x258),
+  pcar: {
+    source_5b0: readFloat(body, 0x5b0),
+    source_8f8: readFloat(body, 0x8f8),
+    selector_dc4: readFloat(body, 0xdc4),
+    multiplier_dd0: readFloat(body, 0xdd0),
+    integrator_product_ddc: readFloat(body, 0xddc),
+    throttle_de0: readFloat(body, 0xde0),
+    brake_de4: readFloat(body, 0xde4),
+    clutch_de8: readFloat(body, 0xde8),
+    selector_dec: readFloat(body, 0xdec),
+    controller_c98: readPointer(body, 0xc98),
+    controller_vtable: safe(() => body.add(0xc98).readPointer().toString()),
+    selected_block: readPointer(safe(() => body.add(0xc98).readPointer()) || ptr(0), 0x4c),
+    pair_d04: snapshotPairBlock(body, 0xd04, false),
+    pair_d24: snapshotPairBlock(body, 0xd24, true),
+    pair_d44: snapshotPairBlock(body, 0xd44, true),
+  },
 });
 const snapshotWheel = wheel => ({
+  spin_target_e4: readFloat(wheel, 0xe4),
+  angular_rate_124: readFloat(wheel, 0x124),
+  derived_rate_128: readFloat(wheel, 0x128),
+  radius_38: readFloat(wheel, 0x38),
   queryOrigin: vector(wheel, 0xc8),
   contactPoint: vector(wheel, 0x130),
   contactActive: readU8(wheel, 0x168),

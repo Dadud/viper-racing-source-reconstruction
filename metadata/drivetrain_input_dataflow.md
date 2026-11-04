@@ -179,6 +179,16 @@ observed. This distinguishes untouched allocator contents from a constructor
 or first-tick source without assigning semantics from offsets. Do not use
 route motion to generate or interpret the input-to-motion trace.
 
+The existing controlled probe `tools/original_pcar_controlled_wheel_capture.js`
+now records the unresolved fields and the related selector, signal, controller,
+pair endpoints, and wheel spin fields before/after sampled integrator and wheel
+updates. It also retains its synthetic DIK_UP observation window and reports
+whether the control intervention actually reached the game. This is a useful
+state-correlation capture, not an exact write watch: it cannot identify which
+instruction wrote a field between samples. Probe syntax was checked with
+`node --check`; a new controlled original run has not yet validated the added
+memory reads.
+
 The arithmetic is now available as
 `derive_ncar_integrator_signal_multiplier`, with the two body fields, divisor,
 selector and `0x4C7D48` scale all explicit. Regression covers both interpolation
