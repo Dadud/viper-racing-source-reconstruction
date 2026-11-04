@@ -56,8 +56,11 @@ A follow-up constructor/vtable trace now connects PCAR's selected `+0xD04`,
 slot `0x43F760` to wheel `+0xE4`, which the active `0x442530` updater consumes.
 The portable selected-pair arithmetic and atomic byte writer are implemented
 and covered by selector-branch regressions. The controller setter argument is
-still an explicit input, and the Windows fixed-step does not call this model;
-the `+0xCE4` getter and the full `0x43F830` controller/curve path remain open.
+still an explicit input, and the Windows fixed-step does not call this model.
+The `+0xCE4` producer is resolved: PCAR constructor `0x4347A4` stores a mode-
+selected D-block pointer at selector `+0xC98 + 0x4C`, and its getter dispatches
+the selected block's slot 0. The active `0x43F830` curve/controller setter path
+and the getter's exact runtime value remain open.
 This closes a wheel-spin response writer seam, not the engine/gear torque
 producer or a playable powered race.
 

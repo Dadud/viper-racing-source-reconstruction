@@ -719,10 +719,12 @@ regression no longer advances a synthetic car along a route and instead checks
 state transitions and fixed-snapshot projection. Route-opponent policy tests
 remain isolated prototype-model checks.
 
-**Immediate work:** Resolve the PCAR `+0xCE4` getter and the live
-`0x43F830` → `0x43FFC0` input path, then feed its source-backed setter argument
-through the new selected-pair `+0xE4` adapter in the fixed player tick. Trace
-the argument further upstream to engine/gear/clutch state and compare
+**Immediate work:** Trace the source-backed value through the live
+`0x43F830` → `0x43FFC0` curve/controller setter path, then feed its sourced
+setter argument through the new selected-pair `+0xE4` adapter in the fixed
+player tick. The `+0xCE4` producer and selected getter dispatch are resolved;
+trace the returned endpoint values and their units. Trace the update argument
+further upstream to engine/gear/clutch state and compare
 controlled throttle, coast, steering, and braking captures against the
 original process. Then close physical lap/checkpoint progression from
 supported native geometry and verify finish/results transitions. Do not treat

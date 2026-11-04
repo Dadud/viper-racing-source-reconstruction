@@ -77,7 +77,19 @@ stores it in controller `+0x4C`. Constructor `0x4347AF..0x4347C5` links the
 `0x431150` calls `0x43F830` on `+0xC7C`; that helper calls the signal pair's
 two virtual +4 setters with opposite values. When the second child is the
 controller, `0x43FFC0` updates the selected D block, which dispatches to the
-wheel endpoints. Wheel vtable `0x4C89C8` slots 0/+4 are `0x444600/0x4445F0`:
+wheel endpoints. The selector's `+0x4C` pointer is initialized by the PCAR
+constructor: `0x4347A4` calls `0x43FA70` on selector `+0xC98`, storing D24
+(`+0xD24`) for mode 0, D44 (`+0xD44`) for mode 2, or D04 (`+0xD04`) otherwise.
+The selector constructor clears this field at `0x43FA4C`. This resolves the
+producer for PCAR `+0xCE4` (`+0xC98 + 0x4C`). Its getter at `0x43FAE0` dispatches
+slot 0 on the selected D block, whose `0x43F730` getter combines endpoint
+getters; exact runtime endpoint values and their semantic units remain open.
+The listing's only literal `+0xCE4` displacement use is the read at `0x4312C5`.
+It invokes slot 0, multiplies the result by PCAR `+0xDD0`, and stores `+0xDDC`
+at `0x4312D5`. This is bounded direct-displacement coverage only; computed
+aliases, copied state, and indirect writes are not excluded.
+
+Wheel vtable `0x4C89C8` slots 0/+4 are `0x444600/0x4445F0`:
 the getter reads wheel `+0x128`, and the setter writes wheel `+0xE4`. The active
 `0x442530` wheel updater consumes `+0xE4` in its spin response.
 
@@ -85,15 +97,16 @@ the getter reads wheel `+0x128`, and the setter writes wheel `+0xE4`. The active
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
 only the wheel `+0xE4` fields reached by the selected block. The Windows
 fixed-step does not call this adapter yet. Its controller setter argument
-remains explicit because `0x43F830`'s `+0xCE4` virtual getter and the active
-runtime's associated controller/curve setter path are not fully integrated.
+remains explicit because the active runtime's associated controller/curve
+setter path is not fully integrated.
 This establishes a source-backed path from that argument to the wheel
 spin-response input; it does not yet identify engine torque, prove that
 throttle supplies the argument, or establish original numeric parity.
 
 After the `+0xC98` animation-controller update, `0x431150` calls the virtual getter at PCAR
-`+0xCE4`, multiplies its result by `+0xDD0`, and stores `+0xDDC`. The exact
-getter identity is unresolved. Direct `+0xDDC` xrefs also include a distinct
+`+0xCE4`, multiplies its result by `+0xDD0`, and stores `+0xDDC`. The selected
+D-block getter identity is resolved, while its runtime result is still bounded
+by endpoint values and unassigned units. Direct `+0xDDC` xrefs also include a distinct
 velocity-magnitude writer at `0x4324B8`, snapshot copying at `0x432AF4`, and
 per-step record copying at `0x438770`; the checked listing shows no direct
 `+0xDDC` use in wheel-force calculations. Indirect consumers of copied records
