@@ -54,9 +54,7 @@ present in the physics tick CSV. The live player now accumulates finalized
 suspension forces at byte-backed wheel application points, adds sourced gravity,
 consumes initialized point-impulse accumulators, and runs the existing body
 kinematics/orientation/basis integrator. The resulting PCAR position and yaw now
-drive the player renderer with route motion disabled. Tire drive forces,
-embedded/virtual-record effects, live collision generation, and AI body physics
-remain unimplemented. The terrain plane sampler
+drive the player renderer with route motion disabled. All three mapped\nper-wheel tire-force calls now contribute force and moment to the live body\nintegration. Numeric parity, embedded/virtual-record effects, live collision\nresponse, damage, steering-to-wheel coupling, AI body physics, and complete race\nacceptance remain open. The terrain plane sampler
 matches the original `0x45F760`/`0x4672B0` X/Z query and plane-height result.
 Contact queries use byte-backed PCAR position/basis and constructor wheel
 geometry; route pose does not supply their origin. Startup body transform matches
@@ -904,3 +902,23 @@ product. The inactive-contact filter reset now clears
 immediate gap is controlled no-ideal-line parity against the original and
 correct steering-to-wheel behavior, followed by collision and complete
 Viper/Bemidji race acceptance.
+
+### 2026-11-03 validation re-run: live tire-force milestone
+
+Rebuilt `viper_game`, `viper_car_runtime_setup_regression`, and
+`viper_ncar_force_capture_regression` with Visual Studio 18 Release, then ran
+the configured CTest suite against the external `GameData` tree: 66/66 passed.
+The run includes fixed-step tire-force replay with route motion disabled and
+asset/WARP smokes for all eight tracks and five vehicle bundles. This verifies
+the current integrated source and tests; it does not establish native numeric
+parity or a completed race.
+
+A source/disassembly audit confirms the live PCAR control callback updates body
+`+0x500` from the smoothed, speed-scaled steering request, while the wheel
+`+0xAC` update in `0x442530` remains sourced from `+0x124 * 0x4C88DC` and its
+single-step wrap. No evidence yet maps the player steering request into wheel
+steering state, so the runtime does not inject a guessed angle. The next valid
+physics comparison remains a clean matched original/reconstruction grid-start
+capture for the four wheel anchors and contact projections; retain inactive
+state for negative signed depths until that upstream comparison resolves the
+mismatch.
