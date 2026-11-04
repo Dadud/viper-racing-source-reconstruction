@@ -70,24 +70,12 @@ const snapshotWheel = wheel => ({
 });
 const thread = () => Process.getCurrentThreadId();
 const now = () => Date.now();
-const t0 = now();
-const phaseWindows = [
-  { phase: "neutral_before", start: t0 + 1000, end: t0 + 2500, control: null },
-  { phase: "throttle", start: t0 + 2500, end: t0 + 4000, control: "throttle" },
-  { phase: "neutral_mid", start: t0 + 4000, end: t0 + 5500, control: null },
-  { phase: "brake", start: t0 + 5500, end: t0 + 7000, control: "brake" },
-  { phase: "neutral_after", start: t0 + 7000, end: t0 + 8500, control: null },
-];
-const stopAt = phaseWindows[phaseWindows.length - 1].end + 1000;
-const phases = Object.fromEntries(phaseWindows.map(window => [window.phase, 0]));
-const phaseSamples = Object.fromEntries(phaseWindows.map(window => [window.phase, 0]));
-const controlSamplesByPhase = Object.fromEntries(phaseWindows.map(window => [
-  window.phase,
-  {
-    throttle: { sum: 0, count: 0 },
-    brake: { sum: 0, count: 0 },
-  },
-]));
+let t0 = null;
+let phaseWindows = [];
+let stopAt = null;
+let phases = {};
+let phaseSamples = {};
+let controlSamplesByPhase = {};
 const active = new Map();
 let selectedPcar = null;
 let callbackCount = 0;
@@ -110,7 +98,45 @@ const bindingRecords = {
   throttle: at(0x509328),
   brake: at(0x509368),
 };
-const phaseAt = t => phaseWindows.find(window => t >= window.start && t < window.end) || null;
+const phaseAt = t => t0 === null ? null :
+  (phaseWindows.find(window => t >= window.start && t < window.end) || null);
+let finishTimer = null;
+let attachTimeout = null;
+let finished = false;
+let captureStarted = false;
+const beginCapture = () => {
+  if (captureStarted || finished) return;
+  captureStarted = true;
+  if (attachTimeout !== null) clearTimeout(attachTimeout);
+  t0 = now();
+  phaseWindows = [
+    { phase: "neutral_before", start: t0 + 1000, end: t0 + 2500, control: null },
+    { phase: "throttle", start: t0 + 2500, end: t0 + 4000, control: "throttle" },
+    { phase: "neutral_mid", start: t0 + 4000, end: t0 + 5500, control: null },
+    { phase: "brake", start: t0 + 5500, end: t0 + 7000, control: "brake" },
+    { phase: "neutral_after", start: t0 + 7000, end: t0 + 8500, control: null },
+  ];
+  stopAt = phaseWindows[phaseWindows.length - 1].end + 1000;
+  phases = Object.fromEntries(phaseWindows.map(window => [window.phase, 0]));
+  phaseSamples = Object.fromEntries(phaseWindows.map(window => [window.phase, 0]));
+  controlSamplesByPhase = Object.fromEntries(phaseWindows.map(window => [
+    window.phase,
+    { throttle: { sum: 0, count: 0 }, brake: { sum: 0, count: 0 } },
+  ]));
+  send({
+    event: "controlled_pcar_capture_armed",
+    body: selectedPcar.toString(),
+    phaseWindowsMs: phaseWindows.map(window => ({
+      phase: window.phase,
+      start: window.start - t0,
+      end: window.end - t0,
+      control: window.control,
+    })),
+    syntheticInput: true,
+    routeOrIdealLineInput: false,
+  });
+  finishTimer = setTimeout(finishCapture, stopAt - now());
+};
 
 const keyListener = Interceptor.attach(at(0x413170), {
   onEnter(args) { this.selector = args[0].toUInt32(); },
@@ -136,9 +162,16 @@ const keyListener = Interceptor.attach(at(0x413170), {
 const callbackListener = Interceptor.attach(at(0x4384d0), {
   onEnter() {
     const car = this.context.ecx;
-    if (!car || car.isNull()) return;
+    if (!car || car.isNull() || safe(() => car.readU32()) !== 0x4c8188) return;
+    if (selectedPcar !== null) return;
     selectedPcar = car;
     callbackCount++;
+    beginCapture();
+    send({
+      event: "pcar_selected_player",
+      body: car.toString(),
+      ordinal_0x510: readU32(car, 0x510),
+    });
   }
 });
 
@@ -226,35 +259,23 @@ const wheelListener = Interceptor.attach(at(0x442530), {
   }
 });
 
-send({
-  event: "controlled_pcar_capture_ready",
-  module: engine.name,
-  base: engine.base.toString(),
-  imageSize: engine.size,
-  phaseWindowsMs: phaseWindows.map(window => ({
-    phase: window.phase,
-    start: window.start - t0,
-    end: window.end - t0,
-    control: window.control,
-  })),
-  sampleEveryPlayerIntegrators: 6,
-  maximumSamplesPerPhase: 16,
-  stopAfterMs: stopAt - t0,
-  syntheticInput: true,
-  routeOrIdealLineInput: false,
-});
-
-setTimeout(() => {
+function finishCapture(reason = null) {
+  if (finished) return;
+  finished = true;
+  if (finishTimer !== null) clearTimeout(finishTimer);
+  if (attachTimeout !== null) clearTimeout(attachTimeout);
   keyListener.detach();
   callbackListener.detach();
   integratorListener.detach();
   wheelListener.detach();
-  const phaseCoverage = Object.values(phaseSamples).every(count => count >= 4);
+  const phaseCoverage = captureStarted &&
+    Object.values(phaseSamples).every(count => count >= 4);
   const phaseMean = (phase, control) => {
     const sample = controlSamplesByPhase[phase][control];
     return sample.count > 0 ? sample.sum / sample.count : null;
   };
   const neutralMean = control => {
+    if (!captureStarted) return null;
     const names = ["neutral_before", "neutral_mid", "neutral_after"];
     const means = names.map(name => phaseMean(name, control)).filter(value => value !== null);
     return means.length === names.length
@@ -262,8 +283,8 @@ setTimeout(() => {
   };
   const neutralThrottle = neutralMean("throttle");
   const neutralBrake = neutralMean("brake");
-  const throttleDuringThrottle = phaseMean("throttle", "throttle");
-  const brakeDuringBrake = phaseMean("brake", "brake");
+  const throttleDuringThrottle = captureStarted ? phaseMean("throttle", "throttle") : null;
+  const brakeDuringBrake = captureStarted ? phaseMean("brake", "brake") : null;
   const throttleObserved = keyStats.throttle.binding_type === 1 &&
     keyStats.throttle.reads > 0 && keyStats.throttle.patched > 0 &&
     throttleDuringThrottle !== null && neutralThrottle !== null &&
@@ -277,6 +298,7 @@ setTimeout(() => {
     event: "controlled_pcar_capture_done",
     captureValid,
     invalidReasons: [
+      ...(reason ? [reason] : []),
       ...(keyStats.throttle.binding_type !== 1 ? ["throttle_binding_not_keyboard_type_1"] : []),
       ...(keyStats.throttle.reads === 0 ? ["throttle_key_wrapper_not_reached"] : []),
       ...(keyStats.throttle.patched === 0 ? ["no_throttle_key_return_patched"] : []),
@@ -288,7 +310,7 @@ setTimeout(() => {
       ...(!phaseCoverage ? ["insufficient_phase_sample_coverage"] : []),
       ...(wheelRows < 20 ? ["insufficient_wheel_rows"] : []),
     ],
-    elapsed_ms: now() - t0,
+    elapsed_ms: t0 === null ? null : now() - t0,
     pcarCallbacks: callbackCount,
     pcarIntegrators: integratorCount,
     sampledIntegratorsByPhase: phaseSamples,
@@ -317,4 +339,18 @@ setTimeout(() => {
       control: window.control,
     })),
   });
-}, stopAt - t0);
+}
+
+send({
+  event: "controlled_pcar_capture_ready",
+  module: engine.name,
+  base: engine.base.toString(),
+  imageSize: engine.size,
+  startCondition: "first_selected_pcar_callback_0x4384d0",
+  attachTimeoutMs: 60000,
+  sampleEveryPlayerIntegrators: 6,
+  maximumSamplesPerPhase: 16,
+  syntheticInput: true,
+  routeOrIdealLineInput: false,
+});
+attachTimeout = setTimeout(() => finishCapture("selected_pcar_not_seen_within_timeout"), 60000);

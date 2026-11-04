@@ -54,6 +54,7 @@ vm.runInNewContext(script, {
     ptr,
     send: event => emitted.push(event),
     setTimeout: callback => { timeoutCallback = callback; return 1; },
+    clearTimeout: () => {},
     Date: { now: () => clock },
     Map,
     Array,
@@ -71,6 +72,7 @@ const controller = ptr(imageBase + 0x120000n);
 const d24 = ptr(imageBase + 0x130000n);
 const throttleBinding = ptr(0x509328n);
 const brakeBinding = ptr(0x509368n);
+memory.set(body.value, 0x4c8188);
 memory.set(body.add(0xc98).value, controller);
 memory.set(controller.add(0x4c).value, d24);
 memory.set(throttleBinding.value, 1);
@@ -87,9 +89,16 @@ const keyInvocation = { selector: 0xc8 };
 keyHook.onEnter.call(keyInvocation, [{ toUInt32: () => keyInvocation.selector }]);
 keyReturn.value = 0;
 keyHook.onLeave.call(keyInvocation, keyReturn);
+assert.equal(keyReturn.value, 0, "no synthetic input before selected PCAR is seen");
+
+hooks.get(0x384d0).onEnter.call({ context: { ecx: body } });
+clock = 7000;
+keyHook.onEnter.call(keyInvocation, [{ toUInt32: () => keyInvocation.selector }]);
+keyReturn.value = 0;
+keyHook.onLeave.call(keyInvocation, keyReturn);
 assert.equal(keyReturn.value, 1, "synthetic throttle return is patched");
 
-clock = 7000;
+clock = 10000;
 memory.set(brakeBinding.value, 2);
 const unsupportedBrakeInvocation = { selector: 0x39 };
 keyHook.onEnter.call(unsupportedBrakeInvocation,
@@ -113,7 +122,6 @@ const brakeReturn = {
 keyHook.onLeave.call(brakeInvocation, brakeReturn);
 assert.equal(brakeReturn.value, 1, "configured type-1 brake key is patched");
 
-hooks.get(0x384d0).onEnter.call({ context: { ecx: body } });
 const integrator = hooks.get(0x31150);
 const invocation = { context: { ecx: body } };
 integrator.onEnter.call(invocation);
@@ -131,6 +139,9 @@ assert.equal(sample.configuredBindings.throttle.selector, 0xc8);
 assert.equal(sample.configuredBindings.brake.type, 1);
 assert.equal(sample.configuredBindings.brake.selector, 0x39);
 assert.equal(emitted[0].event, "controlled_pcar_capture_ready");
+assert(emitted.some(event => event.event === "controlled_pcar_capture_armed"));
+assert(emitted.some(event => event.event === "pcar_selected_player" &&
+    event.body === body.toString()));
 const done = emitted.find(event => event.event === "controlled_pcar_capture_done");
 assert(done && done.captureValid === false,
     "one sample must fail closed on inadequate phase and wheel coverage");

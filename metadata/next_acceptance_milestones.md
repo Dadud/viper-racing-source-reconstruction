@@ -1071,3 +1071,7 @@ invalidate the capture. Acceptance also requires observed changes in both
 throttle `0x5093F4` and brake `0x509320`, at least four selected-PCAR samples
 per phase, and at least 20 wheel rows. Its Node mock checks the script path and
 fail-closed behavior only; actual original-client delivery remains unverified.
+The schedule now starts at the first `0x4384D0` callback whose object vtable is
+`0x4C8188`, and the integrator must carry that exact body pointer. No key is
+synthesized before that selected-player gate. If no selected PCAR appears
+within 60 seconds, the probe detaches and emits an invalid timeout result.
