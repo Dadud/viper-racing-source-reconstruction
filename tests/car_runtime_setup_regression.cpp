@@ -65,6 +65,59 @@ int main()
                 "tire accumulator outputs must use native coefficients and divisors");
         }
         {
+            constexpr std::uint32_t wheel_base = 0x554U;
+            viper::NcarWheelRuntimeObjectState wheel{};
+            const std::array<viper::NcarObjectFieldWrite, 3> sources{{
+                {wheel_base + 0x004U, 4U,
+                    std::bit_cast<std::uint32_t>(0.0F)},
+                {wheel_base + 0x0a4U, 4U,
+                    std::bit_cast<std::uint32_t>(1.5F)},
+                {wheel_base + 0x10cU, 4U,
+                    std::bit_cast<std::uint32_t>(2.0F)},
+            }};
+            require(viper::apply_ncar_wheel_object_writes(
+                        wheel, wheel_base, sources),
+                "tire accumulator source bytes must materialize");
+            viper::WheelTireAccumulatorInput input{};
+            input.response_gate_0x11c = 2.0F;
+            input.forward_response_local_0x38 = 1000.0F;
+            input.lateral_response_local_0x2c = 500.0F;
+            input.divisor_0x1c = 2.0F;
+            input.divisor_factor_0x48 = 1.0F;
+            input.divisor_factor_0xc0 = 2.0F;
+            input.contact_active_0x168 = true;
+            auto expected_input = input;
+            expected_input.accumulator_0xa4 = 1.5F;
+            expected_input.accumulator_0x10c = 2.0F;
+            expected_input.sign_source_0x04 = 0.0F;
+            const auto expected = viper::advance_wheel_tire_accumulators(
+                expected_input);
+            const auto result = viper::advance_ncar_wheel_tire_accumulators_in_object(
+                wheel, wheel_base, input);
+            require(result && result->contact_states_updated &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x0a4U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.accumulator_0xa4)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x10cU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.accumulator_0x10c)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x0ecU) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.state_0xec)} &&
+                    viper::read_ncar_wheel_object_u32(wheel, 0x0f0U) ==
+                        std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
+                            expected.state_0xf0)},
+                "byte-backed active-contact accumulator must match source writes");
+
+            viper::NcarWheelRuntimeObjectState unresolved{};
+            const auto unresolved_before = unresolved;
+            require(!viper::advance_ncar_wheel_tire_accumulators_in_object(
+                        unresolved, wheel_base, input) &&
+                    unresolved.bytes == unresolved_before.bytes &&
+                    unresolved.initialized_bytes == unresolved_before.initialized_bytes,
+                "tire accumulator must fail closed on unknown +0x04/+0xA4/+0x10C inputs");
+        }
+        {
             viper::WheelTireDynamicsState state{};
             state.filtered_component_0x170 = 10.0F;
             state.filtered_component_0x174 = 10.0F;
@@ -594,6 +647,11 @@ int main()
         ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
         const auto ordinary_tire_response = viper::derive_tire_wheel_response(
             {}, ordinary_tire_factor_input);
+        require(ordinary_tire_response.dynamics_division_valid &&
+                ordinary_tire_response.dynamics_denominator_0x1c ==
+                    ordinary_tire_response.factors.forward_curve_value *
+                        ordinary_tire_response.factors.curve_input,
+            "tire accumulator +0xEC divisor must preserve the native forward-curve product");
         const auto upper_bounded_tire_ratio =
             viper::derive_wheel_kinematic_ratios(0.0F, 0.0F, 100.0F, 1.0F);
         const auto lower_bounded_tire_ratio =

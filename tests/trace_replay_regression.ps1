@@ -155,6 +155,7 @@ try {
     $wheelSlipRatioColumns = [int[]]::new(4)
     $wheelTireCurveColumns = @()
     $wheelTireDynamicsColumns = @()
+    $wheelTireAccumulatorColumns = @()
     $wheelScalarColumns = [int[]]::new(4)
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
@@ -227,6 +228,15 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireDynamicsNames[$lane])")
         }
         $wheelTireDynamicsColumns += ,$tireDynamicsColumns
+        $tireAccumulatorNames = @(
+            'tire_accumulator_applied', 'tire_accumulator_0xa4',
+            'tire_accumulator_0x10c', 'tire_state_0xec', 'tire_state_0xf0')
+        $tireAccumulatorColumns = [int[]]::new($tireAccumulatorNames.Count)
+        for ($lane = 0; $lane -lt $tireAccumulatorNames.Count; ++$lane) {
+            $tireAccumulatorColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($tireAccumulatorNames[$lane])")
+        }
+        $wheelTireAccumulatorColumns += ,$tireAccumulatorColumns
         $wheelScalarColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_value_0xe0")
         $spinColumns = [int[]]::new(5)
@@ -305,6 +315,9 @@ try {
         @($wheelTireDynamicsColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0 -or
+        @($wheelTireAccumulatorColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelScalarColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelSpinColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
@@ -327,6 +340,7 @@ try {
     $observedSuspensionForce = $false
     $observedTireCurveDerivation = $false
     $observedTireDynamicsStage = $false
+    $observedTireAccumulatorStage = $false
     $bodyVerticalVelocityColumn = [Array]::IndexOf($tickHeader, 'body_vel_y')
     for ($index = 1; $index -lt $replayedTickLines.Count; ++$index) {
         if ($replayedTickLines[$index] -cne $repeatedTickLines[$index]) {
@@ -438,6 +452,25 @@ try {
                     if ([single]::IsNaN($filterValue) -or
                         [single]::IsInfinity($filterValue)) {
                         throw "Wheel $wheel tire filter output is non-finite at line $($index + 1)"
+                    }
+                }
+            }
+            $accumulatorColumns = $wheelTireAccumulatorColumns[$wheel]
+            $accumulatorApplied = $fields[$accumulatorColumns[0]]
+            if ($dynamicsApplied -eq '1' -and $accumulatorApplied -ne '1') {
+                throw "Wheel $wheel active-contact tire accumulator did not apply at line $($index + 1)"
+            }
+            if ($accumulatorApplied -eq '1') {
+                $observedTireAccumulatorStage = $true
+                foreach ($column in $accumulatorColumns[1..4]) {
+                    if ([string]::IsNullOrWhiteSpace($fields[$column])) {
+                        throw "Wheel $wheel tire accumulator output is missing at line $($index + 1)"
+                    }
+                    $accumulatorValue = [single]::Parse(
+                        $fields[$column], [cultureinfo]::InvariantCulture)
+                    if ([single]::IsNaN($accumulatorValue) -or
+                        [single]::IsInfinity($accumulatorValue)) {
+                        throw "Wheel $wheel tire accumulator output is non-finite at line $($index + 1)"
                     }
                 }
             }
@@ -841,8 +874,11 @@ try {
     if (-not $observedTireDynamicsStage) {
         throw 'Fixed-step replay never entered the finite active-contact tire-filter stage'
     }
+    if (-not $observedTireAccumulatorStage) {
+        throw 'Fixed-step replay never entered the finite active-contact tire accumulator stage'
+    }
 
-    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Tire-curve factors and active-contact filter outputs were derived; tire forces remain outside body integration."
+    Write-Output "Authored throttle/coast/steering/brake/coast input schedule replayed identically across $($replayedLines.Count - 1) frames; body gravity/suspension integration changed velocity while route motion ran zero steps. Active-contact tire filters and accumulator state were derived and persisted; tire forces remain outside body integration."
 }
 finally {
     Remove-Item -LiteralPath $capture, $replay, $repeat, $replayTicks,

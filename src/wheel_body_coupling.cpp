@@ -1162,6 +1162,73 @@ advance_ncar_wheel_tire_dynamics_in_object(
         ? std::optional<WheelTireDynamicsResult>{result} : std::nullopt;
 }
 
+std::optional<WheelTireAccumulatorResult>
+advance_ncar_wheel_tire_accumulators_in_object(
+    NcarWheelRuntimeObjectState& wheel,
+    const std::uint32_t wheel_object_offset,
+    const WheelTireAccumulatorInput& input) noexcept
+{
+    if (!input.contact_active_0x168) return std::nullopt;
+    const auto read_finite = [&wheel](const std::uint32_t local_offset)
+            -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, local_offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto accumulator_0xa4 = read_finite(0x0a4U);
+    const auto accumulator_0x10c = read_finite(0x10cU);
+    const auto sign_source_0x04 = read_finite(0x004U);
+    if (!accumulator_0xa4 || !accumulator_0x10c || !sign_source_0x04) {
+        return std::nullopt;
+    }
+
+    auto resolved = input;
+    resolved.accumulator_0xa4 = *accumulator_0xa4;
+    resolved.accumulator_0x10c = *accumulator_0x10c;
+    resolved.state_0xec = 0.0F;
+    resolved.state_0xf0 = 0.0F;
+    resolved.sign_source_0x04 = *sign_source_0x04;
+    const std::array<float, 10> finite_inputs{
+        resolved.response_gate_0x11c,
+        resolved.forward_response_local_0x38,
+        resolved.lateral_response_local_0x2c,
+        resolved.divisor_0x1c,
+        resolved.divisor_factor_0x48,
+        resolved.divisor_factor_0xc0,
+        resolved.forward_accumulator_scale,
+        resolved.signed_lateral_scale,
+        resolved.decay_0x10c,
+        resolved.forward_scale_0x10c};
+    if (!std::all_of(finite_inputs.begin(), finite_inputs.end(),
+            [](const float value) { return std::isfinite(value); }) ||
+        resolved.divisor_0x1c == 0.0F ||
+        resolved.divisor_factor_0x48 == 0.0F ||
+        resolved.divisor_factor_0xc0 == 0.0F) {
+        return std::nullopt;
+    }
+    const auto result = advance_wheel_tire_accumulators(resolved);
+    const std::array<float, 4> outputs{
+        result.accumulator_0xa4, result.accumulator_0x10c,
+        result.state_0xec, result.state_0xf0};
+    if (!std::all_of(outputs.begin(), outputs.end(),
+            [](const float value) { return std::isfinite(value); })) {
+        return std::nullopt;
+    }
+    const std::array<NcarObjectFieldWrite, 4> writes{{
+        {wheel_object_offset + 0x0a4U, 4U,
+            std::bit_cast<std::uint32_t>(result.accumulator_0xa4)},
+        {wheel_object_offset + 0x10cU, 4U,
+            std::bit_cast<std::uint32_t>(result.accumulator_0x10c)},
+        {wheel_object_offset + 0x0ecU, 4U,
+            std::bit_cast<std::uint32_t>(result.state_0xec)},
+        {wheel_object_offset + 0x0f0U, 4U,
+            std::bit_cast<std::uint32_t>(result.state_0xf0)},
+    }};
+    return apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes)
+        ? std::optional<WheelTireAccumulatorResult>{result} : std::nullopt;
+}
+
 bool apply_ncar_wheel_tire_response_scale(
     NcarWheelRuntimeObjectState& destination,
     const std::uint32_t wheel_object_offset,
@@ -2697,11 +2764,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                 response_components.forward;
             accumulator_input.lateral_response_local_0x2c =
                 response_components.lateral;
-            if (input.wheel_contact_pipeline_enabled) {
-                accumulator_input.divisor_0x1c =
-                    result.wheel_contact_pipeline_results[wheel]
-                        .feature_profile.response_scale;
-            }
+            accumulator_input.divisor_0x1c =
+                response_derivation.dynamics_denominator_0x1c;
             accumulator_input.response_gate_0x11c =
                 result.wheel_tire_dynamics_states[wheel].response_gate_0x11c;
             if (input.wheel_contact_pipeline_enabled) {

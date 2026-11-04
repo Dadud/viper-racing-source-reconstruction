@@ -1402,6 +1402,7 @@ TireWheelResponseDerivation derive_tire_wheel_response(
         input.wheel_scale_0x94 * input.mode_scale_0xf0;
     const auto dynamics_denominator =
         factors.forward_curve_value * factors.curve_input;
+    result.dynamics_denominator_0x1c = dynamics_denominator;
     result.dynamics_division_valid =
         dynamics_denominator != 0.0F && std::isfinite(dynamics_denominator);
     if (result.dynamics_division_valid) {

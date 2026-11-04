@@ -2090,6 +2090,8 @@ struct PlayerPhysicsTickContext {
         wheel_tire_response_derivations{};
     std::array<std::optional<viper::WheelTireDynamicsResult>, 4>
         wheel_tire_dynamics_results{};
+    std::array<std::optional<viper::WheelTireAccumulatorResult>, 4>
+        wheel_tire_accumulator_results{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x170{};
     std::array<std::optional<float>, 4> wheel_tire_filter_0x174{};
     std::array<std::optional<float>, 4> wheel_tire_instantaneous_0x180{};
@@ -3660,6 +3662,34 @@ struct WindowState {
                                                 wheel_object_offset, derivation,
                                                 *player_tire_trigonometric_terms[wheel],
                                                 adjusted_suspension, true, false);
+                                        if (tick.wheel_tire_dynamics_results[wheel]) {
+                                            auto evolved_factors = derivation.factors;
+                                            evolved_factors.trigonometric_response =
+                                                tick.wheel_tire_dynamics_results[wheel]
+                                                    ->trigonometric_response;
+                                            const auto response_components =
+                                                viper::combine_tire_wheel_response(
+                                                    evolved_factors);
+                                            viper::WheelTireAccumulatorInput accumulator_input{};
+                                            accumulator_input.response_gate_0x11c =
+                                                read_response_float(0x11cU).value_or(
+                                                    std::numeric_limits<float>::quiet_NaN());
+                                            accumulator_input.forward_response_local_0x38 =
+                                                response_components.forward;
+                                            accumulator_input.lateral_response_local_0x2c =
+                                                response_components.lateral;
+                                            accumulator_input.divisor_0x1c =
+                                                derivation.dynamics_denominator_0x1c;
+                                            accumulator_input.divisor_factor_0x48 =
+                                                derivation.factors.curve_input;
+                                            accumulator_input.divisor_factor_0xc0 =
+                                                derivation.factors.lateral_curve_value;
+                                            accumulator_input.contact_active_0x168 = true;
+                                            tick.wheel_tire_accumulator_results[wheel] =
+                                                viper::advance_ncar_wheel_tire_accumulators_in_object(
+                                                    player_runtime_state.wheel_objects[wheel],
+                                                    wheel_object_offset,
+                                                    accumulator_input);
                                     }
                                 }
                             }
@@ -3667,6 +3697,7 @@ struct WindowState {
                     }
                 }
             }
+        }
             tick.wheel_tire_filter_0x170[wheel] = read_response_float(0x170U);
             tick.wheel_tire_filter_0x174[wheel] = read_response_float(0x174U);
             tick.wheel_tire_instantaneous_0x180[wheel] =
@@ -5406,6 +5437,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_instantaneous_0x180"
                 << ",wheel" << wheel << "_tire_response_gate_0x11c"
                 << ",wheel" << wheel << "_tire_trigonometric_response"
+                << ",wheel" << wheel << "_tire_accumulator_applied"
+                << ",wheel" << wheel << "_tire_accumulator_0xa4"
+                << ",wheel" << wheel << "_tire_accumulator_0x10c"
+                << ",wheel" << wheel << "_tire_state_0xec"
+                << ",wheel" << wheel << "_tire_state_0xf0"
                 << ",wheel" << wheel << "_surface_adjusted_response_0x178"
                 << ",wheel" << wheel << "_response_scalar_0x7c"
                 << ",wheel" << wheel << "_curve_scale_0x90"
@@ -5834,6 +5870,26 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 tick.wheel_tire_dynamics_results[wheel]
                                     ? std::optional<float>{tick.wheel_tire_dynamics_results[wheel]
                                           ->trigonometric_response}
+                                    : std::nullopt}) {
+                            physics_tick_trace << ',';
+                            if (value) physics_tick_trace << *value;
+                        }
+                        const auto& tire_accumulator =
+                            tick.wheel_tire_accumulator_results[wheel];
+                        physics_tick_trace << ',' <<
+                            (tire_accumulator ? 1 : 0);
+                        for (const auto value : {
+                                tire_accumulator
+                                    ? std::optional<float>{tire_accumulator->accumulator_0xa4}
+                                    : std::nullopt,
+                                tire_accumulator
+                                    ? std::optional<float>{tire_accumulator->accumulator_0x10c}
+                                    : std::nullopt,
+                                tire_accumulator
+                                    ? std::optional<float>{tire_accumulator->state_0xec}
+                                    : std::nullopt,
+                                tire_accumulator
+                                    ? std::optional<float>{tire_accumulator->state_0xf0}
                                     : std::nullopt}) {
                             physics_tick_trace << ',';
                             if (value) physics_tick_trace << *value;

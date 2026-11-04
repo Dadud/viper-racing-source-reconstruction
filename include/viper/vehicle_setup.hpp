@@ -126,7 +126,7 @@ struct WheelTireAccumulatorInput {
     float sign_source_0x04{};
     float forward_response_local_0x38{};
     float lateral_response_local_0x2c{};
-    float divisor_0x1c{};
+    float divisor_0x1c{}; // forward_curve_value * curve_input in 0x442530
     float divisor_factor_0x48{}; // tire response curve_input (stack local +0x48)
     float divisor_factor_0xc0{}; // lateral_curve_value (stack local +0xC0)
     float forward_accumulator_scale{-0x1.1d0934p-14F}; // 0x4C897C
@@ -408,6 +408,8 @@ struct TireWheelResponseDerivation {
     float dynamics_component_0x2c{};
     float dynamics_component_0x30{};
     float secondary_slip_component_0xe4{};
+    // Native accumulator divisor local: forward_curve_value * curve_input.
+    float dynamics_denominator_0x1c{};
     bool dynamics_division_valid{};
 };
 

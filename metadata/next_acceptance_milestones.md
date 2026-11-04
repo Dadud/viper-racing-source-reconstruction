@@ -887,16 +887,16 @@ vector. Its slip-curve input uses wheel animation offset `+0xD8`, the
 contact-normal/forward cross product, and the body basis row at `+0x44..+0x4C`;
 it is distinct from rolling-speed mismatch. The portable four-wheel
 composition now derives these operands accordingly, with focused regression
-coverage. The live session now executes active-contact tire-filter updates,
-while response vectors and tire forces remain disconnected. Next, source the
-upstream tire-accumulator values and connect per-wheel vector stores in native
-order, then compare controlled no-ideal-line runs against the original.
+coverage. The live session now executes active-contact tire-filter and
+accumulator updates, while response vectors and tire forces remain
+disconnected. Next, source the inactive-contact reset/history predicates and
+per-wheel vector stores in native order, then compare controlled no-ideal-line
+runs against the original.
 
-The route-disabled live path now derives finite curve inputs and advances
-stateful tire filters for active-contact wheels, with byte-backed history
-validation and trace regression. The next gap is upstream tire accumulator
-state `+0xA4/+0x10C/+0xEC/+0xF0` and exact same-tick local producers. Resolve
-those lanes and the native reset/history predicates, then produce and persist
-`+0xF4/+0x100/+0x7C` in callback order. Keep force application gated until
-per-wheel response vectors and their native `0x43E6F0` call sequence pass
-source-backed regression and no-ideal-line replay checks.
+The route-disabled live path now derives finite curve inputs, advances the
+active-contact tire filters, and persists `+0xA4/+0x10C/+0xEC/+0xF0` from the
+same-tick accumulator model. Its `+0xEC` divisor is the native forward-curve
+product. The next gap is the inactive-contact filter/reset and accumulator
+behavior, followed by exact `+0xF4/+0x100/+0x7C` stores and projection bases.
+Keep force application gated until per-wheel vectors and their native
+`0x43E6F0` call sequence pass source-backed regression and no-ideal-line replay.

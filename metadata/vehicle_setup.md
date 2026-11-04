@@ -1256,8 +1256,13 @@ hexadecimal literals in `WheelTireAccumulatorInput`. The final `ESP+0x48` and
 and `lateral_curve_value`, respectively. The latter is the linear tire curve
 scaled by wheel `+0x94` and the feature mode scale. The stack correction at
 `0x443501` accounts for one pushed argument before storing the stable `+0xC0`
-local. These mappings match `WheelTireResponseDerivation`; they remain
-caller-supplied until live response derivation is connected.
+local. The `+0xEC` divisor is also source-derived: `local_f0` is assigned the
+forward curve value times `curve_input` at `0x443529..0x443540`, then consumed
+at `0x443963..0x443967`. `derive_tire_wheel_response` now retains that product
+as `dynamics_denominator_0x1c`; the four-wheel model uses it instead of the
+feature-mode scale. Live active-contact accumulator writes now use this same
+denominator. Numeric parity against a controlled original capture remains
+unverified.
 
 The four-wheel composition can now execute this accumulator stage directly
 after the per-wheel tire-dynamics update and before tire response vector and
@@ -1268,9 +1273,9 @@ updated tire-dynamics state. It now also derives the accumulator's forward
 using the newly smoothed `0x435780` trigonometric response. Previous accumulator
 values now live in `WheelTireAccumulatorState` and are carried from the prior
 four-wheel result into the next call. The global coefficients are source-backed
-defaults and denominator factors map to the derived curve input and lateral
-curve value. These locals are formed directly before
-the accumulator writes at `0x004438F3..0x0044399B`.
+defaults; divisor `+0x1C` is the forward-curve product, while denominator
+factors `+0x48/+0xC0` are the curve input and lateral curve value. These locals
+are formed directly before the accumulator writes at `0x004438F3..0x0044399B`.
 
 `advance_wheel_tire_dynamics` models the stateful smoothing immediately before
 the `0x435780` call. The gate is the caller-frame `ESP+0x20` local (a raw
