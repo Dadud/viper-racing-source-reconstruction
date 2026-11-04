@@ -1,3 +1,15 @@
+- **2026-11-04, repeated route-free Viper response gate:** Re-ran the Release
+  `game_fixed_step_trace_replay_regression` (CTest 33) with verbose output and
+  inspected its direct matched-window metrics. The authored 320-frame input,
+  repeated playback, mirrored steering, `yaw_control=1` steering, wheel/tire
+  force pipeline, and zero ideal-line route steps all passed. In the matched
+  fresh-session window (updates 32–63), mean forward speed was exactly equal
+  under neutral and throttle (`-0.4996227566` each), so the throttle-response
+  predicate correctly stayed false. Braking changed mean magnitude from
+  `1.5285613` neutral to `1.4927040`, but this does not identify engine torque
+  or establish original parity. This confirms the known powered-driving blocker;
+  the race is still not accepted as playable. No source or control-law change
+  was made from these diagnostic results.
 # Reconstruction progress
 
 - **2026-11-04, runtime track/car matrix:** Extended
