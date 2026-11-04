@@ -41,13 +41,15 @@ opens setup, then leaves results open after a finished playback so Enter can
 return to setup; explicit CLI asset selections retain bounded replay behavior.
 
 `game_frontend_launch_smoke` is a Windows CTest that launches the actual
-interactive executable with an isolated temporary Config directory, finds the
-setup window, posts C to open career slots and Escape to return, then posts
-Enter, waits for the race window, posts Escape, and checks that the process
-exits with code zero. This exercises slot-screen navigation and setup-to-race
-asset loading. It does not validate a real saved career, run a complete race,
-verify every selector row, persist changed choices, or establish parity with
-the original menus.
+interactive executable with an isolated temporary Config directory. It checks
+career-slot validation, deletion cancellation and confirmation, native career
+file creation, and refusal to overwrite valid or invalid occupied files. It
+then changes the opponent profile, starts a race, and checks the saved profile.
+A second scenario selects Random, verifies that setup resolves it to one of
+the eight installed tracks, confirms the concrete track is persisted, and
+verifies restoration after relaunch. This exercises those frontend flows and
+setup-to-race asset loading; it does not validate career continuation, complete
+a race, or establish parity with the original menus.
 
 `game_frontend_session_lifecycle_smoke` opens the setup and controls pages,
 remaps throttle, changes the selected car and lap count, starts a Viper/Bemidji
@@ -98,7 +100,9 @@ Press C at race setup to open the five-slot career-file screen. The runtime
 uses the resolved Config directory and the native `careerN.dat` reader to
 show slots 1–5 as empty/invalid or display the stored player-name bytes for a
 valid slot. Enter repeats header, payload, XOR, and checksum validation and
-reports whether the slot passed. Press D and confirm with Y to delete only the
+reports whether the slot passed. Press N to create a native-format career file
+in the selected empty slot; creation refuses to overwrite either a valid or
+invalid occupied slot. Press D and confirm with Y to delete only the
 selected slot; N or Escape cancels, and the row refreshes to empty after
 removal. Escape returns to race setup. This screen remains a slot browser and
 validator: the original career action loop, event setup, upgrades, and result
@@ -117,8 +121,10 @@ hotkey is unavailable.
 - Verify each track and supported car through this UI, not only the CLI smoke
   matrix; establish the supported car roster against original frontend data.
 - Implement and retain additional settings beyond quick-race lap count and
-  opponent profile, including random-track behavior,
-  race-mode selection, and native-compatible writeback.
+  opponent profile, including race-mode selection and native-compatible
+  writeback. Random-track selection is implemented and covered by the frontend
+  launch smoke, which checks installed-track resolution, persistence of the
+  realized track, and restoration after relaunch.
 - Connect validated career payloads to the reconstructed career action/event
   loop, preserving upgrades and progression through results and native saves.
 - Compare controlled original and reconstructed menu/race/results captures.
