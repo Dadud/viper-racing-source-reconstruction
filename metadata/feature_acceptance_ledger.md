@@ -1,6 +1,6 @@
 # Feature, evidence, and acceptance ledger
 
-Updated: 2026-11-03. This is a compact acceptance index for the stated goal:
+Updated: 2026-11-04. This is a compact acceptance index for the stated goal:
 a complete, playable modern Windows reconstruction of Viper Racing using
 separately supplied original assets. Original-client interoperability is out
 of scope. It summarizes, and does not replace, the detailed evidence and
@@ -41,6 +41,15 @@ traces throttle/brake ramps through PCAR control setters and finds no link to
 the active wheel `+0x124` writer at `0x443E9D` in that call chain. This does not
 prove a producer is absent elsewhere. Powered longitudinal control and matched
 original traces remain open; first-race physics is partial.
+
+The bounded audit was extended on 2026-11-04 across the throttle, brake, and
+clutch-like binding ramps, PCAR callback `0x4384D0`, shared integrator
+`0x431150`, and active wheel updater `0x442530`. The identified controls reach
+the `+0xC98` selection controller and wheel `+0xE0` response, but no gear,
+engine RPM, clutch-torque, or differential-torque operand is present in that
+reviewed chain. The separate `+0x124` write at `0x44435B` belongs to
+ghost/interpolated records. This narrows the next static search but does not
+prove that a player powertrain producer is absent elsewhere.
 
 **Test oracle rule:** ideal-line-derived pose, route distance/speed, lap
 completion, standings, and results are not driving evidence. Runtime tests must

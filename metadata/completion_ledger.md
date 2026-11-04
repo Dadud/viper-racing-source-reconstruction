@@ -1,5 +1,25 @@
 # Playable reconstruction completion ledger
 
+## 2026-11-04 update
+
+The route-free player now has a persistent body pose and runs the integrated
+terrain/contact, suspension, tire-response, force/moment, and body-kinematics
+stages described in the feature ledger. Its controlled local diagnostic still
+shows no measurable throttle effect: over matched updates 32–63, neutral and
+throttle forward-speed means are both `-0.499623` (absolute mean `1.528561`);
+braking changes the signed mean to `-0.535571` (absolute mean `1.492704`).
+These are reconstructed-client observations, not original parity. The
+2026-11-04 bounded control dataflow audit traces the PCAR throttle/brake/clutch-
+like ramps through callback `0x4384D0` and integrator `0x431150`, but does not
+find a powertrain operand in the reviewed link to the live wheel-rate store at
+`0x443E9D`. It also classifies the other `+0x124` store at `0x44435B` as a
+ghost/interpolated-record writer. This is a bounded result; engine torque and
+powered driving remain unimplemented. Details: [drivetrain input dataflow](drivetrain_input_dataflow.md).
+
+All ideal-line motion remains disabled in acceptance tests. Ideal-line data may
+be loaded as a resource, but route-derived pose, speed, distance, laps,
+standings, and results are not used as driving evidence.
+
 ## Current validation infrastructure
 
 `.github/workflows/windows.yml` configures and builds the x64 Windows Release

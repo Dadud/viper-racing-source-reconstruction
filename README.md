@@ -14,17 +14,23 @@ indexed mesh, and Viper's AI mesh, and draws them in a top-down Direct3D
 development view. It loads the selected track's `track.obt` placement table
 and renders the selected model at the human grid slot and the native Viper
 model at other valid `obj car` start positions. Normal startup keeps the
-recorded grid poses fixed while input and callback diagnostics run; the live
-session does not yet own a physical pose update. Ideal-line route motion is
-disabled by default; `--route-motion-prototype` enables a clearly labeled
-non-physical demo for manual inspection. No acceptance or regression test uses
-it as a driver or oracle. Keyboard bindings can come
-from `options.def`. A Win32 setup screen selects installed tracks and cars.
-Trace capture/playback, WARP rendering smoke cases, and parser regressions
-support repeatable development checks. Physical vehicle dynamics, native AI,
-original-matched frontend flow, career progression, original-compatible
-replays, and multiplayer remain open. See the feature ledger for current
-evidence and acceptance criteria.
+selected placement seeds a persistent player body and wheel state. The live
+fixed-step path queries terrain, advances source-derived suspension and tire
+responses, accumulates body forces and moments, and integrates the player pose;
+the body pose and velocity also feed rendering and the route-disabled HUD.
+These recovered stages still do not make a playable or original-matched race:
+engine/gear torque production is unresolved, and steering, collision, AI
+physics, numeric parity, and physical race progression need further evidence.
+Ideal-line route motion is disabled by default; `--route-motion-prototype`
+enables a clearly labeled non-physical demo for manual inspection. No
+acceptance or regression test uses it as a driver or oracle. Keyboard bindings
+can come from `options.def`. A Win32 setup screen selects installed tracks and
+cars. Trace capture/playback, WARP rendering smoke cases, and parser regressions
+support repeatable development checks. Native AI, original-matched frontend
+flow, career progression, original-compatible replays, and playable
+multiplayer remain open. See the feature ledger and
+[`metadata/drivetrain_input_dataflow.md`](metadata/drivetrain_input_dataflow.md)
+for current evidence and acceptance criteria.
 `viper_reconstruction` remains the asset inspection tool.
 
 ```powershell
@@ -60,9 +66,11 @@ input evaluation, PCAR callback projection, contact/suspension-history
 diagnostics and trace capture. Diagnostics-only acceptance checks select the
 native track-object grid placement with `-grid`, not the ILD-derived spline
 placement. They may parse/draw the ideal line as a resource/reference, but do
-not use it to choose test poses or score behavior. Terrain queries and wheel
-contacts remain diagnostic plumbing, not driving evidence. Portable physics regressions use explicit
-world-space inputs independent of track route data. The runtime can load and validate the eight
+not use it to choose test poses or score behavior. Terrain queries, suspension,
+tire response, and body integration participate in the route-disabled player
+simulation; their current trace checks remain diagnostic evidence, not proof of
+original driving parity. Portable physics regressions use explicit world-space
+inputs independent of track route data. The runtime can load and validate the eight
 shipped track bundles and five shipped car bundles. When the original data
 directory is beside the checkout, CTest adds an asset-validation case for each
 shipped track and car, plus a WARP rendering smoke for each selected track/car.
