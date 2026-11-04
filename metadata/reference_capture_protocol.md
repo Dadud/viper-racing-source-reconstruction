@@ -119,6 +119,21 @@ At the latest read-only foreground check, Windows reported a separate
 the staged `race.bin` window was still in the background. No global keyboard
 input was sent while another application's dialog owned the foreground.
 
+### Isolated silent copy prepared for PCAR source capture (2026-11-04)
+
+Prepared an external copy at
+`../../analysis/reference_captures/silent_reference_copy_20261104/GameRoot`
+for a future constructor-to-first-tick PCAR capture. The source install's
+`Data` entry is a junction; the copy used its resolved target and contains 47
+files. Per-file source/copy hashes are in the adjacent
+`silent_copy_manifest.json`: 45 files match byte-for-byte, and only the copied
+`Data/options.def` and `Config/options.cfg` differ. In both copied files,
+`[SOUND] enabled` is `no`, effects/music volumes are zero, and CD audio is
+disabled. The supplied install and prior captures were not modified. No game
+process was started, so runtime silence and capture behavior are unverified.
+Use this copy for physics instrumentation only after verifying it produces no
+audible output; do not use its muted settings for audio acceptance.
+
 ## Pairing a scenario
 
 Run the original and reconstruction separately on the same Windows machine and

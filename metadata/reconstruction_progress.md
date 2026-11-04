@@ -2485,3 +2485,15 @@ original-runtime fidelity.
   (1/1), and `git diff --check` pass. No original process was launched, so
   native capture and PCAR source provenance remain unverified.
 
+- **2026-11-04, isolated silent original capture staging:** The supplied
+  install's `Data` directory is a junction into an earlier external capture.
+  Prepared a separate external `GameRoot` copy for future PCAR physics
+  instrumentation, resolving that junction explicitly. Its 47 files are
+  recorded with source/copy SHA-256 values in
+  `../../analysis/reference_captures/silent_reference_copy_20261104/silent_copy_manifest.json`;
+  45 are unchanged and only the copied `options.def`/`options.cfg` were muted
+  (`enabled no`, zero effects/music, CD audio off). The supplied installation
+  and previous captures remain untouched. The game was not launched, so
+  runtime silence, first-tick capture, and source provenance remain
+  unverified; this copy is for physics capture only, not audio comparison.
+
