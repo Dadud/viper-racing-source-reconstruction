@@ -283,6 +283,12 @@ if(BUILD_TESTING)
         viper_graphics_startup)
     add_test(NAME graphics_startup_regression
         COMMAND viper_graphics_startup_regression)
+    add_executable(viper_render_transform_regression
+        tests/render_transform_regression.cpp)
+    target_include_directories(viper_render_transform_regression PRIVATE include)
+    target_compile_features(viper_render_transform_regression PRIVATE cxx_std_20)
+    add_test(NAME render_transform_regression
+        COMMAND viper_render_transform_regression)
     add_executable(viper_pcar_control_regression
         tests/pcar_control_update_regression.cpp)
     target_link_libraries(viper_pcar_control_regression PRIVATE viper_pcar_model)

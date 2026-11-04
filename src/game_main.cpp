@@ -27,6 +27,7 @@
 #include "viper/track_selection.hpp"
 #include "viper/replay_file.hpp"
 #include "viper/network_race_state.hpp"
+#include "viper/render_transform.hpp"
 #include "directinput_keyboard_service.h"
 
 #include <array>
@@ -1161,8 +1162,7 @@ public:
                     throw std::runtime_error("track.obt car placement plan is incomplete");
                 const auto& transform = placement.transform;
                 car_placement_plans_.push_back(placement);
-                const float yaw = std::atan2(transform[6], transform[0]);
-                car_poses_.push_back({transform[9], transform[10], transform[11], yaw});
+                car_poses_.push_back(transform);
                 if (placement.placement_route ==
                         viper::CarTrackPlacementRoute::precomputed_transform)
                     ++spline_placements;
@@ -1270,7 +1270,8 @@ public:
                       const float anchor_z, const float yaw)
     {
         if (car_index >= car_poses_.size()) return false;
-        car_poses_[car_index] = {anchor_x, anchor_y, anchor_z, yaw};
+        car_poses_[car_index] = viper::make_yaw_render_transform(
+            anchor_x, anchor_y, anchor_z, yaw);
         return update_car_buffer();
     }
 
@@ -1279,8 +1280,17 @@ public:
         if (poses.size() != car_poses_.size()) return false;
         for (std::size_t index = 0; index < poses.size(); ++index) {
             const auto& pose = poses[index];
-            car_poses_[index] = {pose[0], pose[1], pose[2], pose[3]};
+            car_poses_[index] = viper::make_yaw_render_transform(
+                pose[0], pose[1], pose[2], pose[3]);
         }
+        return update_car_buffer();
+    }
+
+    bool set_car_transforms(
+        const std::span<const viper::BodyRenderTransform> transforms)
+    {
+        if (transforms.size() != car_poses_.size()) return false;
+        std::copy(transforms.begin(), transforms.end(), car_poses_.begin());
         return update_car_buffer();
     }
 
@@ -1289,7 +1299,7 @@ public:
     std::array<float, 2> car_position(const std::size_t car_index) const
     {
         if (car_index >= car_poses_.size()) return {};
-        return {car_poses_[car_index].x, car_poses_[car_index].z};
+        return {car_poses_[car_index][9], car_poses_[car_index][11]};
     }
 
     const viper::CarTrackConstructionPlan* car_placement_plan(
@@ -1301,12 +1311,19 @@ public:
 
     float car_yaw(const std::size_t car_index) const
     {
-        return car_index < car_poses_.size() ? car_poses_[car_index].yaw : 0.0F;
+        return car_index < car_poses_.size()
+            ? viper::render_transform_yaw(car_poses_[car_index]) : 0.0F;
     }
 
     float car_height(const std::size_t car_index) const
     {
-        return car_index < car_poses_.size() ? car_poses_[car_index].y : 0.0F;
+        return car_index < car_poses_.size() ? car_poses_[car_index][10] : 0.0F;
+    }
+
+    viper::BodyRenderTransform car_transform(const std::size_t car_index) const
+    {
+        return car_index < car_poses_.size()
+            ? car_poses_[car_index] : viper::BodyRenderTransform{};
     }
 
 private:
@@ -1572,8 +1589,6 @@ private:
             const auto& pose = car_poses_[car_index];
             const auto& model = car_index == player_car_index_
                 ? *player_model_ : *ai_model_;
-            const float sin_yaw = std::sin(pose.yaw);
-            const float cos_yaw = std::cos(pose.yaw);
             for (const auto& model_group : model.material_groups) {
                 CarDrawGroup draw_group{};
                 draw_group.first_vertex = static_cast<UINT>(vertices.size());
@@ -1589,10 +1604,9 @@ private:
                     const auto vertex_index = static_cast<std::size_t>(model_group.first_vertex) + local_index;
                     if (vertex_index >= model.vertices.size()) return false;
                     const auto& model_vertex = model.vertices[vertex_index].fields;
-                    // FNIM stores vehicle-local XYZ; this overview projects local X/Z onto the map.
-                    const float world_x = pose.x + model_vertex[0] * cos_yaw + model_vertex[2] * sin_yaw;
-                    const float world_z = pose.z - model_vertex[0] * sin_yaw + model_vertex[2] * cos_yaw;
-                    const auto pos = map_to_clip(world_x, world_z);
+                    const auto world = viper::transform_vehicle_point_xz(
+                        pose, {model_vertex[0], model_vertex[1], model_vertex[2]});
+                    const auto pos = map_to_clip(world.x, world.z);
                     vertices.push_back({pos[0], pos[1], color[0], color[1], color[2]});
                 }
                 draw_group.vertex_count = static_cast<UINT>(vertices.size()) - draw_group.first_vertex;
@@ -1614,8 +1628,6 @@ private:
     }
 
     struct CarDrawGroup { UINT first_vertex{}; UINT vertex_count{}; };
-    struct CarPose { float x{}; float y{}; float z{}; float yaw{}; };
-
     bool create_line_pipeline()
     {
         static constexpr char vertex_source[] =
@@ -1694,7 +1706,7 @@ private:
     const viper::ModelResource* player_model_{};
     const viper::ModelResource* ai_model_{};
     std::size_t player_car_index_{};
-    std::vector<CarPose> car_poses_;
+    std::vector<viper::BodyRenderTransform> car_poses_;
     std::vector<viper::CarTrackConstructionPlan> car_placement_plans_;
     std::vector<CarDrawGroup> car_draw_groups_;
     std::array<float, 4> map_bounds_{};
@@ -2078,7 +2090,7 @@ struct WindowState {
     std::optional<std::size_t> remote_player_car_index;
     // Sequence zero is reserved for the pre-race configuration agreement.
     std::uint32_t network_state_sequence{1U};
-    std::vector<std::array<float, 4>> pose_buffer;
+    std::vector<viper::BodyRenderTransform> pose_buffer;
     // Setup- and track-placement-derived PCAR record inputs retained for the
     // session. The complete ordered stream is validated and the recovered
     // 16 ms scheduler drives session updates; native task dispatch and the
@@ -2133,8 +2145,8 @@ struct WindowState {
     std::array<std::optional<std::int64_t>, 4>
         player_wheel_surface_polarity_results{};
     std::array<bool, 4> player_wheel_terrain_queries_succeeded{};
-    std::optional<std::array<float, 4>> player_simulated_pose;
-    std::vector<std::optional<std::array<float, 4>>> opponent_simulated_poses;
+    std::optional<viper::BodyRenderTransform> player_simulated_pose;
+    std::vector<std::optional<viper::BodyRenderTransform>> opponent_simulated_poses;
     std::optional<viper::TrackPhysicsTaskManifest> physics_task_manifest;
     bool player_constructor_inputs_ready{};
     bool accelerate{};
@@ -3356,7 +3368,13 @@ struct WindowState {
                 player_runtime_state.body_object, impulse_writes)) {
             return false;
         }
-        player_simulated_pose = std::array<float, 4>{body_x, body_y, body_z, yaw};
+        viper::BodyRenderTransform render_transform{};
+        std::copy(result.orientation.orientation_matrix.begin(),
+            result.orientation.orientation_matrix.end(), render_transform.begin());
+        render_transform[9] = body_x;
+        render_transform[10] = body_y;
+        render_transform[11] = body_z;
+        player_simulated_pose = render_transform;
         return true;
     }
 
@@ -4008,8 +4026,9 @@ struct WindowState {
         if (!surface.query_succeeded) return false;
 
         opponent_motions[remote_car_index] = remote_state;
-        opponent_simulated_poses[remote_car_index] = std::array<float, 4>{
-            projected.x, surface.sampled_position[1], projected.z, projected.yaw};
+        opponent_simulated_poses[remote_car_index] =
+            viper::make_yaw_render_transform(projected.x,
+                surface.sampled_position[1], projected.z, projected.yaw);
         return true;
     }
 
@@ -4112,8 +4131,9 @@ struct WindowState {
                     if (!surface.query_succeeded) return true;
                     if (!viper::commit_route_motion_after_terrain_query(
                             motion, candidate_motion, surface.query_succeeded)) return true;
-                    player_simulated_pose = std::array<float, 4>{route_result.x,
-                        surface.sampled_position[1], route_result.z, route_result.yaw};
+                    player_simulated_pose = viper::make_yaw_render_transform(
+                        route_result.x, surface.sampled_position[1],
+                        route_result.z, route_result.yaw);
                 } else if (route_result.finished) {
                     motion = candidate_motion;
                 }
@@ -4146,8 +4166,9 @@ struct WindowState {
                             ai, candidate_ai, ai_surface.query_succeeded)) continue;
                     opponent_ai_states[car] = decision.next_state;
                     last_opponent_ai_decisions[car] = decision;
-                    opponent_simulated_poses[car] = std::array<float, 4>{ai_result.x,
-                        ai_surface.sampled_position[1], ai_result.z, ai_result.yaw};
+                    opponent_simulated_poses[car] = viper::make_yaw_render_transform(
+                        ai_result.x, ai_surface.sampled_position[1],
+                        ai_result.z, ai_result.yaw);
                 }
             }
             ++physics_step_count;
@@ -4155,9 +4176,7 @@ struct WindowState {
         if (lap_completed) refresh_title(true);
         if (update_graphics) {
             for (std::size_t car = 0; car < graphics.car_count(); ++car) {
-                const auto position = graphics.car_position(car);
-                pose_buffer[car] = {position[0], graphics.car_height(car), position[1],
-                    graphics.car_yaw(car)};
+                pose_buffer[car] = graphics.car_transform(car);
             }
             for (std::size_t car = 0; car < opponent_motions.size(); ++car) {
                 if (car == player_car_index) continue;
@@ -4167,7 +4186,7 @@ struct WindowState {
             if (player_simulated_pose.has_value())
                 pose_buffer[player_car_index] = *player_simulated_pose;
         }
-        if (update_graphics && !graphics.set_car_poses(pose_buffer)) return false;
+        if (update_graphics && !graphics.set_car_transforms(pose_buffer)) return false;
         refresh_title();
         return true;
     }

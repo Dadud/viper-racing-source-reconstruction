@@ -1,5 +1,17 @@
 # Reconstruction progress
 
+- **2026-11-03, full body orientation reaches vehicle rendering:** The route-free
+  PCAR integrator already updates the native 3x3 orientation matrix, but the
+  scene renderer discarded it and rotated FNIM vertices by yaw only. The race
+  session now passes the matrix and translation through the render transform;
+  route/demo poses still construct the same yaw-only matrix as before. The
+  renderer projects transformed local XYZ into its top-down X/Z view. Added a
+  regression that preserves the previous yaw projection and verifies full
+  basis contributions. Release `viper_game` and regression builds succeeded;
+  the transform regression, WARP render smoke, and fixed-step route-free trace
+  replay passed. This makes orientation visible in the reconstruction but does
+  not establish original visual parity or a complete race.
+
 - **2026-11-03, native PCAR yaw-response x87 order:** Re-read the exact
   `0x432170` instruction stack around `FPTAN`, `FDIVP`, and the speed multiply.
   The native expression is `speed * tan(angle) / geometry_width`; the portable
