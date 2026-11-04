@@ -28,6 +28,32 @@ Evidence: `ev_fb7a9b21717cfb6308ed0b4ff5c8e3f5b185399be225d0fbbfbde36ee68b1217`
 projection. The retained analysis bundle is
 [`ncar_integrator_prefix.evidence.json`](ncar_integrator_prefix.evidence.json).
 
+### ACAR task callsite at `0x42AB20`
+
+The checked-in x86 listing `disasm/engine_.text.asm` establishes the ACAR
+task's call order into the shared integrator. At entry `0x42AB20`, it compares
+body `+0x4FC` with 2. Values below 2 branch to `0x42A930` and then call
+`0x431150`. Values at least 2 first call `0x429570`, `0x42A0F0`, conditionally
+`0x429D60`, then `0x42A200`; they next run the conditional control calls
+`0x428FB0` and `0x428F70`, followed by `0x429690`, `0x4296E0`, and `0x42A8A0`.
+Depending on local flags, this branch also calls `0x429C00` and the virtual
+slot `+0xEC8`, `0x42A650`, and `0x429020`; it reaches `0x429E90` before its
+common call to `0x431150` at `0x42AC98`. The capture of eight car tasks reaching
+`0x431150` corroborates that the shared integrator is used across the field;
+it does not supply valid reconstructed callback inputs or prove these calls'
+numeric effects.
+
+Production currently retains configured ACAR identities and constructor
+bytes, but does not own the mutable task state consumed by this call chain.
+The reconstructed AI fragments still take route rows, pair-registry results,
+body velocity, geometry-loop seeds, controller state, and control values as
+observations. Dispatching only `0x431150` would skip the active branch's
+producers and could integrate stale constructor state. The next implementation
+boundary is to materialize and advance the ACAR task state and registry
+snapshot in native callback order, source those branch operands, then connect
+the shared integrator. Until then, AI body physics and race progression remain
+incomplete.
+
 The next helper call `0x433570` is now modeled by
 `advance_ncar_integrator_timer`. It computes `now = timer_ticks * 0.016`,
 then continues only when the x87 comparison finds `now - +0xE44 < 6.2` (an
