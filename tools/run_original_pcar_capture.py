@@ -148,6 +148,37 @@ def query_process_exit_status(process_id: int) -> dict[str, object]:
         kernel32.CloseHandle(handle)
 
 
+def resume_thread_until_running(thread_id: int, maximum_calls: int = 16) -> dict[str, object]:
+    """Resume the exact suspended child thread created by the launcher hook."""
+    if thread_id <= 0 or maximum_calls <= 0:
+        raise ValueError("thread_id and maximum_calls must be positive")
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    open_thread = kernel32.OpenThread
+    open_thread.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    open_thread.restype = wintypes.HANDLE
+    handle = open_thread(0x0002, False, thread_id)  # THREAD_SUSPEND_RESUME
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        resume = kernel32.ResumeThread
+        resume.argtypes = (wintypes.HANDLE,)
+        resume.restype = wintypes.DWORD
+        previous = 0xFFFFFFFF
+        for calls in range(1, maximum_calls + 1):
+            previous = int(resume(handle))
+            if previous == 0xFFFFFFFF:
+                raise ctypes.WinError(ctypes.get_last_error())
+            if previous <= 1:
+                return {"thread_id": thread_id, "resume_calls": calls,
+                        "previous_suspend_count": previous,
+                        "already_running": previous == 0}
+        raise RuntimeError(
+            f"thread {thread_id} remains suspended after {maximum_calls} resumes "
+            f"(last previous count {previous})")
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def terminate_owned_process(process_id: int, exit_code: int = 0xC000013A) -> bool:
     """Terminate only a PID created by this runner and wait for its exit."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -525,6 +556,12 @@ def main() -> int:
             record({"event": "direct_engine_resumed", "pid": child_pid,
                     "cwd": str(expected_cwd),
                     "host_utc": datetime.now(timezone.utc).isoformat()})
+        else:
+            resume_record = resume_thread_until_running(child_info["tid"])
+            record({"event": "launcher_child_resumed", "pid": child_pid,
+                    **resume_record,
+                    "host_utc": datetime.now(timezone.utc).isoformat()})
+            print(f"Resumed launcher-created engine thread {child_info['tid']} after observer installation; prior suspend count={resume_record['previous_suspend_count']}.", flush=True)
         print(f"Capture running via {'direct engine' if args.direct_engine else 'isolated launcher'}; race.bin pid={child_pid}", flush=True)
         if args.startup_only:
             print(f"Startup-only observation: no synthetic input; observers={','.join(agents)}; host records the process exit status and stops the target after {wait_seconds} seconds if it remains alive.", flush=True)

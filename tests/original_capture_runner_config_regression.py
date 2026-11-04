@@ -17,6 +17,7 @@ canary_semaphore_strategy = runner_functions["canary_semaphore_strategy"]
 capture_agent_names = runner_functions["capture_agent_names"]
 query_process_exit_status = runner_functions["query_process_exit_status"]
 terminate_owned_process = runner_functions["terminate_owned_process"]
+resume_thread_until_running = runner_functions["resume_thread_until_running"]
 resolve_launcher_arguments = runner_functions["resolve_launcher_arguments"]
 
 with tempfile.TemporaryDirectory(prefix="viper_capture_paths_") as temporary:
@@ -82,6 +83,12 @@ assert capture_agent_names(False) == (
     "startup_vram", "exit_status", "pcar_source_watch",
     "controlled_wheel_capture")
 if os.name == "nt":
+    import ctypes
+
+    current_tid = ctypes.WinDLL("kernel32").GetCurrentThreadId()
+    resume_result = resume_thread_until_running(current_tid)
+    assert resume_result["already_running"] is True
+    assert resume_result["previous_suspend_count"] == 0
     own_status = query_process_exit_status(os.getpid())
     assert own_status["process_still_active"] is True
     assert own_status["process_exit_code"] == 259

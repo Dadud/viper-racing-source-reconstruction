@@ -2,18 +2,23 @@
 
 ## 2026-11-04 update
 
-The latest bounded original startup capture adds a passive 10 Hz sampler for
-the launcher-created engine thread. Across all 100 samples, its PC/SP remained
-`ntdll.dll+0x7A7C0` / `0x1AFFF0`; none of the 12 recovered graphics startup
-entries, video-memory query, native process-termination hooks, or exception
-events fired. The thread stayed stopped at capture end and the runner then
-terminated only its two launched PIDs; the VIPER ISO was detached. This is a
-stable pre-graphics wait observation, not an identified cause or gameplay
-trace. External evidence:
-`../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T130140Z.jsonl`.
-The next useful capture should resolve the ntdll wait routine and its stack
-arguments, then collect the launcher-created thread's wait object/return path
-or loader/debug events. Do not repeat the same 15-second startup-only capture.
+The 15-second startup capture at `130140Z` did not execute the engine: the
+launcher bridge created the child suspended, while the host waited 15 seconds
+and the bridge fallback resume was 30 seconds. The 100 identical Frida thread
+contexts were therefore suspended state, not a diagnosed ntdll wait. The
+runner now resumes the exact launcher-created child TID immediately after
+installing observers and records its prior suspend count. In the executing
+captures `130830Z` and `131253Z`, that count was 1; DirectDraw object creation
+and capability selection succeeded, then `0x44EEB0` entered mode enumeration.
+The `0x458D60` EnumDisplayModes wrapper returned `S_OK` (`0`), but the engine's
+`0x44EE00` callback did not run and required 640x480 flag `0x509C52` stayed
+zero. The original child then exited naturally with code 5 before video-memory
+classification and before gameplay. This identifies the required-resolution
+enumeration gate as the current original-startup boundary; why the host's
+DirectDraw enumerator supplied no callback remains open. Exact logs are
+external: `../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T130830Z.jsonl`
+and `../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T131253Z.jsonl`.
+The runner stopped the launcher it created and detached the ISO after both.
 
 The passive sampler and its runner wiring are covered by a Node mock and
 capture-config regression; all five focused capture CTests passed. This

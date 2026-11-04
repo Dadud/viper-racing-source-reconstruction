@@ -149,7 +149,9 @@ and starts its primary thread with `GameRoot\Data` as the working directory,
 matching the successful 2026-10-25 suspended-child reference run. It passes
 the recovered `-1` primary-adapter argument to the launcher and verifies the
 actual child command in the bridge log. It installs a child bridge before
-resuming the launcher; the
+resuming the launcher, then explicitly resumes the launcher-created child
+thread only after all observers are loaded; the bridge's 30-second resume is
+only a fallback. The
 `--direct-engine` mode installs the video-memory, exact-write, controlled
 wheel-state, and exit-status agents before resuming `race.bin`. It kills only
 the exact PIDs it starts at completion or the 180-second host deadline. The

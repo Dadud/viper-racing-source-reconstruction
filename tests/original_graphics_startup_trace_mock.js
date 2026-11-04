@@ -17,7 +17,7 @@ class Pointer {
     toString() { return `0x${this.value.toString(16)}`; }
     toUInt32() { return Number(this.value & 0xffffffffn); }
     isNull() { return this.value === 0n; }
-    readU32() { return this.toUInt32(); }
+    readU32() { return this.value === 0x509c52n ? 0 : this.toUInt32(); }
     readPointer() { return new Pointer(0xabcdefn); }
 }
 const pointer = value => new Pointer(value);
@@ -45,13 +45,27 @@ vm.runInNewContext(source, {
 
 const graphics = hooks.get("0x44e080");
 assert(graphics, "graphics initialization entry hook should be installed");
-const invocation = { returnAddress: pointer(0x44e085n) };
+const invocation = { returnAddress: pointer(0x44e085n), context: {
+    ecx: pointer(0x10n), esi: pointer(0x20n), edi: pointer(0x30n),
+} };
 graphics.onEnter.call(invocation, [pointer(1n), pointer(2n), pointer(3n), pointer(4n)]);
 graphics.onLeave.call(invocation, pointer(0x1234n));
 assert(events.some(event => event.event === "graphics_startup_enter" &&
     event.address === "0x44e080" && event.args[0] === "0x1"));
 assert(events.some(event => event.event === "graphics_startup_return" &&
     event.address === "0x44e080" && event.return_low_byte === 0x34));
+
+const modeEnumeration = hooks.get("0x44eeb0");
+modeEnumeration.onEnter.call(invocation,
+    [pointer(1n), pointer(2n), pointer(3n), pointer(4n)]);
+assert(events.some(event => event.event === "graphics_startup_enter" &&
+    event.address === "0x44eeb0" && event.mode_640x480_flag_0x509c52 === 0));
+const enumWrapper = hooks.get("0x458d60");
+enumWrapper.onEnter.call(invocation,
+    [pointer(0x101n), pointer(0x200n), pointer(0x300n), pointer(0x400n)]);
+assert(events.some(event => event.event === "graphics_startup_enter" &&
+    event.address === "0x458d60" && event.registers.ecx === "0x10" &&
+    event.argument_words.length === 4));
 
 const terminateAddress = events.find(event => event.event === "native_startup_hook_ready" &&
     event.api === "NtTerminateProcess").address;

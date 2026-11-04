@@ -144,6 +144,34 @@ DWORD report and the engine's 32-bit addition, before surface creation.
 Later calls reported totals/free values `0xC0000000/0xBFED4000` for caps
 `0x10001000` and `0x3FFF0000/0x3FFF0000` for caps `0x20001000`.
 
+### 2026-11-04 executing launcher-child trace
+
+The first 2026-11-04 15-second startup-only capture was not an execution
+observation: the launcher bridge created `race.bin` with `CREATE_SUSPENDED`,
+and the host did not resume its initial thread before the capture deadline.
+The bridge's safety fallback is 30 seconds. The host runner now resumes the
+exact reported child thread after loading its observers; both executing traces
+recorded prior suspend count 1.
+
+In `../../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T131253Z.jsonl`,
+DirectDraw creation at `0x458470` returned a non-null object, capability query
+`0x458CB0` returned `S_OK`, and fallback adapter selection `0x44E4D0` returned
+true. The engine then entered mode enumeration `0x44EEB0`. Its
+`EnumDisplayModes` wrapper `0x458D60` returned `S_OK` (`0x00000000`), but the
+mode callback `0x44EE00` was never entered and the required 640x480 flag at
+`0x509C52` remained zero. The engine exited naturally with process status 5
+before `0x44EC00` video-memory classification and before surface creation.
+This matches the recovered missing-required-mode exit path. The bounded
+capture does not explain why DirectDraw reported success without invoking the
+callback; display/driver enumeration differences from the successful
+2026-10-25 capture remain the next graphics investigation. Capture
+`...T130830Z.jsonl` independently reached the same code-5 boundary. Both runs
+used muted staged settings, mounted VIPER ISO, and `-1`; the runner terminated
+only its launcher after the engine's natural exit and detached the ISO.
+
+These are original startup diagnostics only. They do not establish a completed
+original race or resolve reconstruction gameplay gaps.
+
 A child-only override probes
 `../../analysis/reference_captures/vidmem_override_20261025T031500Z.json`
 and `../../analysis/reference_captures/vidmem_override_retry_20261025T031150Z.json`

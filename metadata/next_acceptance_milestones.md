@@ -12,17 +12,21 @@ The 2026-11-04 official-launcher trace exposed and fixed a capture setup bug:
 the launcher itself must create `MGI Viper Racing 1998 Canary`, so the host
 now creates that semaphore only for direct-engine runs. With this correction,
 the launcher passed its startup checks and created `race.bin` in the expected
-`GameRoot\Data` working directory. With the recovered `-1` argument, no
-graphics startup entry or video-memory initialization ran. A bounded 100-sample
-passive trace found the launcher-created engine thread stopped at
-`ntdll.dll+0x7A7C0` with unchanged PC/SP for the full 10 seconds; no native
-termination or exception event fired before host cleanup. This establishes a
-stable pre-graphics wait, but does not identify its cause. Do not repeat the
-same startup-only run. Next resolve the wait routine in installed ntdll and
-trace its stack arguments, wait object, return path, and loader/debug events to
-identify what prevents the engine thread from progressing. Keep original
-assets external, do not change the unresolved powertrain model from startup
-evidence, and keep ideal-line motion disabled in driving acceptance.
+`GameRoot\Data` working directory. The first 15-second startup capture did
+not resume that child: it remained suspended until the bridge's 30-second
+fallback, so its repeated ntdll context was not execution evidence. The runner
+now resumes the exact child thread after installing observers. Two executing
+captures then reached DirectDraw mode enumeration: object creation and
+capability selection succeeded, the `0x458D60` EnumDisplayModes wrapper
+returned S_OK, but no `0x44EE00` mode callback ran and required 640x480 flag
+`0x509C52` stayed zero. The original engine exited naturally with code 5
+before video-memory classification. This locates the host startup boundary at
+required-resolution enumeration; why DirectDraw returns no callback remains
+unresolved. Further startup work should compare the running host's enumerated
+modes against the known successful capture rather than repeat the same probe.
+Keep original assets external, do not change the unresolved powertrain model
+from startup evidence, and keep ideal-line motion disabled in driving
+acceptance.
 
 The ACAR constructor projection now serializes the `0x4401D0` curve writes at
 their recovered child offsets: getter value `1000` at parent `+0xC0C`, derived
