@@ -41,8 +41,12 @@ detaches sessions before unloading scripts.
 
 The passive sampler and its runner wiring are covered by a Node mock and
 capture-config regression; all six active focused capture CTests passed after
-removing the unused synthetic callback mock. This
-validates the instrumentation path only.
+removing the unused synthetic callback mock. This validates the
+instrumentation path only. The complete configured Windows Release suite then
+passed 77/77, including asset validation and WARP render smokes for all shipped
+tracks and vehicles. Those checks validate build, resource loading, and
+rendering; they do not establish a complete playable race or original gameplay
+parity.
 
 Two launcher capture attempts with active effects/music settings
 (`effects=1`, `music=1`, CD audio disabled) exited normally before creating
