@@ -2019,6 +2019,9 @@ struct PlayerPhysicsTickContext {
     // fields and the current contact/history observations. Surface adjustment,
     // finalization, force accumulation, and body integration are not implied.
     std::array<std::optional<float>, 4> wheel_base_suspension_response_0x178{};
+    std::array<std::optional<float>, 4> wheel_collision_response{};
+    std::array<bool, 4> wheel_collision_impulse_accumulated{};
+    std::array<bool, 4> wheel_collision_damage_gate_unresolved{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_suspension_force_vectors{};
     // Returns from the shared polarity stream and the following pure surface
@@ -3208,6 +3211,14 @@ struct WindowState {
              diagnostics.input->accumulated_angular_moment.y,
              diagnostics.input->accumulated_angular_moment.z}};
         const auto& center = diagnostics.input->position;
+        viper::NcarPointImpulseAccumulator point_impulse_state{
+            std::bit_cast<float>(impulse_bits[6]),
+            {std::bit_cast<float>(impulse_bits[0]),
+             std::bit_cast<float>(impulse_bits[1]),
+             std::bit_cast<float>(impulse_bits[2])},
+            {std::bit_cast<float>(impulse_bits[3]),
+             std::bit_cast<float>(impulse_bits[4]),
+             std::bit_cast<float>(impulse_bits[5])}};
         for (std::size_t wheel = 0U; wheel < player_wheel_update_results.size(); ++wheel) {
             const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
             const auto read_float = [&wheel_object](const std::uint32_t offset)
@@ -3233,6 +3244,46 @@ struct WindowState {
             const std::array<float, 3> body_center{center.x, center.y, center.z};
             static_cast<void>(viper::accumulate_ncar_force_moment(
                 accumulator, force_vector, application_point, body_center));
+
+            // 0x442530's collision callback feeds 0x42F100 after a successful
+            // terrain query. The global 0x50878C damage gate is still unknown;
+            // leave it absent so the solver cannot fabricate a wheel damage write.
+            if (player_wheel_terrain_queries_succeeded[wheel]) {
+                const auto& contact = player_wheel_contact_observations[wheel];
+                const auto& suspension = player_wheel_update_results[wheel]
+                    .suspension.base;
+                const auto collision_input =
+                    viper::make_ncar_wheel_collision_impulse_input_from_objects(
+                        player_runtime_state.body_object, wheel_object,
+                        contact.query_contact_normal,
+                        player_wheel_update_results[wheel].contact.clamped_contact_depth,
+                        suspension.threshold_adjustment);
+                if (!collision_input) return false;
+                const auto prior_damage = viper::read_ncar_wheel_object_u8(
+                    wheel_object, 0x20U);
+                if (!prior_damage) return false;
+                auto damage_flag = *prior_damage;
+                const auto collision = viper::apply_wheel_collision_impulse(
+                    point_impulse_state, damage_flag, *collision_input);
+                tick.wheel_collision_response[wheel] =
+                    collision.response.normal_response;
+                tick.wheel_collision_impulse_accumulated[wheel] =
+                    collision.point_impulse_accumulated;
+                tick.wheel_collision_damage_gate_unresolved[wheel] =
+                    collision.damage_gate_input_unresolved;
+                if (collision.damage_flag_written) {
+                    const viper::NcarObjectFieldWrite damage_write{
+                        static_cast<std::uint32_t>(wheel * 0x1a4U + 0x20U),
+                        1U, damage_flag};
+                    if (!viper::apply_ncar_wheel_object_writes(
+                            player_runtime_state.wheel_objects[wheel],
+                            static_cast<std::uint32_t>(wheel * 0x1a4U),
+                            std::span<const viper::NcarObjectFieldWrite>(
+                                &damage_write, 1U))) {
+                        return false;
+                    }
+                }
+            }
 
             const auto& tire_vectors =
                 tick.wheel_tire_response_vector_store_results[wheel];
@@ -3340,14 +3391,6 @@ struct WindowState {
             accumulator.force_0x24c[0], accumulator.force_0x24c[1],
             accumulator.force_0x24c[2], accumulator.moment_0x258[0],
             accumulator.moment_0x258[1], accumulator.moment_0x258[2]};
-        viper::NcarPointImpulseAccumulator point_impulse_state{
-            std::bit_cast<float>(impulse_bits[6]),
-            {std::bit_cast<float>(impulse_bits[0]),
-             std::bit_cast<float>(impulse_bits[1]),
-             std::bit_cast<float>(impulse_bits[2])},
-            {std::bit_cast<float>(impulse_bits[3]),
-             std::bit_cast<float>(impulse_bits[4]),
-             std::bit_cast<float>(impulse_bits[5])}};
         const viper::BodyIntegrationForceCollectionInput force_collection_input{};
         const auto force_collection = viper::prepare_body_integration_force_collection(
             tail_state, point_impulse_state, diagnostics.input->gravity_mass_0x7c,
@@ -5727,6 +5770,10 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     << ",wheel" << wheel << '_' << vector_name << "_y"
                     << ",wheel" << wheel << '_' << vector_name << "_z";
             }
+            physics_tick_trace << ",wheel" << wheel << "_collision_evaluated"
+                << ",wheel" << wheel << "_collision_response"
+                << ",wheel" << wheel << "_collision_impulse_accumulated"
+                << ",wheel" << wheel << "_collision_damage_gate_unresolved";
         }
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
@@ -6328,6 +6375,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         write_vector(tick.wheel_lateral_axes_world[wheel]);
                         write_vector(tick.wheel_response_vectors_0xf4[wheel]);
                         write_vector(tick.wheel_corrected_response_vectors_0x100[wheel]);
+                        physics_tick_trace << ','
+                            << (tick.wheel_collision_response[wheel] ? 1 : 0) << ',';
+                        if (tick.wheel_collision_response[wheel])
+                            physics_tick_trace << *tick.wheel_collision_response[wheel];
+                        physics_tick_trace << ','
+                            << (tick.wheel_collision_impulse_accumulated[wheel] ? 1 : 0)
+                            << ','
+                            << (tick.wheel_collision_damage_gate_unresolved[wheel] ? 1 : 0);
                     }
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {

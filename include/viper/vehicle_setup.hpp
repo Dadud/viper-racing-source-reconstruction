@@ -981,7 +981,7 @@ struct WheelCollisionImpulseInput {
     float contact_depth{};
     float contact_threshold_response_0x28{};
     bool wheel_damage_flag_0x20{};
-    bool query_flag_nonzero_0x50878c{};
+    std::optional<bool> query_flag_nonzero_0x50878c;
 };
 
 struct WheelCollisionImpulseResult {
@@ -990,6 +990,7 @@ struct WheelCollisionImpulseResult {
     float duration{};
     bool applied{};
     bool damage_hook_reached{};
+    bool damage_gate_input_known{true};
     bool set_wheel_damage_flag{};
 };
 

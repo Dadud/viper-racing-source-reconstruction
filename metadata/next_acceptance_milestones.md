@@ -17,9 +17,15 @@ matching getter/store values. The `+0x44` getter's false-gate `+0xC34` value is
 now traced as the constructor-initialized zero for the ordinary
 elapsed-scheduler path. The alternate true-gate `+0xDE0` path and downstream
 sound mixing remain unresolved, so engine playback stays muted.
+The live body update now also consumes the source-backed `0x442530` wheel
+collision impulse using the byte-backed body matrix/mass/velocity, wheel `+0xC8`
+application point, current successful terrain query, and recovered suspension
+threshold. The global `0x50878C` damage gate remains unknown; its possible wheel
+damage write is suppressed and traced as unresolved. Added a focused regression
+for normal impulse accumulation and unknown/known damage-gate behavior.
 Release `viper_game` build and route-free fixed-step replay passed on
 2026-11-03; the complete configured Release CTest suite subsequently passed
-68/68. These are implementation/regression checks, not original-game parity or
+69/69. These are implementation/regression checks, not original-game parity or
 complete race acceptance.
 
 The Windows runtime owns parsed session assets and has a setup window, D3D11

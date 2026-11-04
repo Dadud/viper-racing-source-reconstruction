@@ -2466,6 +2466,75 @@ make_ncar_integrator_mode_force_input_from_objects(
     return input;
 }
 
+std::optional<WheelCollisionImpulseInput>
+make_ncar_wheel_collision_impulse_input_from_objects(
+    const NcarBodyRuntimeObjectState& body,
+    const NcarWheelRuntimeObjectState& wheel,
+    const PhysicsVector3& contact_normal,
+    const float contact_depth,
+    const float contact_threshold_response_0x28,
+    const std::optional<bool> query_flag_nonzero_0x50878c) noexcept
+{
+    const auto read_body_float = [&body](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value}
+                                    : std::nullopt;
+    };
+    const auto read_wheel_float = [&wheel](const std::uint32_t offset)
+        -> std::optional<float> {
+        const auto bits = read_ncar_wheel_object_u32(wheel, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value}
+                                    : std::nullopt;
+    };
+    const auto read_body_vector = [&read_body_float](const std::uint32_t offset,
+                                                      PhysicsVector3& value) {
+        const auto x = read_body_float(offset);
+        const auto y = read_body_float(offset + 4U);
+        const auto z = read_body_float(offset + 8U);
+        if (!x || !y || !z) return false;
+        value = {*x, *y, *z};
+        return true;
+    };
+
+    WheelCollisionImpulseInput input{};
+    if (!read_body_vector(0x05cU, input.body_center) ||
+        !read_body_vector(0x234U, input.body_velocity)) {
+        return std::nullopt;
+    }
+    const auto body_mass = read_body_float(0x1f0U);
+    if (!body_mass) return std::nullopt;
+    input.body_mass = *body_mass;
+    for (std::size_t index = 0U; index < input.angular_response_matrix.size();
+         ++index) {
+        const auto value = read_body_float(0x264U +
+            static_cast<std::uint32_t>(index * sizeof(std::uint32_t)));
+        if (!value) return std::nullopt;
+        input.angular_response_matrix[index] = *value;
+    }
+    const auto contact_x = read_wheel_float(0x0c8U);
+    const auto contact_y = read_wheel_float(0x0ccU);
+    const auto contact_z = read_wheel_float(0x0d0U);
+    const auto damage_flag = read_ncar_wheel_object_u8(wheel, 0x20U);
+    if (!contact_x || !contact_y || !contact_z || !damage_flag ||
+        !std::isfinite(contact_normal.x) || !std::isfinite(contact_normal.y) ||
+        !std::isfinite(contact_normal.z) || !std::isfinite(contact_depth) ||
+        !std::isfinite(contact_threshold_response_0x28)) {
+        return std::nullopt;
+    }
+    input.contact_point = {*contact_x, *contact_y, *contact_z};
+    input.contact_normal = contact_normal;
+    input.contact_depth = contact_depth;
+    input.contact_threshold_response_0x28 = contact_threshold_response_0x28;
+    input.wheel_damage_flag_0x20 = *damage_flag != 0U;
+    input.query_flag_nonzero_0x50878c = query_flag_nonzero_0x50878c;
+    return input;
+}
+
 NcarIntegratorModeForceResult apply_ncar_integrator_mode_force(
     NcarForceMomentAccumulator& accumulator,
     const NcarIntegratorModeForceInput& input) noexcept
@@ -2588,6 +2657,8 @@ WheelCollisionImpulseApplicationResult apply_wheel_collision_impulse(
 {
     WheelCollisionImpulseApplicationResult result{};
     result.response = prepare_wheel_collision_impulse(input);
+    result.damage_gate_input_unresolved = result.response.damage_hook_reached &&
+        !result.response.damage_gate_input_known;
     if (!result.response.applied) {
         return result;
     }

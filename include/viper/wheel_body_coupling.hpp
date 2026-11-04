@@ -409,6 +409,18 @@ make_ncar_integrator_mode_force_input_from_objects(
     const NcarBodyRuntimeObjectState& body,
     const std::array<NcarWheelRuntimeObjectState, 4>& wheels) noexcept;
 
+// Builds the source-backed 0x42F100 operands from the shared PCAR body and
+// wheel objects. Contact geometry/threshold come from the current wheel pass;
+// the unresolved global 0x50878C damage gate remains optional.
+[[nodiscard]] std::optional<WheelCollisionImpulseInput>
+make_ncar_wheel_collision_impulse_input_from_objects(
+    const NcarBodyRuntimeObjectState& body,
+    const NcarWheelRuntimeObjectState& wheel,
+    const PhysicsVector3& contact_normal,
+    float contact_depth,
+    float contact_threshold_response_0x28,
+    std::optional<bool> query_flag_nonzero_0x50878c = std::nullopt) noexcept;
+
 // Reconstructs the mode-0/mode-1 force branch in 0x431150; raw wear bit
 // comparisons and the call-site application point remain explicit.
 [[nodiscard]] NcarIntegratorModeForceResult apply_ncar_integrator_mode_force(
@@ -426,6 +438,7 @@ make_ncar_integrator_mode_force_input_from_objects(
 struct WheelCollisionImpulseApplicationResult {
     WheelCollisionImpulseResult response{};
     bool point_impulse_accumulated{};
+    bool damage_gate_input_unresolved{};
     bool damage_flag_written{};
 };
 

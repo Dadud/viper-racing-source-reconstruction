@@ -1183,7 +1183,10 @@ WheelCollisionImpulseResult prepare_wheel_collision_impulse(
     const auto response_bits = std::bit_cast<std::uint32_t>(result.normal_response);
     if (response_bits > 0x4534c7ffU) {
         result.damage_hook_reached = true;
-        result.set_wheel_damage_flag = input.query_flag_nonzero_0x50878c;
+        result.damage_gate_input_known =
+            input.query_flag_nonzero_0x50878c.has_value();
+        result.set_wheel_damage_flag =
+            input.query_flag_nonzero_0x50878c.value_or(false);
     }
     result.impulse = {
         input.contact_normal.x * result.normal_response,
