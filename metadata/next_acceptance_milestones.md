@@ -23,7 +23,12 @@ application point, current successful terrain query, and recovered suspension
 threshold. The standard frontend initializes `0x50878C` to zero, and that
 source-backed value now feeds the standard race path; alternate session modes
 remain unresolved. Added a focused regression for normal impulse accumulation
-and unknown/known damage-gate behavior.
+and unknown/known damage-gate behavior. The fixed-step replay now checks that
+the collision solver runs exactly when terrain queries succeed, returns finite
+responses, and reports the known standard-session gate value. A separate
+disassembly audit found no source-backed throttle/gear-to-wheel torque producer;
+the existing `+0x124` writer is in the contact/tire-response tail, so powertrain
+force remains a fidelity gap rather than a guessed formula.
 Release `viper_game` build and route-free fixed-step replay passed on
 2026-11-03; the complete configured Release CTest suite subsequently passed
 69/69. These are implementation/regression checks, not original-game parity or

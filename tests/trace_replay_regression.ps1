@@ -238,6 +238,7 @@ try {
     $wheelSpinColumns = @()
     $wheelQuerySucceededColumns = [int[]]::new(4)
     $wheelContactDepthLimitColumns = [int[]]::new(4)
+    $wheelCollisionColumns = @()
     $wheelContactGeometryColumns = @()
     $contactGeometryNames = @(
         'contact_origin', 'query_contact_point',
@@ -374,6 +375,15 @@ try {
             $tickHeader, "wheel${wheel}_contact_query_succeeded")
         $wheelContactDepthLimitColumns[$wheel] = [Array]::IndexOf(
             $tickHeader, "wheel${wheel}_contact_depth_limit_0x44")
+        $collisionNames = @(
+            'collision_evaluated', 'collision_response',
+            'collision_impulse_accumulated', 'collision_damage_gate_unresolved')
+        $collisionColumns = [int[]]::new($collisionNames.Count)
+        for ($lane = 0; $lane -lt $collisionNames.Count; ++$lane) {
+            $collisionColumns[$lane] = [Array]::IndexOf(
+                $tickHeader, "wheel${wheel}_$($collisionNames[$lane])")
+        }
+        $wheelCollisionColumns += ,$collisionColumns
         $geometryColumns = [int[]]::new(18)
         $geometryColumn = 0
         foreach ($geometryName in $contactGeometryNames) {
@@ -462,6 +472,9 @@ try {
         }).Count -gt 0 -or
         @($wheelQuerySucceededColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
         @($wheelContactDepthLimitColumns | Where-Object { $_ -lt 0 }).Count -gt 0 -or
+        @($wheelCollisionColumns | ForEach-Object {
+            $_ | Where-Object { $_ -lt 0 }
+        }).Count -gt 0 -or
         @($wheelContactGeometryColumns | ForEach-Object {
             $_ | Where-Object { $_ -lt 0 }
         }).Count -gt 0) {
@@ -806,11 +819,30 @@ try {
         }
         for ($wheel = 0; $wheel -lt 4; ++$wheel) {
             if ($fields[$wheelQuerySucceededColumns[$wheel]] -ne '1') {
+                if ($fields[$wheelCollisionColumns[$wheel][0]] -ne '0') {
+                    throw "Wheel $wheel collision solver ran without a successful terrain query at line $($index + 1)"
+                }
                 if ($fields[$wheelActiveColumns[$wheel]] -ne '0' -or
                     $fields[$wheelSuspensionResetColumns[$wheel]] -ne '1') {
                     throw "Wheel $wheel terrain miss did not clear contact and reset suspension at line $($index + 1)"
                 }
                 continue
+            }
+            if ($fields[$wheelCollisionColumns[$wheel][0]] -ne '1' -or
+                $fields[$wheelCollisionColumns[$wheel][3]] -ne '0') {
+                throw "Wheel $wheel collision trace omitted its successful-query evaluation or standard-session gate value at line $($index + 1)"
+            }
+            $collisionResponseText = $fields[$wheelCollisionColumns[$wheel][1]]
+            if (-not [string]::IsNullOrWhiteSpace($collisionResponseText)) {
+                $collisionResponse = [single]::Parse(
+                    $collisionResponseText, [cultureinfo]::InvariantCulture)
+                if ([single]::IsNaN($collisionResponse) -or
+                    [single]::IsInfinity($collisionResponse)) {
+                    throw "Wheel $wheel collision response is non-finite at line $($index + 1)"
+                }
+            }
+            if ($fields[$wheelCollisionColumns[$wheel][2]] -notin @('0', '1')) {
+                throw "Wheel $wheel collision impulse flag is invalid at line $($index + 1)"
             }
             $depthLimit = [single]::Parse(
                 $fields[$wheelContactDepthLimitColumns[$wheel]],
