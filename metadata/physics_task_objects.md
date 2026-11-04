@@ -255,9 +255,15 @@ copy helper `0x427BF0`,
 from `0x434BF0`, and its perpendicular, then rotates that 3x3 basis about Y
 using the record's degree value at `+0x24`. It stores the endpoint midpoint at
 `+0x5C..+0x64`; the transformed endpoint vectors are also returned as local
-intermediate observations. It finally makes the unguarded global backend
-virtual `+0x34` call; a null receiver is reported after the preceding writes.
-Host trigonometry, x87 rounding, and Pentium-FDIV behavior are approximations.
+intermediate observations. At `0x43A865..0x43A86E`, it loads the receiver
+from global `0x508A04` and calls that object's vtable slot `+0x34` with the
+new CHKP pointer. The receiver is the selector-created track service from
+`0x426000`; it is not the CHKP object itself. The service factory installs
+different vtables for selectors 0, 1, 3, and 5, so the slot target depends on
+the selected service class. Its implementation and any registration or
+progression effects remain unresolved. A null receiver is reported after the
+preceding geometry writes. Host trigonometry, x87 rounding, and Pentium-FDIV
+behavior are approximations.
 Evidence: `0x43A620`,
 `ev_28f1d49ae0dce63fb5c471cd65da48e9a4cd1a72b586c3932cbffb431e7d1bf2`;
 cross product `0x434BF0`,
