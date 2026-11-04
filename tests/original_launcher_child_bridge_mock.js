@@ -8,6 +8,10 @@ const source = fs.readFileSync(
     path.join(__dirname, "..", "tools", "original_launcher_child_bridge.js"),
     "utf8").replace("__EXPECTED_CWD_JSON__", JSON.stringify(
         "C:\\Stage\\GameRoot\\Data"));
+assert(!source.includes("0x4017B0"),
+    "do not install an entry hook on the launcher's one-byte RET stub");
+assert(source.includes("launcher_code_hook_unavailable"),
+    "a failed diagnostic marker must not abort the remaining bridge hooks");
 const memory = new Map();
 const hooks = new Map();
 const emitted = [];
@@ -62,6 +66,15 @@ vm.runInNewContext(source, {
     setTimeout: callback => { delayedResume = callback; return 1; },
     Map, Set, String, Error, JSON,
 });
+
+const canaryInvocation = {};
+hooks.get("0x401600").onEnter.call(canaryInvocation, []);
+hooks.get("0x401600").onLeave.call(canaryInvocation,
+    { toUInt32: () => 0x100 });
+assert(emitted.some(event => event.event === "launcher_code_enter" &&
+    event.address === "0x401600"));
+assert(emitted.some(event => event.event === "launcher_code_return" &&
+    event.address === "0x401600" && event.return_low_byte === 0));
 
 const dataPathBuffer = pointer(0x9000n);
 memory.set(dataPathBuffer.value, "C:\\Stage\\GameRoot\\Data");

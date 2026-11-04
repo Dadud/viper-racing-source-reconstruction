@@ -17,6 +17,27 @@ const launcher = Process.enumerateModules().find(module =>
 if (!launcher) throw new Error("verified Viper Racing launcher module is not mapped");
 const at = va => launcher.base.add(va - 0x400000);
 
+// Trace the actual launcher control flow when it exits before using the
+// process-creation APIs. These are code-entry markers only; they do not alter
+// the launcher's decisions or return values.
+for (const va of [0x401200, 0x401600, 0x401640, 0x401670, 0x401690,
+  0x401730, 0x4017C0, 0x401880, 0x4019C0]) {
+  try {
+    Interceptor.attach(at(va), {
+      onEnter() {
+        send({event: "launcher_code_enter", address: `0x${va.toString(16)}`});
+      },
+      onLeave(result) {
+        send({event: "launcher_code_return", address: `0x${va.toString(16)}`,
+          result: result.toUInt32(), return_low_byte: result.toUInt32() & 0xff});
+      },
+    });
+  } catch (error) {
+    send({event: "launcher_code_hook_unavailable",
+      address: `0x${va.toString(16)}`, error: String(error)});
+  }
+}
+
 function textArg(pointer, wide) {
   try {
     if (pointer.isNull()) return "";

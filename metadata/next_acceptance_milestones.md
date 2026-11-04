@@ -8,6 +8,19 @@ requirements and final gates remain in [`completion_ledger.md`](completion_ledge
 
 ## Current evidence snapshot
 
+The 2026-11-04 official-launcher trace exposed and fixed a capture setup bug:
+the launcher itself must create `MGI Viper Racing 1998 Canary`, so the host
+now creates that semaphore only for direct-engine runs. With this correction,
+the launcher passed its startup checks and created `race.bin` in the expected
+`GameRoot\Data` working directory. The child terminated about 0.75 seconds
+after resume, before video-memory initialization and all PCAR callbacks. The
+capture has no exit API event or crash record, so the cause remains unknown.
+Next compare a VRAM-only startup against runs that add exception, process-exit,
+and file/resource observers one at a time. Capture host-observed exit status
+and any `NtTerminateProcess`, first-chance/unhandled exception, and early file
+failure. Do not change the unresolved powertrain model from this startup-only
+evidence, and keep ideal-line motion disabled in driving acceptance.
+
 The ACAR constructor projection now serializes the `0x4401D0` curve writes at
 their recovered child offsets: getter value `1000` at parent `+0xC0C`, derived
 value at `+0xC2C`, and one-byte mode flags. Its regression checks the absolute

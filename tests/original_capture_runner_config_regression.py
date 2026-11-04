@@ -10,6 +10,7 @@ runner_functions = runpy.run_path(str(runner))
 select_launcher_paths = runner_functions["select_launcher_paths"]
 validate_disc_volume_label = runner_functions["validate_disc_volume_label"]
 required_capture_sound_settings = runner_functions["required_capture_sound_settings"]
+canary_semaphore_strategy = runner_functions["canary_semaphore_strategy"]
 
 with tempfile.TemporaryDirectory(prefix="viper_capture_paths_") as temporary:
     root = Path(temporary) / "GameRoot"
@@ -49,5 +50,7 @@ assert required_capture_sound_settings(process_silent_audio=True) == {
     "music_volume": "1.000000",
     "cd_audio": "no",
 }
+assert canary_semaphore_strategy(False) == "launcher_creates_for_child"
+assert canary_semaphore_strategy(True) == "host_holds_for_direct_engine"
 
-print("capture launcher path and muted/process-silent audio profiles passed")
+print("capture launcher path, audio profiles, and canary ownership passed")

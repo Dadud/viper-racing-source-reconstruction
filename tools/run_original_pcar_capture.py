@@ -94,6 +94,13 @@ def required_capture_sound_settings(process_silent_audio: bool = False) -> dict[
     }
 
 
+def canary_semaphore_strategy(direct_engine: bool) -> str:
+    # The official launcher creates the canary itself and holds it while
+    # starting race.bin. Pre-creating it here makes the launcher treat this as
+    # a duplicate/copy-protection launch and exit before its preflight.
+    return "host_holds_for_direct_engine" if direct_engine else "launcher_creates_for_child"
+
+
 def hold_canary_semaphore(name: str = CANARY_SEMAPHORE_NAME) -> tuple[object, int, bool]:
     """Supply the named-object precondition expected by engine startup."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -344,16 +351,21 @@ def main() -> int:
         return handler
 
     try:
-        canary_kernel32, canary_handle, canary_preexisting = hold_canary_semaphore()
-        record({"event": "expected_canary_semaphore_held",
-                "name": CANARY_SEMAPHORE_NAME,
-                "preexisting": canary_preexisting,
-                "host_utc": datetime.now(timezone.utc).isoformat()})
         if args.direct_engine:
+            canary_kernel32, canary_handle, canary_preexisting = hold_canary_semaphore()
+            record({"event": "expected_canary_semaphore_held",
+                    "name": CANARY_SEMAPHORE_NAME,
+                    "preexisting": canary_preexisting,
+                    "strategy": canary_semaphore_strategy(True),
+                    "host_utc": datetime.now(timezone.utc).isoformat()})
             child_pid = device.spawn([str(race_bin), "-1"], cwd=str(expected_cwd))
             child_session = device.attach(child_pid)
             child_session.on("detached", on_detached("race.bin"))
         else:
+            record({"event": "launcher_canary_delegated",
+                    "name": CANARY_SEMAPHORE_NAME,
+                    "strategy": canary_semaphore_strategy(False),
+                    "host_utc": datetime.now(timezone.utc).isoformat()})
             (launcher_kernel32, launcher_process_handle, launcher_thread_handle,
              launcher_pid, launcher_tid) = create_launcher_suspended(launcher, launcher_cwd)
             launcher_handles = (launcher_kernel32, launcher_process_handle, launcher_thread_handle)

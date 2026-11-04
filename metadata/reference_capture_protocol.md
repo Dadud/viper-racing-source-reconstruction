@@ -137,7 +137,11 @@ and prior captures were not modified. Do not use this copy for audio acceptance.
 The bounded host runner `tools/run_original_pcar_capture.py` validates the
 official engine and launcher hashes, checks both zero-volume config files,
 requires the selected disc drive (default `F:`) to report volume label `VIPER`,
-holds the canary semaphore, and writes private JSONL outside Git. Mount the
+and writes private JSONL outside Git. In official-launcher mode, the launcher
+creates and holds the canary semaphore for its child; the host must not create
+it first because the launcher exits when its own `CreateSemaphoreA` reports
+`ERROR_ALREADY_EXISTS`. Direct-engine mode has no launcher to establish that
+precondition, so the host creates and holds the canary semaphore there. Mount the
 hash-verified external ISO before launch; the runner only reads the mounted
 volume label and does not mount or modify the disc. Its default
 launcher mode uses the hash-verified launcher inside the isolated `GameRoot`
@@ -160,8 +164,8 @@ official ISO engine and launcher hashes, and runs with the `VIPER` CD volume
 mounted as `F:`. The CloneCD Mode 1 image was converted to a standard ISO by
 extracting each 2048-byte sector payload; the source `.img` was left unchanged.
 
-Across 11 instrumented attempts, none produced a video-memory query or PCAR
-callback. A normal visible launch of the isolated launcher reached its
+Across the first 11 instrumented attempts, none produced a video-memory query
+or PCAR callback. A normal visible launch of the isolated launcher reached its
 “Your video card returned an error” dialog; its exact launcher/engine processes
 were then closed. Current host runner modes include the launcher-child bridge
 and `--direct-engine`, but neither path has yet captured a controlled race.
@@ -169,6 +173,35 @@ Every JSONL attempt and the derived-disc/hash details are external under
 `silent_reference_copy_20261104/silent_copy_manifest.json`. Configured zero
 volume has not been verified as inaudible, and no physics inference is valid
 from these failed runs.
+
+### Canary ownership correction and launcher preflight trace (2026-11-04)
+
+Launcher static inspection and the isolated run at
+`../../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T122814Z.jsonl`
+show that the launcher enters its main routine and returns zero before any
+preflight helper. Its first `CreateSemaphoreA` uses the exact
+`MGI Viper Racing 1998 Canary` name and exits when `GetLastError()` is
+`ERROR_ALREADY_EXISTS`. The runner had been creating that semaphore before
+both launch modes, so it caused the official launcher to take this early exit.
+The runner now delegates semaphore creation to the official launcher and only
+creates it for direct-engine mode. This changes process setup to match the
+observed launcher/engine ownership contract. The muted retry below verifies
+that the official launcher now creates the engine child.
+
+That retry produced the expected child handoff. The launcher passed its
+single-instance and seven preflight callbacks, observed the mounted VIPER disc,
+found `F:\data\common.res`, resolved the staged `Data` directory, and created
+`Data\race.bin` suspended with `GameRoot\Data` as its working directory. All
+four observers loaded before the child resumed. The child terminated about
+0.75 seconds after resume, before the `0x458CE0` video-memory query; no exit API
+event, crash record, or PCAR callback identified why. Its command and working
+directory match the documented successful launcher handoff, so this capture
+does not implicate either value. The record is
+`../../analysis/reference_captures/silent_reference_copy_20261104/pcar_source_capture_20261104T123110Z.jsonl`.
+The next startup capture should record host-observed exit status and first
+chance/unhandled exceptions, `NtTerminateProcess` and early file/resource
+failures; add observers one at a time to distinguish startup behavior from
+instrumentation effects. The run yielded no gameplay evidence.
 
 ## Pairing a scenario
 
