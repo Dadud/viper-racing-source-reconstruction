@@ -113,8 +113,9 @@ int main()
         viper::TrackCurveNodes straight_curve{};
         straight_curve.nodes = {
             {1U, 2U, 0.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F},
-            {2U, 1U, 10.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F}};
-        straight_curve.category_labels = {1U, 2U};
+            {2U, 3U, 10.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F},
+            {3U, 1U, 20.0F, 0.0F, 10.0F, 0.0F, 20.0F, 0.0F}};
+        straight_curve.category_labels = {1U, 2U, 3U};
         viper::TrackPositionIteratorState tracker{};
         require(viper::initialize_track_position_iterator(tracker, straight_curve,
                     5.0F, 0.0F) == viper::TrackPositionIteratorStatus::updated &&
@@ -132,6 +133,12 @@ int main()
                 tracker.node == 1U && tracker.curve_valid &&
                 tracker.fraction > 0.5F && !next_position.category_changed,
             "subsequent physical positions must advance the tracked fraction");
+        const auto crossed_position = viper::update_track_position_iterator(
+            tracker, straight_curve, 10.5F, 0.0F);
+        require(crossed_position.status == viper::TrackPositionIteratorStatus::updated &&
+                tracker.node == 2U && crossed_position.previous_category == 1U &&
+                crossed_position.current_category == 2U && crossed_position.category_changed,
+            "physical movement across a segment must report the category transition");
         auto reset_tracker = tracker;
         reset_tracker.node = 2U;
         reset_tracker.reset_pending = true;

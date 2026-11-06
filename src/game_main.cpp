@@ -2729,6 +2729,11 @@ struct PlayerPhysicsTickContext {
     std::uint32_t scheduled_step_count{};
     std::uint64_t outer_update_index{};
     float simulation_time_seconds{};
+    std::optional<std::array<float, 2>> race_tracking_point;
+    std::optional<viper::TrackPositionIteratorResult> race_tracking_result;
+    std::optional<std::uint32_t> race_tracking_node;
+    std::optional<float> race_tracking_fraction;
+    std::optional<std::uint32_t> race_crossing_count;
     bool body_kinematics_input_ready{};
     bool body_kinematics_non_finite{};
     bool body_kinematics_reader_inventory_mismatch{};
@@ -5120,15 +5125,22 @@ struct WindowState {
                         const auto point = viper::race_tracking_point_xz(basis, position, local_point);
                         const auto tracking = viper::update_track_position_iterator(
                             physical_track_iterator, *physical_track_curve, point[0], point[1]);
+                        auto& tick = player_physics_ticks_this_update.back();
+                        tick.race_tracking_point = point;
+                        tick.race_tracking_result = tracking;
+                        tick.race_tracking_node = physical_track_iterator.node;
+                        tick.race_tracking_fraction = physical_track_iterator.fraction;
                         if (tracking.status == viper::TrackPositionIteratorStatus::updated) {
                             const bool completed = viper::observe_physical_race_category(
                                 physical_lap_state, tracking.category_changed,
-                                tracking.current_category, motion.race.elapsed_seconds, target_laps);
+                                tracking.current_category, tick_context.simulation_time_seconds,
+                                target_laps);
                             if (completed) {
                                 motion.race.completed_laps = physical_lap_state.native_crossing_count - 1U;
                                 motion.race.finished = physical_lap_state.finished;
                                 lap_completed = true;
                             }
+                            tick.race_crossing_count = physical_lap_state.native_crossing_count;
                         } else {
                             physical_track_iterator_ready = false;
                             std::cerr << "Physical lap tracking stopped: track iterator failed.\n";
@@ -6702,7 +6714,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         }
         physics_tick_trace << ",body_constructor_0xd7c,body_constructor_0xd80"
             ",body_constructor_0xd84,body_constructor_0xd88"
-            ",body_constructor_0xd8c,body_constructor_0xd90";
+            ",body_constructor_0xd8c,body_constructor_0xd90"
+            ",race_tracking_x,race_tracking_z,race_tracking_status"
+            ",race_tracking_previous_category,race_tracking_category"
+            ",race_tracking_category_changed,race_tracking_node"
+            ",race_tracking_fraction,race_crossing_count";
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
         if (!physics_tick_trace) {
@@ -7333,6 +7349,28 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << ',';
                         if (value.has_value()) physics_tick_trace << *value;
                     }
+                    for (std::size_t axis = 0; axis < 2U; ++axis) {
+                        physics_tick_trace << ',';
+                        if (tick.race_tracking_point) physics_tick_trace << (*tick.race_tracking_point)[axis];
+                    }
+                    physics_tick_trace << ',';
+                    if (tick.race_tracking_result)
+                        physics_tick_trace << static_cast<unsigned>(tick.race_tracking_result->status);
+                    physics_tick_trace << ',';
+                    if (tick.race_tracking_result)
+                        physics_tick_trace << static_cast<unsigned>(tick.race_tracking_result->previous_category);
+                    physics_tick_trace << ',';
+                    if (tick.race_tracking_result)
+                        physics_tick_trace << static_cast<unsigned>(tick.race_tracking_result->current_category);
+                    physics_tick_trace << ',';
+                    if (tick.race_tracking_result)
+                        physics_tick_trace << tick.race_tracking_result->category_changed;
+                    physics_tick_trace << ',';
+                    if (tick.race_tracking_node) physics_tick_trace << *tick.race_tracking_node;
+                    physics_tick_trace << ',';
+                    if (tick.race_tracking_fraction) physics_tick_trace << *tick.race_tracking_fraction;
+                    physics_tick_trace << ',';
+                    if (tick.race_crossing_count) physics_tick_trace << *tick.race_crossing_count;
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {
                         std::cerr << "Could not write physics tick trace.\n";

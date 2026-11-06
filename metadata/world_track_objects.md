@@ -352,14 +352,18 @@ category portion of `0x41E130`/`0x41E180`. Initialization seeks from the
 supplied initial position and marks the next update for a fresh seek; later
 updates use `0x41D4F0` and report the old and new category. Missing nodes and
 incomplete curve projections are explicit failures rather than inferred race
-progress. Timing-history writes, geometry-key updates, native caller cadence,
-and the full service result behavior remain incomplete. The ordinary physical
+progress. Timing-history writes, geometry-key updates, and the full service
+result behavior remain incomplete. The ordinary physical
 runtime now feeds its simulated body transform and local tracking offset to
 this iterator after each physics step. Its category-one transition follows
 the `0x43D110` crossing counter: the first crossing establishes the counter,
 and subsequent crossings complete laps until the counter exceeds the target.
-This fixed-step placement is provisional: the original service callback cadence,
-timing-history and timing origin still require matched original verification.
+The original shared car update `0x431150` calls service virtual `+0x38` at
+`0x432113`, after body integration. Its `0x425790` timer uses the current
+simulation tick times 0.016 before the scheduler increments that tick. The
+reconstruction uses that tick time for crossing events; timing-history and
+timing origin still require matched original verification. Per-tick diagnostics
+record the tracking point, iterator result, segment, fraction and crossing count.
 Tracker failures disable lap tracking and produce a diagnostic; they do not
 award a lap. An external-asset regression verifies Bemidji initialization, but
 neither that check nor synthetic transition tests demonstrate a complete race.
