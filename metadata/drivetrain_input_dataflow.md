@@ -365,6 +365,14 @@ Constructor ordering also matters for curve `+0x10` (body `+0xC0C`):
 applies that reset after curve configuration. The constructor-based fixture
 checks both the intermediate 1000 and the final zero before advancing ticks.
 
+`asset_drivetrain_regression` reads the external car bundles and default
+setup resources, maps their real numeric fields, and runs 64 drivetrain
+updates for each of the five supplied cars. It covers neutral and a selected
+controller state with fixed synthetic wheel getters; it does not launch the
+game or validate vehicle movement, full session construction, user-specific
+setups, or agreement with original-game measurements. CTest registers this
+check when the external `GameData/common.res` is available.
+
 Next bounded source target: trace writes/copies feeding body `+0x5B0` and
 `+0x8F8` during all PCAR construction paths, including helper arguments and
 base-pointer changes around `0x42FF90 -> 0x43E490 -> 0x433C00`. If the listing
