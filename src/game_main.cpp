@@ -2703,6 +2703,9 @@ struct AcarBodyRuntimeState {
     std::optional<AcarSessionTuningInputs> session_tuning_inputs;
     viper::NcarBodyRuntimeObjectState body_object{};
     viper::PhysicsAcarDerivedRuntimeState derived_object{};
+    // Candidate fallback line, shared by immutable session-owned geometry.
+    // Per-car note lookup and final native descriptor selection are unresolved.
+    const std::vector<viper::AcarDescriptorGeometry>* default_descriptor_candidate{};
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -2907,6 +2910,7 @@ struct WindowState {
     std::vector<AcarBodyRuntimeState> ai_acar_body_states;
     std::optional<viper::TrackCurveNodes> ai_default_curve_nodes;
     std::optional<std::vector<viper::PhysicsAcarModelNodeObservation>> ai_default_model_nodes;
+    std::vector<viper::AcarDescriptorGeometry> ai_default_descriptor_geometry;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
@@ -6006,6 +6010,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     if (ai_default_line != nullptr) {
         state.ai_default_curve_nodes = viper::make_track_curve_nodes(*ai_default_line);
         state.ai_default_model_nodes = viper::make_acar_model_node_observations(*ai_default_line);
+        if (state.ai_default_model_nodes)
+            state.ai_default_descriptor_geometry = viper::make_acar_descriptor_geometry(
+                *state.ai_default_model_nodes);
         if (!state.ai_default_curve_nodes || !state.ai_default_model_nodes)
             std::cerr << "AI default line could not be prepared for opponent initialization.\n";
     }
@@ -6229,6 +6236,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     // ACAR, without treating it as a constructed/registered
                     // ACAR callback object.
                     AcarBodyRuntimeState body_state{};
+                    if (!state.ai_default_descriptor_geometry.empty())
+                        body_state.default_descriptor_candidate = &state.ai_default_descriptor_geometry;
                     viper::initialize_acar_derived_constructor_prefix(body_state.derived_object);
                     const auto profile_words = track_index
                         ? viper::select_acar_track_profile_words(*driver_profile, *track_index, 0U)

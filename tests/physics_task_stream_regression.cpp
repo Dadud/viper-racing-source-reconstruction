@@ -141,10 +141,14 @@ int main()
         descriptor_input.helper_0x41b020_nonzero = true;
         descriptor_input.model_nodes = *model_nodes;
         const auto descriptors = viper::plan_physics_acar_task_constructor(descriptor_input);
+        const auto descriptor_geometry = viper::make_acar_descriptor_geometry(*model_nodes);
         require(!descriptors.model_helper_input_capture_incomplete &&
                 descriptors.model_descriptors.size() == 2U &&
                 descriptors.model_descriptors[0].source_node_address == 1U &&
-                descriptors.model_descriptors[1].source_node_address == 2U,
+                descriptors.model_descriptors[1].source_node_address == 2U &&
+                descriptor_geometry.size() == 2U &&
+                descriptor_geometry[0].mapped_scalar == descriptors.model_descriptors[0].mapped_scalar &&
+                descriptor_geometry[1].mapped_scalar == descriptors.model_descriptors[1].mapped_scalar,
             "AI line node captures must feed the recovered descriptor constructor");
         require(curve_nodes && curve_nodes->nodes.size() == 2U &&
                 curve_nodes->nodes[0].address == 1U &&

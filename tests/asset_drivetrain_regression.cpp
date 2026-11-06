@@ -56,6 +56,14 @@ int main(int argc, char** argv) {
                 require(nodes && nodes->size() == line_data->records.size() && !nodes->empty() &&
                         nodes->back().next_address == nodes->front().address,
                     "AI line descriptors must form a complete circular list");
+                const auto descriptor_geometry = viper::make_acar_descriptor_geometry(*nodes);
+                require(descriptor_geometry.size() == nodes->size(), "AI descriptor count mismatch");
+                for (std::size_t i = 0; i < nodes->size(); ++i)
+                    require(descriptor_geometry[i].node_id == (*nodes)[i].address &&
+                            std::isfinite(descriptor_geometry[i].mapped_scalar) &&
+                            descriptor_geometry[i].mapped_scalar >= 0.3F &&
+                            descriptor_geometry[i].mapped_scalar <= 0.700001F,
+                        "AI descriptor geometry must be finite and reference its source node");
             }
         }
         const auto track = viper::ResourceBundle::open(root / "bemidji.trk");

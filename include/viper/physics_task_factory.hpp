@@ -788,6 +788,16 @@ struct PhysicsAcarModelNodeObservation {
 [[nodiscard]] std::optional<std::vector<PhysicsAcarModelNodeObservation>>
 make_acar_model_node_observations(const IdealLineTrackData& line);
 
+struct AcarDescriptorGeometry {
+    std::uint32_t node_id{};
+    float mapped_scalar{};
+};
+
+// Projects the node-dependent portion of 0x429440 without assuming whether
+// optional per-driver note data or native allocations are available.
+[[nodiscard]] std::vector<AcarDescriptorGeometry> make_acar_descriptor_geometry(
+    std::span<const PhysicsAcarModelNodeObservation> nodes);
+
 // ACAR extends the inherited 0xEF0-byte car body to 0x1080 bytes. Preserve
 // byte-level initialization information for the derived fields separately.
 struct PhysicsAcarDerivedRuntimeState {

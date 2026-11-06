@@ -43,6 +43,10 @@ user installations lack additional resources. The normal-orientation default
 AI line is now parsed and retained separately from `track.ild`, and the session
 prepares its curve and descriptor-node inputs. Full per-car fallback selection,
 ADNT checks and AI callback dispatch remain unimplemented.
+The node-dependent `0x429440` descriptor geometry is also calculated once from
+the default candidate and made available to each opponent, without asserting
+that per-car note lookup selected it or inventing optional note data. The
+asset-backed regression checks both default variants on all eight tracks.
 
 The ACAR constructor obtains its model through `0x419FF0`, which returns the
 `+0x10` geometry object of the per-car manager created by `0x41AF00` and

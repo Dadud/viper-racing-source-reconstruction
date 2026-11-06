@@ -1480,6 +1480,27 @@ make_acar_model_node_observations(const IdealLineTrackData& line)
     return nodes;
 }
 
+static float map_acar_descriptor_scalar(const float scalar) noexcept
+{
+    auto mapped = 1.0L - static_cast<long double>(scalar) * 20.0L;
+    const float rounded = static_cast<float>(mapped);
+    if (!(rounded >= 0.0F)) mapped = 0.0L;
+    else if (rounded > 1.0F) mapped = 1.0L;
+    else mapped = static_cast<long double>(rounded);
+    return static_cast<float>(mapped * 0.39999998L + 0.3L);
+}
+
+std::vector<AcarDescriptorGeometry> make_acar_descriptor_geometry(
+    const std::span<const PhysicsAcarModelNodeObservation> nodes)
+{
+    std::vector<AcarDescriptorGeometry> result;
+    result.reserve(nodes.size());
+    for (const auto& node : nodes) {
+        result.push_back({node.address, map_acar_descriptor_scalar(node.scalar_at_0x1c)});
+    }
+    return result;
+}
+
 void initialize_acar_derived_constructor_prefix(
     PhysicsAcarDerivedRuntimeState& state) noexcept
 {
@@ -1609,18 +1630,7 @@ PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
                     break;
                 }
                 descriptor.source_node_address = node.address;
-                auto mapped = 1.0L
-                    - static_cast<long double>(node.scalar_at_0x1c) * 20.0L;
-                const float rounded = static_cast<float>(mapped);
-                if (!(rounded >= 0.0F)) {
-                    mapped = 0.0L;
-                } else if (rounded > 1.0F) {
-                    mapped = 1.0L;
-                } else {
-                    mapped = static_cast<long double>(rounded);
-                }
-                descriptor.mapped_scalar = static_cast<float>(
-                    mapped * 0.39999998L + 0.3L);
+                descriptor.mapped_scalar = map_acar_descriptor_scalar(node.scalar_at_0x1c);
                 descriptor.writes.push_back({base + 0x10U,
                     std::bit_cast<std::uint32_t>(descriptor.mapped_scalar)});
                 descriptor.writes.push_back({base + 0x14U, node.address});
