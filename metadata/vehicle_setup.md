@@ -1041,6 +1041,13 @@ the post-preprojection wheel spin rate at `+0x124` times wheel scalar `+0x5C`.
 The four-wheel composition now uses the produced animation offset and the
 body-basis row for the slip-curve argument.
 
+The live tick trace now captures the actual pre-update contact depth and
+`+0x158` history, prior-contact point velocity, and resulting base/surface
+suspension responses at the time the wheel update consumes them. Previously
+the trace recomputed those values after the history and contact point had
+changed, so its output could differ from the force actually applied. This
+corrects diagnostic provenance; it is not a native comparison.
+
 Before this projection, `update_wheel_spin_preprojection` models the early
 spin/filter block: it computes the capped response from `abs(+0x124)` and
 wheel response, including the selector `+0x164` override gated by positive

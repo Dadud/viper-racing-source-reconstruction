@@ -2785,18 +2785,15 @@ struct PlayerPhysicsTickContext {
     // differential producer to the byte-backed wheel +0x158 lanes.
     std::array<bool, 4> wheel_0x158_native_producer_owned{};
     std::array<std::optional<float>, 4> wheel_previous_contact_depth_0xe8_after_tick{};
-    // Pure +0x442530 base-suspension calculation from byte-backed constructor
-    // fields and the current contact/history observations. Surface adjustment,
-    // finalization, force accumulation, and body integration are not implied.
+    // Values sampled during the actual +0x442530 suspension update.
     std::array<std::optional<float>, 4> wheel_base_suspension_response_0x178{};
     std::array<std::optional<float>, 4> wheel_collision_response{};
     std::array<bool, 4> wheel_collision_impulse_accumulated{};
     std::array<bool, 4> wheel_collision_damage_gate_unresolved{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_suspension_force_vectors{};
-    // Returns from the shared polarity stream and the following pure surface
-    // adjustment. The stream omits other native process callers and is not a
-    // force input in the current runtime.
+    // Returns from the reconstructed polarity stream and surface adjustment.
+    // The stream still omits other native process callers.
     std::array<std::optional<std::int64_t>, 4> wheel_surface_polarity_results{};
     std::array<std::optional<float>, 4> wheel_surface_motion_projections{};
     std::array<std::optional<float>, 4> wheel_surface_adjusted_responses{};
@@ -3930,6 +3927,11 @@ struct WindowState {
             const float motion_projection =
                 viper::project_body_point_velocity_0x442530(
                     point_velocity, body_transform);
+            tick.wheel_body_point_velocities_0x130[wheel] = point_velocity;
+            tick.wheel_surface_motion_projections[wheel] = motion_projection;
+            tick.wheel_preupdate_value_0x158_after_tick[wheel] = *suspension_base;
+            tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
+                std::bit_cast<float>(*previous_depth_bits);
             const auto& contact = player_wheel_contact_results[wheel];
             const auto& observation = player_wheel_contact_observations[wheel];
             viper::WheelSuspensionPipelineInput suspension_input{};
@@ -3962,6 +3964,10 @@ struct WindowState {
                 player_constructor_inputs_ready = false;
                 return;
             }
+            tick.wheel_base_suspension_response_0x178[wheel] =
+                suspension->base.combined_response_0x178;
+            tick.wheel_surface_adjusted_responses[wheel] =
+                suspension->surface.adjusted_response;
             auto& update = player_wheel_update_results[wheel];
             update.contact = contact;
             update.suspension = *suspension;
@@ -4822,123 +4828,12 @@ struct WindowState {
             tick.wheel_value_0xe0_after_tick[wheel] = read_wheel_float(0x0e0U);
             tick.wheel_value_0xa8_after_tick[wheel] = read_wheel_float(0x0a8U);
             tick.wheel_angle_0xac_after_tick[wheel] = read_wheel_float(0x0acU);
-            if (const auto bits = viper::read_ncar_wheel_object_u32(
-                    wheel_object, 0x158U)) {
-                tick.wheel_preupdate_value_0x158_after_tick[wheel] =
-                    std::bit_cast<float>(*bits);
-            }
             tick.wheel_0x158_native_producer_owned[wheel] =
                 player_wheel_pair_differential_producer_applied;
-            if (const auto bits = viper::read_ncar_wheel_object_u32(
-                    wheel_object, 0xe8U)) {
-                tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] =
-                    std::bit_cast<float>(*bits);
-            }
             tick.wheel_animation_flags_0x120[wheel] =
                 viper::read_ncar_wheel_object_u8(wheel_object, 0x120U);
             tick.wheel_animation_mode_0x121[wheel] =
                 viper::read_ncar_wheel_object_u8(wheel_object, 0x121U);
-            if (player_wheel_core_initialization &&
-                player_wheel_core_initialization->wheels[wheel] &&
-                tick.wheel_contact_clamped_depth_after_tick[wheel] &&
-                tick.wheel_previous_contact_depth_0xe8_after_tick[wheel] &&
-                tick.wheel_preupdate_value_0x158_after_tick[wheel]) {
-                const auto positive_slope = read_wheel_float(0x24U);
-                const auto positive_intercept = read_wheel_float(0x28U);
-                const auto nonpositive_slope = read_wheel_float(0x2cU);
-                const auto nonpositive_intercept = read_wheel_float(0x30U);
-                const auto spring_scale = read_wheel_float(0x3cU);
-                const auto spring_base = read_wheel_float(0x40U);
-                const auto depth_limit = read_wheel_float(0x44U);
-                const auto threshold_scale = read_wheel_float(0x4cU);
-                const auto damage = viper::read_ncar_wheel_object_u8(
-                    wheel_object, 0x20U);
-                if (positive_slope && positive_intercept &&
-                    nonpositive_slope && nonpositive_intercept && spring_scale &&
-                    spring_base && depth_limit && threshold_scale && damage &&
-                    std::isfinite(*tick.wheel_contact_clamped_depth_after_tick[wheel]) &&
-                    std::isfinite(*tick.wheel_previous_contact_depth_0xe8_after_tick[wheel]) &&
-                    std::isfinite(*tick.wheel_preupdate_value_0x158_after_tick[wheel]) &&
-                    std::isfinite(*positive_slope) && std::isfinite(*positive_intercept) &&
-                    std::isfinite(*nonpositive_slope) && std::isfinite(*nonpositive_intercept) &&
-                    std::isfinite(*spring_scale) && std::isfinite(*spring_base) &&
-                    std::isfinite(*depth_limit) && std::isfinite(*threshold_scale)) {
-                    const viper::WheelSuspensionInput input{
-                        {*positive_slope, *positive_intercept,
-                         *nonpositive_slope, *nonpositive_intercept},
-                        *tick.wheel_contact_clamped_depth_after_tick[wheel],
-                        *tick.wheel_previous_contact_depth_0xe8_after_tick[wheel],
-                        *depth_limit, *spring_scale, *spring_base,
-                        *tick.wheel_preupdate_value_0x158_after_tick[wheel],
-                        *threshold_scale, *damage != 0U};
-                    const auto base = viper::evaluate_wheel_suspension(input);
-                    if (std::isfinite(base.combined_response_0x178)) {
-                        tick.wheel_base_suspension_response_0x178[wheel] =
-                            base.combined_response_0x178;
-                        const auto coefficient_0x9c = read_wheel_float(0x9cU);
-                        const auto coefficient_0xa0 = read_wheel_float(0xa0U);
-                        const auto special_scaling_disabled =
-                            viper::read_ncar_wheel_object_u8(wheel_object, 0x1a0U);
-                        const auto& polarity =
-                            player_wheel_surface_polarity_results[wheel];
-                        if (coefficient_0x9c && coefficient_0xa0 &&
-                            special_scaling_disabled && polarity &&
-                            (*polarity == 0 || *polarity == 1) &&
-                            body_transform_ready && body_center_x && body_center_y &&
-                            body_center_z && body_velocity_x && body_velocity_y &&
-                            body_velocity_z && body_angular_x && body_angular_y &&
-                            body_angular_z &&
-                            std::isfinite(*coefficient_0x9c) &&
-                            std::isfinite(*coefficient_0xa0) &&
-                            std::isfinite(*body_center_x) &&
-                            std::isfinite(*body_center_y) &&
-                            std::isfinite(*body_center_z) &&
-                            std::isfinite(*body_velocity_x) &&
-                            std::isfinite(*body_velocity_y) &&
-                            std::isfinite(*body_velocity_z) &&
-                            std::isfinite(*body_angular_x) &&
-                            std::isfinite(*body_angular_y) &&
-                            std::isfinite(*body_angular_z)) {
-                            const viper::BodyPointVelocityInput point_velocity_input{
-                                {*body_center_x, *body_center_y, *body_center_z},
-                                player_wheel_contact_states[wheel].contact_point_0x130,
-                                {*body_velocity_x, *body_velocity_y, *body_velocity_z},
-                                {*body_angular_x, *body_angular_y, *body_angular_z}};
-                            const auto point_velocity =
-                                viper::derive_body_point_velocity_0x43e9b0(
-                                    point_velocity_input);
-                            if (std::isfinite(point_velocity.x) &&
-                                std::isfinite(point_velocity.y) &&
-                                std::isfinite(point_velocity.z)) {
-                                tick.wheel_body_point_velocities_0x130[wheel] =
-                                    point_velocity;
-                            }
-                            const auto motion_projection =
-                                viper::project_body_point_velocity_0x442530(
-                                    point_velocity, body_transform);
-                            if (std::isfinite(motion_projection)) {
-                                tick.wheel_surface_motion_projections[wheel] =
-                                    motion_projection;
-                                const viper::WheelSuspensionSurfaceInput surface_input{
-                                    base.combined_response_0x178,
-                                    motion_projection,
-                                    *coefficient_0xa0,
-                                    *coefficient_0x9c,
-                                    *polarity == 0 ? -1.0F : 1.0F,
-                                    player_wheel_contact_states[wheel]
-                                        .contact_feature_0x19c,
-                                    *special_scaling_disabled != 0U};
-                                const auto surface =
-                                    viper::adjust_wheel_suspension_for_surface(
-                                        surface_input);
-                                if (std::isfinite(surface.adjusted_response))
-                                    tick.wheel_surface_adjusted_responses[wheel] =
-                                        surface.adjusted_response;
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
