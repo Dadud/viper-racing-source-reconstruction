@@ -301,6 +301,7 @@ try {
     $wheelTireDynamicsColumns = @()
     $wheelTireResetColumns = @()
     $wheelTireAccumulatorColumns = @()
+    $wheelTireAccumulatorStatusColumns = [int[]]::new(4)
     $wheelTireVectorColumns = @()
     $wheelRateFinalizeColumns = @()
     $wheelTireForceColumns = @()
@@ -390,6 +391,8 @@ try {
                 $tickHeader, "wheel${wheel}_$($tireAccumulatorNames[$lane])")
         }
         $wheelTireAccumulatorColumns += ,$tireAccumulatorColumns
+        $wheelTireAccumulatorStatusColumns[$wheel] = [Array]::IndexOf(
+            $tickHeader, "wheel${wheel}_tire_accumulator_status")
         $tireVectorNames = @(
             'tire_vectors_applied',
             'tire_vector_0xf4_x', 'tire_vector_0xf4_y', 'tire_vector_0xf4_z',
@@ -802,6 +805,13 @@ try {
             }
             $accumulatorColumns = $wheelTireAccumulatorColumns[$wheel]
             $accumulatorApplied = $fields[$accumulatorColumns[0]]
+            $accumulatorStatus = [int]::Parse(
+                $fields[$wheelTireAccumulatorStatusColumns[$wheel]],
+                [cultureinfo]::InvariantCulture)
+            if ($accumulatorStatus -lt 0 -or $accumulatorStatus -gt 8 -or
+                (($accumulatorApplied -eq '1') -ne ($accumulatorStatus -eq 8))) {
+                throw "Wheel $wheel tire accumulator status disagrees with its result at line $($index + 1)"
+            }
             $curveInput = [single]::Parse(
                 $tireCurveValues[0], [cultureinfo]::InvariantCulture)
             $lateralCurveValue = [single]::Parse(

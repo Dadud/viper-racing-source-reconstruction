@@ -2848,6 +2848,8 @@ struct PlayerPhysicsTickContext {
     std::array<bool, 4> wheel_tire_dynamics_reset_applied{};
     std::array<std::optional<viper::WheelTireAccumulatorResult>, 4>
         wheel_tire_accumulator_results{};
+    std::array<viper::NcarWheelTireAccumulatorStatus, 4>
+        wheel_tire_accumulator_statuses{};
     std::array<std::optional<viper::WheelTireResponseVectorStoreResult>, 4>
         wheel_tire_response_vector_store_results{};
     std::array<std::optional<viper::WheelRateFinalizationResult>, 4>
@@ -4746,7 +4748,8 @@ struct WindowState {
                                                 viper::advance_ncar_wheel_tire_accumulators_in_object(
                                                     player_runtime_state.wheel_objects[wheel],
                                                     wheel_object_offset,
-                                                    accumulator_input);
+                                                    accumulator_input,
+                                                    &tick.wheel_tire_accumulator_statuses[wheel]);
                                             tick.wheel_tire_response_vector_store_results[wheel] =
                                                 viper::advance_ncar_wheel_tire_response_vectors_in_object(
                                                     player_runtime_state.wheel_objects[wheel],
@@ -6823,6 +6826,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_tire_response_gate_0x11c"
                 << ",wheel" << wheel << "_tire_trigonometric_response"
                 << ",wheel" << wheel << "_tire_accumulator_applied"
+                << ",wheel" << wheel << "_tire_accumulator_status"
                 << ",wheel" << wheel << "_tire_accumulator_0xa4"
                 << ",wheel" << wheel << "_tire_accumulator_0x10c"
                 << ",wheel" << wheel << "_tire_state_0xec"
@@ -7341,7 +7345,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         const auto& tire_accumulator =
                             tick.wheel_tire_accumulator_results[wheel];
                         physics_tick_trace << ',' <<
-                            (tire_accumulator ? 1 : 0);
+                            (tire_accumulator ? 1 : 0) << ',' <<
+                            static_cast<unsigned>(
+                                tick.wheel_tire_accumulator_statuses[wheel]);
                         for (const auto value : {
                                 tire_accumulator
                                     ? std::optional<float>{tire_accumulator->accumulator_0xa4}

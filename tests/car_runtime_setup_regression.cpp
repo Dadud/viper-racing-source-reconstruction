@@ -208,9 +208,12 @@ int main()
             expected_input.sign_source_0x04 = 0.0F;
             const auto expected = viper::advance_wheel_tire_accumulators(
                 expected_input);
+            auto status = viper::NcarWheelTireAccumulatorStatus::not_attempted;
             const auto result = viper::advance_ncar_wheel_tire_accumulators_in_object(
-                wheel, wheel_base, input);
-            require(result && result->contact_states_updated &&
+                wheel, wheel_base, input, &status);
+            require(result && status ==
+                        viper::NcarWheelTireAccumulatorStatus::applied &&
+                    result->contact_states_updated &&
                     viper::read_ncar_wheel_object_u32(wheel, 0x0a4U) ==
                         std::optional<std::uint32_t>{std::bit_cast<std::uint32_t>(
                             expected.accumulator_0xa4)} &&
@@ -227,11 +230,24 @@ int main()
 
             viper::NcarWheelRuntimeObjectState unresolved{};
             const auto unresolved_before = unresolved;
+            status = viper::NcarWheelTireAccumulatorStatus::not_attempted;
             require(!viper::advance_ncar_wheel_tire_accumulators_in_object(
-                        unresolved, wheel_base, input) &&
+                        unresolved, wheel_base, input, &status) &&
+                    status == viper::NcarWheelTireAccumulatorStatus::missing_state &&
                     unresolved.bytes == unresolved_before.bytes &&
                     unresolved.initialized_bytes == unresolved_before.initialized_bytes,
                 "tire accumulator must fail closed on unknown +0x04/+0xA4/+0x10C inputs");
+
+            auto zero_divisor = input;
+            zero_divisor.divisor_factor_0xc0 = 0.0F;
+            const auto before_zero_divisor = wheel;
+            status = viper::NcarWheelTireAccumulatorStatus::not_attempted;
+            require(!viper::advance_ncar_wheel_tire_accumulators_in_object(
+                        wheel, wheel_base, zero_divisor, &status) &&
+                    status == viper::NcarWheelTireAccumulatorStatus::zero_divisor &&
+                    wheel.bytes == before_zero_divisor.bytes &&
+                    wheel.initialized_bytes == before_zero_divisor.initialized_bytes,
+                "tire accumulator must identify and avoid writes for zero lateral divisor");
         }
         {
             constexpr std::uint32_t wheel_base = 0x554U;

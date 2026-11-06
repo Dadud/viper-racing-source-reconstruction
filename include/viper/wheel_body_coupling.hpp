@@ -1040,11 +1040,24 @@ advance_ncar_wheel_rate_finalization_in_object(
 // Applies the active-contact 0x442530 accumulator stage to initialized wheel
 // bytes. Contact-active writes replace +0xEC/+0xF0, so their prior contents
 // are deliberately not treated as inputs.
+enum class NcarWheelTireAccumulatorStatus : std::uint8_t {
+    not_attempted,
+    inactive_contact,
+    missing_state,
+    non_finite_state,
+    non_finite_input,
+    zero_divisor,
+    non_finite_output,
+    write_rejected,
+    applied,
+};
+
 [[nodiscard]] std::optional<WheelTireAccumulatorResult>
 advance_ncar_wheel_tire_accumulators_in_object(
     NcarWheelRuntimeObjectState& wheel,
     std::uint32_t wheel_object_offset,
-    const WheelTireAccumulatorInput& input) noexcept;
+    const WheelTireAccumulatorInput& input,
+    NcarWheelTireAccumulatorStatus* status = nullptr) noexcept;
 
 // Persists the 0x441C10 copy of the allocated tire response object's +0x2C
 // scale into wheel +0x90. The host pointer stored at wheel +0x8C is modeled

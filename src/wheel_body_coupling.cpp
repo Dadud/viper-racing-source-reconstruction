@@ -1649,21 +1649,35 @@ std::optional<WheelTireAccumulatorResult>
 advance_ncar_wheel_tire_accumulators_in_object(
     NcarWheelRuntimeObjectState& wheel,
     const std::uint32_t wheel_object_offset,
-    const WheelTireAccumulatorInput& input) noexcept
+    const WheelTireAccumulatorInput& input,
+    NcarWheelTireAccumulatorStatus* status) noexcept
 {
-    if (!input.contact_active_0x168) return std::nullopt;
-    const auto read_finite = [&wheel](const std::uint32_t local_offset)
-            -> std::optional<float> {
+    const auto reject = [status](const NcarWheelTireAccumulatorStatus reason) {
+        if (status) *status = reason;
+        return std::optional<WheelTireAccumulatorResult>{};
+    };
+    if (!input.contact_active_0x168) {
+        return reject(NcarWheelTireAccumulatorStatus::inactive_contact);
+    }
+    const auto read_finite = [&wheel](const std::uint32_t local_offset,
+                                      bool& non_finite) -> std::optional<float> {
         const auto bits = read_ncar_wheel_object_u32(wheel, local_offset);
         if (!bits) return std::nullopt;
         const auto value = std::bit_cast<float>(*bits);
-        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+        if (!std::isfinite(value)) {
+            non_finite = true;
+            return std::nullopt;
+        }
+        return value;
     };
-    const auto accumulator_0xa4 = read_finite(0x0a4U);
-    const auto accumulator_0x10c = read_finite(0x10cU);
-    const auto sign_source_0x04 = read_finite(0x004U);
+    bool non_finite_state = false;
+    const auto accumulator_0xa4 = read_finite(0x0a4U, non_finite_state);
+    const auto accumulator_0x10c = read_finite(0x10cU, non_finite_state);
+    const auto sign_source_0x04 = read_finite(0x004U, non_finite_state);
     if (!accumulator_0xa4 || !accumulator_0x10c || !sign_source_0x04) {
-        return std::nullopt;
+        return reject(non_finite_state
+            ? NcarWheelTireAccumulatorStatus::non_finite_state
+            : NcarWheelTireAccumulatorStatus::missing_state);
     }
 
     auto resolved = input;
@@ -1685,10 +1699,15 @@ advance_ncar_wheel_tire_accumulators_in_object(
         resolved.forward_scale_0x10c};
     if (!std::all_of(finite_inputs.begin(), finite_inputs.end(),
             [](const float value) { return std::isfinite(value); }) ||
-        resolved.divisor_0x1c == 0.0F ||
+        !std::isfinite(resolved.accumulator_0xa4) ||
+        !std::isfinite(resolved.accumulator_0x10c) ||
+        !std::isfinite(resolved.sign_source_0x04)) {
+        return reject(NcarWheelTireAccumulatorStatus::non_finite_input);
+    }
+    if (resolved.divisor_0x1c == 0.0F ||
         resolved.divisor_factor_0x48 == 0.0F ||
         resolved.divisor_factor_0xc0 == 0.0F) {
-        return std::nullopt;
+        return reject(NcarWheelTireAccumulatorStatus::zero_divisor);
     }
     const auto result = advance_wheel_tire_accumulators(resolved);
     const std::array<float, 4> outputs{
@@ -1696,7 +1715,7 @@ advance_ncar_wheel_tire_accumulators_in_object(
         result.state_0xec, result.state_0xf0};
     if (!std::all_of(outputs.begin(), outputs.end(),
             [](const float value) { return std::isfinite(value); })) {
-        return std::nullopt;
+        return reject(NcarWheelTireAccumulatorStatus::non_finite_output);
     }
     const std::array<NcarObjectFieldWrite, 4> writes{{
         {wheel_object_offset + 0x0a4U, 4U,
@@ -1708,8 +1727,11 @@ advance_ncar_wheel_tire_accumulators_in_object(
         {wheel_object_offset + 0x0f0U, 4U,
             std::bit_cast<std::uint32_t>(result.state_0xf0)},
     }};
-    return apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes)
-        ? std::optional<WheelTireAccumulatorResult>{result} : std::nullopt;
+    if (!apply_ncar_wheel_object_writes(wheel, wheel_object_offset, writes)) {
+        return reject(NcarWheelTireAccumulatorStatus::write_rejected);
+    }
+    if (status) *status = NcarWheelTireAccumulatorStatus::applied;
+    return result;
 }
 
 bool apply_ncar_wheel_tire_response_scale(
