@@ -7,6 +7,20 @@
 
 namespace viper {
 
+std::array<float, 2> race_tracking_point_xz(
+    const std::array<float, 9>& basis,
+    const std::array<float, 3>& translation,
+    const std::array<float, 3>& local_point) noexcept
+{
+    // The native matrix is stored as three consecutive basis vectors.
+    return {
+        (basis[0] * local_point[0] + basis[3] * local_point[1] +
+            basis[6] * local_point[2]) + translation[0],
+        (basis[2] * local_point[0] + basis[5] * local_point[1] +
+            basis[8] * local_point[2]) + translation[2],
+    };
+}
+
 void initialize_race_progression(
     RaceProgressionState& state, const std::size_t starting_segment) noexcept
 {

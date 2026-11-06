@@ -8,6 +8,13 @@
 
 namespace viper {
 
+// Native 0x43D110 transforms the car-local tracking point to world space,
+// then supplies its X and Z components to the track iterator.
+[[nodiscard]] std::array<float, 2> race_tracking_point_xz(
+    const std::array<float, 9>& basis,
+    const std::array<float, 3>& translation,
+    const std::array<float, 3>& local_point) noexcept;
+
 struct RaceProgressionState {
     std::size_t lap_start_segment{};
     std::uint32_t completed_laps{};

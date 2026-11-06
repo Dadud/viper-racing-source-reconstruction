@@ -320,7 +320,22 @@ other bytes, completing the placement-to-record handoff.
 otherwise it computes `(z - reference_z) * z_weight + (x - reference_x) *
 x_weight` from fields `+0x18`, `+0x1C`, `+0x3C`, `+0x40`, `+0x4C`, and `+0x50`.
 `0x41E130` stores that helper's result at geometry-object offset `+0x54`.
-That value is distinct from the placement base key: `0x41E070` writes the
+
+The selector-0 race service's `0x43D110` supplies a physical car position to
+the track iterator. It transforms the car-local point at car `+0xD7C..+0xD84`
+using the three basis vectors at `+0x38..+0x58` and translation at
+`+0x5C..+0x64`, and passes world X/Z to `0x41E180`. The helper's return and
+the iterator's `0x41E5C0` result gate race-state updates; the latter reaching
+1 causes the per-entrant counter at service entrant `+0x34` to increment.
+The first such increment initializes timing; later ones record lap timing and
+compare the counter to the configured target. These observations come from
+the local original disassembly at `0x43D110..0x43D383` and
+`0x41E180..0x41E248`. `race_tracking_point_xz` models the position transform
+only, with host floating-point precision. The initialization and linked-curve
+state, crossing semantics, and full caller cadence still need to be recovered
+before using this to award laps in the physical race.
+
+The geometry key at `+0x54` is distinct from the placement base key: `0x41E070` writes the
 last ILIN row's endpoint sum to `+0x5C`, and the `0x45CE10` stack layout maps
 its `local_14` directly to geometry-object `+0x5C`. Thus
 `plan_car_spline_target_key` takes this placement base and models

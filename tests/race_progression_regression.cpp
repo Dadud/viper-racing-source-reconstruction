@@ -20,6 +20,11 @@ void require(const bool condition, const char* message)
 int main()
 {
     try {
+        const auto tracking_point = viper::race_tracking_point_xz(
+            {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F, 9.0F},
+            {10.0F, 20.0F, 30.0F}, {2.0F, 3.0F, 4.0F});
+        require(tracking_point[0] == 52.0F && tracking_point[1] == 90.0F,
+            "race tracking must transform the local point and pass world X and Z");
         viper::RaceInputBindingObservation keyboard_input{};
         const viper::RaceInputBinding up_key_binding{1U, 0x26U};
         keyboard_input.device_button_states[0x26U] = 1U;
