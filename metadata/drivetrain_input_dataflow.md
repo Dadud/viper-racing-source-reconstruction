@@ -159,6 +159,18 @@ the numeric defaults used by that child; native pointer links are represented
 by the model rather than fabricated in the byte-backed object. Host
 floating-point behavior is not established as x87-bit-exact.
 
+The noninteractive wheel regression follows a nonzero selected-pair `+0xE4`
+output through the spin preprojection and exit-rate stores, contrasting it
+with the same synthetic wheel state with `+0xE4` cleared. Both resulting rate
+values differ. This confirms that reconstructed data path for that fixture;
+it does not prove correct acceleration or numerical parity with the original.
+
+The original reaches the `0x443E6C` rate-finalization block even when wheel
+`+0x168` is zero (`0x443CBC..0x443CC3`). The current player path invokes its
+rate-finalization adapter only after the contact response vector is available.
+Recovering the no-contact response vector and running that exit path remains
+necessary; a zero vector is not established merely by absent contact.
+
 `advance_ncar_curve_setter_in_body` bridges that operation to the initialized
 byte-backed body: it reads the curve, body axis and existing moment, then
 commits the getter, curve accumulators, flags and updated body moment together.

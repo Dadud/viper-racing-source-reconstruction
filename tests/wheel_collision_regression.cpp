@@ -555,4 +555,49 @@ int main()
         viper::read_ncar_body_object_u8(gated_body, 0xe49U) == 1U &&
         viper::read_ncar_body_object_u32(gated_body, 0xc7cU) ==
             std::bit_cast<std::uint32_t>(1.0F));
+
+    // Follow the selected wheel setter through the same spin and exit-rate
+    // adapters used by the player tick, using an explicit zero tire vector.
+    auto powered_wheel = drivetrain_wheels[0];
+    auto neutral_wheel = powered_wheel;
+    const std::array<viper::NcarObjectFieldWrite, 17> spin_fields{{
+        {first_wheel_offset + 0x124U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+        {first_wheel_offset + 0x05cU, 4U, std::bit_cast<std::uint32_t>(1.25F)},
+        {first_wheel_offset + 0x0a8U, 4U, std::bit_cast<std::uint32_t>(2.5F)},
+        {first_wheel_offset + 0x050U, 4U, std::bit_cast<std::uint32_t>(0.8F)},
+        {first_wheel_offset + 0x054U, 4U, std::bit_cast<std::uint32_t>(0.1F)},
+        {first_wheel_offset + 0x058U, 4U, std::bit_cast<std::uint32_t>(0.2F)},
+        {first_wheel_offset + 0x0e0U, 4U, std::bit_cast<std::uint32_t>(0.4F)},
+        {first_wheel_offset + 0x178U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+        {first_wheel_offset + 0x17cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {first_wheel_offset + 0x174U, 4U, std::bit_cast<std::uint32_t>(0.2F)},
+        {first_wheel_offset + 0x170U, 4U, std::bit_cast<std::uint32_t>(0.1F)},
+        {first_wheel_offset + 0x15cU, 4U, 0U}, {first_wheel_offset + 0x164U, 4U, 0U},
+        {first_wheel_offset + 0x020U, 1U, 0U}, {first_wheel_offset + 0x160U, 1U, 0U},
+        {first_wheel_offset + 0x038U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {first_wheel_offset + 0x120U, 1U, 0U}}};
+    require(viper::apply_ncar_wheel_object_writes(powered_wheel, first_wheel_offset, spin_fields) &&
+        viper::apply_ncar_wheel_object_writes(neutral_wheel, first_wheel_offset, spin_fields));
+    const viper::NcarObjectFieldWrite zero_e4{first_wheel_offset + 0xe4U, 4U, 0U};
+    require(viper::apply_ncar_wheel_object_writes(neutral_wheel, first_wheel_offset,
+        std::span<const viper::NcarObjectFieldWrite>(&zero_e4, 1U)));
+    std::array<viper::NcarObjectFieldWrite, 12> spin_body_fields{};
+    for (std::size_t i = 0; i < 9U; ++i)
+        spin_body_fields[i] = {0x38U + static_cast<std::uint32_t>(i * 4U), 4U,
+            std::bit_cast<std::uint32_t>(i % 4U == 0U ? 1.0F : 0.0F)};
+    for (std::size_t i = 0; i < 3U; ++i)
+        spin_body_fields[9U + i] = {0x234U + static_cast<std::uint32_t>(i * 4U), 4U, 0U};
+    require(viper::apply_ncar_body_object_writes(drivetrain_body, spin_body_fields));
+    const auto powered_spin = viper::advance_ncar_wheel_spin_preprojection_in_objects(
+        powered_wheel, first_wheel_offset, drivetrain_body);
+    const auto neutral_spin = viper::advance_ncar_wheel_spin_preprojection_in_objects(
+        neutral_wheel, first_wheel_offset, drivetrain_body);
+    require(powered_spin && neutral_spin &&
+        powered_spin->response_local_0x90 != neutral_spin->response_local_0x90);
+    const auto powered_rate = viper::advance_ncar_wheel_rate_finalization_in_object(
+        powered_wheel, first_wheel_offset, *powered_spin, {}, {});
+    const auto neutral_rate = viper::advance_ncar_wheel_rate_finalization_in_object(
+        neutral_wheel, first_wheel_offset, *neutral_spin, {}, {});
+    require(powered_rate && neutral_rate && powered_rate->rate_0x124 != neutral_rate->rate_0x124 &&
+        powered_rate->auxiliary_rate_0x128 != neutral_rate->auxiliary_rate_0x128);
 }
