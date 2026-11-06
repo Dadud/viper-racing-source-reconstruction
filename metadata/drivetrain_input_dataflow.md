@@ -118,6 +118,14 @@ body `+0xCA0/+0xCA4/+0xCAC`, respectively. The controller setters and this
 integrator are not yet wired into the live player step; signal and callback
 state must be sourced together before doing so.
 
+`advance_ncar_controller_setter_in_body_and_wheels` now connects this
+controller projection to the selected pair and persistent wheel state. It
+uses the current wheel getters, writes only the selected wheel endpoints,
+and applies the disabled branch's body-moment update. Body and wheels are
+committed together after validation. The caller still supplies the signal and
+must place the call in the original tick sequence; it is not yet used by the
+live player step.
+
 The signal pair's other child is the curve object at parent `+0xBFC`: its
 vtable `0x4C8780` uses `0x43F970` as getter and `0x4402E0` as setter. The
 setter smooths curve `+0x38` from `+0x2C`, computes a scale from `+0x30`,

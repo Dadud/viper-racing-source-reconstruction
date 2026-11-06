@@ -376,4 +376,53 @@ int main()
         integrated_pair->wheel_value_0xe4[0]) < 1e-6F);
     require(std::bit_cast<float>(
         *viper::read_ncar_wheel_object_u32(integrated_wheels[2], 0xe4U)) == 99.0F);
+
+    viper::NcarBodyRuntimeObjectState controller_body{};
+    const std::array<viper::NcarObjectFieldWrite, 11> controller_fields{{
+        {0xcf0U, 1U, 1U},
+        {0xca8U, 4U, std::bit_cast<std::uint32_t>(7.0F)},
+        {0xcacU, 4U, std::bit_cast<std::uint32_t>(3.0F)},
+        {0xcb0U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+        {0xca0U, 4U, std::bit_cast<std::uint32_t>(5.0F)},
+        {0xca4U, 4U, std::bit_cast<std::uint32_t>(4.0F)},
+        {0x50U, 4U, 0U}, {0x54U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0x58U, 4U, 0U}, {0x258U, 4U, 0U}, {0x25cU, 4U, 0U}}};
+    require(viper::apply_ncar_body_object_writes(controller_body, controller_fields));
+    const viper::NcarObjectFieldWrite moment_z{0x260U, 4U, 0U};
+    require(viper::apply_ncar_body_object_writes(controller_body,
+        std::span<const viper::NcarObjectFieldWrite>(&moment_z, 1U)));
+    auto controller_wheels = integrated_wheels;
+    const auto enabled_step = viper::advance_ncar_controller_setter_in_body_and_wheels(
+        controller_body, controller_wheels, runtime_record, first_wheel_offset, 4.0F);
+    require(enabled_step && !enabled_step->integrator &&
+        enabled_step->controller.observed_value_0x28 == 12.0F &&
+        enabled_step->controller.selected_pair_argument == -64.0F &&
+        viper::read_ncar_body_object_u32(controller_body, 0xca8U) ==
+            std::bit_cast<std::uint32_t>(12.0F) &&
+        viper::read_ncar_body_object_u32(controller_body, 0xcc0U) ==
+            std::bit_cast<std::uint32_t>(12.0F) &&
+        viper::read_ncar_wheel_object_u32(controller_wheels[0], 0xe4U) ==
+            std::bit_cast<std::uint32_t>(enabled_step->pair.wheel_value_0xe4[0]) &&
+        std::bit_cast<float>(*viper::read_ncar_wheel_object_u32(controller_wheels[2], 0xe4U)) == 99.0F);
+    const viper::NcarObjectFieldWrite disable_controller{0xcf0U, 1U, 0U};
+    require(viper::apply_ncar_body_object_writes(controller_body,
+        std::span<const viper::NcarObjectFieldWrite>(&disable_controller, 1U)));
+    const auto disabled_step = viper::advance_ncar_controller_setter_in_body_and_wheels(
+        controller_body, controller_wheels, runtime_record, first_wheel_offset, 4.0F);
+    require(disabled_step && disabled_step->integrator &&
+        disabled_step->controller.observed_value_0x28 == 12.0F &&
+        viper::read_ncar_body_object_u32(controller_body, 0xca8U) ==
+            std::bit_cast<std::uint32_t>(disabled_step->integrator->value_0x10) &&
+        viper::read_ncar_body_object_u32(controller_body, 0x25cU) ==
+            std::bit_cast<std::uint32_t>(disabled_step->integrator->body_moment_delta[1]));
+    const auto saved_controller_body = controller_body;
+    const auto saved_controller_wheels = controller_wheels;
+    require(!viper::advance_ncar_controller_setter_in_body_and_wheels(
+        controller_body, controller_wheels, runtime_record, first_wheel_offset,
+        std::numeric_limits<float>::infinity()) &&
+        controller_body.bytes == saved_controller_body.bytes &&
+        controller_body.initialized_bytes == saved_controller_body.initialized_bytes);
+    for (std::size_t i = 0; i < controller_wheels.size(); ++i)
+        require(controller_wheels[i].bytes == saved_controller_wheels[i].bytes &&
+            controller_wheels[i].initialized_bytes == saved_controller_wheels[i].initialized_bytes);
 }

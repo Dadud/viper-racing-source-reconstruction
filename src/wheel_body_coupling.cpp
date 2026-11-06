@@ -2648,6 +2648,81 @@ advance_ncar_selected_wheel_pair_target_in_wheels(
     return result;
 }
 
+std::optional<NcarControllerBodyUpdateResult>
+advance_ncar_controller_setter_in_body_and_wheels(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::span<const std::byte> runtime_record,
+    const std::uint32_t first_wheel_object_offset,
+    const float signal_argument) noexcept
+{
+    auto next_body = body;
+    auto next_wheels = wheels;
+    const auto read_float = [&body](const std::uint32_t offset) -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        const float value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto enabled = read_ncar_body_object_u8(body, 0xcf0U);
+    const auto previous = read_float(0xca8U);
+    const auto damping = read_float(0xcacU);
+    if (!enabled || !previous || !damping) return std::nullopt;
+    const auto getter_pair = advance_ncar_selected_wheel_pair_target_in_wheels(
+        runtime_record, next_wheels, first_wheel_object_offset, 0.0F);
+    if (!getter_pair) return std::nullopt;
+    const float pair_getter = getter_pair->selected_target == 0U ? getter_pair->getter_d24 :
+        getter_pair->selected_target == 1U ? getter_pair->getter_d04 : getter_pair->getter_d44;
+    const auto scale = *enabled ? read_float(0xcb0U) : std::optional<float>{0.0F};
+    if (!scale) return std::nullopt;
+    const auto controller = project_ncar_controller_setter(
+        {*enabled != 0U, pair_getter, *scale, *damping, *previous, signal_argument});
+    if (!controller) return std::nullopt;
+    // The getter projection above used a disposable wheel copy. The actual
+    // setter must run once against the original pre-dispatch wheel state.
+    next_wheels = wheels;
+    const auto pair = advance_ncar_selected_wheel_pair_target_in_wheels(
+        runtime_record, next_wheels, first_wheel_object_offset,
+        controller->selected_pair_argument);
+    if (!pair) return std::nullopt;
+    std::optional<NcarDisabledControllerIntegratorResult> integrator;
+    std::array<NcarObjectFieldWrite, 5> writes{};
+    std::size_t count = 0U;
+    const auto write_float = [&](const std::uint32_t offset, const float value) {
+        writes[count++] = {offset, 4U, std::bit_cast<std::uint32_t>(value)};
+    };
+    write_float(0xcc0U, controller->observed_value_0x28);
+    if (controller->disabled_integrator_required) {
+        const auto inverse = read_float(0xca4U);
+        const auto body_scale = read_float(0xca0U);
+        std::array<float, 3> axis{}, moment{};
+        if (!inverse || !body_scale) return std::nullopt;
+        for (std::size_t i = 0; i < 3U; ++i) {
+            const auto a = read_float(0x50U + static_cast<std::uint32_t>(i * 4U));
+            const auto m = read_float(0x258U + static_cast<std::uint32_t>(i * 4U));
+            if (!a || !m) return std::nullopt;
+            axis[i] = *a;
+            moment[i] = *m;
+        }
+        integrator = project_ncar_disabled_controller_integrator(
+            {*previous, *damping, *inverse, *body_scale, signal_argument, axis});
+        if (!integrator) return std::nullopt;
+        write_float(0xca8U, integrator->value_0x10);
+        for (std::size_t i = 0; i < 3U; ++i) {
+            const float updated = moment[i] + integrator->body_moment_delta[i];
+            if (!std::isfinite(updated)) return std::nullopt;
+            write_float(0x258U + static_cast<std::uint32_t>(i * 4U), updated);
+        }
+    } else {
+        write_float(0xca8U, controller->stored_value_0x10);
+    }
+    if (!apply_ncar_body_object_writes(next_body,
+            std::span<const NcarObjectFieldWrite>(writes.data(), count))) return std::nullopt;
+    body = std::move(next_body);
+    wheels = std::move(next_wheels);
+    return NcarControllerBodyUpdateResult{*controller, *pair, integrator};
+}
+
 std::optional<NcarIntegratorWheelPairDifferentialInput>
 make_ncar_integrator_wheel_pair_differential_input_from_updates(
     const std::array<WheelUpdatePipelineResult, 4>& wheel_updates,

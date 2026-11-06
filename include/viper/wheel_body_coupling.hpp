@@ -195,6 +195,22 @@ advance_ncar_selected_wheel_pair_target_in_wheels(
     std::uint32_t first_wheel_object_offset,
     float controller_setter_argument) noexcept;
 
+struct NcarControllerBodyUpdateResult {
+    NcarControllerSetterResult controller{};
+    NcarSelectedWheelPairTargetResult pair{};
+    std::optional<NcarDisabledControllerIntegratorResult> integrator;
+};
+
+// Applies 0x43FFC0 and its selected-pair dispatch to a single consistent
+// body/wheel snapshot. Missing or invalid fields leave both objects unchanged.
+[[nodiscard]] std::optional<NcarControllerBodyUpdateResult>
+advance_ncar_controller_setter_in_body_and_wheels(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::span<const std::byte> runtime_record,
+    std::uint32_t first_wheel_object_offset,
+    float signal_argument) noexcept;
+
 struct NcarIntegratorCommonForceInput {
     std::array<std::uint8_t, 4> contact_bytes{};
     PhysicsVector3 velocity_delta_0x234_0xdfc{};
