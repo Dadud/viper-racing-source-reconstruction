@@ -2,9 +2,11 @@
 
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -42,6 +44,35 @@ std::vector<std::byte> make_car_record(const std::uint32_t tag)
 int main()
 {
     try {
+        viper::UpdateCurveSetterPrefixInput setter{};
+        setter.getter_value_0x10 = 500.0F;
+        setter.control_value_0x2c = 0.5F;
+        setter.derived_value_0x30 = 0.5F;
+        setter.setter_argument = -3.0F;
+        setter.curve.blend_value_0x38 = 0.2F;
+        setter.curve.cutoff_0x3c = 1000.0F;
+        setter.curve.linear_0x48 = 2.0F;
+        setter.curve.intercept_0x4c = 10.0F;
+        const auto prefix = viper::project_update_curve_setter_prefix(setter);
+        require(prefix && std::fabs(prefix->blended_value_0x38 - 0.29F) < 1e-6F &&
+                std::fabs(prefix->curve_scale - 0.75F) < 1e-6F &&
+                std::fabs(prefix->raw_curve_output - 757.5F) < 1e-4F &&
+                std::fabs(prefix->integrator_argument - 754.5F) < 1e-4F,
+            "curve setter prefix must preserve smoothing, raw curve and integrator input");
+        setter.getter_value_0x10 = 1000.0F;
+        const auto cutoff = viper::project_update_curve_setter_prefix(setter);
+        require(cutoff && cutoff->raw_curve_output == 0.0F &&
+                cutoff->integrator_argument == -3.0F,
+            "curve setter must suppress the curve at the cutoff");
+        setter.curve.mode_0x41 = 1U;
+        setter.curve.mode_0x40 = 1U;
+        const auto alternate = viper::project_update_curve_setter_prefix(setter);
+        require(alternate && alternate->raw_curve_output == 80.0F &&
+                alternate->integrator_argument == 77.0F,
+            "curve setter alternate mode must return the native fixed value");
+        setter.getter_value_0x10 = std::numeric_limits<float>::quiet_NaN();
+        require(!viper::project_update_curve_setter_prefix(setter),
+            "curve setter must reject non-finite inputs");
         auto acar_record = make_car_record(0x41434152U);
         const auto source = viper::read_car_curve_source_record(acar_record);
         require(source.has_value() && source->value_0x68 == 300.0F &&

@@ -118,6 +118,17 @@ body `+0xCA0/+0xCA4/+0xCAC`, respectively. The controller setters and this
 integrator are not yet wired into the live player step; signal and callback
 state must be sourced together before doing so.
 
+The signal pair's other child is the curve object at parent `+0xBFC`: its
+vtable `0x4C8780` uses `0x43F970` as getter and `0x4402E0` as setter. The
+setter smooths curve `+0x38` from `+0x2C`, computes a scale from `+0x30`,
+`+0x2C`, cutoff `+0x3C`, and the getter, evaluates the raw `0x4404D0` curve,
+and adds its setter argument before calling `0x43F980`. The bounded
+`project_update_curve_setter_prefix` models those steps. Its output is the
+input to the separately modeled `0x43F980` integrator, not yet a complete
+engine update: the later `0x4402E0` state/child callbacks and the ordered
+controller interactions remain unconnected. Host floating-point behavior is
+not established as x87-bit-exact.
+
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
 only the wheel `+0xE4` fields reached by the selected block. The Windows

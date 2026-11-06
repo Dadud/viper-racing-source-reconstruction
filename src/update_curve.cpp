@@ -2,7 +2,9 @@
 
 #include "viper/legacy_fdiv.hpp"
 
+#include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstddef>
 
 namespace viper {
@@ -182,6 +184,45 @@ float evaluate_update_curve(
     }
 
     return response - curve.subtract_scale_0x14 * x;
+}
+
+std::optional<UpdateCurveSetterPrefixResult> project_update_curve_setter_prefix(
+    const UpdateCurveSetterPrefixInput& input) noexcept
+{
+    const auto& curve = input.curve;
+    const std::array<float, 11> values{input.getter_value_0x10,
+        input.control_value_0x2c, input.derived_value_0x30,
+        input.setter_argument, curve.blend_value_0x38, curve.cutoff_0x3c,
+        curve.quadratic_0x44, curve.linear_0x48, curve.intercept_0x4c,
+        curve.offset_0x54, curve.penalty_0x58};
+    if (!std::all_of(values.begin(), values.end(),
+            [](const float value) { return std::isfinite(value); })) return std::nullopt;
+    constexpr float retained = std::bit_cast<float>(0x3f333333U);
+    constexpr float incoming = std::bit_cast<float>(0x3e99999aU);
+    const auto blended = static_cast<float>(
+        static_cast<long double>(curve.blend_value_0x38) * retained +
+        static_cast<long double>(input.control_value_0x2c) * incoming);
+    const auto base = (1.0L - static_cast<long double>(input.derived_value_0x30)) *
+        input.control_value_0x2c + input.derived_value_0x30;
+    const auto denominator = (std::max)(1000.0L,
+        static_cast<long double>(input.getter_value_0x10));
+    const auto scale = static_cast<float>((std::min)(1.0L,
+        base * static_cast<long double>(curve.cutoff_0x3c) / denominator));
+    float raw = 0.0F;
+    if (curve.mode_0x41 == 0U && input.getter_value_0x10 < curve.cutoff_0x3c) {
+        const long double x = input.getter_value_0x10;
+        const long double distance = (std::max)(0.0L, x - curve.offset_0x54);
+        raw = static_cast<float>((static_cast<long double>(curve.linear_0x48) * x +
+            (x * x * curve.quadratic_0x44 - distance * curve.penalty_0x58) +
+            curve.intercept_0x4c) * scale);
+    } else if (curve.mode_0x41 != 0U && curve.mode_0x40 != 0U) {
+        raw = 80.0F;
+    }
+    const auto argument = static_cast<float>(
+        static_cast<long double>(raw) + input.setter_argument);
+    if (!std::isfinite(blended) || !std::isfinite(scale) ||
+        !std::isfinite(raw) || !std::isfinite(argument)) return std::nullopt;
+    return UpdateCurveSetterPrefixResult{blended, scale, raw, argument};
 }
 
 int update_embedded_selection(

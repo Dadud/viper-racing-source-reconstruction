@@ -91,6 +91,26 @@ make_configured_update_curve_object_writes(
     float x,
     float scale) noexcept;
 
+struct UpdateCurveSetterPrefixInput {
+    UpdateCurveFields curve{};
+    float getter_value_0x10{};
+    float control_value_0x2c{};
+    float derived_value_0x30{};
+    float setter_argument{};
+};
+
+struct UpdateCurveSetterPrefixResult {
+    float blended_value_0x38{};
+    float curve_scale{};
+    float raw_curve_output{};
+    float integrator_argument{};
+};
+
+// Bounded finite-input projection of 0x4402E0 through its call to 0x43F980.
+// The integrator, body-moment write, and later curve-state updates are separate.
+[[nodiscard]] std::optional<UpdateCurveSetterPrefixResult>
+project_update_curve_setter_prefix(const UpdateCurveSetterPrefixInput& input) noexcept;
+
 // Numeric fields consumed by 0x43FDD0 in the embedded object at parent
 // +0xC98. These are raw offsets; no semantic labels are inferred.
 struct EmbeddedSelectionFields {
