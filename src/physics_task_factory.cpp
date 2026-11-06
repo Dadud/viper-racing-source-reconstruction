@@ -1915,6 +1915,33 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
     return plan;
 }
 
+std::optional<AcarLineThresholdCandidate> plan_acar_line_threshold_candidate(
+    const std::span<const PhysicsAcarModelNodeObservation> nodes,
+    const std::uint32_t profile_value_0x98, const bool fdiv_compatibility_enabled)
+{
+    if (nodes.empty()) return std::nullopt;
+    const auto& last = nodes.back();
+    const auto linked = std::find_if(nodes.begin(), nodes.end(), [&last](const auto& node) {
+        return node.address != 0U && node.address == last.next_address;
+    });
+    if (linked == nodes.end()) return std::nullopt;
+    PhysicsAcarRuntimeInitializationObservation observation{};
+    observation.profile_value_0x98 = profile_value_0x98;
+    observation.linked_object_value_0x18 = linked->value_0x18;
+    observation.last_model_node_value_0x18 = last.value_0x18;
+    observation.last_model_node_value_0x20 = last.value_0x20;
+    observation.last_model_node_value_0x38 = last.value_0x38;
+    observation.fdiv_compatibility_enabled = fdiv_compatibility_enabled;
+    const auto plan = plan_physics_acar_runtime_initialization(observation);
+    if (!plan.derived_threshold_0x1044 || !plan.normalized_value_0x1030)
+        return std::nullopt;
+    return AcarLineThresholdCandidate{*plan.derived_threshold_0x1044,
+        *plan.normalized_value_0x1030,
+        plan.derived_value_selected ? std::bit_cast<std::uint32_t>(*plan.derived_threshold_0x1044)
+                                    : profile_value_0x98,
+        plan.derived_value_selected};
+}
+
 PhysicsTaskRecordLoadPlan plan_physics_task_record_load(
     const PhysicsTaskRecordLoadObservation& observation) noexcept
 {

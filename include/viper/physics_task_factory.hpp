@@ -943,6 +943,20 @@ struct PhysicsAcarRuntimeInitializationPlan {
     bool final_helper_0x428590_called{};
 };
 
+struct AcarLineThresholdCandidate {
+    float derived_threshold_0x1044{};
+    float normalized_value_0x1030{};
+    std::uint32_t selected_profile_value_0x1028{};
+    bool derived_value_selected{};
+};
+
+// Projects the descriptor-derived portion of 0x428790 from the final AI
+// line node and its link, without claiming the line has been selected.
+[[nodiscard]] std::optional<AcarLineThresholdCandidate>
+plan_acar_line_threshold_candidate(
+    std::span<const PhysicsAcarModelNodeObservation> nodes,
+    std::uint32_t profile_value_0x98, bool fdiv_compatibility_enabled = false);
+
 // Projects the ACAR follow-up initializer at 0x428790 from captured inputs.
 [[nodiscard]] PhysicsAcarRuntimeInitializationPlan
 plan_physics_acar_runtime_initialization(

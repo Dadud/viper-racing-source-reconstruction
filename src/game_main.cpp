@@ -2706,6 +2706,7 @@ struct AcarBodyRuntimeState {
     // Candidate fallback line, shared by immutable session-owned geometry.
     // Per-car note lookup and final native descriptor selection are unresolved.
     const std::vector<viper::AcarDescriptorGeometry>* default_descriptor_candidate{};
+    std::optional<viper::AcarLineThresholdCandidate> default_line_threshold_candidate;
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -6247,6 +6248,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         break;
                     }
                     viper::set_acar_derived_profile_word(body_state.derived_object, profile_words->value_0xf50);
+                    if (state.ai_default_model_nodes) {
+                        body_state.default_line_threshold_candidate =
+                            viper::plan_acar_line_threshold_candidate(
+                                *state.ai_default_model_nodes, profile_words->value_0x1028);
+                    }
                     body_state.stream_binding = binding;
                     AcarSessionTuningInputs tuning_inputs{};
                     tuning_inputs.entrant_index = binding.configured_car_index;

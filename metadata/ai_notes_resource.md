@@ -47,6 +47,13 @@ The node-dependent `0x429440` descriptor geometry is also calculated once from
 the default candidate and made available to each opponent, without asserting
 that per-car note lookup selected it or inventing optional note data. The
 asset-backed regression checks both default variants on all eight tracks.
+The `0x419EC0` jump table tries the `*notes\` `.ilq` candidate, then the
+`.trk` `.ilg` candidate, then `default.ili` or `rdefault.ili` by orientation;
+reverse mode has a further normal-default fallback. The supplied track bundles
+and extracted install contain no `.ilq` or `.ilg` entries found by the scan.
+Each opponent now also retains a candidate `0x428790` threshold and normalized
+profile derived from the fallback line's last node, its linked node and that
+opponent's profile. These remain candidates until per-car lookup is modeled.
 
 The ACAR constructor obtains its model through `0x419FF0`, which returns the
 `+0x10` geometry object of the per-car manager created by `0x41AF00` and

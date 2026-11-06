@@ -86,6 +86,20 @@ int main()
         require(ai_plan.derived_threshold_0x1044 &&
                 *ai_plan.derived_threshold_0x1044 == 5.0F,
             "ACAR threshold must divide by the mean of both node values");
+        const std::array<viper::PhysicsAcarModelNodeObservation, 2> threshold_nodes{{
+            {1U, 2U, 0.0F, 2.0F, 0.0F, 0.0F},
+            {2U, 1U, 0.0F, 4.0F, 12.0F, 1.0F}}};
+        const auto threshold = viper::plan_acar_line_threshold_candidate(
+            threshold_nodes, std::bit_cast<std::uint32_t>(2.5F));
+        require(threshold && threshold->derived_threshold_0x1044 == 5.0F &&
+                threshold->normalized_value_0x1030 == 0.5F && !threshold->derived_value_selected,
+            "AI line threshold must use the last node and its linked node");
+        const auto replaced = viper::plan_acar_line_threshold_candidate(
+            threshold_nodes, std::bit_cast<std::uint32_t>(-1.0F));
+        require(replaced && replaced->derived_value_selected &&
+                replaced->selected_profile_value_0x1028 == std::bit_cast<std::uint32_t>(5.0F) &&
+                replaced->normalized_value_0x1030 == 1.0F,
+            "negative profile words must select the descriptor-derived threshold");
         viper::PhysicsAcarDerivedRuntimeState acar_derived{};
         viper::initialize_acar_derived_constructor_prefix(acar_derived);
         for (std::size_t i = 0; i < acar_derived.bytes.size(); ++i) {

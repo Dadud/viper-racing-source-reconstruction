@@ -57,6 +57,9 @@ int main(int argc, char** argv) {
                         nodes->back().next_address == nodes->front().address,
                     "AI line descriptors must form a complete circular list");
                 const auto descriptor_geometry = viper::make_acar_descriptor_geometry(*nodes);
+                const auto threshold_candidate = viper::plan_acar_line_threshold_candidate(
+                    *nodes, std::bit_cast<std::uint32_t>(1.0F));
+                require(threshold_candidate.has_value(), "AI line threshold inputs incomplete");
                 require(descriptor_geometry.size() == nodes->size(), "AI descriptor count mismatch");
                 for (std::size_t i = 0; i < nodes->size(); ++i)
                     require(descriptor_geometry[i].node_id == (*nodes)[i].address &&
