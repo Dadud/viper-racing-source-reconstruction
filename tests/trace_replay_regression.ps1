@@ -53,6 +53,7 @@ $yawReplayTicks = Join-Path $root 'yaw-replay-ticks.csv'
 $repeatTicks = Join-Path $root 'repeat-ticks.csv'
 $neutralTicks = Join-Path $root 'neutral-ticks.csv'
 $brakeTicks = Join-Path $root 'brake-ticks.csv'
+$testCompleted = $false
 try {
     # Author a repeatable fixed-step driver input fixture. Route motion is
     # disabled below, so these actions exercise the real binding/PCAR control
@@ -1606,21 +1607,26 @@ try {
     } else {
         'mode-force branch was traced as unsupported for this race mode'
     }
+    $testCompleted = $true
     Write-Output "Authored throttle/coast/steering/brake/coast schedule replayed identically across $($replayedLines.Count - 1) frames; matched 32-update longitudinal means: neutral=$neutralAverageForwardSpeed throttle=$throttleInputAverage (response=$throttleForwardResponseObserved), neutralMagnitude=$brakeNeutralAverage brakeMagnitude=$brakeCompare (response=$brakeResponseObserved). Mirrored steering reached opposite wheel +0xDC values, changed the traced wheel basis and world forward axis, and changed body motion; basis sine/cosine matched their traced angle. The yaw_control=1 route-free replay completed with finite wheel-response values, physical body movement, and measurable body angular response during steering. Route motion stayed at zero in all cases. Body gravity, suspension, and all three reconstructed tire-force call sites reached integration. The $modeForceSummary. Terrain misses cleared contact and reset suspension deterministically."
 }
 finally {
-    Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,
-        $yawReplay, $repeat, $replayTicks, $rightReplayTicks, $yawReplayTicks,
-        $repeatTicks, $neutralCapture, $neutralTicks, $brakeCapture, $brakeTicks -Force `
-        -ErrorAction SilentlyContinue
-    if (Test-Path -LiteralPath $yawDataDir) {
-        $rootFullPath = [System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
-        $yawDataFullPath = [System.IO.Path]::GetFullPath($yawDataDir)
-        if ($yawDataFullPath.StartsWith(
-                $rootFullPath, [StringComparison]::OrdinalIgnoreCase)) {
-            Remove-Item -LiteralPath $yawDataFullPath -Recurse -Force `
+    if (-not $testCompleted) {
+        Write-Output "Preserved failed replay diagnostics at $root"
+    } else {
+        Remove-Item -LiteralPath $capture, $rightCapture, $replay, $rightReplay,
+            $yawReplay, $repeat, $replayTicks, $rightReplayTicks, $yawReplayTicks,
+            $repeatTicks, $neutralCapture, $neutralTicks, $brakeCapture, $brakeTicks -Force `
                 -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $yawDataDir) {
+            $rootFullPath = [System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
+            $yawDataFullPath = [System.IO.Path]::GetFullPath($yawDataDir)
+            if ($yawDataFullPath.StartsWith(
+                    $rootFullPath, [StringComparison]::OrdinalIgnoreCase)) {
+                Remove-Item -LiteralPath $yawDataFullPath -Recurse -Force `
+                    -ErrorAction SilentlyContinue
+            }
         }
+        Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
     }
-    Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
 }
