@@ -813,6 +813,8 @@ void initialize_acar_derived_constructor_prefix(
     PhysicsAcarDerivedRuntimeState& state) noexcept;
 void set_acar_derived_profile_word(
     PhysicsAcarDerivedRuntimeState& state, std::uint32_t value) noexcept;
+[[nodiscard]] bool write_acar_derived_field(PhysicsAcarDerivedRuntimeState& state,
+    std::uint32_t offset, std::uint8_t width, std::uint32_t value) noexcept;
 
 struct PhysicsAcarModelDescriptorProjection {
     std::optional<std::uint32_t> descriptor_address;

@@ -65,6 +65,15 @@ void test_ai_driver_resource()
     const auto* driver = find_ai_driver_record(*parsed, AIDriverGroup::easy, 2U);
     require(driver != nullptr, "active AIDR driver lookup failed");
     const auto tuning = select_ai_driver_track_tuning(*driver, 3U, 1U);
+    const auto forward_config = select_acar_track_configuration(0U, 0U);
+    const auto reverse_config = select_acar_track_configuration(0U, 1U);
+    require(forward_config && forward_config->base_0x00 == 8.0F &&
+            forward_config->ordinal_scale_0x04 == 3.0F &&
+            forward_config->driver_flag_0x08 == 1U && reverse_config &&
+            reverse_config->base_0x00 == 3.0F && reverse_config->ordinal_scale_0x04 == 0.8F &&
+            !select_acar_track_configuration(8U, 0U) &&
+            !select_acar_track_configuration(0U, 2U),
+        "ACAR configuration must select the correct track and orientation row");
     require(select_acar_track_profile_word(*driver, 3U, 1U) == 0x1234abcdU &&
             !select_acar_track_profile_word(*driver, 8U, 0U) &&
             !select_acar_track_profile_word(*driver, 0U, 2U),

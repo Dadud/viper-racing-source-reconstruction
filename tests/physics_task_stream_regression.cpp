@@ -117,6 +117,11 @@ int main()
                 !acar_derived.initialized_bytes[profile_offset - 1U] &&
                 !acar_derived.initialized_bytes[profile_offset + 4U],
             "ACAR profile word must not initialize adjacent unknown fields");
+        require(viper::write_acar_derived_field(acar_derived, 0xf54U, 1U, 1U) &&
+                acar_derived.initialized_bytes[profile_offset + 4U] &&
+                !acar_derived.initialized_bytes[profile_offset + 5U] &&
+                !viper::write_acar_derived_field(acar_derived, 0x107fU, 4U, 1U),
+            "derived AI writes must preserve byte widths and object bounds");
         viper::IdealLineTrackData track_curve{};
         track_curve.records.resize(2U);
         track_curve.next_indices = {1U, 0U};

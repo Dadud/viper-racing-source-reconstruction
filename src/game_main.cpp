@@ -2694,6 +2694,7 @@ struct AcarSessionTuningInputs {
     std::array<std::uint32_t, 35> setup_words{};
     viper::AIDriverResource::Record raw_driver_profile{};
     viper::AcarTrackProfileWords track_profile_words{};
+    viper::AcarTrackConfiguration track_configuration{};
     std::string notes_line_path;
     std::string track_line_path;
 };
@@ -6258,7 +6259,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     const auto profile_words = track_index
                         ? viper::select_acar_track_profile_words(*driver_profile, *track_index, 0U)
                         : std::nullopt;
-                    if (!profile_words) {
+                    const auto track_configuration = track_index
+                        ? viper::select_acar_track_configuration(*track_index, 0U)
+                        : std::nullopt;
+                    if (!profile_words || !track_configuration ||
+                        !viper::write_acar_derived_field(body_state.derived_object,
+                            0xf54U, 1U, track_configuration->driver_flag_0x08)) {
                         stream_ok = false;
                         break;
                     }
@@ -6276,6 +6282,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     tuning_inputs.setup_words = selected_setup->setup.setup_words;
                     tuning_inputs.raw_driver_profile = *driver_profile;
                     tuning_inputs.track_profile_words = *profile_words;
+                    tuning_inputs.track_configuration = *track_configuration;
                     const viper::AINoteLookupKey line_key{
                         selected_setup->driver_slot,
                         static_cast<std::uint32_t>(*selected_ai_driver_group),
@@ -6349,6 +6356,38 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         body_state.descriptors = viper::make_acar_runtime_descriptors(
                             *selected_nodes, pairs, false);
                         if (!body_state.descriptors) { stream_ok = false; break; }
+                        const auto ordinal = std::bit_cast<std::int32_t>(read_u32_le(
+                            record_bytes.data() + 0x194U));
+                        const float scaled_ordinal = static_cast<float>(
+                            static_cast<long double>(track_configuration->ordinal_scale_0x04) * ordinal);
+                        const float configured_value = static_cast<float>(
+                            static_cast<long double>(track_configuration->base_0x00) + scaled_ordinal);
+                        if (!viper::write_acar_derived_field(body_state.derived_object,
+                                0x1078U, 4U, std::bit_cast<std::uint32_t>(configured_value))) {
+                            stream_ok = false;
+                            break;
+                        }
+                        const auto& threshold = body_state.driver_model_nodes
+                            ? body_state.driver_line_threshold : body_state.default_line_threshold_candidate;
+                        if (threshold) {
+                            const std::array<viper::NcarObjectFieldWrite, 12> derived_writes{{
+                                {0x107cU, 4U, 0xc2c80000U}, {0xfe0U, 4U, 0U},
+                                {0x1070U, 4U, 0U}, {0x1020U, 4U, 0U},
+                                {0x1034U, 4U, 0U}, {0x1040U, 4U, 0U},
+                                {0x1024U, 4U, 0U}, {0x103cU, 4U, 0x3f800000U},
+                                {0x1028U, 4U, threshold->selected_profile_value_0x1028},
+                                {0x102cU, 4U, profile_words->value_0x102c},
+                                {0x1044U, 4U, std::bit_cast<std::uint32_t>(threshold->derived_threshold_0x1044)},
+                                {0x1030U, 4U, std::bit_cast<std::uint32_t>(threshold->normalized_value_0x1030)}}};
+                            for (const auto& write : derived_writes) {
+                                if (!viper::write_acar_derived_field(body_state.derived_object,
+                                        write.offset, write.width_bytes, write.value_bits)) {
+                                    stream_ok = false;
+                                    break;
+                                }
+                            }
+                            if (!stream_ok) break;
+                        }
                     }
                     body_state.session_tuning_inputs = std::move(tuning_inputs);
                     const auto body_plan =

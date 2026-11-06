@@ -80,6 +80,16 @@ struct AcarTrackProfileWords {
     std::uint32_t value_0x102c{};
 };
 
+struct AcarTrackConfiguration {
+    float base_0x00{};
+    float ordinal_scale_0x04{};
+    std::uint8_t driver_flag_0x08{};
+};
+
+// Initial rows of the original 0x4D4708 table, selected by 0x41FD10.
+[[nodiscard]] std::optional<AcarTrackConfiguration> select_acar_track_configuration(
+    std::uint32_t track_index, std::uint8_t orientation) noexcept;
+
 // Direct AIDR words read by 0x4285D0 and 0x428790, before the latter's
 // optional descriptor-derived replacement of +0x1028.
 [[nodiscard]] std::optional<AcarTrackProfileWords> select_acar_track_profile_words(

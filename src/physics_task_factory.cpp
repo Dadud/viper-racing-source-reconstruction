@@ -1532,14 +1532,26 @@ void initialize_acar_derived_constructor_prefix(
     std::fill_n(state.initialized_bytes.begin() + first, 7U * 4U, 1U);
 }
 
+bool write_acar_derived_field(PhysicsAcarDerivedRuntimeState& state,
+    const std::uint32_t offset, const std::uint8_t width, const std::uint32_t value) noexcept
+{
+    if ((width != 1U && width != 2U && width != 4U) ||
+        offset < PhysicsAcarDerivedRuntimeState::base_offset ||
+        static_cast<std::uint64_t>(offset) + width >
+            PhysicsAcarDerivedRuntimeState::base_offset + PhysicsAcarDerivedRuntimeState::byte_count)
+        return false;
+    const auto relative = offset - PhysicsAcarDerivedRuntimeState::base_offset;
+    for (std::size_t i = 0; i < width; ++i) {
+        state.bytes[relative + i] = static_cast<std::byte>((value >> (i * 8U)) & 0xffU);
+        state.initialized_bytes[relative + i] = 1U;
+    }
+    return true;
+}
+
 void set_acar_derived_profile_word(PhysicsAcarDerivedRuntimeState& state,
     const std::uint32_t value) noexcept
 {
-    constexpr std::size_t offset = 0xf50U - PhysicsAcarDerivedRuntimeState::base_offset;
-    for (std::size_t i = 0; i < 4U; ++i) {
-        state.bytes[offset + i] = static_cast<std::byte>((value >> (i * 8U)) & 0xffU);
-        state.initialized_bytes[offset + i] = 1U;
-    }
+    (void)write_acar_derived_field(state, 0xf50U, 4U, value);
 }
 
 PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(

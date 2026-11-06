@@ -91,6 +91,18 @@ std::optional<std::uint32_t> select_acar_track_profile_word(
         row * ai_driver_track_profile_bytes + 0x10U);
 }
 
+std::optional<AcarTrackConfiguration> select_acar_track_configuration(
+    const std::uint32_t track_index, const std::uint8_t orientation) noexcept
+{
+    constexpr std::array<AcarTrackConfiguration, 16> rows{{
+        {8.0F, 3.0F, 1U}, {5.0F, 1.0F, 1U}, {5.0F, 1.2F, 1U}, {5.0F, 1.5F, 1U},
+        {5.0F, 1.2F, 1U}, {5.0F, 2.0F, 0U}, {7.0F, 3.0F, 0U}, {5.0F, 1.3F, 1U},
+        {3.0F, 0.8F, 1U}, {5.0F, 1.0F, 1U}, {5.0F, 1.2F, 1U}, {5.0F, 1.5F, 1U},
+        {3.0F, 1.0F, 1U}, {5.0F, 2.0F, 0U}, {7.0F, 3.0F, 0U}, {5.0F, 1.3F, 1U}}};
+    if (track_index >= ai_driver_track_count || orientation > 1U) return std::nullopt;
+    return rows[track_index + static_cast<std::size_t>(orientation) * ai_driver_track_count];
+}
+
 std::optional<AcarTrackProfileWords> select_acar_track_profile_words(
     const AIDriverResource::Record& record, const std::uint32_t track_index,
     const std::uint8_t orientation)
