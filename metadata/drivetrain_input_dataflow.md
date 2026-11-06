@@ -166,10 +166,13 @@ values differ. This confirms that reconstructed data path for that fixture;
 it does not prove correct acceleration or numerical parity with the original.
 
 The original reaches the `0x443E6C` rate-finalization block even when wheel
-`+0x168` is zero (`0x443CBC..0x443CC3`). The current player path invokes its
-rate-finalization adapter only after the contact response vector is available.
-Recovering the no-contact response vector and running that exit path remains
-necessary; a zero vector is not established merely by absent contact.
+`+0x168` is zero (`0x443CBC..0x443CC3`). At `0x443666..0x443691` it clears
+the instantaneous tire components and filter history, then continues through
+the trigonometric response and response-vector calculation. The player path
+now models that reset and continues to rate finalization on no-contact ticks
+when the required projection and tire inputs are available. It does not assume
+the resulting response vector is zero. Cases where those inputs are unavailable
+and parity with original no-contact output remain unverified.
 
 `advance_ncar_curve_setter_in_body` bridges that operation to the initialized
 byte-backed body: it reads the curve, body axis and existing moment, then

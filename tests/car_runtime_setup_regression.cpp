@@ -446,6 +446,19 @@ int main()
                         std::optional<std::uint32_t>{0U},
                 "observed tire filter reset must persist its four native zero stores");
 
+            auto airborne_wheel = wheel;
+            const auto airborne = viper::advance_ncar_wheel_tire_dynamics_in_object(
+                airborne_wheel, wheel_base, response, expected_input.tire_terms,
+                expected_input.smoothing_gate_local_0x20, false, true);
+            require(airborne && std::isfinite(airborne->trigonometric_response) &&
+                    airborne->trigonometric_response != 0.0F &&
+                    viper::read_ncar_wheel_object_u32(airborne_wheel, 0x170U) == 0U &&
+                    viper::read_ncar_wheel_object_u32(airborne_wheel, 0x174U) == 0U &&
+                    viper::read_ncar_wheel_object_u32(airborne_wheel, 0x178U) == 0U &&
+                    viper::read_ncar_wheel_object_u32(airborne_wheel, 0x180U) == 0U &&
+                    viper::read_ncar_wheel_object_u32(airborne_wheel, 0x11cU) == 0U,
+                "no-contact reset must still compute the response from remaining slip");
+
             viper::NcarWheelRuntimeObjectState unresolved{};
             const auto unresolved_before = unresolved;
             require(!viper::advance_ncar_wheel_tire_dynamics_in_object(

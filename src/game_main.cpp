@@ -4699,12 +4699,13 @@ struct WindowState {
                                     std::isfinite(derivation.factors.lateral_curve_value)) {
                                     tick.wheel_tire_response_derivations[wheel] =
                                         derivation;
-                                    // Active contact reaches the keep-history
-                                    // branch on this sourced path. The inactive
-                                    // branch is persisted below.
-                                    if (player_wheel_contact_states[wheel]
-                                            .contact_active_0x168 != 0U &&
-                                        player_tire_trigonometric_terms[wheel]) {
+                                    // 0x43666 resets tire history on the
+                                    // no-contact branch, but continues through
+                                    // response-vector and rate finalization.
+                                    if (player_tire_trigonometric_terms[wheel]) {
+                                        const bool contact_active =
+                                            player_wheel_contact_states[wheel]
+                                                .contact_active_0x168 != 0U;
                                         const auto wheel_object_offset =
                                             static_cast<std::uint32_t>(
                                                 0x554U + 0x1a4U *
@@ -4714,7 +4715,8 @@ struct WindowState {
                                                 player_runtime_state.wheel_objects[wheel],
                                                 wheel_object_offset, derivation,
                                                 *player_tire_trigonometric_terms[wheel],
-                                                adjusted_suspension, true, false);
+                                                adjusted_suspension, contact_active,
+                                                !contact_active);
                                         if (tick.wheel_tire_dynamics_results[wheel]) {
                                             auto evolved_factors = derivation.factors;
                                             evolved_factors.trigonometric_response =
@@ -4737,7 +4739,7 @@ struct WindowState {
                                                 derivation.factors.curve_input;
                                             accumulator_input.divisor_factor_0xc0 =
                                                 derivation.factors.lateral_curve_value;
-                                            accumulator_input.contact_active_0x168 = true;
+                                            accumulator_input.contact_active_0x168 = contact_active;
                                             tick.wheel_tire_accumulator_results[wheel] =
                                                 viper::advance_ncar_wheel_tire_accumulators_in_object(
                                                     player_runtime_state.wheel_objects[wheel],
