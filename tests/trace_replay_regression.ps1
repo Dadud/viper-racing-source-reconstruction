@@ -802,7 +802,14 @@ try {
             }
             $accumulatorColumns = $wheelTireAccumulatorColumns[$wheel]
             $accumulatorApplied = $fields[$accumulatorColumns[0]]
-            if ($dynamicsApplied -eq '1' -and $accumulatorApplied -ne '1') {
+            $curveInput = [single]::Parse(
+                $tireCurveValues[0], [cultureinfo]::InvariantCulture)
+            $lateralCurveValue = [single]::Parse(
+                $tireCurveValues[2], [cultureinfo]::InvariantCulture)
+            $accumulatorDivisorsValid = $curveInput -ne 0 -and
+                $lateralCurveValue -ne 0
+            if ($dynamicsApplied -eq '1' -and $accumulatorDivisorsValid -and
+                $accumulatorApplied -ne '1') {
                 throw "Wheel $wheel active-contact tire accumulator did not apply at line $($index + 1)"
             }
             if ($accumulatorApplied -eq '1') {
