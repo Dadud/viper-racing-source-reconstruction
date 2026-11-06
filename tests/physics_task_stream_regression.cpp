@@ -192,6 +192,16 @@ int main()
             {2U, 3U, 10.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F},
             {3U, 1U, 20.0F, 0.0F, 10.0F, 0.0F, 20.0F, 0.0F}};
         straight_curve.category_labels = {1U, 2U, 3U};
+        const auto model_tracker = viper::initialize_acar_model_tracker(
+            straight_curve, {5.0F, 0.0F}, {2.0F, -1.0F});
+        require(model_tracker && model_tracker->seek_count == 2U &&
+                model_tracker->node == 1U && model_tracker->fraction > 0.0F &&
+                !model_tracker->reset_pending && !model_tracker->curve_valid &&
+                model_tracker->velocity == std::array<float, 2>{2.0F, -1.0F},
+            "ACAR startup must synchronize physical state and perform both reset seeks");
+        require(!viper::initialize_acar_model_tracker(straight_curve,
+                {std::numeric_limits<float>::infinity(), 0.0F}, {}),
+            "non-finite physical positions must not initialize an ACAR tracker");
         viper::TrackPositionIteratorState tracker{};
         require(viper::initialize_track_position_iterator(tracker, straight_curve,
                     5.0F, 0.0F) == viper::TrackPositionIteratorStatus::updated &&

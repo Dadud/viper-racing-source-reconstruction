@@ -489,6 +489,30 @@ AcarCurveDistancePlan plan_acar_curve_distance(
     return plan;
 }
 
+std::optional<AcarModelTrackerState> initialize_acar_model_tracker(
+    const TrackCurveNodes& track, const std::array<float, 2> position,
+    const std::array<float, 2> velocity, const bool fdiv_compatibility_enabled)
+{
+    if (track.nodes.empty() || !std::isfinite(position[0]) || !std::isfinite(position[1]) ||
+        !std::isfinite(velocity[0]) || !std::isfinite(velocity[1])) return std::nullopt;
+    AcarModelTrackerState state{};
+    state.position = position;
+    state.velocity = velocity;
+    state.reset_pending = true;
+    for (std::uint8_t i = 0; i < 2U; ++i) {
+        const auto seek = plan_acar_curve_distance({track.nodes.front().address, 0U,
+            state.fraction, position[0], position[1], 10000.0F,
+            fdiv_compatibility_enabled, track.nodes});
+        if (!seek.output_written || (seek.status != AcarCurveDistanceStatus::updated &&
+                seek.status != AcarCurveDistanceStatus::no_segment_found)) return std::nullopt;
+        state.node = seek.cursor_node_address;
+        state.fraction = seek.fraction_0x08;
+        ++state.seek_count;
+        state.reset_pending = false;
+    }
+    return state;
+}
+
 TrackPositionIteratorStatus initialize_track_position_iterator(
     TrackPositionIteratorState& state, const TrackCurveNodes& track,
     const float initial_x, const float initial_z, const bool fdiv_compatibility_enabled)

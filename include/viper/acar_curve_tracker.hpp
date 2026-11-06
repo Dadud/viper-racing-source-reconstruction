@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <optional>
 #include <span>
 #include <vector>
@@ -38,6 +39,22 @@ struct TrackPositionIteratorState {
     bool reset_pending{};
     bool curve_valid{};
 };
+
+struct AcarModelTrackerState {
+    std::uint32_t node{};
+    float fraction{};
+    std::array<float, 2> position{};
+    std::array<float, 2> velocity{};
+    bool reset_pending{};
+    bool curve_valid{};
+    std::uint8_t seek_count{};
+};
+
+// Constructor 0x41CE60 starts in reset mode; 0x429690 synchronizes the
+// physical X/Z state and 0x428790 then requests a second reset seek.
+[[nodiscard]] std::optional<AcarModelTrackerState> initialize_acar_model_tracker(
+    const TrackCurveNodes& track, std::array<float, 2> position,
+    std::array<float, 2> velocity, bool fdiv_compatibility_enabled = false);
 
 enum class TrackPositionIteratorStatus : std::uint8_t {
     updated, missing_track, missing_node, curve_failure

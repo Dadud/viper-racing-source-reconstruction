@@ -829,7 +829,12 @@ known non-pointer writes from this prefix. The original 16-row table at
 `0x4D4708` supplies `+0xF54` and `+0x1078` via `0x41FD10`; the reconstruction
 uses the executable's initial table values and normal orientation for quick race.
 Indirect runtime mutations of that table remain unverified. The native service
-pointer, linked-model sync and callback dispatch are not yet materialized.
+pointer and callback dispatch are not yet materialized. The selected AI line's
+host-owned model tracker now records physical body X/Z position and velocity
+and runs the reset seek in `0x429690`, followed by the second reset seek in
+`0x428790`. It preserves a null cursor when no directed segment is found and
+does not substitute route-driven motion. The resulting state is not yet used
+to run the opponent AI callback or update its physical body.
 The `0x429690` path copies `+0xF0C` to `+0xFE4` and calls the `0x41D170` model
 sync. That helper copies four task vectors when the model has records, then
 selects reset (`0x41D1D0`) or curve update (`0x41D4F0`) from model flag `+0x28`.

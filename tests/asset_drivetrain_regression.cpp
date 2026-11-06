@@ -86,6 +86,10 @@ int main(int argc, char** argv) {
         require(normalized_driver_line &&
                 viper::make_acar_model_node_observations(*normalized_driver_line).has_value(),
             "selected driver line must provide AI model nodes");
+        const auto driver_curve = viper::make_track_curve_nodes(*normalized_driver_line);
+        require(driver_curve && viper::initialize_acar_model_tracker(*driver_curve,
+                    {0.0F, 0.0F}, {0.0F, 0.0F}).has_value(),
+            "bundled driver line must support physical tracker initialization");
         const auto* driver_note_entry = driver_lines.find("000vipr.dnt", viper::AINoteResource::resource_type_code);
         require(driver_note_entry != nullptr, "stock driver note missing");
         const auto stock_note = viper::parse_ai_note_resource(

@@ -2719,6 +2719,7 @@ struct AcarBodyRuntimeState {
     std::optional<viper::AINoteResource> selected_driver_note;
     std::optional<std::vector<std::array<std::uint32_t, 2>>> selected_driver_note_pairs;
     std::optional<std::vector<viper::PhysicsAcarRuntimeDescriptor>> descriptors;
+    std::optional<viper::AcarModelTrackerState> model_tracker;
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -6528,6 +6529,21 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             record_bytes)) {
                         stream_ok = false;
                         break;
+                    }
+                    const auto* selected_curve = body_state.driver_curve_nodes
+                        ? &*body_state.driver_curve_nodes
+                        : (body_state.default_line_selected && state.ai_default_curve_nodes
+                            ? &*state.ai_default_curve_nodes : nullptr);
+                    if (selected_curve && body_state.descriptors) {
+                        const auto x = viper::read_ncar_body_object_u32(body_state.body_object, 0x5cU);
+                        const auto z = viper::read_ncar_body_object_u32(body_state.body_object, 0x64U);
+                        const auto vx = viper::read_ncar_body_object_u32(body_state.body_object, 0x234U);
+                        const auto vz = viper::read_ncar_body_object_u32(body_state.body_object, 0x23cU);
+                        if (x && z && vx && vz) {
+                            body_state.model_tracker = viper::initialize_acar_model_tracker(*selected_curve,
+                                {std::bit_cast<float>(*x), std::bit_cast<float>(*z)},
+                                {std::bit_cast<float>(*vx), std::bit_cast<float>(*vz)});
+                        }
                     }
                     state.ai_acar_body_states.push_back(std::move(body_state));
                 }
