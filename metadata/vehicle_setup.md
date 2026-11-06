@@ -1188,7 +1188,11 @@ curve multipliers. The two wheel-relative ratios are computed through
 `derive_wheel_kinematic_ratios`; normalized pseudocode maps the lateral/forward
 point-velocity ratio to `local_74` and the rolling-speed mismatch ratio to
 `local_9c`. The same stage reproduces the projection floor at ten
-times the mode scale and its low-speed weight. It also derives the bounded
+times the mode scale and its low-speed weight from the pre-floor speed
+magnitude divided by that limit (for example, speed 2 and limit 10 yield
+0.2, while the denominator uses 10). The response-factor implementation
+preserves this original magnitude before applying the signed denominator
+floor. It also derives the bounded
 direction adjustment from the quadratic correction, signed slip, and adjusted
 forward response when the divisor is nonzero. The curve input itself is
 computed from the three suspension-response plus stored-wheel-vector terms

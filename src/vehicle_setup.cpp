@@ -1381,11 +1381,14 @@ TireWheelResponseDerivation derive_tire_wheel_response(
         ? input.reference_speed_scale_0x1c : input.mode_scale_0xf0;
     const auto reference_speed_limit = reference_speed_scale * 10.0F;
     if (std::abs(reference_speed) < reference_speed_limit) {
+        // Preserve the native low-speed fade from the unmodified forward
+        // speed. `reference_speed` is replaced with the signed denominator
+        // floor below, so deriving this factor afterward would always yield 1.
+        low_speed_weight = std::abs(reference_speed) / reference_speed_limit;
         reference_speed = reference_speed_limit;
         if (std::bit_cast<std::int32_t>(input.longitudinal_velocity) <= 0) {
             reference_speed = -reference_speed_limit;
         }
-        low_speed_weight = std::abs(reference_speed) / reference_speed_limit;
     }
     const float rolling_surface_speed = input.derive_rolling_surface_speed
         ? input.wheel_spin_rate_0x124 * input.wheel_scalar_0x5c

@@ -1000,6 +1000,22 @@ int main()
         ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
         const auto ordinary_tire_response = viper::derive_tire_wheel_response(
             {}, ordinary_tire_factor_input);
+        auto low_speed_tire_input = ordinary_tire_factor_input;
+        low_speed_tire_input.longitudinal_velocity = 2.0F;
+        const auto low_speed_tire_response = viper::derive_tire_wheel_response(
+            {}, low_speed_tire_input);
+        auto threshold_speed_tire_input = ordinary_tire_factor_input;
+        threshold_speed_tire_input.longitudinal_velocity = 10.0F;
+        const auto threshold_speed_tire_response =
+            viper::derive_tire_wheel_response({}, threshold_speed_tire_input);
+        auto reverse_low_speed_tire_input = ordinary_tire_factor_input;
+        reverse_low_speed_tire_input.longitudinal_velocity = -2.0F;
+        const auto reverse_low_speed_tire_response =
+            viper::derive_tire_wheel_response({}, reverse_low_speed_tire_input);
+        require(low_speed_tire_response.factors.low_speed_weight == 0.2F &&
+                threshold_speed_tire_response.factors.low_speed_weight == 1.0F &&
+                reverse_low_speed_tire_response.factors.low_speed_weight == 0.2F,
+            "tire response low-speed fade must use original signed speed magnitude before applying its denominator floor");
         auto wheel_spin_input = ordinary_tire_factor_input;
         wheel_spin_input.derive_rolling_surface_speed = true;
         wheel_spin_input.wheel_spin_rate_0x124 = 4.0F;
