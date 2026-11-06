@@ -77,6 +77,15 @@ std::uint32_t read_u32_le(const std::span<const std::byte> bytes,
 int main()
 {
     try {
+        viper::PhysicsAcarRuntimeInitializationObservation ai_init{};
+        ai_init.linked_object_value_0x18 = 2.0F;
+        ai_init.last_model_node_value_0x18 = 4.0F;
+        ai_init.last_model_node_value_0x20 = 12.0F;
+        ai_init.last_model_node_value_0x38 = 1.0F;
+        const auto ai_plan = viper::plan_physics_acar_runtime_initialization(ai_init);
+        require(ai_plan.derived_threshold_0x1044 &&
+                *ai_plan.derived_threshold_0x1044 == 5.0F,
+            "ACAR threshold must divide by the mean of both node values");
         viper::PhysicsAcarDerivedRuntimeState acar_derived{};
         viper::initialize_acar_derived_constructor_prefix(acar_derived);
         for (std::size_t i = 0; i < acar_derived.bytes.size(); ++i) {

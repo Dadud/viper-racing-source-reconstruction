@@ -91,4 +91,17 @@ std::optional<std::uint32_t> select_acar_track_profile_word(
         row * ai_driver_track_profile_bytes + 0x10U);
 }
 
+std::optional<AcarTrackProfileWords> select_acar_track_profile_words(
+    const AIDriverResource::Record& record, const std::uint32_t track_index,
+    const std::uint8_t orientation)
+{
+    const auto selected = select_acar_track_profile_word(record, track_index, orientation);
+    if (!selected) return std::nullopt;
+    const auto row = static_cast<std::size_t>(track_index) +
+        static_cast<std::size_t>(orientation) * ai_driver_track_count;
+    const auto offset = ai_driver_track_profile_offset + row * ai_driver_track_profile_bytes;
+    return AcarTrackProfileWords{*selected, read_u32_le(record, offset + 8U),
+        read_u32_le(record, offset + 0x14U)};
+}
+
 } // namespace viper

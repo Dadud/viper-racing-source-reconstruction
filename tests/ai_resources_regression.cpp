@@ -53,6 +53,8 @@ void test_ai_driver_resource()
     write_f32_le(payload, selected_record + selected_row + 4U, 5.0F);
     write_f32_le(payload, selected_record + selected_row + 0x0cU, 6.0F);
     write_u32_le(payload, selected_record + selected_row + 0x10U, 0x1234abcdU);
+    write_u32_le(payload, selected_record + selected_row + 8U, 0x89abcdefU);
+    write_u32_le(payload, selected_record + selected_row + 0x14U, 0x76543210U);
 
     const auto parsed = parse_ai_driver_resource(2U, payload);
     require(parsed.has_value(), "valid AIDR v2 resource rejected");
@@ -67,6 +69,12 @@ void test_ai_driver_resource()
             !select_acar_track_profile_word(*driver, 8U, 0U) &&
             !select_acar_track_profile_word(*driver, 0U, 2U),
         "ACAR profile word must use the selected track/orientation row");
+    const auto profile_words = select_acar_track_profile_words(*driver, 3U, 1U);
+    require(profile_words && profile_words->value_0xf50 == 0x1234abcdU &&
+            profile_words->value_0x1028 == 0x89abcdefU &&
+            profile_words->value_0x102c == 0x76543210U &&
+            !select_acar_track_profile_words(*driver, 8U, 0U),
+        "ACAR initializer must preserve the three selected profile words");
     require(tuning.has_value() && tuning->record_scale_0x20 == 2.0F &&
             tuning->record_scale_0x6c == 3.0F &&
             tuning->track_value_0x90 == 4.0F &&

@@ -74,4 +74,16 @@ struct AIDriverTrackTuning {
     const AIDriverResource::Record& record, std::uint32_t track_index,
     std::uint8_t orientation);
 
+struct AcarTrackProfileWords {
+    std::uint32_t value_0xf50{};
+    std::uint32_t value_0x1028{};
+    std::uint32_t value_0x102c{};
+};
+
+// Direct AIDR words read by 0x4285D0 and 0x428790, before the latter's
+// optional descriptor-derived replacement of +0x1028.
+[[nodiscard]] std::optional<AcarTrackProfileWords> select_acar_track_profile_words(
+    const AIDriverResource::Record& record, std::uint32_t track_index,
+    std::uint8_t orientation);
+
 } // namespace viper

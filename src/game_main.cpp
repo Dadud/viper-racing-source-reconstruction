@@ -2692,6 +2692,7 @@ struct AcarSessionTuningInputs {
     std::uint32_t driver_slot{};
     std::array<std::uint32_t, 35> setup_words{};
     viper::AIDriverResource::Record raw_driver_profile{};
+    viper::AcarTrackProfileWords track_profile_words{};
 };
 
 // Persistent constructor state for one configured ACAR record. The inherited
@@ -6220,14 +6221,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     // ACAR callback object.
                     AcarBodyRuntimeState body_state{};
                     viper::initialize_acar_derived_constructor_prefix(body_state.derived_object);
-                    const auto profile_word = track_index
-                        ? viper::select_acar_track_profile_word(*driver_profile, *track_index, 0U)
+                    const auto profile_words = track_index
+                        ? viper::select_acar_track_profile_words(*driver_profile, *track_index, 0U)
                         : std::nullopt;
-                    if (!profile_word) {
+                    if (!profile_words) {
                         stream_ok = false;
                         break;
                     }
-                    viper::set_acar_derived_profile_word(body_state.derived_object, *profile_word);
+                    viper::set_acar_derived_profile_word(body_state.derived_object, profile_words->value_0xf50);
                     body_state.stream_binding = binding;
                     AcarSessionTuningInputs tuning_inputs{};
                     tuning_inputs.entrant_index = binding.configured_car_index;
@@ -6235,6 +6236,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     tuning_inputs.driver_slot = selected_setup->driver_slot;
                     tuning_inputs.setup_words = selected_setup->setup.setup_words;
                     tuning_inputs.raw_driver_profile = *driver_profile;
+                    tuning_inputs.track_profile_words = *profile_words;
                     body_state.session_tuning_inputs = std::move(tuning_inputs);
                     const auto body_plan =
                         viper::plan_ncar_body_constructor(*body_observation);

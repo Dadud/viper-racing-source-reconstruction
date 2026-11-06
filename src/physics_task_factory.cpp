@@ -1707,9 +1707,9 @@ PhysicsAcarRuntimeInitializationPlan plan_physics_acar_runtime_initialization(
     std::uint32_t selected_profile_value = observation.profile_value_0x98;
     if (have_last_descriptor_data) {
         const auto denominator =
-            static_cast<long double>(*observation.linked_object_value_0x18)
+            (static_cast<long double>(*observation.linked_object_value_0x18)
             + static_cast<long double>(
-                *observation.last_model_node_value_0x18) * 0.5L;
+                *observation.last_model_node_value_0x18)) * 0.5L;
         const auto ratio = divide_with_vc98_fdiv_compatibility(
             static_cast<long double>(*observation.last_model_node_value_0x20),
             denominator, observation.fdiv_compatibility_enabled);

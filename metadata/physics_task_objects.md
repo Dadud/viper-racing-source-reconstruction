@@ -821,7 +821,12 @@ shared-state pointer calculation, timer observation, fixed state constants,
 and the descriptor-derived threshold (`+0x1044`) and normalized value
 (`+0x1030`) when their source fields are captured. The raw-bit gate deciding
 whether the derived threshold replaces profile `+0x98` is preserved. The
-`0x429690` path copies `+0xF0C` to `+0xFE4` and calls the `0x41D170` model
+threshold denominator is `(linked_node_0x18 + last_node_0x18) * 0.5`, as
+shown by `0x428887..0x42889D`; the previous model incorrectly halved only the
+second operand. The selected driver's `+0x98` and `+0xA4` track-row words are
+now retained as initializer inputs, but are not written into the live derived
+object before its missing descriptor initialization runs.
+The `0x429690` path copies `+0xF0C` to `+0xFE4` and calls the `0x41D170` model
 sync. That helper copies four task vectors when the model has records, then
 selects reset (`0x41D1D0`) or curve update (`0x41D4F0`) from model flag `+0x28`.
 The caller performs a second unconditional `0x41D1D0`, modeled as clearing
