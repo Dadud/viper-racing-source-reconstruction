@@ -267,13 +267,13 @@ dd0 = (((1.0 - body[0xDC4]) * body[0x5B0]
       * 0x4C7D48
 ```
 
-The two source body offsets `+0x5B0` and `+0x8F8` have no other direct
-displacement references in the checked listing; `+0xDD0` is read at
-`0x4312CF` after controller update and written by the constructor above.
-This is bounded exact-address/displacement evidence. It does not rule out
-register-based aliases, block copies, or writes through a subobject/base
-pointer, so the source fields are unresolved rather than zero or constructor
-constants. Do not project the `+0xDDC` product until their provenance is found.
+The body addresses `+0x5B0` and `+0x8F8` are aliases for wheel 0 and wheel 2
+`+0x5C`; their setup provenance is now known through the shared wheel setup
+and runtime-record pointer. `+0xDD0` is read at `0x4312CF` after controller
+update and written by the constructor above. The host reconstruction now
+initializes these aliases and computes `+0xDD0`, then projects the selected
+pair getter into `+0xDDC` during the fixed step. The mapping is source-backed;
+host floating-point arithmetic has not been shown bit-identical to x87.
 
 The constructor ranges were checked for those copy/alias possibilities. The
 PCAR allocator requests `0xEF0` bytes and then calls `0x4381E0 -> 0x43DFB0 ->
@@ -294,34 +294,31 @@ That initializer clears known wheel fields, including wheel `+0x124`. The
 later correction above identifies `+0x5C` as the alias of the two body fields,
 including its initialization and subsequent setup writes.
 
-The next decisive observation is a write watch on the newly allocated PCAR
-body's `+0x5B0` and `+0x8F8`, armed before constructor `0x434700` and kept
-through the first `0x431150` update. At each write, record the instruction,
-effective destination, value, and call stack. In the same run, capture PCAR
-`+0xDC4/+0xDD0/+0xDDC`, `+0xDE0/+0xDE4/+0xDE8/+0xDEC`, the `+0xC98` child
-pointer and vtable, selected D-block and endpoint values, and four wheel
-`+0xE4/+0x124/+0x128` states around `0x442530` and `0x443E9D`. Capture any
-candidate gear/RPM child only after its pointer and vtable identity are
-observed. This distinguishes untouched allocator contents from a constructor
-or first-tick source without assigning semantics from offsets. Do not use
-route motion to generate or interpret the input-to-motion trace.
+The constructor source for these aliases is resolved. The remaining drivetrain
+question is how the selected pair setter and the active wheel response produce
+longitudinal body force. The checked-in `0x442530` projection runs the four
+wheel updates and force collection, but the controlled route-free comparison
+still shows no measurable throttle effect. Further work should audit the exact
+native inputs to the contact/tire response and the body-force handoff; retain
+the existing trace/watch tools only if static evidence leaves a specific
+runtime write ambiguous. Do not use route motion to generate or interpret
+input-to-motion checks.
 
 The existing controlled probe `tools/original_pcar_controlled_wheel_capture.js`
-now records the unresolved fields and the related selector, signal, controller,
+records the now-resolved aliases together with selector, signal, controller,
 pair endpoints, and wheel spin fields before/after sampled integrator and wheel
 updates. It also retains its synthetic DIK_UP observation window and reports
-whether the control intervention actually reached the game. This is a useful
-state-correlation capture, not an exact write watch: it cannot identify which
-instruction wrote a field between samples. Probe syntax was checked with
-`node --check`; a new controlled original run has not yet validated the added
-memory reads.
+whether the control intervention reached the game. This remains a sampled
+state-correlation capture, not an exact write watch; no new original-client
+capture is required to establish the constructor alias mapping.
 
 An exact-write probe, `tools/pcar_source_field_watch.js`, arms x86 hardware
-write watchpoints for both fields at PCAR constructor `0x4381E0`, using its
-`ECX` body pointer. The constructor-thread watchpoints remain armed after
-constructor return and through setup callbacks until selected-integrator
-sampling or capture cleanup, covering writes between construction and the
-first tick. The probe's bounded observation is 120 seconds; when selected with
+write watchpoints for both alias addresses at PCAR constructor `0x4381E0`,
+using its `ECX` body pointer. The constructor-thread watchpoints remain armed
+after constructor return and through setup callbacks until selected-integrator
+sampling or capture cleanup. This probe can corroborate runtime mutations, but
+the checked-in disassembly already establishes the constructor sources. Its
+bounded observation is 120 seconds; when selected with
 `--startup-only --include-pcar-source-watch`, the capture runner now extends a
 shorter requested startup window to 122 seconds so it can receive the probe's
 completion event and tear down cleanly. It records every callback body with PCAR vtable `0x4C8188` and its
@@ -393,12 +390,13 @@ contact, vehicle movement, full session construction, user-specific setups,
 or agreement with original-game measurements. The check never launches the
 game; CTest registers it when external `GameData/common.res` is available.
 
-Next bounded source target: trace writes/copies feeding body `+0x5B0` and
-`+0x8F8` during all PCAR construction paths, including helper arguments and
-base-pointer changes around `0x42FF90 -> 0x43E490 -> 0x433C00`. If the listing
-cannot resolve them, record the exact native runtime observation needed before
-integrating this call chain. Continue to keep route motion disabled in physics
-acceptance runs.
+Next bounded source target: audit the wheel contact/tire response from the
+inputs at `0x442530` through the `+0x124` update at `0x443E9D` and the resulting
+force/moment writes consumed by body integration. Compare every production
+operand against the C++ adapter, especially the response-vector inputs and
+their contact gates. The PCAR `+0x5B0/+0x8F8` constructor source is resolved;
+the route-free physics comparison still shows no throttle propulsion. Keep
+route motion disabled in physics acceptance runs.
 
 ## Live wheel-rate writer and decoy writer
 
@@ -437,12 +435,14 @@ pretending the powered-driving acceptance condition has passed.
 
 ## Next source-reconstruction target
 
-The bounded checked-in listing audit still does not identify an engine/gear
-torque producer. Continue with a constructor/first-tick write watch for PCAR
-`+0x5B0/+0x8F8` and trace the object state feeding the active contact response
-at `0x443E9D`. Record caller identity, child pointers/vtables, endpoint values,
-and wheel state before adapting discovered behavior into the C++20 session.
-No direct throttle-to-force formula should be introduced from current traces.
+The checked-in listing resolves the control path through PCAR `+0xDE0/+0xDE4`,
+the selector and pair state, and the wheel `+0xE4` setter; it does not yet
+establish a complete engine/gear torque law. The next implementation target is
+the native contact/tire response at `0x442530` and its `+0x124` write at
+`0x443E9D`, followed through to body force integration. Compare its exact
+operands with the host adapter before changing the runtime. Do not infer a
+direct throttle-to-force formula from the existing uncontrolled or synthetic
+captures.
 
 ## Controlled key selector evidence boundary
 
