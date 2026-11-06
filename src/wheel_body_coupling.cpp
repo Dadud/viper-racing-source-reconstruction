@@ -691,10 +691,10 @@ std::optional<NcarWheelCoreInitialization> initialize_ncar_wheel_core(
 
     const float base_height = read_float(front ? 0x60U : 0x64U) * 0.0254F;
     const float initial_value_0x44 = base_height * 2.0F;
-    const float axle_setup = read_float(front ? 0x138U : 0x144U) * 0.0127F;
-    const float scale_setup = read_float(front ? 0x130U : 0x13cU) * 0.001F;
-    const float amount_setup = read_float(front ? 0x134U : 0x140U);
-    const float accumulated_setup = amount_setup * 0.01F * scale_setup + axle_setup;
+    const auto wheel_scalar = derive_ncar_wheel_scalar_0x5c(
+        input.runtime_record, input.wheel_index);
+    if (!wheel_scalar) return std::nullopt;
+    const float accumulated_setup = *wheel_scalar;
     const float mass_fraction = front ? ratio : 1.0F - ratio;
     const float body_term = input.body_mass_scale_0x1f0 * mass_fraction * 4.905F;
     if (!std::isfinite(body_term) || body_term == 0.0F)

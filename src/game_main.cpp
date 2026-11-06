@@ -3337,6 +3337,37 @@ struct WindowState {
             }
             player_runtime_state.wheel_constructor_plans[wheel] = std::move(plan);
         }
+        // 0x433C00 initializes all four wheel +0x5C values before
+        // 0x434700 reads wheel 0/2 through their body-relative aliases.
+        const auto front_scalar = viper::read_ncar_wheel_object_u32(
+            player_runtime_state.wheel_objects[0], 0x5cU);
+        const auto rear_scalar = viper::read_ncar_wheel_object_u32(
+            player_runtime_state.wheel_objects[2], 0x5cU);
+        const auto selector_bits = read_u32_le(player_runtime_car_record.data() + 0xb4U);
+        const auto divisor_bits = read_u32_le(player_runtime_car_record.data() + 0x90U);
+        if (!front_scalar || !rear_scalar) {
+            player_runtime_state = {};
+            return false;
+        }
+        const auto signal_multiplier = viper::derive_ncar_integrator_signal_multiplier(
+            std::bit_cast<float>(*front_scalar), std::bit_cast<float>(*rear_scalar),
+            std::bit_cast<float>(selector_bits), std::bit_cast<float>(divisor_bits),
+            std::bit_cast<float>(0x3dd67750U));
+        if (!signal_multiplier) {
+            player_runtime_state = {};
+            return false;
+        }
+        const std::array<viper::NcarObjectFieldWrite, 4> signal_source_writes{{
+            {0x5b0U, 4U, *front_scalar},
+            {0x8f8U, 4U, *rear_scalar},
+            {0xdc4U, 4U, selector_bits},
+            {0xdd0U, 4U, std::bit_cast<std::uint32_t>(*signal_multiplier)},
+        }};
+        if (!viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object, signal_source_writes)) {
+            player_runtime_state = {};
+            return false;
+        }
         player_wheel_anchors = player_wheel_core_initialization->anchors;
         if (!player_wheel_anchors.has_value()) {
             player_runtime_car_record.clear();

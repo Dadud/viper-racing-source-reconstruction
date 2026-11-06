@@ -59,8 +59,10 @@ golden traces.
 **2026-11-06 correction:** PCAR `+0x5B0/+0x8F8` are wheel 0/2 `+0x5C`.
 Wheel setup `0x441C10` writes them from the constructor's runtime record before
 `0x434700` reads them. See `drivetrain_input_dataflow.md` for the recovered
-front/rear formulas; older statements below that their constructor provenance
-is unknown are superseded. The live tick and full torque path remain open.
+front/rear formulas; the player constructor now initializes those aliases and
+`+0xDC4/+0xDD0` from the record. Older statements below that their constructor
+provenance is unknown are superseded. The live controller and full torque path
+remain open.
 
 The 2026-11-04 official-launcher trace exposed and fixed a capture setup bug:
 the launcher itself must create `MGI Viper Racing 1998 Canary`, so the host

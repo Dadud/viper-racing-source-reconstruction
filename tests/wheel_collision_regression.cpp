@@ -67,6 +67,15 @@ int main()
     require(!viper::derive_ncar_wheel_scalar_0x5c(wheel_setup_record, 4U));
     require(!viper::derive_ncar_wheel_scalar_0x5c(
         std::span<const std::byte>(wheel_setup_record.data(), 0x147U), 0U));
+    const auto front_setup = viper::derive_ncar_wheel_scalar_0x5c(wheel_setup_record, 0U);
+    const auto rear_setup = viper::derive_ncar_wheel_scalar_0x5c(wheel_setup_record, 2U);
+    require(front_setup && rear_setup);
+    const auto source_multiplier = viper::derive_ncar_integrator_signal_multiplier(
+        *front_setup, *rear_setup, 0.25F, 2.0F,
+        std::bit_cast<float>(0x3dd67750U));
+    require(source_multiplier && std::abs(*source_multiplier -
+        ((0.3032F * 0.75F + 0.3246F * 0.25F) / 2.0F *
+            std::bit_cast<float>(0x3dd67750U))) < 1e-6F);
     const auto signal_multiplier =
         viper::derive_ncar_integrator_signal_multiplier(
             2.0F, 10.0F, 0.25F, 2.0F, 3.0F);

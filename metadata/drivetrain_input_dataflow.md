@@ -140,9 +140,12 @@ at `0x4C8870`, `0x4C8874`, and `0x4C885C`. `0x00433C00` retains its first
 argument in EBP at `0x00433C12`, passes that same pointer as the first setup
 argument at `0x004344BB`, and calls `0x00441C10` for all four wheels before
 reading these fields at `0x0043470C..0x00434718`. This is the runtime-record
-pointer already used for the constructor's `+0x90` input. Reconstruct the
-four setup writes and their x87 arithmetic before deriving `+0xDD0`; later
-mutations and the remaining controller inputs still need investigation.
+pointer already used for the constructor's `+0x90` input. The runtime now
+uses the shared wheel-scalar projection for wheel core initialization, copies
+wheel 0/2 values into the body-relative aliases, and initializes `+0xDC4` and
+`+0xDD0` from the runtime record and native `0x4C7D48` scale. Its arithmetic
+is host floating point, not proven x87-bit-exact; later mutations and the
+remaining controller inputs still need investigation.
 
 The full checked-in `engine_.text.asm` listing was searched for direct body
 displacements `+0x5B0`, `+0x8F8`, and `+0xDD0`, and for the `0x431150` call
