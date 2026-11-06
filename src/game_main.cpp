@@ -2652,14 +2652,15 @@ private:
     bool paused_{};
 };
 
-// Persistent subset of the native car object that can be populated without
-// inventing the unobserved integrator, force, collision, and tire fields.
-// The source placement is row-major 3x3 plus translation at [9..11].
+// Persistent byte-backed subset of the native car object. The live player
+// projection updates selected wheel/contact/tire/force/body fields each fixed
+// step; unobserved native fields and the complete 0x431150 dispatch remain
+// outside this representation. Placement is row-major 3x3 plus translation.
 struct MaterializedNcarRuntimeState {
     std::array<float, 12> placement_transform{};
-    // Shared 0x43E490 constructor bytes are persistent session-owned state.
-    // The byte mask distinguishes native constructor writes from untouched
-    // fields; it is not yet advanced by the fixed-step physics callback.
+    // Shared 0x43E490 constructor bytes persist into the reconstructed player
+    // fixed-step path. The byte mask distinguishes known writes from fields
+    // whose current native values are still unavailable.
     viper::NcarBodyRuntimeObjectState body_object{};
     std::array<std::array<float, 3>, 4> initial_wheel_world_positions{};
     // The derived 0x42FF90 constructor writes 1.0 here after the base body
