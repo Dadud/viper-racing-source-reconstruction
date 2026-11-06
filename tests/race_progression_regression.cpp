@@ -32,6 +32,12 @@ int main()
             "released and unbound controls must remain inactive");
 
         viper::RaceProgressionState state{};
+        viper::RaceProgressionState physical_clock{};
+        for (int i = 0; i < 5; ++i)
+            viper::advance_race_clock(physical_clock, 0.016F);
+        require(std::abs(physical_clock.elapsed_seconds - 0.08F) < 1.0e-6F &&
+                physical_clock.completed_laps == 0U && !physical_clock.finished,
+            "physical simulation time must advance without route transitions");
         viper::initialize_race_progression(state, 1U);
         viper::advance_race_clock(state, 0.5F);
         require(!viper::observe_race_route_transition(state, 2U, true, 2U),

@@ -5089,6 +5089,10 @@ struct WindowState {
                         ai_result.x, ai_surface.sampled_position[1],
                         ai_result.z, ai_result.yaw);
                 }
+            } else {
+                // The physical path has no route adapter to advance its
+                // displayed clock. Count only completed fixed simulation steps.
+                viper::advance_race_clock(motion.race, 0.016F);
             }
             ++physics_step_count;
         }
