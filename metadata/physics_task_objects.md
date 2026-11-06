@@ -835,6 +835,13 @@ and runs the reset seek in `0x429690`, followed by the second reset seek in
 `0x428790`. It preserves a null cursor when no directed segment is found and
 does not substitute route-driven motion. The resulting state is not yet used
 to run the opponent AI callback or update its physical body.
+`advance_acar_line_tracking` now composes the `0x429690` physical-position
+tracker update with `0x4296E0` descriptor selection. On a node change the
+latter clears the descriptor word at `+0` and byte at `+2`, decrements the
+active count, and records the current/next indices and fraction. A null node
+leaves the descriptor cursor untouched. The previous host descriptor declared
+the `+2` field as a word; it is now a byte, matching `0x429010`. This combined
+model is tested but is not yet dispatched in the live ACAR callback chain.
 The `0x429690` path copies `+0xF0C` to `+0xFE4` and calls the `0x41D170` model
 sync. That helper copies four task vectors when the model has records, then
 selects reset (`0x41D1D0`) or curve update (`0x41D4F0`) from model flag `+0x28`.

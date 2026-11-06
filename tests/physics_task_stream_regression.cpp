@@ -169,6 +169,29 @@ int main()
                 descriptor_geometry[0].mapped_scalar == descriptors.model_descriptors[0].mapped_scalar &&
                 descriptor_geometry[1].mapped_scalar == descriptors.model_descriptors[1].mapped_scalar,
             "AI line node captures must feed the recovered descriptor constructor");
+        auto runtime_descriptors = viper::make_acar_runtime_descriptors(*model_nodes, std::nullopt, false);
+        require(runtime_descriptors.has_value(), "runtime descriptors must initialize from the model nodes");
+        (*runtime_descriptors)[1].value_0x00 = 3U;
+        (*runtime_descriptors)[1].value_0x02 = 4U;
+        viper::AcarDescriptorCursorState cursor{};
+        cursor.active_count_0x1050 = 2U;
+        viper::AcarModelTrackerState model_cursor{};
+        model_cursor.node = 2U;
+        model_cursor.fraction = 0.25F;
+        require(viper::synchronize_acar_descriptor_cursor(cursor, *runtime_descriptors, model_cursor) &&
+                cursor.current_index_0x105c == 1 && cursor.next_index_0x1060 == 0 &&
+                cursor.fraction_0x1064 == 0.25F && cursor.enabled_0x1069 &&
+                cursor.changed_0x1068 && cursor.active_count_0x1050 == 1U &&
+                (*runtime_descriptors)[1].value_0x00 == 0U &&
+                (*runtime_descriptors)[1].value_0x02 == 0U,
+            "AI descriptor cursor must select the physical tracker node and clear changed-entry state");
+        require(viper::synchronize_acar_descriptor_cursor(cursor, *runtime_descriptors, model_cursor) &&
+                !cursor.changed_0x1068 && cursor.active_count_0x1050 == 1U,
+            "revisiting the same tracker node must not decrement the active count");
+        model_cursor.node = 0U;
+        require(viper::synchronize_acar_descriptor_cursor(cursor, *runtime_descriptors, model_cursor) &&
+                cursor.current_index_0x105c == 1 && cursor.enabled_0x1069,
+            "a null AI tracker node must leave the descriptor cursor untouched");
         require(curve_nodes && curve_nodes->nodes.size() == 2U &&
                 curve_nodes->nodes[0].address == 1U &&
                 curve_nodes->nodes[0].next_address == 2U &&
@@ -202,6 +225,17 @@ int main()
         require(!viper::initialize_acar_model_tracker(straight_curve,
                 {std::numeric_limits<float>::infinity(), 0.0F}, {}),
             "non-finite physical positions must not initialize an ACAR tracker");
+        auto moving_tracker = *model_tracker;
+        viper::AcarDescriptorCursorState moving_cursor{};
+        std::array<viper::PhysicsAcarRuntimeDescriptor, 3> moving_descriptors{};
+        for (std::size_t i = 0; i < moving_descriptors.size(); ++i)
+            moving_descriptors[i].node_id_0x14 = static_cast<std::uint32_t>(i + 1U);
+        require(viper::advance_acar_line_tracking(moving_tracker, moving_cursor,
+                    moving_descriptors, straight_curve, {10.5F, 0.0F}, {4.0F, 0.0F}) &&
+                moving_tracker.node == 2U && moving_cursor.current_index_0x105c == 1 &&
+                moving_cursor.next_index_0x1060 == 2 && moving_cursor.enabled_0x1069 &&
+                moving_tracker.velocity[0] == 4.0F,
+            "physical tracker advancement must update the matching descriptor cursor");
         viper::TrackPositionIteratorState tracker{};
         require(viper::initialize_track_position_iterator(tracker, straight_curve,
                     5.0F, 0.0F) == viper::TrackPositionIteratorStatus::updated &&

@@ -2720,6 +2720,7 @@ struct AcarBodyRuntimeState {
     std::optional<std::vector<std::array<std::uint32_t, 2>>> selected_driver_note_pairs;
     std::optional<std::vector<viper::PhysicsAcarRuntimeDescriptor>> descriptors;
     std::optional<viper::AcarModelTrackerState> model_tracker;
+    viper::AcarDescriptorCursorState descriptor_cursor{};
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};

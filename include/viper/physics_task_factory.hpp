@@ -826,7 +826,7 @@ struct PhysicsAcarModelDescriptorProjection {
 
 struct PhysicsAcarRuntimeDescriptor {
     std::uint16_t value_0x00{};
-    std::uint16_t value_0x02{};
+    std::uint8_t value_0x02{};
     std::array<std::uint32_t, 2> note_pair_0x04{};
     std::uint8_t flag_0x0c{};
     float mapped_scalar_0x10{};
@@ -840,6 +840,29 @@ make_acar_runtime_descriptors(
     std::span<const PhysicsAcarModelNodeObservation> nodes,
     std::optional<std::span<const std::array<std::uint32_t, 2>>> note_pairs,
     bool note_lookup_gated);
+
+struct AcarDescriptorCursorState {
+    std::uint32_t active_count_0x1050{};
+    std::int32_t current_index_0x105c{};
+    std::int32_t next_index_0x1060{};
+    float fraction_0x1064{};
+    bool changed_0x1068{};
+    bool enabled_0x1069{};
+};
+
+// Applies 0x4296E0 to a host-owned tracker and descriptor array. A null
+// tracker node leaves the cursor untouched, as in the original.
+[[nodiscard]] bool synchronize_acar_descriptor_cursor(
+    AcarDescriptorCursorState& state,
+    std::span<PhysicsAcarRuntimeDescriptor> descriptors,
+    const AcarModelTrackerState& tracker) noexcept;
+
+// Composes 0x429690/0x41D170 with 0x4296E0 for an initialized model.
+[[nodiscard]] bool advance_acar_line_tracking(
+    AcarModelTrackerState& tracker, AcarDescriptorCursorState& cursor,
+    std::span<PhysicsAcarRuntimeDescriptor> descriptors,
+    const TrackCurveNodes& line, std::array<float, 2> position,
+    std::array<float, 2> velocity, bool fdiv_compatibility_enabled = false);
 
 struct PhysicsAcarTaskConstructorObservation {
     std::uint32_t object_address{};

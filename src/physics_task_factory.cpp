@@ -1524,6 +1524,63 @@ std::optional<std::vector<PhysicsAcarRuntimeDescriptor>> make_acar_runtime_descr
     return result;
 }
 
+bool synchronize_acar_descriptor_cursor(AcarDescriptorCursorState& state,
+    const std::span<PhysicsAcarRuntimeDescriptor> descriptors,
+    const AcarModelTrackerState& tracker) noexcept
+{
+    if (tracker.node == 0U) return true;
+    if (descriptors.empty() || descriptors.size() > 32768U) return false;
+    const auto found = std::find_if(descriptors.begin(), descriptors.end(),
+        [&tracker](const auto& descriptor) { return descriptor.node_id_0x14 == tracker.node; });
+    if (found == descriptors.end()) return false;
+    const auto index = static_cast<std::int32_t>(found - descriptors.begin());
+    const bool changed = state.current_index_0x105c != index;
+    state.current_index_0x105c = index;
+    state.next_index_0x1060 = static_cast<std::int32_t>(
+        (static_cast<std::size_t>(index) + 1U) % descriptors.size());
+    state.fraction_0x1064 = tracker.fraction;
+    state.changed_0x1068 = changed;
+    if (changed) {
+        found->value_0x00 = 0U;
+        found->value_0x02 = 0U;
+        --state.active_count_0x1050;
+    }
+    state.enabled_0x1069 = true;
+    return true;
+}
+
+bool advance_acar_line_tracking(AcarModelTrackerState& tracker,
+    AcarDescriptorCursorState& cursor, const std::span<PhysicsAcarRuntimeDescriptor> descriptors,
+    const TrackCurveNodes& line, const std::array<float, 2> position,
+    const std::array<float, 2> velocity, const bool fdiv_compatibility_enabled)
+{
+    if (line.nodes.empty() || !std::isfinite(position[0]) || !std::isfinite(position[1]) ||
+        !std::isfinite(velocity[0]) || !std::isfinite(velocity[1])) return false;
+    auto next_tracker = tracker;
+    next_tracker.position = position;
+    next_tracker.velocity = velocity;
+    if (next_tracker.reset_pending) {
+        const auto seek = plan_acar_curve_distance({line.nodes.front().address, 0U,
+            next_tracker.fraction, position[0], position[1], 10000.0F,
+            fdiv_compatibility_enabled, line.nodes});
+        if (!seek.output_written) return false;
+        next_tracker.node = seek.cursor_node_address;
+        next_tracker.fraction = seek.fraction_0x08;
+        next_tracker.reset_pending = false;
+    } else {
+        const auto update = plan_acar_curve_tracker_update({next_tracker.node,
+            next_tracker.fraction, position[0], position[1], fdiv_compatibility_enabled,
+            line.nodes});
+        if (!update.output_written) return false;
+        next_tracker.node = update.segment_node_address;
+        next_tracker.fraction = update.fraction_0x08;
+        next_tracker.curve_valid = update.segment_valid;
+    }
+    if (!synchronize_acar_descriptor_cursor(cursor, descriptors, next_tracker)) return false;
+    tracker = next_tracker;
+    return true;
+}
+
 void initialize_acar_derived_constructor_prefix(
     PhysicsAcarDerivedRuntimeState& state) noexcept
 {
