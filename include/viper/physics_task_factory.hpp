@@ -793,6 +793,8 @@ struct PhysicsAcarDerivedRuntimeState {
 // Pointer, profile, and subsequent initialization stores need their own inputs.
 void initialize_acar_derived_constructor_prefix(
     PhysicsAcarDerivedRuntimeState& state) noexcept;
+void set_acar_derived_profile_word(
+    PhysicsAcarDerivedRuntimeState& state, std::uint32_t value) noexcept;
 
 struct PhysicsAcarModelDescriptorProjection {
     std::optional<std::uint32_t> descriptor_address;

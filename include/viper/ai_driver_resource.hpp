@@ -69,4 +69,9 @@ struct AIDriverTrackTuning {
     std::uint32_t track_index,
     std::uint8_t mode);
 
+// The ACAR constructor copies the word at row offset +0x10 into +0xF50.
+[[nodiscard]] std::optional<std::uint32_t> select_acar_track_profile_word(
+    const AIDriverResource::Record& record, std::uint32_t track_index,
+    std::uint8_t orientation);
+
 } // namespace viper

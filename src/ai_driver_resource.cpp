@@ -80,4 +80,15 @@ std::optional<AIDriverTrackTuning> select_ai_driver_track_tuning(
     };
 }
 
+std::optional<std::uint32_t> select_acar_track_profile_word(
+    const AIDriverResource::Record& record, const std::uint32_t track_index,
+    const std::uint8_t orientation)
+{
+    if (track_index >= ai_driver_track_count || orientation > 1U) return std::nullopt;
+    const auto row = static_cast<std::size_t>(track_index) +
+        static_cast<std::size_t>(orientation) * ai_driver_track_count;
+    return read_u32_le(record, ai_driver_track_profile_offset +
+        row * ai_driver_track_profile_bytes + 0x10U);
+}
+
 } // namespace viper

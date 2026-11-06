@@ -87,6 +87,13 @@ int main()
             if (cleared) require(acar_derived.bytes[i] == std::byte{},
                 "ACAR derived prefix must clear all seven words");
         }
+        viper::set_acar_derived_profile_word(acar_derived, 0x1234abcdU);
+        constexpr auto profile_offset = 0xf50U - viper::PhysicsAcarDerivedRuntimeState::base_offset;
+        require(read_u32_le(acar_derived.bytes, profile_offset) == 0x1234abcdU &&
+                acar_derived.initialized_bytes[profile_offset] &&
+                !acar_derived.initialized_bytes[profile_offset - 1U] &&
+                !acar_derived.initialized_bytes[profile_offset + 4U],
+            "ACAR profile word must not initialize adjacent unknown fields");
         viper::IdealLineTrackData track_curve{};
         track_curve.records.resize(2U);
         track_curve.next_indices = {1U, 0U};

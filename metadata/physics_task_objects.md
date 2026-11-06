@@ -970,8 +970,12 @@ Each live ACAR now additionally owns byte-tracked storage for the derived
 `0xEF0..0x107F` tail of the `0x1080`-byte object. The constructor prefix
 initializes only its seven unconditional cleared DWORDs at `+0x1054..+0x106F`;
 the native `+0x4F4 = 2` store is applied to the inherited body after its common
-initialization. Unresolved profile, allocation and callback-pointer fields
-remain uninitialized, rather than being interpreted as zero.
+initialization. The `+0xF50` profile word now comes from the selected driver's
+AIDR row: `0x41CAA0` combines the track index with eight times the orientation
+byte, and `0x42868D..0x42869D` reads the word at record `+0xA0 + row*0x18`.
+The live normal-orientation path uses orientation zero, matching the loaded
+track normalization. Other unresolved profile, allocation and callback-pointer
+fields remain uninitialized, rather than being interpreted as zero.
 Player and opponent construction now share
 `initialize_ncar_embedded_curve_and_selector`, which writes the configured
 curve and selector entries from each entrant's mapped record; the opponent

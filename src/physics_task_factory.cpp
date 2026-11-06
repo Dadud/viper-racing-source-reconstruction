@@ -1464,6 +1464,16 @@ void initialize_acar_derived_constructor_prefix(
     std::fill_n(state.initialized_bytes.begin() + first, 7U * 4U, 1U);
 }
 
+void set_acar_derived_profile_word(PhysicsAcarDerivedRuntimeState& state,
+    const std::uint32_t value) noexcept
+{
+    constexpr std::size_t offset = 0xf50U - PhysicsAcarDerivedRuntimeState::base_offset;
+    for (std::size_t i = 0; i < 4U; ++i) {
+        state.bytes[offset + i] = static_cast<std::byte>((value >> (i * 8U)) & 0xffU);
+        state.initialized_bytes[offset + i] = 1U;
+    }
+}
+
 PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
     const PhysicsAcarTaskConstructorObservation& observation)
 {

@@ -5914,6 +5914,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::SingleRaceAISetupPlan* const selected_ai_setups,
                const viper::AIDriverResource& ai_driver_resource,
                const std::optional<viper::AIDriverGroup> selected_ai_driver_group,
+               const std::optional<std::uint32_t> track_index,
                const viper::CarFileResourcePayloads& ai_car_resources,
                const std::uint32_t target_laps,
                const std::string_view track_name,
@@ -6219,6 +6220,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     // ACAR callback object.
                     AcarBodyRuntimeState body_state{};
                     viper::initialize_acar_derived_constructor_prefix(body_state.derived_object);
+                    const auto profile_word = track_index
+                        ? viper::select_acar_track_profile_word(*driver_profile, *track_index, 0U)
+                        : std::nullopt;
+                    if (!profile_word) {
+                        stream_ok = false;
+                        break;
+                    }
+                    viper::set_acar_derived_profile_word(body_state.derived_object, *profile_word);
                     body_state.stream_binding = binding;
                     AcarSessionTuningInputs tuning_inputs{};
                     tuning_inputs.entrant_index = binding.configured_car_index;
@@ -7910,6 +7919,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         configured_car_record_tags,
         selected_ai_setups ? &*selected_ai_setups : nullptr,
         assets.ai_drivers(), selected_ai_driver_group,
+        assets.track_index(),
         assets.ai_car(),
         std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),
