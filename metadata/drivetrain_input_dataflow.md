@@ -351,6 +351,14 @@ static call sequence nor the route-free comparison establishes that this is
 the engine torque producer. Powered longitudinal control remains the first
 race acceptance blocker.
 
+The integrated drivetrain initially rejected the first player tick because
+the session did not persist body `+0xD70`, the previous curve getter sampled
+by the ramp gate. Native initialization clears this field at `0x433B52`; the
+session now copies that specific write from the existing initializer plan.
+A noninteractive synthetic constructor/configuration fixture advances three
+drivetrain steps including a selection change. This checks initialized state
+and finite outputs, not asset-backed gameplay or original numeric parity.
+
 Next bounded source target: trace writes/copies feeding body `+0x5B0` and
 `+0x8F8` during all PCAR construction paths, including helper arguments and
 base-pointer changes around `0x42FF90 -> 0x43E490 -> 0x433C00`. If the listing

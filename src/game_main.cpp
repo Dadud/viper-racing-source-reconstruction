@@ -3426,11 +3426,25 @@ struct WindowState {
             [](const viper::NcarObjectFieldWrite& write) {
                 return write.offset == 0xe44U && write.width_bytes == 4U;
             });
+        // 0x433B52 clears the previous curve sample before the first tick.
+        // Copy just this store: the same group also restores a saved transform
+        // which has already been initialized separately above.
+        const auto d70_initializer = std::find_if(
+            pcar_initializer.writes_before_helper_0x4331e0.begin(),
+            pcar_initializer.writes_before_helper_0x4331e0.end(),
+            [](const viper::NcarObjectFieldWrite& write) {
+                return write.offset == 0xd70U && write.width_bytes == 4U;
+            });
         if (e44_initializer ==
                 pcar_initializer.writes_before_backend_refresh.end() ||
+            d70_initializer ==
+                pcar_initializer.writes_before_helper_0x4331e0.end() ||
             !viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object,
-                pcar_initializer.writes_before_backend_refresh)) {
+                pcar_initializer.writes_before_backend_refresh) ||
+            !viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                std::span<const viper::NcarObjectFieldWrite>(&*d70_initializer, 1U))) {
             player_runtime_state = {};
             return false;
         }

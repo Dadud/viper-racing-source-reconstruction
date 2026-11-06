@@ -1,5 +1,6 @@
 #include "viper/wheel_body_coupling.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -600,4 +601,60 @@ int main()
         neutral_wheel, first_wheel_offset, *neutral_spin, {}, {});
     require(powered_rate && neutral_rate && powered_rate->rate_0x124 != neutral_rate->rate_0x124 &&
         powered_rate->auxiliary_rate_0x128 != neutral_rate->auxiliary_rate_0x128);
+
+    // Start from the same constructor and curve configuration projections
+    // used by the session, then advance several fixed control steps.
+    viper::NcarBodyRuntimeObjectState startup_body{};
+    const auto startup_defaults = viper::plan_ncar_constructor_subobject_defaults();
+    const auto startup_initializer = viper::plan_ncar_object_initialization({});
+    require(viper::apply_ncar_body_object_writes(startup_body, startup_defaults.writes) &&
+        viper::apply_ncar_body_object_writes(startup_body,
+            startup_initializer.writes_before_backend_refresh));
+    const auto d70_initializer = std::find_if(
+        startup_initializer.writes_before_helper_0x4331e0.begin(),
+        startup_initializer.writes_before_helper_0x4331e0.end(),
+        [](const auto& write) { return write.offset == 0xd70U && write.width_bytes == 4U; });
+    require(d70_initializer != startup_initializer.writes_before_helper_0x4331e0.end() &&
+        viper::apply_ncar_body_object_writes(startup_body,
+            std::span<const viper::NcarObjectFieldWrite>(&*d70_initializer, 1U)));
+    const auto startup_curve = viper::configure_update_curve(
+        0U, 2.0F, 0.1F, {0.0F, 0.0F, 100.0F, 0.0F, 0.0F, 0.0F},
+        6000.0F, 1000.0F);
+    for (const auto& source : viper::make_configured_update_curve_object_writes(
+             startup_curve, 0xbfcU)) {
+        const viper::NcarObjectFieldWrite write{source.offset, source.width, source.value_bits};
+        require(viper::apply_ncar_body_object_writes(startup_body,
+            std::span<const viper::NcarObjectFieldWrite>(&write, 1U)));
+    }
+    const std::array<viper::NcarObjectFieldWrite, 15> startup_setup{{
+        {0x050U, 4U, 0U}, {0x054U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0x058U, 4U, 0U}, {0x258U, 4U, 0U}, {0x25cU, 4U, 0U}, {0x260U, 4U, 0U},
+        {0xc8cU, 4U, std::bit_cast<std::uint32_t>(1000.0F)},
+        {0xc90U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xca0U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+        {0xca4U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+        {0xcacU, 4U, std::bit_cast<std::uint32_t>(0.1F)},
+        {0xcc4U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+        {0xdd0U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+        {0xbe4U, 1U, 0U}, {0x534U, 1U, 0U}}};
+    require(viper::apply_ncar_body_object_writes(startup_body, startup_setup));
+    auto startup_wheels = integrated_wheels;
+    for (std::uint32_t tick = 0U; tick < 3U; ++tick) {
+        const std::array<viper::NcarObjectFieldWrite, 3> controls{{
+            {0xde0U, 4U, std::bit_cast<std::uint32_t>(0.25F * static_cast<float>(tick))},
+            {0xdecU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+            {0xcbcU, 4U, tick == 0U ? 0U : 1U}}};
+        require(viper::apply_ncar_body_object_writes(startup_body, controls));
+        const auto step = viper::advance_ncar_drivetrain_control_in_body_and_wheels(
+            startup_body, startup_wheels, runtime_record, first_wheel_offset);
+        require(step && std::isfinite(step->signal_pair.curve.integrator.value_0x10));
+        const auto getter = viper::read_ncar_body_object_u32(startup_body, 0xc0cU);
+        require(getter.has_value());
+        const viper::NcarObjectFieldWrite post_wheel_sample{0xd70U, 4U, *getter};
+        require(viper::apply_ncar_body_object_writes(startup_body,
+            std::span<const viper::NcarObjectFieldWrite>(&post_wheel_sample, 1U)));
+    }
+    require(viper::read_ncar_body_object_u8(startup_body, 0xcf0U) == 1U &&
+        viper::read_ncar_body_object_u32(startup_body, 0xcb0U) ==
+            std::bit_cast<std::uint32_t>(2.0F));
 }
