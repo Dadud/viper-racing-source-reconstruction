@@ -474,4 +474,36 @@ int main()
     for (std::size_t i = 0; i < signal_wheels.size(); ++i)
         require(signal_wheels[i].bytes == wheels_before_failure[i].bytes &&
             signal_wheels[i].initialized_bytes == wheels_before_failure[i].initialized_bytes);
+
+    auto selector_body = saved_curve_body;
+    const std::array<viper::NcarObjectFieldWrite, 11> selector_fields{{
+        {0xde0U, 4U, std::bit_cast<std::uint32_t>(0.75F)},
+        {0xdecU, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+        {0xcb0U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+        {0xcb4U, 4U, 1U}, {0xcbcU, 4U, 2U},
+        {0xcc4U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+        {0xcc8U, 4U, std::bit_cast<std::uint32_t>(20.0F)},
+        {0xcf8U, 4U, 0U}, {0xd00U, 4U, 0U},
+        {0x534U, 1U, 0U}, {0xc3dU, 1U, 0U}}};
+    require(viper::apply_ncar_body_object_writes(selector_body, selector_fields));
+    const auto selector_step = viper::advance_ncar_integrator_child_control_in_body(
+        selector_body, integrated_wheels, runtime_record, first_wheel_offset);
+    require(selector_step && selector_step->controller.input_complete &&
+        selector_step->child.previous_index_0x1c == 2 &&
+        selector_step->child.selected_value_0x18 == 20.0F &&
+        viper::read_ncar_body_object_u32(selector_body, 0xcb0U) ==
+            std::bit_cast<std::uint32_t>(20.0F) &&
+        viper::read_ncar_body_object_u32(selector_body, 0xc28U) ==
+            std::bit_cast<std::uint32_t>(0.75F) &&
+        viper::read_ncar_body_object_u32(selector_body, 0xc7cU) ==
+            std::bit_cast<std::uint32_t>(0.5F) &&
+        viper::read_ncar_body_object_u8(selector_body, 0xcf0U) == 1U);
+    const viper::NcarObjectFieldWrite unavailable_index{0xcbcU, 4U, 7U};
+    require(viper::apply_ncar_body_object_writes(selector_body,
+        std::span<const viper::NcarObjectFieldWrite>(&unavailable_index, 1U)));
+    const auto selector_before_failure = selector_body;
+    require(!viper::advance_ncar_integrator_child_control_in_body(selector_body,
+        integrated_wheels, runtime_record, first_wheel_offset) &&
+        selector_body.bytes == selector_before_failure.bytes &&
+        selector_body.initialized_bytes == selector_before_failure.initialized_bytes);
 }

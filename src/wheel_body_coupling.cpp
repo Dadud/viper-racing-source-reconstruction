@@ -1767,6 +1767,85 @@ advance_ncar_integrator_child_control_step(
     return result;
 }
 
+std::optional<NcarIntegratorChildControlStepResult>
+advance_ncar_integrator_child_control_in_body(
+    NcarBodyRuntimeObjectState& body,
+    const std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::span<const std::byte> runtime_record,
+    const std::uint32_t first_wheel_object_offset,
+    const bool fdiv_compatibility_enabled)
+{
+    const auto word = [&body](const std::uint32_t offset) {
+        return read_ncar_body_object_u32(body, offset);
+    };
+    const auto number = [&word](const std::uint32_t offset) -> std::optional<float> {
+        const auto bits = word(offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto de0 = word(0xde0U), dec = word(0xdecU);
+    const auto previous = word(0xcb4U), selection = word(0xcbcU);
+    const auto state = word(0xd00U);
+    const auto scale = number(0xcb0U), ramp = number(0xcf8U);
+    const auto curve_getter = number(0xc0cU), curve_low = number(0xc30U);
+    const auto curve_high = number(0xc38U);
+    const auto mode = read_ncar_body_object_u8(body, 0x534U);
+    const auto override_flag = read_ncar_body_object_u8(body, 0xc3dU);
+    if (!de0 || !dec || !previous || !selection || !state || !scale || !ramp ||
+        !curve_getter || !curve_low || !curve_high || !mode || !override_flag ||
+        !std::isfinite(std::bit_cast<float>(*de0)) ||
+        !std::isfinite(std::bit_cast<float>(*dec))) return std::nullopt;
+    NcarIntegratorChildControlStepInput input{};
+    auto& child = input.child;
+    child.previous_index_0x1c = std::bit_cast<std::int32_t>(*previous);
+    child.selection_index_0x24 = std::bit_cast<std::int32_t>(*selection);
+    child.animation_state_0x68 = std::bit_cast<std::int32_t>(*state);
+    child.selected_value_0x18 = *scale;
+    child.ramp_value_0x60 = *ramp;
+    if (child.previous_index_0x1c > 7 || child.selection_index_0x24 > 7)
+        return std::nullopt;
+    // The native table starts at +0x2C, which also supplies the reverse value.
+    for (const auto index : {child.previous_index_0x1c, child.selection_index_0x24}) {
+        if (index <= 0) continue;
+        const auto entry = number(0xcc4U + static_cast<std::uint32_t>(index - 1) * 4U);
+        if (!entry) return std::nullopt;
+        input.observation.selected_values_by_index[static_cast<std::size_t>(index - 1)] = *entry;
+    }
+    if (child.previous_index_0x1c < 0 || child.selection_index_0x24 < 0) {
+        const auto reverse = number(0xcc4U);
+        if (!reverse) return std::nullopt;
+        child.negative_index_value_0x2c = *reverse;
+    }
+    auto wheel_snapshot = wheels;
+    const auto pair = advance_ncar_selected_wheel_pair_target_in_wheels(
+        runtime_record, wheel_snapshot, first_wheel_object_offset, 0.0F);
+    if (!pair) return std::nullopt;
+    input.observation.mode_byte = *mode;
+    input.observation.child_override_flag_0x41 = *override_flag != 0U;
+    input.observation.callback_value_0x4c = pair->selected_target == 0U ? pair->getter_d24 :
+        pair->selected_target == 1U ? pair->getter_d04 : pair->getter_d44;
+    input.observation.callback_value_0x50 = *curve_getter;
+    input.observation.child_value_0x34 = *curve_low;
+    input.observation.child_value_0x3c = *curve_high;
+    input.observation.fdiv_compatibility_enabled = fdiv_compatibility_enabled;
+    input.car_value_0xdec_bits = *dec;
+    const auto result = advance_ncar_integrator_child_control_step(input, *de0);
+    if (!result.controller.input_complete || !std::isfinite(result.child.selected_value_0x18) ||
+        !std::isfinite(result.child.ramp_value_0x60)) return std::nullopt;
+    const std::array<NcarObjectFieldWrite, 9> writes{{
+        {0xcfcU, 4U, *de0}, {0xcf4U, 4U, *dec},
+        {0xcb0U, 4U, std::bit_cast<std::uint32_t>(result.child.selected_value_0x18)},
+        {0xcb4U, 4U, std::bit_cast<std::uint32_t>(result.child.previous_index_0x1c)},
+        {0xcf8U, 4U, std::bit_cast<std::uint32_t>(result.child.ramp_value_0x60)},
+        {0xd00U, 4U, std::bit_cast<std::uint32_t>(result.child.animation_state_0x68)},
+        {0xcf0U, 1U, result.child.enabled_0x58},
+        {0xc28U, 4U, result.targets.value_target_0x2c},
+        {0xc7cU, 4U, std::bit_cast<std::uint32_t>(result.targets.ramp_target_0x00)}}};
+    if (!apply_ncar_body_object_writes(body, writes)) return std::nullopt;
+    return result;
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,

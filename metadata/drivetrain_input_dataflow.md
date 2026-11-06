@@ -52,6 +52,11 @@ index at controller `+0x1C`, which can differ from the requested index at
 `+0x24` while the shift state machine runs. The recovered model retains the
 seven indexed values separately and keeps neutral disabled until that previous
 index changes. Indices beyond the available seven-entry table are rejected.
+`advance_ncar_integrator_child_control_in_body` now reads the initialized
+selection, the referenced entries and the linked curve and wheel getters,
+then writes the selector, curve control and signal ramp back to the body.
+It leaves the body untouched if a required field is unavailable. Its caller
+still owns the surrounding `0x431150` gate and signal update ordering.
 
 Constructor `0x4346A9..0x4347A4` configures three paired state blocks at
 `+0xD04/+0xD24/+0xD44`. `0x43F6F0` stores its arguments at block `+0x14`,

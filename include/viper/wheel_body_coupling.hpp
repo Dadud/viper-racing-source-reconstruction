@@ -1116,6 +1116,16 @@ advance_ncar_integrator_child_control_step(
     const NcarIntegratorChildControlStepInput& input,
     std::uint32_t car_value_0xde0_bits);
 
+// Reads the selector and its linked curve/pair getters from the persistent
+// body and wheels, then atomically applies the 0x43FAE0 numeric stores.
+[[nodiscard]] std::optional<NcarIntegratorChildControlStepResult>
+advance_ncar_integrator_child_control_in_body(
+    NcarBodyRuntimeObjectState& body,
+    const std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::span<const std::byte> runtime_record,
+    std::uint32_t first_wheel_object_offset,
+    bool fdiv_compatibility_enabled = false);
+
 enum class FourWheelBodyStepInputGroup : std::uint32_t {
     wheel_runtime_state = 1U << 0U,
     contact_and_surface_state = 1U << 1U,
