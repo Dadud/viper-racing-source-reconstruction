@@ -3612,6 +3612,11 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                 wheel_update_input);
             wheel_application_point = transform_wheel_point_0xc8(
                 wheel_update_input.point_transform);
+            const auto tire_point_velocity = derive_body_point_velocity_0x43e9b0({
+                kinematics_at_step_start.position, wheel_application_point,
+                kinematics_at_step_start.linear_velocity,
+                kinematics_at_step_start.angular_velocity});
+            result.wheel_tire_point_velocities_0xc8[wheel] = tire_point_velocity;
             const auto& update = result.wheel_contact_pipeline_results[wheel];
             result.wheel_tire_accumulator_states[wheel].state_0xec =
                 update.feature_state.state_0xec;
@@ -3663,11 +3668,11 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
                 normal.z * forward.x - normal.x * forward.z,
                 normal.x * forward.y - normal.y * forward.x};
             curve_factor_input.lateral_velocity =
-                point_velocity.x * lateral.x + point_velocity.y * lateral.y +
-                point_velocity.z * lateral.z;
+                tire_point_velocity.x * lateral.x + tire_point_velocity.y * lateral.y +
+                tire_point_velocity.z * lateral.z;
             curve_factor_input.longitudinal_velocity =
-                point_velocity.x * forward.x + point_velocity.y * forward.y +
-                point_velocity.z * forward.z;
+                tire_point_velocity.x * forward.x + tire_point_velocity.y * forward.y +
+                tire_point_velocity.z * forward.z;
             const auto speed_floor = update.feature_profile.response_scale * 10.0F;
             auto adjusted_forward_speed =
                 curve_factor_input.longitudinal_velocity;

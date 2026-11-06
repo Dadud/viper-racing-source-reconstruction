@@ -2806,6 +2806,8 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_body_point_velocities_0x130{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
+        wheel_tire_point_velocities_0xc8{};
+    std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_forward_axes_world{};
     std::array<std::optional<viper::PhysicsVector3>, 4>
         wheel_lateral_axes_world{};
@@ -4222,7 +4224,7 @@ struct WindowState {
             }
 
             const auto& point_velocity =
-                tick.wheel_body_point_velocities_0x130[wheel];
+                tick.wheel_tire_point_velocities_0xc8[wheel];
             const auto& tire_derivation =
                 tick.wheel_tire_response_derivations[wheel];
             const auto& tire_curves = player_tire_response_curves[wheel];
@@ -4582,12 +4584,13 @@ struct WindowState {
                 wheel_object, 0xb4U);
             const auto axis_z_bits = viper::read_ncar_wheel_object_u32(
                 wheel_object, 0xb8U);
+            const auto wheel_application_point = read_response_vector(0xc8U);
             if (body_transform_ready && body_center_x && body_center_y &&
                 body_center_z && body_velocity_x && body_velocity_y &&
                 body_velocity_z && body_angular_x && body_angular_y &&
                 body_angular_z && contact_observation.body_query_enabled &&
                 contact_observation.query_succeeded &&
-                axis_x_bits && axis_y_bits && axis_z_bits &&
+                axis_x_bits && axis_y_bits && axis_z_bits && wheel_application_point &&
                 std::isfinite(*body_center_x) && std::isfinite(*body_center_y) &&
                 std::isfinite(*body_center_z) && std::isfinite(*body_velocity_x) &&
                 std::isfinite(*body_velocity_y) && std::isfinite(*body_velocity_z) &&
@@ -4599,7 +4602,7 @@ struct WindowState {
                     std::bit_cast<float>(*axis_z_bits)};
                 const auto point_velocity = viper::derive_body_point_velocity_0x43e9b0({
                     {*body_center_x, *body_center_y, *body_center_z},
-                    player_wheel_contact_states[wheel].contact_point_0x130,
+                    *wheel_application_point,
                     {*body_velocity_x, *body_velocity_y, *body_velocity_z},
                     {*body_angular_x, *body_angular_y, *body_angular_z}});
                 const auto finite_vector = [](const viper::PhysicsVector3& value) {
@@ -4607,7 +4610,7 @@ struct WindowState {
                         std::isfinite(value.z);
                 };
                 if (finite_vector(local_forward_axis) && finite_vector(point_velocity)) {
-                    tick.wheel_body_point_velocities_0x130[wheel] = point_velocity;
+                    tick.wheel_tire_point_velocities_0xc8[wheel] = point_velocity;
                     std::array<float, 9> body_basis{};
                     std::copy_n(body_transform.begin(), body_basis.size(),
                         body_basis.begin());

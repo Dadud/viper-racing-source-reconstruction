@@ -1837,6 +1837,11 @@ int main()
                 body_step.wheel_point_velocities_0x43e9b0[0].y == 10.0F &&
                 body_step.wheel_point_velocities_0x43e9b0[0].z == 3.0F,
             "four-wheel step must calculate point velocity from prior contact state");
+        require(body_step.wheel_tire_point_velocities_0xc8[0].x == 1.0F &&
+                body_step.wheel_tire_point_velocities_0xc8[0].y == 2.0F &&
+                body_step.wheel_tire_point_velocities_0xc8[0].z == 3.0F &&
+                body_step.wheel_tire_curve_factor_inputs_applied[0].longitudinal_velocity == 1.0F,
+            "tire slip must use wheel application-point velocity, distinct from prior contact velocity");
         require(body_step.wheel_contact_pipeline_results[0]
                     .suspension.surface.absolute_motion_projection == 20.0F,
             "four-wheel step must project point velocity through the body fields");

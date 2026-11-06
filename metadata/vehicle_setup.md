@@ -1018,13 +1018,14 @@ but their field names and sign convention remain provisional.
 The point velocity feeding those projections is now isolated as
 `derive_body_point_velocity_0x43e9b0`. The recovered `0x43E9B0` helper takes
 the wheel point minus body center, computes angular velocity crossed with
-that offset, then adds body linear velocity componentwise. In the wheel call,
-the point is the world-space wheel value at `+0x130`; the body center is
-`+0x5C`, linear velocity is `+0x234`, and angular velocity is `+0x240`. This
-When the optional contact pipeline is enabled, the four-wheel composition
-feeds the updated wheel `+0x130` point and current body kinematics to this
-primitive, then projects the result onto the supplied forward axis and the
-contact-normal/forward-axis cross product. Those projections replace the
+that offset, then adds body linear velocity componentwise. The wheel update
+calls it twice: the early suspension projection uses the prior contact point
+at `+0x130` (`0x44260F..0x442627`), while the later tire-slip calculation
+uses the wheel application point at `+0xC8` (`0x4432C9..0x4432D7`). Both use
+body center `+0x5C`, linear velocity `+0x234`, and angular velocity `+0x240`.
+The four-wheel composition now keeps those two velocities separate, then
+projects the application-point velocity onto the supplied forward axis and
+the contact-normal/forward-axis cross product. Those projections replace the
 caller-supplied lateral and longitudinal velocities. The slip-curve argument
 is a separate geometric quantity: `(wheel +0xD8 - dot(contact_normal x
 forward_axis, body_basis[+0x44..+0x4C])) * low_speed_weight`. It is not the

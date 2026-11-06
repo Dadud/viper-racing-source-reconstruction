@@ -1257,6 +1257,7 @@ struct FourWheelBodyStepResult {
     std::array<WheelContactState, 4> wheel_contact_states{};
     std::array<WheelUpdatePipelineResult, 4> wheel_contact_pipeline_results{};
     std::array<PhysicsVector3, 4> wheel_point_velocities_0x43e9b0{};
+    std::array<PhysicsVector3, 4> wheel_tire_point_velocities_0xc8{};
     std::array<WheelSpinPreprojectionResult, 4> wheel_spin_preprojection_results{};
     std::array<PhysicsVector3, 4> wheel_application_points_applied_0xc8{};
     std::array<bool, 4> wheel_suspension_force_accumulated{};

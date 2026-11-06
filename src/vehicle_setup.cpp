@@ -1263,7 +1263,7 @@ PhysicsVector3 derive_body_point_velocity_0x43e9b0(
         {input.body_center_0x5c.x, input.body_center_0x5c.y,
          input.body_center_0x5c.z}};
     const auto velocity = transform_ncar_vector_at_point(
-        body, {input.point_0x130.x, input.point_0x130.y, input.point_0x130.z});
+        body, {input.point.x, input.point.y, input.point.z});
     return {velocity[0], velocity[1], velocity[2]};
 }
 

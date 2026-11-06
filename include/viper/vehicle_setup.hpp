@@ -447,7 +447,7 @@ project_wheel_point_velocity_onto_contact_axes(
 
 struct BodyPointVelocityInput {
     PhysicsVector3 body_center_0x5c{};
-    PhysicsVector3 point_0x130{};
+    PhysicsVector3 point{};
     PhysicsVector3 linear_velocity_0x234{};
     PhysicsVector3 angular_velocity_0x240{};
 };
