@@ -127,6 +127,26 @@ int main()
     require(!viper::project_ncar_disabled_controller_integrator(
         {0.0F, 0.0F, 1.0F, 1.0F, 0.0F,
          {0.0F, std::numeric_limits<float>::quiet_NaN(), 0.0F}}));
+    viper::NcarCurveSetterInput curve_step{};
+    curve_step.prefix.getter_value_0x10 = 500.0F;
+    curve_step.prefix.curve.mode_0x40 = 1U;
+    curve_step.prefix.curve.mode_0x41 = 1U;
+    curve_step.prefix.curve.cutoff_0x3c = 1000.0F;
+    curve_step.prefix.setter_argument = 10.0F;
+    curve_step.inverse_scale_0x0c = 1.0F;
+    curve_step.body_scale_0x08 = 5.0F;
+    curve_step.body_axis_0x50 = {0.0F, 1.0F, 0.0F};
+    curve_step.value_0x24 = 400.0F;
+    curve_step.value_0x68 = 401.0F;
+    const auto curve_result = viper::project_ncar_curve_setter(curve_step);
+    require(curve_result && curve_result->prefix.raw_curve_output == 80.0F &&
+        curve_result->integrator.value_0x10 > 500.0F &&
+        curve_result->integrator.body_moment_delta[1] > 0.0F &&
+        curve_result->tail.accumulator_0x28 > 160.0F &&
+        std::abs(curve_result->tail.accumulator_0x6c + 160.0F) < 1e-4F &&
+        curve_result->tail.mode_0x40 == 0U && curve_result->tail.mode_0x41 == 0U);
+    curve_step.body_axis_0x50[0] = std::numeric_limits<float>::quiet_NaN();
+    require(!viper::project_ncar_curve_setter(curve_step));
     require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
         std::span<const std::byte>(signal_runtime_record.data(), 0x6bU)));
     signal_runtime_record[0x68U] = std::byte{0U};

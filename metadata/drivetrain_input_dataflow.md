@@ -126,10 +126,13 @@ and adds its setter argument before calling `0x43F980`. The bounded
 `project_update_curve_setter_prefix` models those steps. Its output is the
 input to the separately modeled `0x43F980` integrator. The bounded
 `project_update_curve_setter_tail` models the subsequent accumulator update,
-mode flags and linked `0x440DC0` transfer. The parent constructor now retains
+mode flags and linked `0x440DC0` transfer. `project_ncar_curve_setter`
+composes the prefix, base integrator, and tail in native order, retaining the
+getter sampled before the integrator for the later calculations. It returns
+the body-moment delta and state updates for a caller to apply. The parent constructor now retains
 the numeric defaults used by that child; native pointer links are represented
-by the model rather than fabricated in the byte-backed object. These pieces
-and the ordered controller interactions remain unconnected to the live step;
+by the model rather than fabricated in the byte-backed object. This composed
+setter and the ordered controller interactions remain unconnected to the live step;
 host floating-point behavior is not established as x87-bit-exact.
 
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected

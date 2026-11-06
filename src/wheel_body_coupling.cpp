@@ -2407,6 +2407,25 @@ project_ncar_disabled_controller_integrator(
     return result;
 }
 
+std::optional<NcarCurveSetterResult> project_ncar_curve_setter(
+    const NcarCurveSetterInput& input) noexcept
+{
+    const auto prefix = project_update_curve_setter_prefix(input.prefix);
+    if (!prefix) return std::nullopt;
+    const auto integrator = project_ncar_disabled_controller_integrator({
+        input.prefix.getter_value_0x10, input.prefix.curve.subtract_scale_0x14,
+        input.inverse_scale_0x0c, input.body_scale_0x08,
+        prefix->integrator_argument, input.body_axis_0x50});
+    if (!integrator) return std::nullopt;
+    const auto tail = project_update_curve_setter_tail({
+        input.prefix.getter_value_0x10, prefix->raw_curve_output,
+        input.prefix.curve.subtract_scale_0x14, input.value_0x24,
+        input.accumulator_0x28, input.value_0x68, input.accumulator_0x6c,
+        input.prefix.curve.mode_0x40, input.prefix.curve.mode_0x41});
+    if (!tail) return std::nullopt;
+    return NcarCurveSetterResult{*prefix, *integrator, *tail};
+}
+
 std::optional<NcarSelectedWheelPairTargetResult>
 advance_ncar_selected_wheel_pair_target(
     const NcarSelectedWheelPairTargetInput& input) noexcept

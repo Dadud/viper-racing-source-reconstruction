@@ -245,9 +245,10 @@ std::optional<UpdateCurveSetterTailResult> project_update_curve_setter_tail(
         (getter * input.damping_0x14 +
             static_cast<long double>(input.raw_curve_output) * raw_weight) *
         getter * angular_scale * timestep);
-    const auto fraction = (std::clamp)(
-        (static_cast<long double>(input.value_0x24) - threshold) * coupling_scale,
-        0.0L, 1.0L);
+    // 0x4403C6 stores this product before the upper clamp and multiply.
+    const float fraction = (std::clamp)(static_cast<float>(
+        (static_cast<long double>(input.value_0x24) - threshold) * coupling_scale),
+        0.0F, 1.0F);
     const auto coupling = static_cast<float>(fraction * coupling_max);
     const long double transfer =
         (static_cast<long double>(input.value_0x68) - input.value_0x24) *

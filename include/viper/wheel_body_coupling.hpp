@@ -9,6 +9,7 @@
 
 #include "viper/model_resource.hpp"
 #include "viper/ncar_state.hpp"
+#include "viper/update_curve.hpp"
 #include "viper/vehicle_setup.hpp"
 
 namespace viper {
@@ -118,6 +119,28 @@ struct NcarDisabledControllerIntegratorResult {
 [[nodiscard]] std::optional<NcarDisabledControllerIntegratorResult>
 project_ncar_disabled_controller_integrator(
     const NcarDisabledControllerIntegratorInput& input) noexcept;
+
+struct NcarCurveSetterInput {
+    UpdateCurveSetterPrefixInput prefix{};
+    float inverse_scale_0x0c{};
+    float body_scale_0x08{};
+    std::array<float, 3> body_axis_0x50{};
+    float value_0x24{};
+    float accumulator_0x28{};
+    float value_0x68{};
+    float accumulator_0x6c{};
+};
+
+struct NcarCurveSetterResult {
+    UpdateCurveSetterPrefixResult prefix{};
+    NcarDisabledControllerIntegratorResult integrator{};
+    UpdateCurveSetterTailResult tail{};
+};
+
+// Executes the curve setter's recovered prefix, base integrator and linked
+// tail in native order. The caller supplies the live body axis and owns writes.
+[[nodiscard]] std::optional<NcarCurveSetterResult>
+project_ncar_curve_setter(const NcarCurveSetterInput& input) noexcept;
 
 struct NcarSelectedWheelPairTargetResult {
     // Constructor selector: 0 selects +0xD24, 1 selects +0xD04, and 2
