@@ -32,6 +32,33 @@ struct TrackCurveNodes {
 [[nodiscard]] std::optional<TrackCurveNodes> make_track_curve_nodes(
     const IdealLineTrackData& track);
 
+struct TrackPositionIteratorState {
+    std::uint32_t node{};
+    float fraction{};
+    bool reset_pending{};
+    bool curve_valid{};
+};
+
+enum class TrackPositionIteratorStatus : std::uint8_t {
+    updated, missing_track, missing_node, curve_failure
+};
+
+struct TrackPositionIteratorResult {
+    TrackPositionIteratorStatus status{TrackPositionIteratorStatus::missing_track};
+    std::uint8_t previous_category{};
+    std::uint8_t current_category{};
+    bool category_changed{};
+};
+
+// Models the 0x41E130 initial seek and the position/label portion of
+// 0x41E180. Timing history and geometry-key updates remain separate.
+[[nodiscard]] TrackPositionIteratorStatus initialize_track_position_iterator(
+    TrackPositionIteratorState& state, const TrackCurveNodes& track,
+    float initial_x, float initial_z, bool fdiv_compatibility_enabled = false);
+[[nodiscard]] TrackPositionIteratorResult update_track_position_iterator(
+    TrackPositionIteratorState& state, const TrackCurveNodes& track,
+    float world_x, float world_z, bool fdiv_compatibility_enabled = false);
+
 struct AcarCurveTrackerObservation {
     std::uint32_t segment_node_address{};
     float fraction_0x08{};

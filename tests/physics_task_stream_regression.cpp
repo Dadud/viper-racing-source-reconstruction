@@ -110,6 +110,45 @@ int main()
         track_curve.next_indices[1] = 2U;
         require(!viper::make_track_curve_nodes(track_curve),
             "track curve adapter must reject an out-of-range link");
+        viper::TrackCurveNodes straight_curve{};
+        straight_curve.nodes = {
+            {1U, 2U, 0.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F},
+            {2U, 1U, 10.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F}};
+        straight_curve.category_labels = {1U, 2U};
+        viper::TrackPositionIteratorState tracker{};
+        require(viper::initialize_track_position_iterator(tracker, straight_curve,
+                    5.0F, 0.0F) == viper::TrackPositionIteratorStatus::updated &&
+                tracker.node == 1U && tracker.reset_pending,
+            "track iterator must seek the initial physical position");
+        const auto first_position = viper::update_track_position_iterator(
+            tracker, straight_curve, 5.0F, 0.0F);
+        require(first_position.status == viper::TrackPositionIteratorStatus::updated &&
+                !tracker.reset_pending && !first_position.category_changed &&
+                first_position.current_category == 1U,
+            "first position update must perform the reset seek");
+        const auto next_position = viper::update_track_position_iterator(
+            tracker, straight_curve, 6.0F, 0.0F);
+        require(next_position.status == viper::TrackPositionIteratorStatus::updated &&
+                tracker.node == 1U && tracker.curve_valid &&
+                tracker.fraction > 0.5F && !next_position.category_changed,
+            "subsequent physical positions must advance the tracked fraction");
+        auto reset_tracker = tracker;
+        reset_tracker.node = 2U;
+        reset_tracker.reset_pending = true;
+        const auto changed_category = viper::update_track_position_iterator(
+            reset_tracker, straight_curve, 5.0F, 0.0F);
+        require(changed_category.status == viper::TrackPositionIteratorStatus::updated &&
+                changed_category.previous_category == 2U &&
+                changed_category.current_category == 1U &&
+                changed_category.category_changed,
+            "reset seek must report the old and new category even when decreasing");
+        auto invalid_tracker = tracker;
+        invalid_tracker.node = 99U;
+        const auto missing_node = viper::update_track_position_iterator(
+            invalid_tracker, straight_curve, 6.0F, 0.0F);
+        require(missing_node.status == viper::TrackPositionIteratorStatus::missing_node &&
+                invalid_tracker.node == 99U,
+            "missing iterator nodes must not modify tracker state");
         const auto default_track_service = viper::plan_physics_track_service(
             0U, true, true, true);
         const auto alternate_track_service = viper::plan_physics_track_service(

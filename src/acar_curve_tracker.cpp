@@ -489,6 +489,77 @@ AcarCurveDistancePlan plan_acar_curve_distance(
     return plan;
 }
 
+TrackPositionIteratorStatus initialize_track_position_iterator(
+    TrackPositionIteratorState& state, const TrackCurveNodes& track,
+    const float initial_x, const float initial_z, const bool fdiv_compatibility_enabled)
+{
+    if (track.nodes.empty() || track.nodes.size() != track.category_labels.size())
+        return TrackPositionIteratorStatus::missing_track;
+    const auto seek = plan_acar_curve_distance({track.nodes.front().address, 0U,
+        0.0F, initial_x, initial_z, 10000.0F, fdiv_compatibility_enabled,
+        track.nodes});
+    if (seek.status != AcarCurveDistanceStatus::updated || !seek.output_written)
+        return TrackPositionIteratorStatus::curve_failure;
+    if (seek.cursor_node_address == 0U)
+        return TrackPositionIteratorStatus::missing_node;
+    state = {seek.cursor_node_address, seek.fraction_0x08, true, false};
+    return TrackPositionIteratorStatus::updated;
+}
+
+TrackPositionIteratorResult update_track_position_iterator(
+    TrackPositionIteratorState& state, const TrackCurveNodes& track,
+    const float world_x, const float world_z, const bool fdiv_compatibility_enabled)
+{
+    TrackPositionIteratorResult result{};
+    if (track.nodes.empty() || track.nodes.size() != track.category_labels.size())
+        return result;
+    const auto category = [&track](const std::uint32_t address)
+        -> std::optional<std::uint8_t> {
+        for (std::size_t i = 0; i < track.nodes.size(); ++i)
+            if (track.nodes[i].address == address) return track.category_labels[i];
+        return std::nullopt;
+    };
+    const auto old_category = category(state.node);
+    if (!old_category) {
+        result.status = TrackPositionIteratorStatus::missing_node;
+        return result;
+    }
+    auto next = state;
+    if (next.reset_pending) {
+        const auto seek = plan_acar_curve_distance({track.nodes.front().address, 0U,
+            next.fraction, world_x, world_z, 10000.0F,
+            fdiv_compatibility_enabled, track.nodes});
+        if (seek.status != AcarCurveDistanceStatus::updated || !seek.output_written) {
+            result.status = TrackPositionIteratorStatus::curve_failure;
+            return result;
+        }
+        next.node = seek.cursor_node_address;
+        next.fraction = seek.fraction_0x08;
+        next.reset_pending = false;
+    } else {
+        const auto update = plan_acar_curve_tracker_update({next.node, next.fraction,
+            world_x, world_z, fdiv_compatibility_enabled, track.nodes});
+        if (update.status != AcarCurveTrackerStatus::updated || !update.output_written) {
+            result.status = TrackPositionIteratorStatus::curve_failure;
+            return result;
+        }
+        next.node = update.segment_node_address;
+        next.fraction = update.fraction_0x08;
+        next.curve_valid = update.segment_valid;
+    }
+    const auto new_category = category(next.node);
+    if (!new_category) {
+        result.status = TrackPositionIteratorStatus::missing_node;
+        return result;
+    }
+    result.previous_category = *old_category;
+    result.current_category = *new_category;
+    result.category_changed = *old_category != *new_category;
+    result.status = TrackPositionIteratorStatus::updated;
+    state = next;
+    return result;
+}
+
 AcarCurveLookupPlan plan_acar_curve_lookup(
     const AcarCurveLookupObservation& observation)
 {

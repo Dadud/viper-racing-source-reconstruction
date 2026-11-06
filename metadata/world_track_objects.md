@@ -346,6 +346,15 @@ returns the new node's category or zero for a null node/list. Reproducing this
 requires the iterator's initialization and reset behavior as well as its
 per-tick traversal; a change in category alone is not a lap.
 
+`initialize_track_position_iterator` and `update_track_position_iterator`
+compose the existing seek and curve-update projections for the position and
+category portion of `0x41E130`/`0x41E180`. Initialization seeks from the
+supplied initial position and marks the next update for a fresh seek; later
+updates use `0x41D4F0` and report the old and new category. Missing nodes and
+incomplete curve projections are explicit failures rather than inferred race
+progress. Timing-history writes, geometry-key updates, native caller cadence,
+and the service's lap/result state are not yet connected.
+
 The geometry key at `+0x54` is distinct from the placement base key: `0x41E070` writes the
 last ILIN row's endpoint sum to `+0x5C`, and the `0x45CE10` stack layout maps
 its `local_14` directly to geometry-object `+0x5C`. Thus
