@@ -52,6 +52,16 @@ int main()
                 physical_laps.last_lap_time == 12.0F && physical_laps.finished &&
                 !viper::observe_physical_race_category(physical_laps, true, 1U, 30.0F, 2U),
             "the target crossing must finish and freeze the lap state");
+        viper::RaceProgressionState results_race{};
+        viper::PhysicalRaceLapState results_laps{};
+        results_race.elapsed_seconds = 3.016F;
+        require(!viper::apply_physical_race_category(results_race, results_laps,
+                    true, 1U, 3.0F, 1U), "first crossing must not finish the race");
+        results_race.elapsed_seconds = 13.016F;
+        require(viper::apply_physical_race_category(results_race, results_laps,
+                    true, 1U, 13.0F, 1U) && results_race.finished &&
+                results_race.completed_laps == 1U && results_race.elapsed_seconds == 13.0F,
+            "results must retain the crossing tick rather than the next display tick");
         viper::RaceProgressionState physical_clock{};
         for (int i = 0; i < 5; ++i)
             viper::advance_race_clock(physical_clock, 0.016F);

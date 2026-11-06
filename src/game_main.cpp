@@ -5131,13 +5131,11 @@ struct WindowState {
                         tick.race_tracking_node = physical_track_iterator.node;
                         tick.race_tracking_fraction = physical_track_iterator.fraction;
                         if (tracking.status == viper::TrackPositionIteratorStatus::updated) {
-                            const bool completed = viper::observe_physical_race_category(
-                                physical_lap_state, tracking.category_changed,
+                            const bool completed = viper::apply_physical_race_category(
+                                motion.race, physical_lap_state, tracking.category_changed,
                                 tracking.current_category, tick_context.simulation_time_seconds,
                                 target_laps);
                             if (completed) {
-                                motion.race.completed_laps = physical_lap_state.native_crossing_count - 1U;
-                                motion.race.finished = physical_lap_state.finished;
                                 lap_completed = true;
                             }
                             tick.race_crossing_count = physical_lap_state.native_crossing_count;

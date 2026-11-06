@@ -364,6 +364,10 @@ simulation tick times 0.016 before the scheduler increments that tick. The
 reconstruction uses that tick time for crossing events; timing-history and
 timing origin still require matched original verification. Per-tick diagnostics
 record the tracking point, iterator result, segment, fraction and crossing count.
+On a completed physical race, `apply_physical_race_category` also stores the
+crossing tick as the results timestamp instead of the next displayed clock tick.
+The current results screen still waits for every opponent, whose physical
+driving and finishing behavior are not yet integrated.
 Tracker failures disable lap tracking and produce a diagnostic; they do not
 award a lap. An external-asset regression verifies Bemidji initialization, but
 neither that check nor synthetic transition tests demonstrate a complete race.

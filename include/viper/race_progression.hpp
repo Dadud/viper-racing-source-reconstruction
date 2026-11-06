@@ -37,6 +37,13 @@ struct PhysicalRaceLapState {
     std::uint8_t current_category, float current_time,
     std::uint32_t target_laps) noexcept;
 
+// Applies a physical crossing to the shared HUD/results state, retaining the
+// crossing tick as the finish timestamp when the race ends.
+[[nodiscard]] bool apply_physical_race_category(
+    RaceProgressionState& race, PhysicalRaceLapState& physical,
+    bool category_changed, std::uint8_t current_category,
+    float current_time, std::uint32_t target_laps) noexcept;
+
 struct RouteMotionState {
     std::size_t route_segment{};
     float route_fraction{};

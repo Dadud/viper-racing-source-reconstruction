@@ -53,6 +53,19 @@ bool observe_physical_race_category(PhysicalRaceLapState& state,
     return completed;
 }
 
+bool apply_physical_race_category(RaceProgressionState& race,
+    PhysicalRaceLapState& physical, const bool category_changed,
+    const std::uint8_t current_category, const float current_time,
+    const std::uint32_t target_laps) noexcept
+{
+    if (!observe_physical_race_category(physical, category_changed,
+            current_category, current_time, target_laps)) return false;
+    race.completed_laps = physical.native_crossing_count - 1U;
+    race.finished = physical.finished;
+    if (race.finished) race.elapsed_seconds = current_time;
+    return true;
+}
+
 bool observe_race_route_transition(
     RaceProgressionState& state,
     const std::size_t next_segment,
