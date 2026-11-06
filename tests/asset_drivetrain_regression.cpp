@@ -1,4 +1,5 @@
 #include "viper/resource_bundle.hpp"
+#include "viper/pcar_control_update.hpp"
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/world_track_objects.hpp"
 
@@ -144,10 +145,28 @@ int main(int argc, char** argv) {
                     "wheel control initialization failed");
             }
             bool wheel_rate_changed = false;
+            auto neutral_body = body;
+            auto neutral_wheels = wheels;
+            bool signal_response_differs = false;
+            viper::PcarScalarFields neutral_fields{}, active_fields{};
+            viper::PcarCallbackGlobals neutral_globals{}, active_globals{};
+            active_globals.value_0x5093f4 = 0.75F;
             for (int tick = 0; tick < 64; ++tick) {
+                viper::update_pcar_callback_scalar_prefix(neutral_fields, neutral_globals, 1.0F);
+                viper::update_pcar_callback_scalar_prefix(active_fields, active_globals, 1.0F);
+                const viper::NcarObjectFieldWrite neutral_control{
+                    0xde0U, 4U, std::bit_cast<std::uint32_t>(neutral_fields.value_0xde0)};
+                const viper::NcarObjectFieldWrite active_control{
+                    0xde0U, 4U, std::bit_cast<std::uint32_t>(active_fields.value_0xde0)};
+                require(viper::apply_ncar_body_object_writes(neutral_body, std::span(&neutral_control, 1U)) &&
+                    viper::apply_ncar_body_object_writes(body, std::span(&active_control, 1U)),
+                    "control signal write failed");
                 const auto step = viper::advance_ncar_drivetrain_control_in_body_and_wheels(
                     body, wheels, record, 0x554U);
                 if (!step) throw std::runtime_error(car + " coupled drivetrain step " + std::to_string(tick) + " failed");
+                const auto neutral_step = viper::advance_ncar_drivetrain_control_in_body_and_wheels(
+                    neutral_body, neutral_wheels, record, 0x554U);
+                require(neutral_step.has_value(), "neutral drivetrain update failed");
                 for (std::size_t i = 0; i < wheels.size(); ++i) {
                     const auto base = 0x554U + 0x1a4U * static_cast<std::uint32_t>(i);
                     require(viper::advance_ncar_wheel_update_prefix_in_object(wheels[i], base).has_value(),
@@ -158,14 +177,30 @@ int main(int argc, char** argv) {
                         wheels[i], base, *spin, {}, {});
                     require(rate && std::isfinite(rate->rate_0x124), "wheel rate failed");
                     wheel_rate_changed |= rate->rate_0x124 != 0.0F;
+                    require(viper::advance_ncar_wheel_update_prefix_in_object(neutral_wheels[i], base).has_value(),
+                        "neutral wheel prefix failed");
+                    const auto neutral_spin = viper::advance_ncar_wheel_spin_preprojection_in_objects(
+                        neutral_wheels[i], base, neutral_body);
+                    require(neutral_spin.has_value(), "neutral wheel spin failed");
+                    const auto neutral_rate = viper::advance_ncar_wheel_rate_finalization_in_object(
+                        neutral_wheels[i], base, *neutral_spin, {}, {});
+                    require(neutral_rate.has_value(), "neutral wheel rate failed");
+                    signal_response_differs |= rate->rate_0x124 != neutral_rate->rate_0x124;
                 }
                 const auto getter = viper::read_ncar_body_object_u32(body, 0xc0cU);
                 require(getter.has_value(), "curve sample missing");
                 const viper::NcarObjectFieldWrite sample{0xd70U, 4U, *getter};
                 require(viper::apply_ncar_body_object_writes(body, std::span(&sample, 1U)), "curve sample failed");
+                const auto neutral_getter = viper::read_ncar_body_object_u32(neutral_body, 0xc0cU);
+                require(neutral_getter.has_value(), "neutral curve sample missing");
+                const viper::NcarObjectFieldWrite neutral_sample{0xd70U, 4U, *neutral_getter};
+                require(viper::apply_ncar_body_object_writes(neutral_body, std::span(&neutral_sample, 1U)),
+                    "neutral curve sample failed");
             }
             require(wheel_rate_changed, "selected drivetrain did not change any wheel rate");
-            std::cout << car << ": 128 finite drivetrain updates; wheel rate changed\n";
+            require(signal_response_differs, "accelerator signal did not change any wheel rate");
+            std::cout << car << ": 128 finite drivetrain updates; wheel rate changed; control difference="
+                << signal_response_differs << '\n';
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

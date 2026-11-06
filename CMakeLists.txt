@@ -542,7 +542,8 @@ if(BUILD_TESTING)
     add_executable(viper_asset_drivetrain_regression
         tests/asset_drivetrain_regression.cpp)
     target_link_libraries(viper_asset_drivetrain_regression PRIVATE
-        viper_scene_model viper_resource_bundle viper_wheel_body_coupling)
+        viper_scene_model viper_resource_bundle viper_wheel_body_coupling
+        viper_pcar_model)
     if(EXISTS "${CMAKE_SOURCE_DIR}/../game_install/GameData/common.res")
         add_test(NAME asset_drivetrain_regression COMMAND viper_asset_drivetrain_regression
             "${CMAKE_SOURCE_DIR}/../game_install/GameData")

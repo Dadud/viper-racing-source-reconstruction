@@ -377,7 +377,9 @@ setup resources, maps their real numeric fields, and runs 128 drivetrain
 updates for each of the five supplied cars. The first 64 cover neutral and a
 selected controller state with fixed wheel getters. The next 64 construct
 resource-derived wheel cores and feed updated wheel rates back to the
-drivetrain; each car produces a changed wheel rate. That phase explicitly uses
+drivetrain. A matched pair of those runs sends neutral and 0.75 accelerator
+values through the PCAR scalar callback; all five cars produce different wheel
+rates between the two scenarios. This phase explicitly uses
 a zero tire-response vector and fixed body pose, so it does not validate ground
 contact, vehicle movement, full session construction, user-specific setups,
 or agreement with original-game measurements. The check never launches the
