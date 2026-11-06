@@ -20,6 +20,11 @@ namespace viper {
     NcarBodyRuntimeObjectState& body, std::span<const std::byte> runtime_record,
     bool fdiv_compatibility_enabled = false);
 
+// Materializes the shared 0x433AA0/0x4338C0 callback-history reset after the
+// constructor has copied the placement and configured the embedded curve.
+[[nodiscard]] bool initialize_ncar_constructor_callback_history(
+    NcarBodyRuntimeObjectState& body) noexcept;
+
 // Materializes the shared 0x433C00/0x434700 wheel-derived signal inputs.
 [[nodiscard]] bool initialize_ncar_wheel_signal_inputs(
     NcarBodyRuntimeObjectState& body,

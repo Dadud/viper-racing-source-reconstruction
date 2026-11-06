@@ -95,6 +95,19 @@ bool initialize_ncar_embedded_curve_and_selector(
     return apply_ncar_body_object_writes(body, writes);
 }
 
+bool initialize_ncar_constructor_callback_history(
+    NcarBodyRuntimeObjectState& body) noexcept
+{
+    // 0x433AA0 clears +0xD70 before its final 0x4338C0 call; that helper
+    // clears +0xC0C. These histories must start clean even after the curve
+    // subobject has been populated by the preceding 0x433C00 path.
+    const std::array<NcarObjectFieldWrite, 2> writes{{
+        {0xd70U, 4U, 0U},
+        {0xc0cU, 4U, 0U},
+    }};
+    return apply_ncar_body_object_writes(body, writes);
+}
+
 namespace {
 
 using OrdinalPairPointer = std::optional<std::size_t>;

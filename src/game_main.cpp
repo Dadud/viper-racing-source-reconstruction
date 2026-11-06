@@ -3405,32 +3405,16 @@ struct WindowState {
             [](const viper::NcarObjectFieldWrite& write) {
                 return write.offset == 0xe44U && write.width_bytes == 4U;
             });
-        // 0x433B52 clears the previous curve sample before the first tick.
-        // Copy just this store: the same group also restores a saved transform
-        // which has already been initialized separately above.
-        const auto d70_initializer = std::find_if(
-            pcar_initializer.writes_before_helper_0x4331e0.begin(),
-            pcar_initializer.writes_before_helper_0x4331e0.end(),
-            [](const viper::NcarObjectFieldWrite& write) {
-                return write.offset == 0xd70U && write.width_bytes == 4U;
-            });
-        // 0x433AA0 subsequently calls 0x4338C0, which clears the curve
-        // getter after 0x433C00 configured it to its temporary startup value.
-        const viper::NcarObjectFieldWrite curve_reset{
-            0xc0cU, 4U, pcar_initializer.cleared_field_0xc0c};
+        // The common constructor path's direct prefix includes its exact
+        // +0xE44 timestamp sentinel. Its callback-history reset is applied
+        // below after curve configuration, without restoring the saved pose.
         if (e44_initializer ==
                 pcar_initializer.writes_before_backend_refresh.end() ||
-            d70_initializer ==
-                pcar_initializer.writes_before_helper_0x4331e0.end() ||
             !viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object,
                 pcar_initializer.writes_before_backend_refresh) ||
-            !viper::apply_ncar_body_object_writes(
-                player_runtime_state.body_object,
-                std::span<const viper::NcarObjectFieldWrite>(&*d70_initializer, 1U)) ||
-            !viper::apply_ncar_body_object_writes(
-                player_runtime_state.body_object,
-                std::span<const viper::NcarObjectFieldWrite>(&curve_reset, 1U))) {
+            !viper::initialize_ncar_constructor_callback_history(
+                player_runtime_state.body_object)) {
             player_runtime_state = {};
             return false;
         }
@@ -6456,6 +6440,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         0x50cU, 4U, std::bit_cast<std::uint32_t>(1.0F)};
                     if (!viper::apply_ncar_body_object_writes(body_state.body_object,
                             std::span(&shared_integrator_default, 1U))) {
+                        stream_ok = false;
+                        break;
+                    }
+                    if (!viper::initialize_ncar_constructor_callback_history(
+                            body_state.body_object)) {
                         stream_ok = false;
                         break;
                     }

@@ -1008,6 +1008,13 @@ also receives the common `0x42FF90` body `+0x50C` default. Asset-backed checks
 verify the curve and selector fields for all five supplied car records and
 reject a truncated record. The AI driver and wheel/body update callbacks are
 still required before these stored values can make opponents drive.
+After curve configuration, both constructors now apply the common callback
+history reset: `0x433AA0` clears body `+0xD70`, then its final `0x4338C0`
+call clears `+0xC0C`. This preserves the native order in which curve setup
+precedes resetting its sampled value. The asset-backed drivetrain regression
+seeds both histories nonzero and verifies they are cleared by the shared
+helper; this checks constructor state only and does not claim an AI update
+callback is wired.
 `initialize_ncar_wheel_signal_inputs` now also initializes each opponent's
 body wheel aliases, selector, signal multiplier and wheel-pair scales from
 that entrant's wheel state and runtime record. The asset-backed regression

@@ -217,6 +217,14 @@ int main(int argc, char** argv) {
             require(!viper::initialize_ncar_embedded_curve_and_selector(
                     initialized_body, std::span(record).first(0x80U)),
                 "truncated runtime records must fail embedded setup");
+            const viper::NcarObjectFieldWrite stale_callback_history[]{
+                {0xd70U, 4U, 0x41200000U}, {0xc0cU, 4U, 0x3f800000U}};
+            require(viper::apply_ncar_body_object_writes(
+                        initialized_body, stale_callback_history) &&
+                    viper::initialize_ncar_constructor_callback_history(initialized_body) &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0xd70U) == 0U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0xc0cU) == 0U,
+                "shared constructor must clear callback histories after curve setup");
             const auto signal = viper::make_ncar_integrator_signal_state_from_runtime_record(record);
             const auto front = viper::derive_ncar_wheel_scalar_0x5c(record, 0U);
             const auto rear = viper::derive_ncar_wheel_scalar_0x5c(record, 2U);
