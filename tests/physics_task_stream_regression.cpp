@@ -77,6 +77,39 @@ std::uint32_t read_u32_le(const std::span<const std::byte> bytes,
 int main()
 {
     try {
+        viper::IdealLineTrackData track_curve{};
+        track_curve.records.resize(2U);
+        track_curve.next_indices = {1U, 0U};
+        const auto write_curve_float = [&track_curve](const std::size_t row,
+            const std::size_t offset, const float value) {
+            const auto bits = std::bit_cast<std::uint32_t>(value);
+            for (std::size_t i = 0; i < 4U; ++i)
+                track_curve.records[row][offset + i] =
+                    static_cast<std::byte>((bits >> (8U * i)) & 0xffU);
+        };
+        write_curve_float(0U, 0x04U, 10.0F);
+        write_curve_float(0U, 0x08U, -3.0F);
+        write_curve_float(0U, 0x0cU, 2.0F);
+        write_curve_float(0U, 0x10U, 4.0F);
+        write_curve_float(0U, 0x20U, 5.0F);
+        write_curve_float(0U, 0x3cU, 7.0F);
+        track_curve.records[0][0x2aU] = std::byte{3};
+        const auto curve_nodes = viper::make_track_curve_nodes(track_curve);
+        require(curve_nodes && curve_nodes->nodes.size() == 2U &&
+                curve_nodes->nodes[0].address == 1U &&
+                curve_nodes->nodes[0].next_address == 2U &&
+                curve_nodes->nodes[1].next_address == 1U &&
+                curve_nodes->nodes[0].position_x_0x04 == 10.0F &&
+                curve_nodes->nodes[0].position_y_0x08 == -3.0F &&
+                curve_nodes->nodes[0].tangent_x_0x0c == 2.0F &&
+                curve_nodes->nodes[0].tangent_y_0x10 == 4.0F &&
+                curve_nodes->nodes[0].update_denominator_0x20 == 5.0F &&
+                curve_nodes->nodes[0].route_scalar_0x3c == 7.0F &&
+                curve_nodes->category_labels[0] == 3U,
+            "track rows must preserve spline fields, category and circular links");
+        track_curve.next_indices[1] = 2U;
+        require(!viper::make_track_curve_nodes(track_curve),
+            "track curve adapter must reject an out-of-range link");
         const auto default_track_service = viper::plan_physics_track_service(
             0U, true, true, true);
         const auto alternate_track_service = viper::plan_physics_track_service(

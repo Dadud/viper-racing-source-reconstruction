@@ -7,6 +7,8 @@
 
 namespace viper {
 
+struct IdealLineTrackData;
+
 struct AcarCurveNodeObservation {
     std::uint32_t address{};
     std::uint32_t next_address{};
@@ -17,6 +19,18 @@ struct AcarCurveNodeObservation {
     float update_denominator_0x20{};
     std::optional<float> route_scalar_0x3c;
 };
+
+struct TrackCurveNodes {
+    // Addresses are stable synthetic identifiers (row index + 1), not host
+    // or original-process pointers. Labels are indexed in the same order.
+    std::vector<AcarCurveNodeObservation> nodes;
+    std::vector<std::uint8_t> category_labels;
+};
+
+// Maps normalized 0x44-byte track rows into the curve tracker representation.
+// Returns no value if the row links cannot be represented safely.
+[[nodiscard]] std::optional<TrackCurveNodes> make_track_curve_nodes(
+    const IdealLineTrackData& track);
 
 struct AcarCurveTrackerObservation {
     std::uint32_t segment_node_address{};

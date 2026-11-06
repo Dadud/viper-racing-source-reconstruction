@@ -1,9 +1,11 @@
 #include "viper/acar_curve_tracker.hpp"
 
 #include "viper/legacy_fdiv.hpp"
+#include "viper/world_track_objects.hpp"
 
 #include <bit>
 #include <cmath>
+#include <limits>
 
 namespace viper {
 namespace {
@@ -29,6 +31,37 @@ float curve_divide(const float numerator, const float denominator,
 }
 
 } // namespace
+
+std::optional<TrackCurveNodes> make_track_curve_nodes(
+    const IdealLineTrackData& track)
+{
+    if (track.records.empty() || track.records.size() != track.next_indices.size() ||
+        track.records.size() >= std::numeric_limits<std::uint32_t>::max()) {
+        return std::nullopt;
+    }
+    TrackCurveNodes result;
+    result.nodes.reserve(track.records.size());
+    result.category_labels.reserve(track.records.size());
+    const auto read_word = [](const auto& row, const std::size_t offset) {
+        std::uint32_t value = 0U;
+        for (std::size_t i = 0; i < 4U; ++i)
+            value |= std::to_integer<std::uint32_t>(row[offset + i]) << (i * 8U);
+        return value;
+    };
+    for (std::size_t i = 0; i < track.records.size(); ++i) {
+        if (track.next_indices[i] >= track.records.size()) return std::nullopt;
+        const auto& row = track.records[i];
+        const auto read_float = [&](const std::size_t offset) {
+            return std::bit_cast<float>(read_word(row, offset));
+        };
+        result.nodes.push_back({static_cast<std::uint32_t>(i + 1U),
+            static_cast<std::uint32_t>(track.next_indices[i] + 1U),
+            read_float(0x04U), read_float(0x08U), read_float(0x0cU),
+            read_float(0x10U), read_float(0x20U), read_float(0x3cU)});
+        result.category_labels.push_back(std::to_integer<std::uint8_t>(row[0x2aU]));
+    }
+    return result;
+}
 
 AcarCurveTrackerPlan plan_acar_curve_tracker_update(
     const AcarCurveTrackerObservation& observation)

@@ -335,6 +335,17 @@ only, with host floating-point precision. The initialization and linked-curve
 state, crossing semantics, and full caller cadence still need to be recovered
 before using this to award laps in the physical race.
 
+`make_track_curve_nodes` maps the normalized track rows into the existing
+`0x41D4F0`/`0x41D3A0` curve projections: position, tangent, denominator,
+the word at `+0x3C`, category byte `+0x2A`, and circular links are preserved.
+It assigns synthetic nonzero identifiers rather than retaining native pointers.
+This is a data bridge only; it does not drive the car or update lap counters.
+The `0x41E180` return is based on whether the old and new category bytes
+differ (the subtraction is tested as an unsigned value), while `0x41E5C0`
+returns the new node's category or zero for a null node/list. Reproducing this
+requires the iterator's initialization and reset behavior as well as its
+per-tick traversal; a change in category alone is not a lap.
+
 The geometry key at `+0x54` is distinct from the placement base key: `0x41E070` writes the
 last ILIN row's endpoint sum to `+0x5C`, and the `0x45CE10` stack layout maps
 its `local_14` directly to geometry-object `+0x5C`. Thus
