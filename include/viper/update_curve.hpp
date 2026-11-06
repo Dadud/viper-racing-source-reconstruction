@@ -111,6 +111,31 @@ struct UpdateCurveSetterPrefixResult {
 [[nodiscard]] std::optional<UpdateCurveSetterPrefixResult>
 project_update_curve_setter_prefix(const UpdateCurveSetterPrefixInput& input) noexcept;
 
+struct UpdateCurveSetterTailInput {
+    float previous_getter_0x10{};
+    float raw_curve_output{};
+    float damping_0x14{};
+    float value_0x24{};
+    float accumulator_0x28{};
+    float value_0x68{};
+    float accumulator_0x6c{};
+    std::uint8_t mode_0x40{};
+    std::uint8_t mode_0x41{};
+};
+
+struct UpdateCurveSetterTailResult {
+    float accumulator_0x28{};
+    float accumulator_0x6c{};
+    float coupling_0x74{};
+    std::uint8_t mode_0x40{};
+    std::uint8_t mode_0x41{};
+};
+
+// Projects 0x4402E0 after its 0x43F980 call, including 0x440DC0's linked
+// accumulator updates. The caller supplies the getter sampled before it.
+[[nodiscard]] std::optional<UpdateCurveSetterTailResult>
+project_update_curve_setter_tail(const UpdateCurveSetterTailInput& input) noexcept;
+
 // Numeric fields consumed by 0x43FDD0 in the embedded object at parent
 // +0xC98. These are raw offsets; no semantic labels are inferred.
 struct EmbeddedSelectionFields {

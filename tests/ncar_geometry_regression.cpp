@@ -178,6 +178,12 @@ int main()
                 viper::apply_ncar_body_object_writes(body_runtime_state,
                     constructor_subobjects.embedded_curve_selector_writes) &&
                 read_body_dword(0xbfcU) == 0x004c8780U &&
+                read_body_dword(0xc28U) == 0U &&
+                read_body_dword(0xc58U) == 0x44c90000U &&
+                read_body_dword(0xc5cU) == 0x47510000U &&
+                read_body_dword(0xc60U) == 0x379cc8e1U &&
+                read_body_dword(0xc68U) == 0U &&
+                read_body_dword(0xc70U) == 0U &&
                 read_body_dword(0xc98U) == 0x004c8778U &&
                 read_body_dword(0xcb0U) == 0U &&
                 !viper::read_ncar_body_object_u32(body_runtime_state, 0xc00U) &&

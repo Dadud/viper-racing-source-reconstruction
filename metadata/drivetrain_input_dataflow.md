@@ -124,10 +124,13 @@ setter smooths curve `+0x38` from `+0x2C`, computes a scale from `+0x30`,
 `+0x2C`, cutoff `+0x3C`, and the getter, evaluates the raw `0x4404D0` curve,
 and adds its setter argument before calling `0x43F980`. The bounded
 `project_update_curve_setter_prefix` models those steps. Its output is the
-input to the separately modeled `0x43F980` integrator, not yet a complete
-engine update: the later `0x4402E0` state/child callbacks and the ordered
-controller interactions remain unconnected. Host floating-point behavior is
-not established as x87-bit-exact.
+input to the separately modeled `0x43F980` integrator. The bounded
+`project_update_curve_setter_tail` models the subsequent accumulator update,
+mode flags and linked `0x440DC0` transfer. The parent constructor now retains
+the numeric defaults used by that child; native pointer links are represented
+by the model rather than fabricated in the byte-backed object. These pieces
+and the ordered controller interactions remain unconnected to the live step;
+host floating-point behavior is not established as x87-bit-exact.
 
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes

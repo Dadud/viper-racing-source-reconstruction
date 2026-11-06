@@ -225,6 +225,51 @@ std::optional<UpdateCurveSetterPrefixResult> project_update_curve_setter_prefix(
     return UpdateCurveSetterPrefixResult{blended, scale, raw, argument};
 }
 
+std::optional<UpdateCurveSetterTailResult> project_update_curve_setter_tail(
+    const UpdateCurveSetterTailInput& input) noexcept
+{
+    const std::array<float, 7> values{input.previous_getter_0x10,
+        input.raw_curve_output, input.damping_0x14, input.value_0x24,
+        input.accumulator_0x28, input.value_0x68, input.accumulator_0x6c};
+    if (!std::all_of(values.begin(), values.end(),
+            [](const float value) { return std::isfinite(value); })) return std::nullopt;
+    constexpr float raw_weight = std::bit_cast<float>(0x3dcccccdU);
+    constexpr float angular_scale = std::bit_cast<float>(0x3dd67750U);
+    constexpr float timestep = std::bit_cast<float>(0x3c83126fU);
+    constexpr float threshold = std::bit_cast<float>(0x43b6aaabU);
+    constexpr float coupling_scale = std::bit_cast<float>(0x3e3851ecU);
+    constexpr float coupling_max = std::bit_cast<float>(0x461c4000U);
+
+    const long double getter = input.previous_getter_0x10;
+    const auto intermediate = static_cast<float>(input.accumulator_0x28 +
+        (getter * input.damping_0x14 +
+            static_cast<long double>(input.raw_curve_output) * raw_weight) *
+        getter * angular_scale * timestep);
+    const auto fraction = (std::clamp)(
+        (static_cast<long double>(input.value_0x24) - threshold) * coupling_scale,
+        0.0L, 1.0L);
+    const auto coupling = static_cast<float>(fraction * coupling_max);
+    const long double transfer =
+        (static_cast<long double>(input.value_0x68) - input.value_0x24) *
+        coupling * timestep;
+    UpdateCurveSetterTailResult result{};
+    result.accumulator_0x28 = static_cast<float>(intermediate + transfer);
+    result.accumulator_0x6c = static_cast<float>(input.accumulator_0x6c - transfer);
+    result.coupling_0x74 = coupling;
+    result.mode_0x40 = input.mode_0x40;
+    result.mode_0x41 = input.mode_0x41;
+    if (std::bit_cast<std::int32_t>(input.previous_getter_0x10) > 0x43c80000) {
+        result.mode_0x40 = 0U;
+        result.mode_0x41 = 0U;
+    } else {
+        result.mode_0x41 = 1U;
+    }
+    if (!std::isfinite(result.accumulator_0x28) ||
+        !std::isfinite(result.accumulator_0x6c) ||
+        !std::isfinite(result.coupling_0x74)) return std::nullopt;
+    return result;
+}
+
 int update_embedded_selection(
     const EmbeddedSelectionFields& selection,
     const UpdateCurveFields& curve) noexcept

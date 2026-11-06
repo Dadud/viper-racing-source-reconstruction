@@ -2482,12 +2482,18 @@ NcarConstructorSubobjectDefaultsPlan plan_ncar_constructor_subobject_defaults(
     write(0x0c1cU, 4U, 0x37690453U); // +0x20, 1/72000
     write(0x0c20U, 4U, 0x43910000U); // +0x24
     write(0x0c24U, 4U, 0U);          // +0x28
+    write(0x0c28U, 4U, 0U);          // +0x2C
     write(0x0c30U, 4U, 0x43142000U); // +0x34
     write(0x0c34U, 4U, 0U);          // +0x38
     write(0x0c38U, 4U, 0x45bb8000U); // +0x3C, 6000
     write(0x0c3cU, 1U, 0U);          // +0x40
     write(0x0c3dU, 1U, 0U);          // +0x41
+    write(0x0c58U, 4U, 0x44c90000U); // +0x5C, 1608
+    write(0x0c5cU, 4U, 0x47510000U); // +0x60, 53504
+    write(0x0c60U, 4U, 0x379cc8e1U); // +0x64, reciprocal
     write(0x0c64U, 4U, 0x43910000U); // +0x68
+    write(0x0c68U, 4U, 0U);          // +0x6C
+    write(0x0c70U, 4U, 0U);          // +0x74
 
     // 0x43F7D0 at object +0xC7C: five zero DWORDs.
     for (const std::uint32_t offset : {0x0c7cU, 0x0c80U, 0x0c84U,

@@ -73,6 +73,24 @@ int main()
         setter.getter_value_0x10 = std::numeric_limits<float>::quiet_NaN();
         require(!viper::project_update_curve_setter_prefix(setter),
             "curve setter must reject non-finite inputs");
+        const auto tail = viper::project_update_curve_setter_tail(
+            {500.0F, 0.0F, 0.0F, 400.0F, 5.0F, 401.0F, 7.0F, 1U, 1U});
+        require(tail && tail->coupling_0x74 == 10000.0F &&
+                std::fabs(tail->accumulator_0x28 - 165.0F) < 1e-4F &&
+                std::fabs(tail->accumulator_0x6c + 153.0F) < 1e-4F &&
+                tail->mode_0x40 == 0U && tail->mode_0x41 == 0U,
+            "curve setter tail must transfer between accumulators and clear high-speed flags");
+        const auto low_tail = viper::project_update_curve_setter_tail(
+            {100.0F, 0.0F, 0.0F, 300.0F, 5.0F, 301.0F, 7.0F, 1U, 0U});
+        require(low_tail && low_tail->coupling_0x74 == 0.0F &&
+                low_tail->accumulator_0x28 == 5.0F &&
+                low_tail->accumulator_0x6c == 7.0F &&
+                low_tail->mode_0x40 == 1U && low_tail->mode_0x41 == 1U,
+            "curve setter tail must preserve the low-speed flag and zero coupling");
+        require(!viper::project_update_curve_setter_tail(
+            {std::numeric_limits<float>::infinity(), 0.0F, 0.0F, 0.0F,
+             0.0F, 0.0F, 0.0F, 0U, 0U}),
+            "curve setter tail must reject non-finite input");
         auto acar_record = make_car_record(0x41434152U);
         const auto source = viper::read_car_curve_source_record(acar_record);
         require(source.has_value() && source->value_0x68 == 300.0F &&
