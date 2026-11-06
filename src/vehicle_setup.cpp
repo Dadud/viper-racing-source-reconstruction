@@ -1272,9 +1272,11 @@ float project_body_point_velocity_0x442530(
     const std::array<float, 12>& body_transform_0x38_to_0x64) noexcept
 {
     const auto& transform = body_transform_0x38_to_0x64;
-    return transform[6] * point_velocity.x +
-        transform[8] * point_velocity.y +
-        transform[7] * point_velocity.z;
+    // 0x442E89 multiplies +0x50 by X, +0x58 by Z, then +0x54 by Y.
+    return static_cast<float>(
+        static_cast<long double>(transform[6]) * point_velocity.x +
+        static_cast<long double>(transform[8]) * point_velocity.z +
+        static_cast<long double>(transform[7]) * point_velocity.y);
 }
 
 WheelMomentVectorResult derive_wheel_moment_vector_0x43e7f0(

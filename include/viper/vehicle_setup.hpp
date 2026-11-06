@@ -453,7 +453,7 @@ struct BodyPointVelocityInput {
 };
 
 // Projects 0x43E9B0's point velocity through 0x442530's body fields
-// +0x50/+0x58/+0x54, in X/Y/Z operand order.
+// +0x50/+0x58/+0x54, multiplying X/Z/Y respectively.
 [[nodiscard]] float project_body_point_velocity_0x442530(
     const PhysicsVector3& point_velocity,
     const std::array<float, 12>& body_transform_0x38_to_0x64) noexcept;

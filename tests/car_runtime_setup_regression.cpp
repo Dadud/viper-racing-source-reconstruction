@@ -1783,7 +1783,7 @@ int main()
                     std::bit_cast<std::uint32_t>(materialized_application_point->z),
             "live wheel point transform must persist native +0xC8..+0xD0 bytes");
         require(viper::project_body_point_velocity_0x442530(
-                    {10.0F, 20.0F, 30.0F}, projection_transform) == 140.0F,
+                    {10.0F, 20.0F, 30.0F}, projection_transform) == 130.0F,
             "wheel surface projection must preserve native +0x50/+0x58/+0x54 operand order");
         const std::array<float, 9> wheel_axis_body_basis{
             0.0F, 1.0F, 0.0F,
@@ -1880,7 +1880,7 @@ int main()
                 body_step.wheel_tire_curve_factor_inputs_applied[0].longitudinal_velocity == 1.0F,
             "tire slip must use wheel application-point velocity, distinct from prior contact velocity");
         require(body_step.wheel_contact_pipeline_results[0]
-                    .suspension.surface.absolute_motion_projection == 20.0F,
+                    .suspension.surface.absolute_motion_projection == 27.0F,
             "four-wheel step must project point velocity through the body fields");
         require(body_step.wheel_contact_pipeline_results[0]
                     .suspension.surface.adjusted_response == 10.0F &&

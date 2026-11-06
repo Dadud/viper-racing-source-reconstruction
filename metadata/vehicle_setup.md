@@ -816,11 +816,10 @@ their upstream vector calculation and global helper have separate effects.
 The composed four-wheel body step now derives the motion projection from the
 prior wheel contact point and current body kinematics before running the new
 contact query. It uses `0x43E9B0` to calculate point velocity from body center,
-linear velocity, and angular velocity, then projects X/Y/Z through body fields
-`+0x50/+0x58/+0x54`, matching the operand order in `0x442530`. The same
-pre-query point velocity is reused by the later tire response stages, matching
-the native local computed before `0x443F00` can replace wheel contact point
-`+0x130`. The `0x419620` table/index/phase transition and `0x4193F0`
+linear velocity, and angular velocity, then projects X/Z/Y through body fields
+`+0x50/+0x58/+0x54`, matching the operands in `0x442E89..0x442EA9`. The
+later tire response samples velocity separately at wheel `+0xC8`; see the
+corrected call-site description below. The `0x419620` table/index/phase transition and `0x4193F0`
 scale-plus-`__ftol` conversion are now modeled with explicit persistent state.
 The startup table still depends on two process random draws, and initialization
 and call timing are not connected to the player session, so this result is not
@@ -878,9 +877,9 @@ distance from the point behind wheel pointer `+0x10` to wheel coordinates
 supplied threshold (`0x4C88D8`). Existing flag state is preserved otherwise.
 
 In the later traction-control branch, `0x44294A..0x442967` projects body
-linear velocity through `+0x50/+0x54/+0x58` in ordinary X/Y/Z order. This is
-distinct from the earlier suspension projection's `+0x50/+0x58/+0x54` order;
-the persistent wheel adapter now uses the correct traction projection. The
+linear velocity through `+0x50/+0x54/+0x58` in ordinary X/Y/Z order. The
+earlier suspension projection adds the same axis/component products in X/Z/Y
+instruction order. Both adapters now use the correct component mapping. The
 damage gate at `0x44288F..0x442897` also clears the `+0xE4` drivetrain
 contribution before spin integration for a damaged wheel. Focused regressions
 exercise both differences; original runtime parity remains unverified.
