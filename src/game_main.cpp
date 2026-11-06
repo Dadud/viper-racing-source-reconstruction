@@ -2715,6 +2715,8 @@ struct AcarBodyRuntimeState {
     std::optional<std::vector<viper::PhysicsAcarModelNodeObservation>> driver_model_nodes;
     std::vector<viper::AcarDescriptorGeometry> driver_descriptor_geometry;
     std::optional<viper::AcarLineThresholdCandidate> driver_line_threshold;
+    std::optional<viper::AINoteResource> selected_driver_note;
+    std::optional<std::vector<std::array<std::uint32_t, 2>>> selected_driver_note_pairs;
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -6289,6 +6291,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     tuning_inputs.track_line_path = *track_line;
                     const auto selection = viper::select_stock_ai_line(
                         ai_driver_bundle, line_key, ai_line_overrides);
+                    std::optional<viper::IdealLineTrackData> resolved_driver_line;
                     body_state.default_line_selected =
                         selection.status == viper::AILineSelectionStatus::default_line &&
                         body_state.default_descriptor_candidate != nullptr;
@@ -6296,7 +6299,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         const auto* entry = selection.driver_entry;
                         const auto raw_line = viper::parse_ideal_line_resource(
                             entry->attributes, ai_driver_bundle.payload(*entry));
-                        const auto line = raw_line
+                        auto line = raw_line
                             ? viper::normalize_ideal_line_resource(*raw_line, 0U) : std::nullopt;
                         if (!line) {
                             body_state.default_line_selected = body_state.default_descriptor_candidate != nullptr;
@@ -6311,6 +6314,24 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                 *body_state.driver_model_nodes);
                             body_state.driver_line_threshold = viper::plan_acar_line_threshold_candidate(
                                 *body_state.driver_model_nodes, profile_words->value_0x1028);
+                            resolved_driver_line = std::move(*line);
+                        }
+                    }
+                    const auto* selected_line = resolved_driver_line
+                        ? &*resolved_driver_line : (body_state.default_line_selected ? ai_default_line : nullptr);
+                    if (selected_line && ai_line_overrides == viper::AILineOverrideInventory::none) {
+                        const auto note_path = viper::make_ai_note_path(
+                            line_key, viper::AINotePathKind::track_sidecar);
+                        const auto* note_entry = note_path ? ai_driver_bundle.find(
+                            std::string_view(*note_path).substr(4U), viper::AINoteResource::resource_type_code) : nullptr;
+                        if (note_entry) {
+                            auto note = viper::parse_ai_note_resource(note_entry->attributes,
+                                ai_driver_bundle.payload(*note_entry));
+                            if (note && viper::ai_note_matches_line(*note, line_key, *selected_line)) {
+                                body_state.selected_driver_note_pairs = viper::read_ai_note_node_pairs(*note);
+                                if (body_state.selected_driver_note_pairs)
+                                    body_state.selected_driver_note = std::move(*note);
+                            }
                         }
                     }
                     body_state.session_tuning_inputs = std::move(tuning_inputs);

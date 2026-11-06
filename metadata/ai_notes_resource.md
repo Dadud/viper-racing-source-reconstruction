@@ -21,14 +21,17 @@ data size to match the remaining payload and mirrors the native integer
 division check `data_bytes / node_count == 8`. It preserves the node payload
 raw. `ai_note_matches_lookup_key` checks the four lookup values.
 
-The native loader cross-checks the note against the selected ILIN resource. It
-derives a 16-bit checksum from eight bytes at an ILIN-relative offset and a
-DWORD line value, then compares them with ADNT header fields. It also compares
-a redundant header check; the exact helper semantics for these checks are not
-yet reconstructed, so the parser exposes those raw values without claiming
-full native acceptance. The new parser is not yet wired into `GameAssets`:
-the shipped extraction contains `drivers.res` but no loose `.dnt` sidecars, and
-the legacy game resource-set lookup path still needs integration. An earlier
+The native loader cross-checks the note against the selected ILIN resource. The
+`0x49D800` table and loop implement CRC-16/XMODEM with initial zero over eight
+bytes at ILIN object `+0xDC` (normalized row 3, offsets `+4..+0xB`). Successful
+`0x41F6E0` acceptance compares that checksum and the node count, after the
+header/key and payload-size checks. The separate redundant check is used in
+the mismatch-report path and is not needed for the successful branch.
+`ai_note_matches_line` implements the bounded success check; the runtime now
+retains validated stock notes and their raw DWORD pairs per opponent. Their
+consumption by AI descriptor callbacks remains unconnected.
+The shipped extraction contains `drivers.res` but no loose `.dnt` sidecars.
+The legacy game resource-set lookup path still needs integration. An earlier
 inventory found no loose `.dnt` or `.ili` files but incorrectly missed indexed
 entries. A corrected RST0 scan found 524 `.ilg` driver lines and 695 `.dnt`
 notes in `drivers.res`, plus both `default.ili` and `rdefault.ili` in every
@@ -44,7 +47,9 @@ AI line is parsed separately from `track.ild`. When a conservative inventory
 finds no higher-priority overrides, each opponent selects its exact `.ilg`
 entry from `drivers.res`, falling back to the track default when absent or
 invalid. The session prepares that line's curve, nodes, descriptor geometry and
-threshold. Full override lookup, ADNT checks and AI dispatch remain unimplemented.
+threshold. Full override lookup, the ADNT mismatch-report path and AI dispatch
+remain unimplemented. A known stock note/line pair and all bundled note headers
+are checked noninteractively by the asset regression.
 The node-dependent `0x429440` descriptor geometry is also calculated once from
 the default candidate and made available to each opponent, without asserting
 that per-car note lookup selected it or inventing optional note data. The

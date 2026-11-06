@@ -86,6 +86,17 @@ int main(int argc, char** argv) {
         require(normalized_driver_line &&
                 viper::make_acar_model_node_observations(*normalized_driver_line).has_value(),
             "selected driver line must provide AI model nodes");
+        const auto* driver_note_entry = driver_lines.find("000vipr.dnt", viper::AINoteResource::resource_type_code);
+        require(driver_note_entry != nullptr, "stock driver note missing");
+        const auto stock_note = viper::parse_ai_note_resource(
+            driver_note_entry->attributes, driver_lines.payload(*driver_note_entry));
+        require(stock_note && viper::ai_note_matches_line(*stock_note, stock_key, *normalized_driver_line),
+            "stock driver note must match its selected line checksum and node count");
+        const auto note_pairs = viper::read_ai_note_node_pairs(*stock_note);
+        require(note_pairs && note_pairs->size() == normalized_driver_line->records.size() &&
+                note_pairs->front()[0] == word(stock_note->node_payload, 0U) &&
+                note_pairs->front()[1] == word(stock_note->node_payload, 4U),
+            "validated driver note must supply a pair for each AI line node");
         require(viper::select_stock_ai_line(driver_lines, stock_key,
                     viper::AILineOverrideInventory::present).status ==
                     viper::AILineSelectionStatus::unresolved_overrides,

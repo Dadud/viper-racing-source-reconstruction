@@ -134,6 +134,10 @@ void test_ai_note_resource()
             "ADNT check and payload fields mismatch");
 
     const AINoteLookupKey key{2U, 7U, 12U, "viper"};
+    constexpr std::array<std::byte, 9> crc_fixture{
+        std::byte{'1'}, std::byte{'2'}, std::byte{'3'}, std::byte{'4'}, std::byte{'5'},
+        std::byte{'6'}, std::byte{'7'}, std::byte{'8'}, std::byte{'9'}};
+    require(ai_note_checksum(crc_fixture) == 0x31c3U, "AI line CRC calculation mismatch");
     require(ai_note_matches_lookup_key(*parsed, key),
             "case-insensitive ADNT key match failed");
     require(make_ai_note_path(key, AINotePathKind::track_sidecar) ==

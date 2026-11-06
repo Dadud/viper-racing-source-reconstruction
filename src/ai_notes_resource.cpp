@@ -1,5 +1,6 @@
 #include "viper/ai_notes_resource.hpp"
 #include "viper/resource_bundle.hpp"
+#include "viper/world_track_objects.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -124,7 +125,8 @@ AILineOverrideInventory inventory_ai_line_overrides(const std::filesystem::path&
         if (ec) return AILineOverrideInventory::incomplete;
         if (!regular) continue;
         const auto ext = extension(it->path().extension().string());
-        if (ext == ".ilq" || ext == ".ilg") return AILineOverrideInventory::present;
+        if (ext == ".ilq" || ext == ".ilg" || ext == ".dnt")
+            return AILineOverrideInventory::present;
         if (ext != ".res" && ext != ".trk" && ext != ".car") continue;
         try {
             const auto bundle = ResourceBundle::open(it->path());
@@ -134,7 +136,7 @@ AILineOverrideInventory inventory_ai_line_overrides(const std::filesystem::path&
                 // resources and is resolved by exact key later.
                 const auto bundle_name = extension(it->path().filename().string());
                 if (entry_ext == ".ilq" ||
-                    (entry_ext == ".ilg" && bundle_name != "drivers.res"))
+                    ((entry_ext == ".ilg" || entry_ext == ".dnt") && bundle_name != "drivers.res"))
                     return AILineOverrideInventory::present;
             }
         } catch (...) {
@@ -207,6 +209,41 @@ bool ai_note_matches_lookup_key(const AINoteResource& note,
         note.entrant_group == key.entrant_group &&
         note.difficulty == key.difficulty &&
         ascii_equal_case_insensitive(note.car_stem, key.car_stem);
+}
+
+std::uint16_t ai_note_checksum(const std::span<const std::byte> bytes) noexcept
+{
+    std::uint16_t crc{};
+    for (const auto byte : bytes) {
+        crc ^= static_cast<std::uint16_t>(std::to_integer<std::uint8_t>(byte)) << 8U;
+        for (unsigned bit = 0; bit < 8U; ++bit)
+            crc = static_cast<std::uint16_t>((crc & 0x8000U) ? (crc << 1U) ^ 0x1021U : crc << 1U);
+    }
+    return crc;
+}
+
+bool ai_note_matches_line(const AINoteResource& note, const AINoteLookupKey& key,
+    const IdealLineTrackData& line) noexcept
+{
+    if (!ai_note_matches_lookup_key(note, key) || line.records.size() < 4U ||
+        line.records.size() != note.ideal_line_node_count ||
+        note.node_payload_bytes != note.node_payload.size() ||
+        note.ideal_line_node_count == 0U ||
+        note.node_payload_bytes / note.ideal_line_node_count != 8U) return false;
+    return ai_note_checksum(std::span(line.records[3]).subspan(4U, 8U)) == note.ideal_line_check;
+}
+
+std::optional<std::vector<std::array<std::uint32_t, 2>>> read_ai_note_node_pairs(
+    const AINoteResource& note)
+{
+    if (note.ideal_line_node_count == 0U || note.node_payload_bytes != note.node_payload.size() ||
+        note.node_payload_bytes / note.ideal_line_node_count != 8U) return std::nullopt;
+    std::vector<std::array<std::uint32_t, 2>> pairs;
+    pairs.reserve(note.ideal_line_node_count);
+    const auto bytes = std::span<const std::byte>(note.node_payload);
+    for (std::size_t i = 0; i < note.ideal_line_node_count; ++i)
+        pairs.push_back({read_u32_le(bytes, i * 8U), read_u32_le(bytes, i * 8U + 4U)});
+    return pairs;
 }
 
 } // namespace viper
