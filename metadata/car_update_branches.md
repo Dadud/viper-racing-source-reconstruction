@@ -221,33 +221,33 @@ shared-body constructor subset and separate four-wheel geometry/tire setup
 objects for bound ACAR records. Their byte masks prove
 which constructor fields and record-derived transforms were initialized,
 including the `0x433AA0` timer seeds `+0x50C = 1.0f` and `+0xE44 = -100.0f`,
-but do not prove those values track the race. The ACAR wheel/tire states are
-constructor projections and are not advanced by a native ACAR callback.
-`0x431150` body integration is not
-called in production, and visible player/opponent poses remain route-owned.
-Consequently, these initial body values are stale/zero motion rather than the
-current participant state required by `0x419E80`.
+but do not prove those values track the race. The ACAR wheel/tire states remain
+constructor projections and are not advanced by a native ACAR callback. The
+player's rendered pose is now updated from the reconstructed body result in
+`advance_player_body_kinematics_from_forces`; that force/integration path is a
+partial runtime projection and is not a complete dispatch of native
+`0x431150`.
 
-Configured AI entrants still move through `OpponentMotion`'s route segment,
-fraction, and synthetic speed adapter. ACAR records now retain their observed
-initial body transform and native ordinal and retains their wheel constructor
-geometry and Viper tire response setup, but the session does not create the
-ACAR task objects or manager pointer registry, nor evolve their native body
-position/velocity. Their route poses/speeds and constructor snapshots must not
-be converted into timer rows. The player object also cannot stand in for all
-registered descriptor slots: the native setup walks a registry of object
-pointers and leaves unregistered ordinal rows zero-filled.
+Opponent behavior still depends on the explicitly named
+`--route-motion-prototype` path, which advances `OpponentMotion` using route
+fractions and synthetic speed. With that prototype disabled, opponent body
+position and velocity are not evolved by the live runtime; the constructed
+ACAR bodies and wheels remain at constructor state. These poses, prototype
+speeds, and stale constructor snapshots must not be converted into timer rows.
+The session also does not create the ACAR manager pointer registry. The native
+setup walks registered object pointers and leaves unregistered ordinal rows
+zero-filled, so the player body alone cannot stand in for all descriptor
+slots.
 
-The next safe implementation boundary is to make body integration the
-production pose authority for the player and to create each participant's
-persistent body/registration record through the recovered vehicle setup path.
-Only then can the race session materialize rows in descriptor ordinal order
-from each registered body's initialized `+0x5C/+0x64/+0x234/+0x23C` fields,
-preserve unregistered slots as zero rows, and pass the complete span with the
-player's native `+0x510` ordinal. Until both live body ownership and ordinal
-registration exist, `ordinal_rows_resolved` must remain false; using route
-motion or constructor defaults here would make the timer appear wired while
-feeding it invented/stale participant physics.
+The next implementation boundary is to add persistent physical update state
+for each ACAR and reproduce its ordered callback producers before the shared
+integrator. Once all participant bodies and the native registration set are
+current, the race session can retain the one-update-lagged registry snapshot
+and materialize ordinal rows from each registered body's `+0x5C/+0x64/
++0x234/+0x23C` fields, preserve unregistered slots as zero rows, and pass the
+complete span with the player's native `+0x510` ordinal. Until then,
+`ordinal_rows_resolved` must remain false; constructor defaults and route
+motion are not valid substitutes for current participant physics.
 
 The portable resolver constructs and sorts only the requested row because
 the timer consumes one row entry; the native descriptor itself constructs all
