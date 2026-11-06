@@ -3413,9 +3413,7 @@ struct WindowState {
                 pcar_initializer.writes_before_backend_refresh.end() ||
             !viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object,
-                pcar_initializer.writes_before_backend_refresh) ||
-            !viper::initialize_ncar_constructor_callback_history(
-                player_runtime_state.body_object)) {
+                pcar_initializer.writes_before_backend_refresh)) {
             player_runtime_state = {};
             return false;
         }
@@ -3444,6 +3442,12 @@ struct WindowState {
                 player_runtime_state = {};
                 return false;
             }
+        }
+        if (!viper::initialize_ncar_shared_car_constructor_state(
+                player_runtime_state.body_object,
+                player_runtime_state.wheel_objects, 0x554U)) {
+            player_runtime_state = {};
+            return false;
         }
         player_runtime_state.constructor_outputs_materialized = true;
         for (std::size_t wheel = 0; wheel < player_wheel_tire_setups.size(); ++wheel) {
@@ -6444,11 +6448,6 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         stream_ok = false;
                         break;
                     }
-                    if (!viper::initialize_ncar_constructor_callback_history(
-                            body_state.body_object)) {
-                        stream_ok = false;
-                        break;
-                    }
                     body_state.wheel_core_initialization =
                         viper::initialize_ncar_four_wheel_core({
                             record_bytes, ai_model.vertices,
@@ -6515,11 +6514,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         }
                     }
                     if (!stream_ok) break;
-                    if (!viper::initialize_acar_common_control_defaults(
-                            body_state.body_object, body_state.wheel_objects, 0x554U) ||
-                        !viper::initialize_ncar_wheel_signal_inputs(
+                    if (!viper::initialize_ncar_wheel_signal_inputs(
                             body_state.body_object, body_state.wheel_objects,
-                            record_bytes)) {
+                            record_bytes) ||
+                        !viper::initialize_ncar_shared_car_constructor_state(
+                            body_state.body_object, body_state.wheel_objects, 0x554U) ||
+                        !viper::initialize_acar_common_control_defaults(
+                            body_state.body_object, body_state.wheel_objects, 0x554U)) {
                         stream_ok = false;
                         break;
                     }

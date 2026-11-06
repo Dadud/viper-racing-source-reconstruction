@@ -217,14 +217,52 @@ int main(int argc, char** argv) {
             require(!viper::initialize_ncar_embedded_curve_and_selector(
                     initialized_body, std::span(record).first(0x80U)),
                 "truncated runtime records must fail embedded setup");
-            const viper::NcarObjectFieldWrite stale_callback_history[]{
-                {0xd70U, 4U, 0x41200000U}, {0xc0cU, 4U, 0x3f800000U}};
-            require(viper::apply_ncar_body_object_writes(
-                        initialized_body, stale_callback_history) &&
-                    viper::initialize_ncar_constructor_callback_history(initialized_body) &&
+            const viper::NcarObjectFieldWrite constructor_canaries[]{
+                {0x500U, 4U, 0x41200000U}, {0x508U, 4U, 0x41200000U},
+                {0xd64U, 4U, 0x41200000U}, {0xd70U, 4U, 0x41200000U},
+                {0xde0U, 4U, 0x3f800000U}, {0xdecU, 4U, 0U},
+                {0xc0cU, 4U, 0x3f800000U}};
+            require(viper::apply_ncar_body_object_writes(initialized_body,
+                        constructor_canaries),
+                "shared constructor field canaries must be writable");
+            std::array<viper::NcarWheelRuntimeObjectState, 4> constructor_wheels{};
+            for (std::size_t wheel = 0U; wheel < constructor_wheels.size(); ++wheel) {
+                const auto base = 0x554U + 0x1a4U *
+                    static_cast<std::uint32_t>(wheel);
+                const viper::NcarObjectFieldWrite wheel_canary{
+                    base + 0x13cU, 4U, 0x41200000U};
+                require(viper::apply_ncar_wheel_object_writes(
+                            constructor_wheels[wheel], base,
+                            std::span(&wheel_canary, 1U)),
+                    "wheel constructor canary must be writable");
+            }
+            require(viper::initialize_ncar_shared_car_constructor_state(
+                        initialized_body, constructor_wheels, 0x554U) &&
+                    viper::read_ncar_body_object_u8(initialized_body, 0xe3cU) == 1U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0xe14U) ==
+                        0x40a00000U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0x500U) == 0U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0x508U) == 0U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0xd64U) == 0U &&
                     viper::read_ncar_body_object_u32(initialized_body, 0xd70U) == 0U &&
-                    viper::read_ncar_body_object_u32(initialized_body, 0xc0cU) == 0U,
-                "shared constructor must clear callback histories after curve setup");
+                    viper::read_ncar_body_object_u32(initialized_body, 0xde0U) == 0U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0xdecU) ==
+                        0x3f800000U &&
+                    viper::read_ncar_body_object_u32(initialized_body, 0xc0cU) == 0U &&
+                    !viper::read_ncar_body_object_u32(initialized_body, 0xe18U),
+                "shared car constructor must apply known resets and preserve unknown derived inputs");
+            for (std::size_t wheel = 0U; wheel < constructor_wheels.size(); ++wheel) {
+                require(viper::read_ncar_wheel_object_u32(
+                            constructor_wheels[wheel], 0x13cU) == 0U,
+                    "shared constructor must clear each wheel's callback state");
+            }
+            auto invalid_layout_body = initialized_body;
+            auto invalid_layout_wheels = constructor_wheels;
+            require(!viper::initialize_ncar_shared_car_constructor_state(
+                        invalid_layout_body, invalid_layout_wheels, 0x558U) &&
+                    invalid_layout_body.bytes == initialized_body.bytes &&
+                    invalid_layout_wheels[0].bytes == constructor_wheels[0].bytes,
+                "shared constructor reset must reject non-native wheel layouts atomically");
             const auto signal = viper::make_ncar_integrator_signal_state_from_runtime_record(record);
             const auto front = viper::derive_ncar_wheel_scalar_0x5c(record, 0U);
             const auto rear = viper::derive_ncar_wheel_scalar_0x5c(record, 2U);

@@ -25,6 +25,14 @@ namespace viper {
 [[nodiscard]] bool initialize_ncar_constructor_callback_history(
     NcarBodyRuntimeObjectState& body) noexcept;
 
+// Materializes source-known literal stores from 0x433AA0/0x4338C0 after the
+// body pose, curve and four wheel objects have been constructed. Transform
+// copies and derived +0xE18/+0xE1C operands remain caller-owned.
+[[nodiscard]] bool initialize_ncar_shared_car_constructor_state(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::uint32_t first_wheel_object_offset);
+
 // Materializes the shared 0x433C00/0x434700 wheel-derived signal inputs.
 [[nodiscard]] bool initialize_ncar_wheel_signal_inputs(
     NcarBodyRuntimeObjectState& body,

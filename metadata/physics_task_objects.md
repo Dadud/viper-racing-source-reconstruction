@@ -1008,13 +1008,17 @@ also receives the common `0x42FF90` body `+0x50C` default. Asset-backed checks
 verify the curve and selector fields for all five supplied car records and
 reject a truncated record. The AI driver and wheel/body update callbacks are
 still required before these stored values can make opponents drive.
-After curve configuration, both constructors now apply the common callback
-history reset: `0x433AA0` clears body `+0xD70`, then its final `0x4338C0`
-call clears `+0xC0C`. This preserves the native order in which curve setup
-precedes resetting its sampled value. The asset-backed drivetrain regression
-seeds both histories nonzero and verifies they are cleared by the shared
-helper; this checks constructor state only and does not claim an AI update
-callback is wired.
+After curve configuration and wheel setup, both constructors now materialize
+the source-known literal stores from `0x433AA0` and `0x4338C0`, including
+`+0xDEC = 1`, the body control/history clears, and all four wheel reset groups.
+The 12-float pose copy stays sourced from the runtime record, and computed
+`+0xE18/+0xE1C` remain unknown because their constructor inputs are unresolved.
+The final shared helper clears `+0xD70` and `+0xC0C`, preserving native curve
+configuration-before-reset order; ACAR-specific clutch and wheel modes are
+then applied after the base reset. The asset-backed drivetrain regression
+seeds body and wheel fields with canaries and verifies known resets while
+confirming unresolved derived fields remain unknown. This checks constructor
+state only and does not claim an AI update callback is wired.
 `initialize_ncar_wheel_signal_inputs` now also initializes each opponent's
 body wheel aliases, selector, signal multiplier and wheel-pair scales from
 that entrant's wheel state and runtime record. The asset-backed regression

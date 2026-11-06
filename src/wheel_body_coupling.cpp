@@ -108,6 +108,66 @@ bool initialize_ncar_constructor_callback_history(
     return apply_ncar_body_object_writes(body, writes);
 }
 
+bool initialize_ncar_shared_car_constructor_state(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::uint32_t first_wheel_object_offset)
+{
+    // The shared native reset plan uses the four fixed wheel offsets beginning
+    // at +0x554; reject alternate layouts instead of applying it to wrong slots.
+    if (first_wheel_object_offset != 0x554U ||
+        static_cast<std::uint64_t>(first_wheel_object_offset) + 4U * 0x1a4U >
+            ncar_body_runtime_object_bytes) return false;
+
+    const auto plan = plan_ncar_object_initialization({});
+    auto next_body = body;
+    auto next_wheels = wheels;
+    const auto apply_body = [&next_body](
+        const std::vector<NcarObjectFieldWrite>& writes) {
+        return apply_ncar_body_object_writes(next_body, writes);
+    };
+    if (!apply_body(plan.writes_before_backend_refresh)) return false;
+
+    // 0x433AA0 copies the saved 12-float transform before its literal reset
+    // stores. The live constructor already sourced that pose from +0xE6C or
+    // the runtime record, so do not replace it with this planner's defaults.
+    std::vector<NcarObjectFieldWrite> body_resets;
+    for (const auto& write : plan.writes_before_helper_0x4331e0) {
+        if (write.offset >= 0x38U && write.offset <= 0x64U) continue;
+        body_resets.push_back(write);
+    }
+    if (!apply_body(body_resets) || !apply_body(plan.writes_from_helper_0x4331e0))
+        return false;
+
+    // The two computed stores depend on +0xE9C/+0xEA0 inputs that are not
+    // established by this constructor path. Keep those bytes unknown.
+    std::vector<NcarObjectFieldWrite> post_helper_resets;
+    for (const auto& write : plan.writes_after_helper_0x4331e0) {
+        if (write.offset == 0xe18U || write.offset == 0xe1cU) continue;
+        post_helper_resets.push_back(write);
+    }
+    if (!apply_body(post_helper_resets) ||
+        !apply_body(plan.wheel_reset_writes_0x441b90)) return false;
+
+    for (std::size_t wheel = 0U; wheel < next_wheels.size(); ++wheel) {
+        const auto base = first_wheel_object_offset +
+            static_cast<std::uint32_t>(wheel) * 0x1a4U;
+        std::vector<NcarObjectFieldWrite> wheel_resets;
+        for (const auto& write : plan.wheel_reset_writes_0x441b90) {
+            if (write.offset >= base && write.offset < base + 0x1a4U)
+                wheel_resets.push_back(write);
+        }
+        if (!apply_ncar_wheel_object_writes(next_wheels[wheel], base, wheel_resets))
+            return false;
+    }
+    if (!apply_body(plan.reset_object_writes_0x433920) ||
+        !initialize_ncar_constructor_callback_history(next_body)) return false;
+
+    body = std::move(next_body);
+    wheels = std::move(next_wheels);
+    return true;
+}
+
 namespace {
 
 using OrdinalPairPointer = std::optional<std::size_t>;
