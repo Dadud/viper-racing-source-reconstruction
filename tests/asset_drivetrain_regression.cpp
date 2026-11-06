@@ -15,6 +15,7 @@
 #include <fstream>
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -245,6 +246,20 @@ int main(int argc, char** argv) {
             signal_wheels[0] = {};
             require(!viper::initialize_ncar_wheel_signal_inputs(signal_body, signal_wheels, record),
                 "missing wheel source must fail signal initialization");
+            viper::NcarBodyRuntimeObjectState opponent_body{};
+            std::array<viper::NcarWheelRuntimeObjectState, 4> opponent_wheels{};
+            require(viper::initialize_acar_common_control_defaults(opponent_body, opponent_wheels, 0x554U) &&
+                    viper::read_ncar_body_object_u8(opponent_body, 0x534U) == 1U,
+                "opponent control defaults must initialize the body gate");
+            for (std::size_t i = 0; i < opponent_wheels.size(); ++i) {
+                const auto base = 0x554U + 0x1a4U * static_cast<std::uint32_t>(i);
+                require(viper::read_ncar_wheel_object_u32(opponent_wheels[i], 0x164U) == 2U &&
+                        viper::read_ncar_body_object_u32(opponent_body, base + 0x164U) == 2U,
+                    "opponent wheel defaults must agree with their body aliases");
+            }
+            require(!viper::initialize_acar_common_control_defaults(opponent_body, opponent_wheels,
+                        std::numeric_limits<std::uint32_t>::max()),
+                "invalid wheel offsets must fail control initialization");
             const auto multiplier = viper::derive_ncar_integrator_signal_multiplier(
                 *front, *rear, std::bit_cast<float>(word(record, 0xb4U)),
                 std::bit_cast<float>(word(record, 0x90U)), std::bit_cast<float>(0x3dd67750U));

@@ -987,6 +987,10 @@ geometry and signal scales from the entrant's own runtime record. The
 asset-backed wheel setup regression checks the response-scale write for all
 four wheels of each supplied car. This prepares persistent opponent state;
 the ACAR driver callbacks and physical update dispatch remain unconnected.
+The live ACAR constructor also applies `0x428FF0(1)` as four DWORD value-2
+writes at wheel-relative `+0x164` and applies the subsequent byte value 1 at
+body `+0x534`. These writes are retained in both wheel objects and their
+body-relative aliases; out-of-range inputs fail without partial mutation.
 Each live ACAR now additionally owns byte-tracked storage for the derived
 `0xEF0..0x107F` tail of the `0x1080`-byte object. The constructor prefix
 initializes only its seven unconditional cleared DWORDs at `+0x1054..+0x106F`;

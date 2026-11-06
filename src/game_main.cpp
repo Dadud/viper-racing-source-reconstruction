@@ -6525,7 +6525,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         }
                     }
                     if (!stream_ok) break;
-                    if (!viper::initialize_ncar_wheel_signal_inputs(
+                    if (!viper::initialize_acar_common_control_defaults(
+                            body_state.body_object, body_state.wheel_objects, 0x554U) ||
+                        !viper::initialize_ncar_wheel_signal_inputs(
                             body_state.body_object, body_state.wheel_objects,
                             record_bytes)) {
                         stream_ok = false;

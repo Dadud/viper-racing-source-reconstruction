@@ -26,6 +26,12 @@ namespace viper {
     const std::array<NcarWheelRuntimeObjectState, 4>& wheels,
     std::span<const std::byte> runtime_record) noexcept;
 
+// ACAR constructor 0x4285D0 calls 0x428FF0(1) and writes body +0x534 = 1.
+[[nodiscard]] bool initialize_acar_common_control_defaults(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::uint32_t first_wheel_object_offset) noexcept;
+
 inline constexpr std::uint32_t ncar_shared_zero_wheel_reference_address_0x508e80 =
     0x00508e80U;
 

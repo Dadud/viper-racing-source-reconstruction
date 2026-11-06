@@ -11,6 +11,27 @@
 
 namespace viper {
 
+bool initialize_acar_common_control_defaults(NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::uint32_t first_wheel_object_offset) noexcept
+{
+    if (static_cast<std::uint64_t>(first_wheel_object_offset) + 3U * 0x1a4U + 0x168U >
+        ncar_body_runtime_object_bytes) return false;
+    auto next_body = body;
+    auto next_wheels = wheels;
+    const NcarObjectFieldWrite clutch{0x534U, 1U, 1U};
+    if (!apply_ncar_body_object_writes(next_body, std::span(&clutch, 1U))) return false;
+    for (std::size_t i = 0; i < next_wheels.size(); ++i) {
+        const auto base = first_wheel_object_offset + static_cast<std::uint32_t>(i) * 0x1a4U;
+        const NcarObjectFieldWrite wheel_mode{base + 0x164U, 4U, 2U};
+        if (!apply_ncar_wheel_object_writes(next_wheels[i], base, std::span(&wheel_mode, 1U)) ||
+            !apply_ncar_body_object_writes(next_body, std::span(&wheel_mode, 1U))) return false;
+    }
+    body = std::move(next_body);
+    wheels = std::move(next_wheels);
+    return true;
+}
+
 bool initialize_ncar_wheel_signal_inputs(NcarBodyRuntimeObjectState& body,
     const std::array<NcarWheelRuntimeObjectState, 4>& wheels,
     const std::span<const std::byte> record) noexcept
