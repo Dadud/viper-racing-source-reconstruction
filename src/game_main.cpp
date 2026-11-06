@@ -3640,6 +3640,32 @@ struct WindowState {
         return true;
     }
 
+    bool update_player_selected_pair_value()
+    {
+        std::array<float, 4> wheel_spin{};
+        for (std::size_t wheel = 0U; wheel < wheel_spin.size(); ++wheel) {
+            const auto bits = viper::read_ncar_wheel_object_u32(
+                player_runtime_state.wheel_objects[wheel], 0x128U);
+            if (!bits) return false;
+            wheel_spin[wheel] = std::bit_cast<float>(*bits);
+        }
+        const auto input = viper::make_ncar_selected_wheel_pair_target_input_from_runtime_record(
+            player_runtime_car_record, 0.0F, wheel_spin);
+        if (!input) return false;
+        const auto pair = viper::advance_ncar_selected_wheel_pair_target(*input);
+        const auto multiplier = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object, 0xdd0U);
+        if (!pair || !multiplier) return false;
+        const auto value = viper::derive_ncar_selected_pair_value_0xddc(
+            *pair, std::bit_cast<float>(*multiplier));
+        if (!value) return false;
+        const viper::NcarObjectFieldWrite write{
+            0xddcU, 4U, std::bit_cast<std::uint32_t>(*value)};
+        return viper::apply_ncar_body_object_writes(
+            player_runtime_state.body_object,
+            std::span<const viper::NcarObjectFieldWrite>(&write, 1U));
+    }
+
     bool update_player_integrator_wheel_scalars()
     {
         player_integrator_wheel_scalars_applied = false;
@@ -5094,6 +5120,7 @@ struct WindowState {
             if (!sample_player_integrator_curve_getter(
                     player_physics_ticks_this_update.back(),
                     scheduler_input.gate_0x508a40)) return false;
+            if (!update_player_selected_pair_value()) return false;
             if (!update_player_integrator_wheel_scalars()) return false;
             update_player_wheel_contacts_from_body(
                 player_physics_ticks_this_update.back());

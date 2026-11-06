@@ -98,6 +98,22 @@ int main()
     require(!viper::derive_ncar_integrator_signal_multiplier(
         2.0F, 10.0F, 0.25F, 2.0F,
         std::numeric_limits<float>::infinity()));
+    const auto controller_enabled = viper::project_ncar_controller_setter(
+        {true, 10.0F, 2.0F, 3.0F, 7.0F, 4.0F});
+    require(controller_enabled && controller_enabled->observed_value_0x28 == 20.0F &&
+        controller_enabled->stored_value_0x10 == 20.0F &&
+        controller_enabled->selected_pair_argument == -112.0F &&
+        !controller_enabled->disabled_integrator_required);
+    const auto controller_clamped = viper::project_ncar_controller_setter(
+        {true, 1000.0F, 1.0F, 1.0F, 0.0F, 5.0F});
+    require(controller_clamped && controller_clamped->selected_pair_argument == -395.0F);
+    const auto controller_disabled = viper::project_ncar_controller_setter(
+        {false, 0.0F, 0.0F, 0.0F, 7.0F, 4.0F});
+    require(controller_disabled && controller_disabled->observed_value_0x28 == 7.0F &&
+        controller_disabled->selected_pair_argument == 0.0F &&
+        controller_disabled->disabled_integrator_required);
+    require(!viper::project_ncar_controller_setter(
+        {true, std::numeric_limits<float>::infinity(), 1.0F, 1.0F, 0.0F, 0.0F}));
     require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
         std::span<const std::byte>(signal_runtime_record.data(), 0x6bU)));
     signal_runtime_record[0x68U] = std::byte{0U};
@@ -167,6 +183,11 @@ int main()
     require(std::abs(selected_pair->getter_d24 - 6.0F) < 1e-6F);
     require(std::abs(selected_pair->getter_d44 - 14.0F) < 1e-6F);
     require(std::abs(selected_pair->getter_d04 - 10.0F) < 1e-6F);
+    const auto selected_pair_ddc =
+        viper::derive_ncar_selected_pair_value_0xddc(*selected_pair, 0.5F);
+    require(selected_pair_ddc && std::abs(*selected_pair_ddc - 5.0F) < 1e-6F);
+    require(!viper::derive_ncar_selected_pair_value_0xddc(
+        *selected_pair, std::numeric_limits<float>::infinity()));
     require(selected_pair->wheel_setter_reached ==
         std::array<bool, 4>{true, true, true, true});
     require(std::abs(selected_pair->wheel_value_0xe4[0] - 19.2015F) < 1e-4F &&
@@ -181,6 +202,7 @@ int main()
     selected_pair =
         viper::advance_ncar_selected_wheel_pair_target(pair_input);
     require(selected_pair.has_value() && selected_pair->selected_target == 0U);
+    require(viper::derive_ncar_selected_pair_value_0xddc(*selected_pair, 0.5F) == 3.0F);
     require(selected_pair->wheel_setter_reached ==
         std::array<bool, 4>{true, true, false, false});
 
@@ -188,10 +210,15 @@ int main()
     selected_pair =
         viper::advance_ncar_selected_wheel_pair_target(pair_input);
     require(selected_pair.has_value() && selected_pair->selected_target == 2U);
+    require(viper::derive_ncar_selected_pair_value_0xddc(*selected_pair, 0.5F) == 7.0F);
     require(selected_pair->wheel_setter_reached ==
         std::array<bool, 4>{false, false, true, true});
     require(std::abs(selected_pair->wheel_value_0xe4[2] - 5.829F) < 1e-4F &&
             std::abs(selected_pair->wheel_value_0xe4[3] + 5.029F) < 1e-4F);
+
+    pair_input.selector_value_bits_0xb4 = 0xbf800000U;
+    selected_pair = viper::advance_ncar_selected_wheel_pair_target(pair_input);
+    require(selected_pair && selected_pair->selected_target == 0U);
 
     pair_input.selector_value_bits_0xb4 = 0x3c000000U;
     selected_pair =

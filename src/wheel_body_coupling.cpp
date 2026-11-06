@@ -2348,6 +2348,32 @@ make_ncar_selected_wheel_pair_target_input_from_runtime_record(
     return input;
 }
 
+std::optional<NcarControllerSetterResult> project_ncar_controller_setter(
+    const NcarControllerSetterInput& input) noexcept
+{
+    if (!std::isfinite(input.previous_value_0x10) ||
+        !std::isfinite(input.signal_argument)) return std::nullopt;
+    if (!input.enabled_0x58) {
+        return NcarControllerSetterResult{input.previous_value_0x10,
+            input.previous_value_0x10, 0.0F, true};
+    }
+    if (!std::isfinite(input.selected_pair_getter) ||
+        !std::isfinite(input.selection_scale_0x18) ||
+        !std::isfinite(input.damping_0x14)) return std::nullopt;
+    const auto observed = static_cast<float>(
+        static_cast<long double>(input.selected_pair_getter) * input.selection_scale_0x18);
+    if (!std::isfinite(observed)) return std::nullopt;
+    const auto residual = static_cast<float>(
+        -static_cast<long double>(input.damping_0x14) * observed);
+    if (!std::isfinite(residual)) return std::nullopt;
+    const auto bounded = std::clamp(residual, -400.0F, 400.0F);
+    const auto target = static_cast<float>(
+        (static_cast<long double>(bounded) + input.signal_argument) *
+        input.selection_scale_0x18);
+    if (!std::isfinite(target)) return std::nullopt;
+    return NcarControllerSetterResult{observed, observed, target, false};
+}
+
 std::optional<NcarSelectedWheelPairTargetResult>
 advance_ncar_selected_wheel_pair_target(
     const NcarSelectedWheelPairTargetInput& input) noexcept
@@ -2363,9 +2389,11 @@ advance_ncar_selected_wheel_pair_target(
         return std::nullopt;
     }
 
-    constexpr std::uint32_t first_selector_boundary_bits = 0x3c23d70aU;
-    constexpr std::uint32_t second_selector_boundary_bits = 0x3f7d70a4U;
-    const auto selector_bits = input.selector_value_bits_0xb4;
+    constexpr std::int32_t first_selector_boundary_bits = 0x3c23d70a;
+    constexpr std::int32_t second_selector_boundary_bits = 0x3f7d70a4;
+    // 0x434575/0x43458C use signed JL/JG on the raw DWORD, not float
+    // comparison or unsigned bit ordering.
+    const auto selector_bits = std::bit_cast<std::int32_t>(input.selector_value_bits_0xb4);
     const std::uint32_t selected_target =
         selector_bits < first_selector_boundary_bits ? 0U :
         selector_bits <= second_selector_boundary_bits ? 1U : 2U;
@@ -2439,6 +2467,20 @@ advance_ncar_selected_wheel_pair_target(
         return std::nullopt;
     }
     return result;
+}
+
+std::optional<float> derive_ncar_selected_pair_value_0xddc(
+    const NcarSelectedWheelPairTargetResult& pair,
+    const float multiplier_0xdd0) noexcept
+{
+    if (pair.selected_target > 2U || !std::isfinite(multiplier_0xdd0))
+        return std::nullopt;
+    const float getter = pair.selected_target == 0U ? pair.getter_d24 :
+        pair.selected_target == 1U ? pair.getter_d04 : pair.getter_d44;
+    if (!std::isfinite(getter)) return std::nullopt;
+    const auto result = static_cast<float>(
+        static_cast<long double>(getter) * multiplier_0xdd0);
+    return std::isfinite(result) ? std::optional<float>{result} : std::nullopt;
 }
 
 bool apply_ncar_selected_wheel_pair_target_to_wheels(

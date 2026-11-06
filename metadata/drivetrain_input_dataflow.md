@@ -59,8 +59,10 @@ Constructor `0x4346A9..0x4347A4` configures three paired state blocks at
 The constructor's raw runtime-record `+0xB4` DWORD selects the controller's
 target `+0x4C`: bits below `0x3C23D70A` select `D24` (index 0), bits through
 `0x3F7D70A4` select `D04` (index 1), and larger bits select `D44` (index 2).
-These are unsigned raw-bit comparisons; interpreting the boundaries as float
-values is only a convenience, not the comparison semantics.
+These are signed raw-DWORD comparisons (`JL`/`JG`), not floating-point
+comparisons; interpreting the boundaries as float values is only a convenience.
+Negative raw values therefore select D24. The portable selector now preserves
+this signed ordering.
 
 The `0x4C8768` vtable maps slots 0/+4 to `0x43F730/0x43F760`. For each pair,
 slot 0 returns `(endpoint1_getter + endpoint2_getter) * block[+0x1C] * 0.5`.
@@ -92,6 +94,18 @@ aliases, copied state, and indirect writes are not excluded.
 Wheel vtable `0x4C89C8` slots 0/+4 are `0x444600/0x4445F0`:
 the getter reads wheel `+0x128`, and the setter writes wheel `+0xE4`. The active
 `0x442530` wheel updater consumes `+0xE4` in its spin response.
+
+**2026-11-06 update:** The player step now reads the initialized wheel `+0x128`
+values, evaluates the selected D-block getter, and stores its product with
+constructor `+0xDD0` to body `+0xDDC` before wheel updates. This does not
+execute the D-block setters or establish a throttle-to-torque path. The
+finite-input `0x43FFC0` projection now models its enabled branch: it stores
+the scaled selected-pair getter at controller `+0x28/+0x10`, clamps the
+negative damping product to `[-400, 400]`, and multiplies the sum of that
+residual and the signal argument by controller `+0x18` for the pair setter.
+The disabled branch requests a zero pair setter and then calls `0x43F980`;
+that integrator remains separate and is not projected by this helper. These
+controller setters are not yet wired into the live player step.
 
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes

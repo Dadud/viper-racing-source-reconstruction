@@ -77,6 +77,28 @@ struct NcarSelectedWheelPairTargetInput {
     std::array<float, 4> wheel_spin_0x128{};
 };
 
+struct NcarControllerSetterInput {
+    bool enabled_0x58{};
+    float selected_pair_getter{};
+    float selection_scale_0x18{};
+    float damping_0x14{};
+    float previous_value_0x10{};
+    float signal_argument{};
+};
+
+struct NcarControllerSetterResult {
+    float observed_value_0x28{};
+    float stored_value_0x10{};
+    float selected_pair_argument{};
+    // The disabled branch also calls 0x43F980; its state update is separate.
+    bool disabled_integrator_required{};
+};
+
+// Models the bounded finite-input setter dispatch at 0x43FFC0. The disabled
+// path reports, but does not execute, the subsequent 0x43F980 integrator.
+[[nodiscard]] std::optional<NcarControllerSetterResult>
+project_ncar_controller_setter(const NcarControllerSetterInput& input) noexcept;
+
 struct NcarSelectedWheelPairTargetResult {
     // Constructor selector: 0 selects +0xD24, 1 selects +0xD04, and 2
     // selects +0xD44. The raw +0xB4 bit comparisons are preserved.
@@ -101,6 +123,11 @@ make_ncar_selected_wheel_pair_target_input_from_runtime_record(
 [[nodiscard]] std::optional<NcarSelectedWheelPairTargetResult>
 advance_ncar_selected_wheel_pair_target(
     const NcarSelectedWheelPairTargetInput& input) noexcept;
+
+// 0x4312C5 reads the selected pair's getter, scales it by +0xDD0, and
+// stores the result at body +0xDDC before the wheel update calls.
+[[nodiscard]] std::optional<float> derive_ncar_selected_pair_value_0xddc(
+    const NcarSelectedWheelPairTargetResult& pair, float multiplier_0xdd0) noexcept;
 
 // Atomically persists the selected target's four wheel +0xE4 setter results.
 [[nodiscard]] bool apply_ncar_selected_wheel_pair_target_to_wheels(
