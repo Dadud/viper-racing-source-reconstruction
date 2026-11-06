@@ -34,6 +34,19 @@ viper::WheelCollisionImpulseInput make_input()
 
 int main()
 {
+    viper::NcarIntegratorSignalState precision_state{};
+    precision_state.value_bits_0xc7c = 0x3e947f4cU;
+    precision_state.limit_scale_0xc8c = 100.0F;
+    precision_state.callback_scale_0xc90 = 1.0F;
+    precision_state.smoothed_value_0xc94 = std::bit_cast<float>(0x40a0ec07U);
+    viper::NcarIntegratorSignalInput precision_input{};
+    precision_input.callback_value_0xc84 = std::bit_cast<float>(0x40850485U);
+    const auto precision_signal = viper::advance_ncar_integrator_signal_control(
+        precision_state, precision_input, 0U);
+    require(std::bit_cast<std::uint32_t>(precision_signal.paired_setter_value) ==
+        0x3ed2f414U &&
+        std::bit_cast<std::uint32_t>(precision_signal.paired_setter_opposite) ==
+        0xbed2f414U);
     std::array<std::byte, 0x6cU> signal_runtime_record{};
     constexpr std::uint32_t signal_source_bits = 0x40000000U; // 2.0f
     for (std::size_t byte = 0U; byte < sizeof(signal_source_bits); ++byte) {

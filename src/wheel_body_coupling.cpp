@@ -520,13 +520,16 @@ NcarIntegratorSignalResult advance_ncar_integrator_signal_control(
     } else if (delta < -clamp_bound) {
         delta = -clamp_bound;
     }
-    state.smoothed_value_0xc94 = static_cast<float>(
+    // 0x43F8A5 uses FST, so the x87 register retains this intermediate
+    // even though the persistent +0xC94 field is rounded to float.
+    const double smoothed_intermediate =
         static_cast<double>(delta) * static_cast<double>(ramp_weight) +
         static_cast<double>(state.smoothed_value_0xc94) *
-            static_cast<double>(retained_weight));
+            static_cast<double>(retained_weight);
+    state.smoothed_value_0xc94 = static_cast<float>(smoothed_intermediate);
     const auto paired_value = static_cast<float>(
         static_cast<double>(value_0xc7c) * static_cast<double>(value_0xc7c) *
-        static_cast<double>(state.smoothed_value_0xc94));
+        smoothed_intermediate);
 
     result.helper_0x43f830_reached = true;
     result.paired_setters_reached = true;
