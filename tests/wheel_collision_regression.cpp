@@ -114,6 +114,19 @@ int main()
         controller_disabled->disabled_integrator_required);
     require(!viper::project_ncar_controller_setter(
         {true, std::numeric_limits<float>::infinity(), 1.0F, 1.0F, 0.0F, 0.0F}));
+    const auto disabled_update = viper::project_ncar_disabled_controller_integrator(
+        {2.0F, 0.5F, 4.0F, 5.0F, 3.0F, {0.0F, 1.0F, 0.0F}});
+    require(disabled_update && std::abs(disabled_update->value_0x10 - 3.22231F) < 1e-4F &&
+        std::abs(disabled_update->body_moment_delta[1] - 40.0F) < 1e-3F &&
+        disabled_update->body_moment_delta[0] == 0.0F &&
+        disabled_update->body_moment_delta[2] == 0.0F);
+    const auto disabled_equilibrium = viper::project_ncar_disabled_controller_integrator(
+        {2.0F, 0.5F, 4.0F, 5.0F, 1.0F, {1.0F, 2.0F, 3.0F}});
+    require(disabled_equilibrium && disabled_equilibrium->value_0x10 == 2.0F &&
+        disabled_equilibrium->body_moment_delta == std::array<float, 3>{});
+    require(!viper::project_ncar_disabled_controller_integrator(
+        {0.0F, 0.0F, 1.0F, 1.0F, 0.0F,
+         {0.0F, std::numeric_limits<float>::quiet_NaN(), 0.0F}}));
     require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
         std::span<const std::byte>(signal_runtime_record.data(), 0x6bU)));
     signal_runtime_record[0x68U] = std::byte{0U};

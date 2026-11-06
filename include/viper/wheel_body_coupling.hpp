@@ -99,6 +99,26 @@ struct NcarControllerSetterResult {
 [[nodiscard]] std::optional<NcarControllerSetterResult>
 project_ncar_controller_setter(const NcarControllerSetterInput& input) noexcept;
 
+struct NcarDisabledControllerIntegratorInput {
+    float previous_value_0x10{};
+    float damping_0x14{};
+    float inverse_scale_0x0c{};
+    float body_scale_0x08{};
+    float signal_argument{};
+    std::array<float, 3> body_axis_0x50{};
+};
+
+struct NcarDisabledControllerIntegratorResult {
+    float value_0x10{};
+    std::array<float, 3> body_moment_delta{};
+};
+
+// Models 0x43F980's disabled-controller update and its 0x43E7F0 moment
+// argument. Caller owns body-moment accumulation and native callback order.
+[[nodiscard]] std::optional<NcarDisabledControllerIntegratorResult>
+project_ncar_disabled_controller_integrator(
+    const NcarDisabledControllerIntegratorInput& input) noexcept;
+
 struct NcarSelectedWheelPairTargetResult {
     // Constructor selector: 0 selects +0xD24, 1 selects +0xD04, and 2
     // selects +0xD44. The raw +0xB4 bit comparisons are preserved.

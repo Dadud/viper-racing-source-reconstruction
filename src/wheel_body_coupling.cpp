@@ -2374,6 +2374,39 @@ std::optional<NcarControllerSetterResult> project_ncar_controller_setter(
     return NcarControllerSetterResult{observed, observed, target, false};
 }
 
+std::optional<NcarDisabledControllerIntegratorResult>
+project_ncar_disabled_controller_integrator(
+    const NcarDisabledControllerIntegratorInput& input) noexcept
+{
+    if (!std::isfinite(input.previous_value_0x10) ||
+        !std::isfinite(input.damping_0x14) ||
+        !std::isfinite(input.inverse_scale_0x0c) ||
+        !std::isfinite(input.body_scale_0x08) ||
+        !std::isfinite(input.signal_argument) ||
+        !std::all_of(input.body_axis_0x50.begin(), input.body_axis_0x50.end(),
+            [](const float value) { return std::isfinite(value); })) return std::nullopt;
+    constexpr float angular_scale = std::bit_cast<float>(0x3dd67750U);
+    constexpr float timestep = std::bit_cast<float>(0x3c83126fU);
+    constexpr float inverse_timestep = std::bit_cast<float>(0x4279ffffU);
+    const long double previous = input.previous_value_0x10;
+    const auto next = static_cast<float>(previous +
+        (static_cast<long double>(input.signal_argument) -
+            static_cast<long double>(input.damping_0x14) * previous) *
+        input.inverse_scale_0x0c / angular_scale * timestep);
+    if (!std::isfinite(next)) return std::nullopt;
+    const long double moment_scale =
+        (static_cast<long double>(next) - previous) * angular_scale *
+        input.body_scale_0x08 * inverse_timestep;
+    NcarDisabledControllerIntegratorResult result{};
+    result.value_0x10 = next;
+    for (std::size_t axis = 0U; axis < result.body_moment_delta.size(); ++axis) {
+        result.body_moment_delta[axis] = static_cast<float>(
+            moment_scale * input.body_axis_0x50[axis]);
+        if (!std::isfinite(result.body_moment_delta[axis])) return std::nullopt;
+    }
+    return result;
+}
+
 std::optional<NcarSelectedWheelPairTargetResult>
 advance_ncar_selected_wheel_pair_target(
     const NcarSelectedWheelPairTargetInput& input) noexcept

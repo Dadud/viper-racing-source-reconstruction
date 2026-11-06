@@ -103,9 +103,20 @@ finite-input `0x43FFC0` projection now models its enabled branch: it stores
 the scaled selected-pair getter at controller `+0x28/+0x10`, clamps the
 negative damping product to `[-400, 400]`, and multiplies the sum of that
 residual and the signal argument by controller `+0x18` for the pair setter.
-The disabled branch requests a zero pair setter and then calls `0x43F980`;
-that integrator remains separate and is not projected by this helper. These
-controller setters are not yet wired into the live player step.
+The disabled branch requests a zero pair setter and then calls `0x43F980`.
+That routine advances its `+0x10` value from the signal argument, damping
+`+0x14`, inverse scale `+0x0C`, and native `0.016` step. It then multiplies
+the change by `0x4C861C`, controller `+0x08`, and `0x4C8650`, scales the body
+axis at `+0x50..+0x58`, and passes the resulting vector to `0x43E7F0`, which
+adds it to body moment `+0x258..+0x260`. The bounded
+`project_ncar_disabled_controller_integrator` models the resulting value and
+moment argument, leaving accumulation and callback order to the caller.
+Constructor `0x434663..0x43466F` supplies controller `+0x08` as the float
+with bits `0x3E587910`; `0x43F910` stores its reciprocal at `+0x0C` and the
+profile-derived argument at `+0x14`. The runtime already retains these as
+body `+0xCA0/+0xCA4/+0xCAC`, respectively. The controller setters and this
+integrator are not yet wired into the live player step; signal and callback
+state must be sourced together before doing so.
 
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
