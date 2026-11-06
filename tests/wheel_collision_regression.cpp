@@ -425,4 +425,53 @@ int main()
     for (std::size_t i = 0; i < controller_wheels.size(); ++i)
         require(controller_wheels[i].bytes == saved_controller_wheels[i].bytes &&
             controller_wheels[i].initialized_bytes == saved_controller_wheels[i].initialized_bytes);
+
+    auto signal_body = saved_curve_body;
+    require(viper::apply_ncar_body_object_writes(signal_body, controller_fields));
+    const std::array<viper::NcarObjectFieldWrite, 5> signal_fields{{
+        {0xc7cU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xc8cU, 4U, std::bit_cast<std::uint32_t>(1000.0F)},
+        {0xc90U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xc94U, 4U, 0U}, {0x260U, 4U, 0U}}};
+    require(viper::apply_ncar_body_object_writes(signal_body, signal_fields));
+    auto signal_wheels = integrated_wheels;
+    auto expected_body = signal_body;
+    auto expected_wheels = signal_wheels;
+    const float curve_getter = std::bit_cast<float>(
+        *viper::read_ncar_body_object_u32(signal_body, 0xc0cU));
+    viper::NcarIntegratorSignalState signal_state{};
+    signal_state.value_bits_0xc7c = std::bit_cast<std::uint32_t>(1.0F);
+    signal_state.limit_scale_0xc8c = 1000.0F;
+    signal_state.callback_scale_0xc90 = 1.0F;
+    viper::NcarIntegratorSignalInput signal_input{};
+    signal_input.callback_value_0xc80 = curve_getter;
+    signal_input.callback_value_0xc84 = 12.0F;
+    const auto expected_signal = viper::advance_ncar_integrator_signal_control(
+        signal_state, signal_input, 0U);
+    const viper::NcarObjectFieldWrite expected_smoother{0xc94U, 4U,
+        std::bit_cast<std::uint32_t>(signal_state.smoothed_value_0xc94)};
+    require(viper::apply_ncar_body_object_writes(expected_body,
+        std::span<const viper::NcarObjectFieldWrite>(&expected_smoother, 1U)) &&
+        viper::advance_ncar_curve_setter_in_body(expected_body,
+            expected_signal.paired_setter_value).has_value() &&
+        viper::advance_ncar_controller_setter_in_body_and_wheels(expected_body,
+            expected_wheels, runtime_record, first_wheel_offset,
+            expected_signal.paired_setter_opposite).has_value());
+    const auto signal_step = viper::advance_ncar_signal_pair_in_body_and_wheels(
+        signal_body, signal_wheels, runtime_record, first_wheel_offset);
+    require(signal_step && signal_body.bytes == expected_body.bytes &&
+        signal_body.initialized_bytes == expected_body.initialized_bytes &&
+        signal_step->signal.paired_setter_value == expected_signal.paired_setter_value);
+    for (std::size_t i = 0; i < signal_wheels.size(); ++i)
+        require(signal_wheels[i].bytes == expected_wheels[i].bytes &&
+            signal_wheels[i].initialized_bytes == expected_wheels[i].initialized_bytes);
+    const auto before_failure = signal_body;
+    const auto wheels_before_failure = signal_wheels;
+    require(!viper::advance_ncar_signal_pair_in_body_and_wheels(signal_body,
+        signal_wheels, std::span<const std::byte>(runtime_record.data(), 0xc3U),
+        first_wheel_offset) && signal_body.bytes == before_failure.bytes &&
+        signal_body.initialized_bytes == before_failure.initialized_bytes);
+    for (std::size_t i = 0; i < signal_wheels.size(); ++i)
+        require(signal_wheels[i].bytes == wheels_before_failure[i].bytes &&
+            signal_wheels[i].initialized_bytes == wheels_before_failure[i].initialized_bytes);
 }

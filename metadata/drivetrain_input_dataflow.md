@@ -126,6 +126,13 @@ committed together after validation. The caller still supplies the signal and
 must place the call in the original tick sequence; it is not yet used by the
 live player step.
 
+`advance_ncar_signal_pair_in_body_and_wheels` now joins the signal smoother,
+curve setter and controller setter in the `0x43F830` order. It samples both
+getters before either setter and commits the whole body/wheel update only on
+success. It expects the surrounding selector and ramp gates to be updated by
+its caller and is not yet installed in the live tick. The live tick's curve
+getter sample was moved after wheel updates to match `0x4313F2`.
+
 The signal pair's other child is the curve object at parent `+0xBFC`: its
 vtable `0x4C8780` uses `0x43F970` as getter and `0x4402E0` as setter. The
 setter smooths curve `+0x38` from `+0x2C`, computes a scale from `+0x30`,

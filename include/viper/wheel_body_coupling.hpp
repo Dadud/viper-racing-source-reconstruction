@@ -773,6 +773,22 @@ struct NcarIntegratorSignalResult {
     float paired_setter_opposite{};
 };
 
+struct NcarSignalPairBodyResult {
+    NcarIntegratorSignalResult signal{};
+    NcarCurveSetterResult curve{};
+    NcarControllerBodyUpdateResult controller{};
+};
+
+// Models 0x43F830 on an initialized body, invoking the curve setter first
+// and the controller setter second. The enclosing 0x431150 gate and selector
+// update must already have run. Changes commit together on success.
+[[nodiscard]] std::optional<NcarSignalPairBodyResult>
+advance_ncar_signal_pair_in_body_and_wheels(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::span<const std::byte> runtime_record,
+    std::uint32_t first_wheel_object_offset) noexcept;
+
 // Runs the 0x43F830 clamp/smoother and opposite setter calculation without
 // projecting the separate +0xDDC callback product whose +0xDD0 input is not
 // necessarily available to a caller.

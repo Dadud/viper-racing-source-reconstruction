@@ -537,6 +537,75 @@ NcarIntegratorSignalResult advance_ncar_integrator_signal_control(
     return result;
 }
 
+std::optional<NcarSignalPairBodyResult> advance_ncar_signal_pair_in_body_and_wheels(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::span<const std::byte> runtime_record,
+    const std::uint32_t first_wheel_object_offset) noexcept
+{
+    auto next_body = body;
+    auto next_wheels = wheels;
+    const auto read_float = [&body](const std::uint32_t offset) -> std::optional<float> {
+        const auto bits = read_ncar_body_object_u32(body, offset);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        return std::isfinite(value) ? std::optional<float>{value} : std::nullopt;
+    };
+    const auto signal_bits = read_ncar_body_object_u32(body, 0xc7cU);
+    const auto limit = read_float(0xc8cU);
+    const auto response = read_float(0xc90U);
+    const auto smoothed = read_float(0xc94U);
+    const auto curve_getter = read_float(0xc0cU);
+    const auto controller_enabled = read_ncar_body_object_u8(body, 0xcf0U);
+    if (!signal_bits || !std::isfinite(std::bit_cast<float>(*signal_bits)) ||
+        !limit || !response || !smoothed || !curve_getter || !controller_enabled)
+        return std::nullopt;
+    const auto pair = advance_ncar_selected_wheel_pair_target_in_wheels(
+        runtime_record, next_wheels, first_wheel_object_offset, 0.0F);
+    if (!pair) return std::nullopt;
+    float controller_getter{};
+    if (*controller_enabled != 0U) {
+        const auto scale = read_float(0xcb0U);
+        if (!scale) return std::nullopt;
+        const float pair_getter = pair->selected_target == 0U ? pair->getter_d24 :
+            pair->selected_target == 1U ? pair->getter_d04 : pair->getter_d44;
+        controller_getter = static_cast<float>(
+            static_cast<long double>(pair_getter) * *scale);
+    } else {
+        const auto previous = read_float(0xca8U);
+        if (!previous) return std::nullopt;
+        controller_getter = *previous;
+    }
+    if (!std::isfinite(controller_getter)) return std::nullopt;
+    NcarIntegratorSignalState state{};
+    state.value_bits_0xc7c = *signal_bits;
+    state.limit_scale_0xc8c = *limit;
+    state.callback_scale_0xc90 = *response;
+    state.smoothed_value_0xc94 = *smoothed;
+    NcarIntegratorSignalInput input{};
+    input.callback_value_0xc80 = *curve_getter;
+    input.callback_value_0xc84 = controller_getter;
+    const auto signal = advance_ncar_integrator_signal_control(state, input, 0U);
+    if (!std::isfinite(signal.smoothed_value) ||
+        !std::isfinite(signal.paired_setter_value) ||
+        !std::isfinite(signal.paired_setter_opposite)) return std::nullopt;
+    const NcarObjectFieldWrite smoother_write{
+        0xc94U, 4U, std::bit_cast<std::uint32_t>(state.smoothed_value_0xc94)};
+    if (!apply_ncar_body_object_writes(next_body,
+            std::span<const NcarObjectFieldWrite>(&smoother_write, 1U))) return std::nullopt;
+    const auto curve = advance_ncar_curve_setter_in_body(
+        next_body, signal.paired_setter_value);
+    if (!curve) return std::nullopt;
+    next_wheels = wheels;
+    const auto controller = advance_ncar_controller_setter_in_body_and_wheels(
+        next_body, next_wheels, runtime_record, first_wheel_object_offset,
+        signal.paired_setter_opposite);
+    if (!controller) return std::nullopt;
+    body = std::move(next_body);
+    wheels = std::move(next_wheels);
+    return NcarSignalPairBodyResult{signal, *curve, *controller};
+}
+
 NcarIntegratorWheelCallbackSetup
 initialize_ncar_integrator_wheel_callback_setup(
     const NcarIntegratorWheelCallbackSetupInput& input) noexcept
