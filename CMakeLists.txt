@@ -82,6 +82,14 @@ add_library(viper_model_resource src/model_resource.cpp)
 target_include_directories(viper_model_resource PUBLIC include)
 target_compile_features(viper_model_resource PUBLIC cxx_std_20)
 
+add_library(viper_texture_resource src/texture_resource.cpp)
+target_include_directories(viper_texture_resource PUBLIC include)
+target_compile_features(viper_texture_resource PUBLIC cxx_std_20)
+
+add_library(viper_track_graphics_resource src/track_graphics_resource.cpp)
+target_include_directories(viper_track_graphics_resource PUBLIC include)
+target_compile_features(viper_track_graphics_resource PUBLIC cxx_std_20)
+
 add_library(viper_vehicle_model src/vehicle_setup.cpp)
 target_include_directories(viper_vehicle_model PUBLIC include)
 target_compile_features(viper_vehicle_model PUBLIC cxx_std_20)
@@ -215,6 +223,8 @@ target_link_libraries(viper_reconstruction PRIVATE
     viper_asset_catalog
     viper_frontend_model
     viper_resource_bundle
+    viper_texture_resource
+    viper_track_graphics_resource
     viper_pcar_model
     viper_scene_model
     viper_graphics_startup
@@ -248,6 +258,8 @@ if(WIN32)
         viper_network_session
         viper_race_progression
         viper_race_loop_model
+        viper_texture_resource
+        viper_track_graphics_resource
         viper_pcar_model
         viper_ai_resources viper_resource_bundle viper_model_resource
         viper_sound_resource

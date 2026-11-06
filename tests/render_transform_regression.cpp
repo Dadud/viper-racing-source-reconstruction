@@ -39,6 +39,12 @@ int main()
         "yaw-only projection changed from the previous renderer transform");
     require(close(viper::render_transform_yaw(yaw_transform), yaw),
         "yaw extraction changed for a yaw-only body transform");
+    const auto yaw_world = viper::transform_vehicle_point_xyz(
+        yaw_transform, local_point);
+    require(close(yaw_world.x, expected_yaw_x) &&
+            close(yaw_world.y, 2.4F) &&
+            close(yaw_world.z, expected_yaw_z),
+        "full XYZ transform did not preserve vertical translation and scale");
 
     const viper::BodyRenderTransform pitched_and_rolled{
         0.8F, 0.1F, 0.6F,
@@ -49,14 +55,22 @@ int main()
         pitched_and_rolled, {2.0F, 3.0F, 4.0F});
     require(close(full_basis.x, 8.8F) && close(full_basis.z, 35.14F),
         "full body basis did not transform local FNIM XYZ into world X/Z");
+    const auto full_basis_xyz = viper::transform_vehicle_point_xyz(
+        pitched_and_rolled, {2.0F, 3.0F, 4.0F});
+    require(close(full_basis_xyz.x, 8.8F) &&
+            close(full_basis_xyz.y, 21.5F) &&
+            close(full_basis_xyz.z, 35.14F),
+        "full body basis did not transform all local FNIM coordinates");
 
     const auto ignores_local_height =
         viper::make_yaw_render_transform(0.0F, 0.0F, 0.0F, yaw);
-    const auto flat_projection = viper::transform_vehicle_point_xz(
+    const auto flat_projection = viper::transform_vehicle_point_xyz(
         ignores_local_height, {0.0F, 5.0F, 0.0F});
-    require(close(flat_projection.x, 0.0F) && close(flat_projection.z, 0.0F),
-        "yaw-only projection introduced a vertical-to-ground offset");
+    require(close(flat_projection.x, 0.0F) &&
+            close(flat_projection.y, 5.0F) &&
+            close(flat_projection.z, 0.0F),
+        "yaw-only transform did not preserve local height");
 
-    std::cout << "Native 3x3 transform projection preserves flat yaw and applies full-basis pitch/roll.\n";
+    std::cout << "Native 3x3 transform preserves full XYZ across yaw, pitch, and roll.\n";
     return 0;
 }

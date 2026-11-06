@@ -1,18 +1,17 @@
 # Original-versus-reconstruction capture protocol
 
-Use this protocol to validate behavior-sensitive features. It defines what to
-record, not expected values or tolerances. No comparison recording is claimed
-by this document. Original binaries and assets remain external; do not commit
-private captures or payloads to the public source repository.
+Use this protocol to validate behavior-sensitive features. Pair original and
+reconstruction observations at the same scenario and tick/event ordinal; record
+the comparison tolerance and confounds. Use
+[`reverse_engineering_workflow.md`](reverse_engineering_workflow.md) and its
+function/scenario templates to keep evidence linked to code and acceptance.
+Original binaries, assets, and raw private captures remain external to the
+public source repository.
 
-Current reconstruction evidence includes `viper_game` loading six original
-bundles and 822 language entries with `--validate-assets`, plus a three-frame
-D3D11 WARP smoke run that exits cleanly. The top-down scene renders every
-parsed `obj car` grid position and supports provisional keyboard-driven
-kinematic motion for the first mesh; smoke coverage does not replay input.
-Record these as startup, asset-validation, and bounded rendering evidence only;
-they do not constitute a gameplay comparison or replace the paired playable
-scenario below.
+The reconstruction now supports a perspective chase-camera development view
+and `--capture-frame PATH` for one bounded rendered-frame capture. These are
+renderer and capture capabilities only. They do not establish visual or
+gameplay parity; use the matched playable scenario below for acceptance.
 
 A private original-client startup attempt is recorded at
 `../../analysis/reference_captures/original_graphics_failure.json`. Its
@@ -237,6 +236,12 @@ vehicle position/orientation/speed when available, lap or checkpoint progress,
 damage, opponent positions/order, timer, result/rank, menus, and errors. Include
 event timestamps and the source of each value (UI, log, debugger, or saved
 state). Preserve raw logs/state dumps as well as any normalized extracts.
+For compatible tick-indexed CSV traces, use
+[`../tools/compare_physics_traces.py`](../tools/compare_physics_traces.py) to
+align selected numeric fields on exact `tick_index` keys. Select tolerances
+from measured original variability, retain its JSON report with the scenario,
+and review capture validity and input matching separately; the tool reports
+numeric deltas and does not decide parity.
 
 ## Media and persistence
 

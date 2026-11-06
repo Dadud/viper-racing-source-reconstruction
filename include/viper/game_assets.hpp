@@ -6,6 +6,7 @@
 #include "viper/model_resource.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/terrain_surface.hpp"
+#include "viper/track_graphics_resource.hpp"
 #include "viper/vehicle_setup.hpp"
 #include "viper/world_track_objects.hpp"
 
@@ -35,6 +36,8 @@ public:
     [[nodiscard]] const LanguageResource& language() const noexcept { return language_; }
     [[nodiscard]] const AIDriverResource& ai_drivers() const noexcept { return ai_drivers_; }
     [[nodiscard]] const TerrainSurfaceResourcePayload& terrain() const noexcept { return terrain_; }
+    [[nodiscard]] const std::optional<TrackGraphicsResourcePayload>& track_graphics() const noexcept
+    { return track_graphics_; }
     [[nodiscard]] const TrackObjectTextTable& track_objects() const noexcept { return track_objects_; }
     [[nodiscard]] const std::array<std::byte, 0x8c>& ai_vehicle_setup() const noexcept { return ai_vehicle_setup_; }
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
@@ -65,6 +68,7 @@ private:
     LanguageResource language_;
     AIDriverResource ai_drivers_;
     TerrainSurfaceResourcePayload terrain_;
+    std::optional<TrackGraphicsResourcePayload> track_graphics_;
     TrackObjectTextTable track_objects_;
     std::array<std::byte, 0x8c> ai_vehicle_setup_{};
     IdealLineTrackData ideal_line_;

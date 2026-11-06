@@ -1,17 +1,23 @@
 #include "viper/asset_catalog.hpp"
 #include "viper/career_season.hpp"
 #include "viper/language_resource.hpp"
+#include "viper/model_resource.hpp"
 #include "viper/resource_bundle.hpp"
 #include "viper/race_scene_render_flow.hpp"
 #include "viper/scene_overlay.hpp"
 #include "viper/terrain_surface.hpp"
+#include "viper/texture_resource.hpp"
+#include "viper/track_graphics_resource.hpp"
 #include "viper/vehicle_setup.hpp"
 #include "viper/world_track_objects.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
+#include <cmath>
 #include <cstdlib>
 #include <cstddef>
+#include <cstdio>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -20,6 +26,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -34,9 +41,14 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --list-resources BUNDLE_PATH\n"
            << "       viper_reconstruction --inspect-tire BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-car BUNDLE_PATH CAR_STEM\n"
+           << "       viper_reconstruction --inspect-model BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-season BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-stamp BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-image BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --inspect-texture BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --inspect-grf BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --inspect-wobble-models TRACK_BUNDLE GRAF_RESOURCE\n"
+           << "       viper_reconstruction --inspect-grf-view BUNDLE_PATH RESOURCE_NAME X Y Z FX FY FZ [DETAIL_LEVEL]\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-text-table BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-terrain BUNDLE_PATH\n"
@@ -217,6 +229,215 @@ int inspect_car(const std::filesystem::path& path, const std::string_view car_st
         }
     }
     return 0;
+}
+
+int inspect_model(const std::filesystem::path& path,
+                  const std::string_view resource_name)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* entry = bundle.find(
+        resource_name, viper::ModelResource::resource_type_code);
+    if (entry == nullptr) {
+        throw std::runtime_error("FNIM model resource not found: " +
+                                 std::string(resource_name));
+    }
+    const auto model = viper::parse_model_resource(
+        entry->attributes, bundle.payload(*entry));
+    if (!model) throw std::runtime_error("FNIM model resource is malformed or unsupported");
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "resource\t" << entry->name << '\n'
+              << "version\t" << model->resource_version << '\n'
+              << "vertices\t" << model->vertices.size() << '\n'
+              << "groups\t" << model->material_groups.size() << '\n';
+    for (std::size_t index = 0; index < model->material_groups.size(); ++index) {
+        const auto& group = model->material_groups[index];
+        std::cout << "group_" << index << "_material\t"
+                  << (group.material_name.empty() ? "<empty>" : group.material_name) << '\n'
+                  << "group_" << index << "_vertex_range\t"
+                  << group.first_vertex << ':' << group.end_vertex << '\n'
+                  << "group_" << index << "_triangle_range\t"
+                  << group.first_triangle << ':' << group.end_triangle << '\n'
+                  << "group_" << index << "_index_count\t"
+                  << group.local_indices.size() << '\n';
+    }
+    return 0;
+}
+
+int inspect_track_graphics(const std::filesystem::path& path,
+                           const std::string_view resource_name)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* entry = bundle.find(resource_name,
+        viper::TrackGraphicsResourcePayload::resource_type_code);
+    if (entry == nullptr) {
+        throw std::runtime_error("GRAF resource not found: " +
+            std::string(resource_name));
+    }
+    const auto graphics = viper::parse_track_graphics_resource(
+        entry->attributes, bundle.payload(*entry));
+    if (!graphics) {
+        throw std::runtime_error("GRAF resource is malformed, unsupported, or contains no recognized chunks");
+    }
+    const auto summary = viper::summarize_track_graphics(*graphics);
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "resource\t" << entry->name << '\n'
+              << "version\t" << graphics->resource_version << '\n'
+              << "payload_bytes\t" << graphics->source_payload_size << '\n'
+              << "chunks\t" << summary.chunk_count << '\n'
+              << "corners\t" << summary.corner_count << '\n'
+              << "faces\t" << summary.face_count << '\n'
+              << "materials\t" << summary.material_count << '\n'
+              << "empty_material_names\t" << summary.empty_material_name_count << '\n'
+              << "facing_models\t" << summary.facing_model_count << '\n'
+              << "opaque_bytes\t" << summary.opaque_bytes << '\n'
+              << "scene_graph_complete\t" << (graphics->scene_graph_complete ? 1 : 0) << '\n'
+              << "scene_graph_geometry_matched\t" << (graphics->scene_graph_geometry_matched ? 1 : 0) << '\n'
+              << "scene_nodes\t" << summary.scene_node_count << '\n'
+              << "scene_geometry_nodes\t" << summary.scene_geometry_node_count << '\n'
+              << "scene_lod_nodes\t" << summary.scene_lod_node_count << '\n'
+              << "scene_facing_nodes\t" << summary.scene_facing_node_count << '\n'
+              << "scene_geometry_chunks_matched\t" << summary.scene_geometry_chunks_matched << '\n'
+              << "facing_registry_entries\t" << summary.facing_registry_entry_count << '\n'
+              << "facing_registry_duplicate_ids\t" << summary.facing_registry_duplicate_id_count << '\n'
+              << "facing_registry_invalid_ids\t" << summary.facing_registry_invalid_id_count << '\n';
+    for (std::size_t chunk_index = 0; chunk_index < graphics->chunks.size(); ++chunk_index) {
+        const auto& chunk = graphics->chunks[chunk_index];
+        for (std::size_t material_index = 0;
+             material_index < chunk.materials.size(); ++material_index) {
+            const auto& material = chunk.materials[material_index];
+            std::cout << "chunk_" << chunk_index << "_material_" << material_index
+                      << '\t' << (material.texture_name.empty()
+                          ? "<empty>" : material.texture_name)
+                      << "\tcorners " << material.first_corner << ':'
+                      << material.end_corner << "\tfaces " << material.first_face
+                      << ':' << material.end_face << '\n';
+        }
+    }
+    return 0;
+}
+
+int inspect_track_graphics_view(const std::filesystem::path& path,
+                                const std::string_view resource_name,
+                                const std::array<float, 3>& camera_position,
+                                const std::array<float, 3>& camera_forward,
+                                const float detail_level)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* entry = bundle.find(resource_name,
+        viper::TrackGraphicsResourcePayload::resource_type_code);
+    if (entry == nullptr)
+        throw std::runtime_error("GRAF resource not found: " + std::string(resource_name));
+    const auto graphics = viper::parse_track_graphics_resource(
+        entry->attributes, bundle.payload(*entry));
+    if (!graphics)
+        throw std::runtime_error("GRAF resource is malformed or unsupported");
+
+    const float detail_factor = 2.0F - detail_level;
+    const viper::TrackGraphicsCamera camera{camera_position, camera_forward,
+        1000.0F, 4.0F, detail_factor * detail_factor};
+    const auto selection = viper::select_track_graphics_nodes(*graphics, camera);
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "resource\t" << entry->name << '\n'
+              << "selection_complete\t" << (selection.traversal_complete ? 1 : 0) << '\n'
+              << "visited_nodes\t" << selection.visited_node_count << '\n'
+              << "visited_type_1\t" << selection.visited_type_counts[1] << '\n'
+              << "visited_type_2\t" << selection.visited_type_counts[2] << '\n'
+              << "visited_type_3\t" << selection.visited_type_counts[3] << '\n'
+              << "visited_type_4\t" << selection.visited_type_counts[4] << '\n'
+              << "ordinary_nodes\t" << selection.ordinary_node_offsets.size() << '\n'
+              << "facing_mode_1_nodes\t" << selection.facing_mode_1_node_offsets.size() << '\n'
+              << "facing_mode_2_nodes\t" << selection.facing_mode_2_node_offsets.size() << '\n'
+              << "registered_mode_4_nodes\t" << selection.registered_mode_4_node_offsets.size() << '\n';
+    return selection.traversal_complete ? 0 : 2;
+}
+
+int inspect_wobble_model_bindings(const std::filesystem::path& path,
+                                  const std::string_view graf_resource_name)
+{
+    constexpr auto bats_type = viper::TrackObjectTextTable::bats_resource_type_code;
+    constexpr auto graf_type = viper::TrackGraphicsResourcePayload::resource_type_code;
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto bats_payload = bundle.find_payload("track.obt", bats_type);
+    const auto* graf_entry = bundle.find(graf_resource_name, graf_type);
+    if (!bats_payload || graf_entry == nullptr)
+        throw std::runtime_error("track.obt or requested GRAF resource is missing");
+    const auto table = viper::parse_track_object_text_table(*bats_payload);
+    const auto graphics = viper::parse_track_graphics_resource(
+        graf_entry->attributes, bundle.payload(*graf_entry));
+    if (!table || !graphics)
+        throw std::runtime_error("track object table or GRAF payload is malformed");
+
+    std::size_t wobble_count = 0U;
+    std::size_t resolved_count = 0U;
+    std::size_t unresolved_count = 0U;
+    std::size_t malformed_count = 0U;
+    std::size_t duplicate_id_count = 0U;
+    std::unordered_set<std::int32_t> seen_model_ids;
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "graf_resource\t" << graf_resource_name << '\n';
+    for (std::size_t row = 1U; row < table->line_count; ++row) {
+        const auto raw_line = viper::track_object_text_line(*table, row);
+        if (!raw_line) throw std::runtime_error("track.obt line is out of bounds");
+        const auto directive = viper::classify_track_directive(*raw_line);
+        if (directive.kind == viper::TrackDirectiveKind::end) break;
+        if (directive.kind != viper::TrackDirectiveKind::object) continue;
+
+        std::array<char, 256> object_type{};
+        int model_id = 0;
+        const std::string line(directive.object_line);
+        const int converted = std::sscanf(line.c_str(), "obj wobble %255s %d",
+            object_type.data(), &model_id);
+        if (converted == 0) continue;
+        ++wobble_count;
+        const auto record = viper::make_wobble_track_record({object_type.data(),
+            static_cast<std::uint32_t>(converted), model_id});
+        if (!record) {
+            ++malformed_count;
+            std::cout << "row_" << row << "\tmalformed\t" << directive.object_line << '\n';
+            continue;
+        }
+        if (!seen_model_ids.insert(record->parsed_parameter_0x18).second)
+            ++duplicate_id_count;
+        const auto node_offset = viper::lookup_registered_facing_node(
+            *graphics, record->parsed_parameter_0x18);
+        if (!node_offset) {
+            ++unresolved_count;
+            std::cout << "row_" << row << "\tunresolved_id\t"
+                      << record->parsed_parameter_0x18 << '\n';
+            continue;
+        }
+        const auto node = std::find_if(graphics->scene_nodes.begin(),
+            graphics->scene_nodes.end(), [node_offset](const auto& candidate) {
+                return candidate.source_offset == *node_offset;
+            });
+        if (node == graphics->scene_nodes.end() || !node->parsed_chunk_index ||
+            *node->parsed_chunk_index >= graphics->chunks.size()) {
+            ++unresolved_count;
+            std::cout << "row_" << row << "\tregistry_node_without_mesh\t"
+                      << record->parsed_parameter_0x18 << '\t' << *node_offset << '\n';
+            continue;
+        }
+        ++resolved_count;
+        const auto& center = graphics->chunks[*node->parsed_chunk_index].center;
+        std::cout << "row_" << row << "\tresolved\t"
+                  << record->parsed_parameter_0x18 << '\t' << *node_offset << '\t'
+                  << center[0] << '\t' << center[1] << '\t' << center[2] << '\n';
+    }
+    std::cout << "wobble_rows\t" << wobble_count << '\n'
+              << "resolved_models\t" << resolved_count << '\n'
+              << "unresolved_models\t" << unresolved_count << '\n'
+              << "duplicate_model_ids\t" << duplicate_id_count << '\n'
+              << "malformed_rows\t" << malformed_count << '\n';
+    return 0;
+}
+
+float parse_finite_float(const std::string_view text, const std::string_view label)
+{
+    std::size_t parsed = 0U;
+    const auto value = std::stof(std::string(text), &parsed);
+    if (parsed != text.size() || !std::isfinite(value))
+        throw std::invalid_argument(std::string(label) + " must be a finite number");
+    return value;
 }
 
 int inspect_terrain(const std::filesystem::path& path)
@@ -409,6 +630,42 @@ int inspect_stamp_image(const std::filesystem::path& path,
         : 2;
 }
 
+int inspect_texture(const std::filesystem::path& path,
+                    const std::string_view resource_name)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* entry = bundle.find(
+        resource_name, viper::resource_type_code('T', 'E', 'X', ' '));
+    if (entry == nullptr) {
+        throw std::runtime_error("TEX texture resource not found: " +
+                                 std::string(resource_name));
+    }
+    const auto texture = viper::parse_texture_payload(bundle.payload(*entry));
+    if (!texture) {
+        throw std::runtime_error(
+            "TEX payload is malformed or uses an unsupported pixel variant");
+    }
+    std::size_t transparent_pixels = 0U;
+    for (std::size_t pixel = 0U; pixel < texture->rgba.size() / 4U; ++pixel) {
+        if (texture->rgba[pixel * 4U + 3U] == 0U) ++transparent_pixels;
+    }
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "resource\t" << entry->name << '\n'
+              << "payload_bytes\t" << entry->payload_size << '\n'
+              << "flags\t0x" << std::hex << static_cast<unsigned>(texture->flags)
+              << std::dec << '\n'
+              << "geometry_usage\t"
+              << static_cast<unsigned>(texture->geometry_usage) << '\n'
+              << "wrap\t" << static_cast<unsigned>(texture->wrap) << '\n'
+              << "color_key\t0x" << std::hex << texture->color_key << std::dec << '\n'
+              << "mip_count\t" << texture->mip_count << '\n'
+              << "width\t" << texture->width << '\n'
+              << "height\t" << texture->height << '\n'
+              << "decoded_rgba_bytes\t" << texture->rgba.size() << '\n'
+              << "transparent_pixels\t" << transparent_pixels << '\n';
+    return 0;
+}
+
 int inspect_text_table(const std::filesystem::path& path,
                        const std::string_view resource_name)
 {
@@ -451,9 +708,15 @@ int main(int argc, char** argv)
         std::optional<std::string> season_resource_name;
         std::optional<std::string> stamp_resource_name;
         std::optional<std::string> stamp_image_resource_name;
+        std::optional<std::string> texture_resource_name;
         std::optional<std::string> font_resource_name;
         std::optional<std::string> text_table_resource_name;
         std::optional<std::string> car_stem;
+        std::optional<std::string> model_resource_name;
+        std::optional<std::string> grf_resource_name;
+        std::optional<std::string> wobble_graf_resource_name;
+        std::optional<std::array<float, 6>> grf_view_camera;
+        float grf_view_detail_level = 1.0F;
         bool inspect_track_terrain = false;
 
         for (int i = 1; i < argc; ++i) {
@@ -524,6 +787,15 @@ int main(int argc, char** argv)
                 stamp_image_resource_name = argv[++i];
                 continue;
             }
+            if (argument == "--inspect-texture") {
+                if (i + 2 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-texture requires a bundle path and resource name");
+                }
+                resource_bundle_path = argv[++i];
+                texture_resource_name = argv[++i];
+                continue;
+            }
             if (argument == "--inspect-font") {
                 if (i + 2 >= argc) {
                     throw std::invalid_argument(
@@ -549,6 +821,53 @@ int main(int argc, char** argv)
                 }
                 resource_bundle_path = argv[++i];
                 car_stem = argv[++i];
+                continue;
+            }
+            if (argument == "--inspect-model") {
+                if (i + 2 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-model requires a bundle path and resource name");
+                }
+                resource_bundle_path = argv[++i];
+                model_resource_name = argv[++i];
+                continue;
+            }
+            if (argument == "--inspect-grf") {
+                if (i + 2 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-grf requires a bundle path and resource name");
+                }
+                resource_bundle_path = argv[++i];
+                grf_resource_name = argv[++i];
+                continue;
+            }
+            if (argument == "--inspect-wobble-models") {
+                if (i + 2 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-wobble-models requires a track bundle and GRAF resource name");
+                }
+                resource_bundle_path = argv[++i];
+                wobble_graf_resource_name = argv[++i];
+                continue;
+            }
+            if (argument == "--inspect-grf-view") {
+                if (i + 8 >= argc) {
+                    throw std::invalid_argument(
+                        "--inspect-grf-view requires bundle, resource, camera position, and forward vector");
+                }
+                resource_bundle_path = argv[++i];
+                grf_resource_name = argv[++i];
+                std::array<float, 6> view{};
+                constexpr std::array<std::string_view, 6> labels{
+                    "camera X", "camera Y", "camera Z",
+                    "forward X", "forward Y", "forward Z"};
+                for (std::size_t index = 0; index < view.size(); ++index)
+                    view[index] = parse_finite_float(argv[++i], labels[index]);
+                grf_view_camera = view;
+                if (i + 1 < argc &&
+                    !std::string_view(argv[i + 1]).starts_with("--"))
+                    grf_view_detail_level = parse_finite_float(argv[++i],
+                        "detail level");
                 continue;
             }
             if (argument == "--inspect-terrain") {
@@ -591,9 +910,13 @@ int main(int argc, char** argv)
                 static_cast<unsigned>(season_resource_name.has_value()) +
                 static_cast<unsigned>(stamp_resource_name.has_value()) +
                 static_cast<unsigned>(stamp_image_resource_name.has_value()) +
+                static_cast<unsigned>(texture_resource_name.has_value()) +
                 static_cast<unsigned>(font_resource_name.has_value()) +
                 static_cast<unsigned>(text_table_resource_name.has_value()) +
                 static_cast<unsigned>(car_stem.has_value()) +
+                static_cast<unsigned>(model_resource_name.has_value()) +
+                static_cast<unsigned>(grf_resource_name.has_value()) +
+                static_cast<unsigned>(wobble_graf_resource_name.has_value()) +
                 static_cast<unsigned>(inspect_track_terrain);
             if (inspection_count > 1U) {
                 throw std::invalid_argument(
@@ -612,6 +935,10 @@ int main(int argc, char** argv)
                 return inspect_stamp_image(
                     *resource_bundle_path, *stamp_image_resource_name);
             }
+            if (texture_resource_name) {
+                return inspect_texture(*resource_bundle_path,
+                                       *texture_resource_name);
+            }
             if (font_resource_name) {
                 return inspect_font(*resource_bundle_path, *font_resource_name);
             }
@@ -621,6 +948,25 @@ int main(int argc, char** argv)
             }
             if (car_stem) {
                 return inspect_car(*resource_bundle_path, *car_stem);
+            }
+            if (model_resource_name) {
+                return inspect_model(*resource_bundle_path, *model_resource_name);
+            }
+            if (grf_resource_name) {
+                if (grf_view_camera) {
+                    return inspect_track_graphics_view(*resource_bundle_path,
+                        *grf_resource_name,
+                        {(*grf_view_camera)[0], (*grf_view_camera)[1],
+                            (*grf_view_camera)[2]},
+                        {(*grf_view_camera)[3], (*grf_view_camera)[4],
+                            (*grf_view_camera)[5]}, grf_view_detail_level);
+                }
+                return inspect_track_graphics(*resource_bundle_path,
+                    *grf_resource_name);
+            }
+            if (wobble_graf_resource_name) {
+                return inspect_wobble_model_bindings(*resource_bundle_path,
+                    *wobble_graf_resource_name);
             }
             if (inspect_track_terrain) {
                 return inspect_terrain(*resource_bundle_path);

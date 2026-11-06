@@ -7,17 +7,26 @@ The goal's feature, evidence, and acceptance crosswalk is in
 The detailed implementation history and gaps are in
 [`metadata/completion_ledger.md`](metadata/completion_ledger.md), alongside the
 [reference capture protocol](metadata/reference_capture_protocol.md).
+The applied evidence workflow is in
+[`metadata/reverse_engineering_workflow.md`](metadata/reverse_engineering_workflow.md),
+with reusable function and scenario records in `metadata/*template.md`.
 `viper_game` is the new Windows runtime foundation: it loads external assets,
 parses the selected track's terrain and ideal line plus the selected car's
 human setup, the track bundle's AI default setup, the selected car's level-0
-indexed mesh, and Viper's AI mesh, and draws them in a top-down Direct3D
-development view. It loads the selected track's `track.obt` placement table
+indexed mesh, and Viper's AI mesh, and draws them in a Direct3D development
+view. A perspective chase camera and bounded `--capture-frame PATH`
+screenshot option are available; the renderer remains a prototype and has not
+passed visual-parity acceptance. It loads the selected track's `track.obt` placement table
 and renders the selected model at the human grid slot and the native Viper
 model at other valid `obj car` start positions. Normal startup keeps the
 selected placement seeds a persistent player body and wheel state. The live
 fixed-step path queries terrain, advances source-derived suspension and tire
 responses, accumulates body forces and moments, and integrates the player pose;
 the body pose and velocity also feed rendering and the route-disabled HUD.
+For a Viper player, the renderer resolves `GLOBAL/player_paintjob` to
+`Config/paintN.tex`; AI body liveries and same-named vehicle/shared material
+textures are loaded when supported resources exist. Material ordering,
+sampler modes, lighting, and visual parity remain under reconstruction.
 These recovered stages still do not make a playable or original-matched race:
 engine/gear torque production is unresolved, and steering, collision, AI
 physics, numeric parity, and physical race progression need further evidence.
@@ -32,6 +41,12 @@ multiplayer remain open. See the feature ledger and
 [`metadata/drivetrain_input_dataflow.md`](metadata/drivetrain_input_dataflow.md)
 for current evidence and acceptance criteria.
 `viper_reconstruction` remains the asset inspection tool.
+Use `viper_reconstruction --inspect-model BUNDLE RESOURCE` to list a model's
+FNIM material groups and index ranges when tracing texture bindings.
+Use `--inspect-texture BUNDLE RESOURCE` to decode and report the base RGBA mip
+for supported TEX payload variants. Extracted livery/material inventory and
+bundle hashes are recorded in
+[`metadata/texture_resource_inventory.md`](metadata/texture_resource_inventory.md).
 
 ```powershell
 cmake -S . -B build -A x64 -DBUILD_TESTING=ON
@@ -600,6 +615,7 @@ cmake --build build --config Release
 ./build/viper_reconstruction --inspect-season ../game_install/GameData/ui.res season0.ssn
 ./build/viper_reconstruction --inspect-stamp ../game_install/GameData/common.res euro6.fnt
 ./build/viper_reconstruction --inspect-image ../game_install/GameData/common.res Load.stp
+./build/viper_reconstruction --inspect-texture ../game_install/GameRoot/Data/viper.car viperd.tex
 ./build/viper_reconstruction --inspect-font ../game_install/GameData/common.res euro6.fnt
 ./build/viper_reconstruction --inspect-terrain ../game_install/GameData/uptown.trk
 ```
@@ -621,6 +637,9 @@ planes, frame rows, and bounded RLE data. It also reports first-frame
 mode-4/mode-5 palette-write coverage and raster completeness. For
 `status.stp`, it also populates the state-0 observation from `race.res` and
 reports the reconstructed source-buffer sizes for both modes.
+`--inspect-texture` reports TEX flags, wrap mode, colorkey, mip count, and
+decodes the supported base-level RGB565/ARGB4444 payloads to RGBA8. The
+four-byte `0x03` variant remains unsupported pending its channel layout.
 
 ## Scope and next steps
 
@@ -628,7 +647,8 @@ The current target is a portable, source-only reconstruction, not yet a
 playable game. The C files are evidence fragments and are not compiled into the
 new target. The executable inventories external assets, lists RST0 bundle
 contents, and decodes TIRE, SEAS, and STMP resources including indexed image
-frames. The C++ library also models
+frames, plus supported TEX base-mip variants. Supported TEX pixels are bound
+to vehicle and track materials in the prototype 3D renderer. The C++ library also models
 observed wheel and tire response equations, kinematic ratios, response-vector
 assembly and correction, wheel contact and suspension state, the tire curve
 helpers, and a rigid-body contact-response/impulse path. Static

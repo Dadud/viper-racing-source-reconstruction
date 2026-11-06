@@ -5,6 +5,54 @@ unchanged full objective: a faithful, fully playable modern Windows
 reconstruction of Viper Racing. It is a sequencing aid, not a scope reduction,
 acceptance substitute, or completion claim. The detailed feature-by-feature
 requirements and final gates remain in [`completion_ledger.md`](completion_ledger.md).
+Use [`reverse_engineering_workflow.md`](reverse_engineering_workflow.md) for
+function-level evidence and controlled comparisons; the templates keep each
+observation linked to its implementation and acceptance gate.
+
+## Immediate visual blocker: native 3D track scene
+
+The pinned Viper Racing Modding reference identifies `track.grf` as the visible
+world geometry and material scene graph, while `track.bpp` supplies
+collision/terrain data. A bounded GRF chunk parser and perspective draw path
+now exist, with BPP retained for physics and fallback. The linked graph maps to
+all active stock mesh chunks. Local `race.bin` disassembly resolves the draw
+tree's raw-link roles, type-2 distance gates, type-1 sphere culling, and type-4
+dispatch. The renderer now applies the recovered visibility/LOD gates per
+frame and submits the selected ordinary and facing groups in pass categories.
+Camera pose parity and mode 4 facing behavior remain open. Modes 1 and 2 now
+use reconstructed native bases. Keep full 3D scene parity
+as the first visual acceptance gate, ahead of screenshot or driving acceptance.
+See [`native_graf_draw_tree.md`](native_graf_draw_tree.md).
+
+Implement it in this order:
+
+1. **Complete:** Map linked geometry nodes to parsed chunks. Type-3 `+0x28` and
+   type-4 `+0x3c` center offsets plus array counts map every active node across
+   all eight stock tracks; zero-count placeholders have no mesh.
+2. **Implemented; parity open:** Apply type-1 axial visibility and type-2 LOD
+   intervals each frame. Reconcile the reconstructed camera pose with the
+   native scene-camera matrix and compare selected node sets.
+3. **Partial:** Implement type-4 mode 1/2 transforms. Verify basis orientation
+   and pass order against the native renderer; trace the dynamic consumers of
+   the reconstructed mode-4 ID registry.
+4. Validate track texture resolution and color/UV interpretation against
+   the track archive and native loader; resolve alpha ordering and baked
+   lighting.
+5. Compare a controlled ordinary race view through the perspective camera
+   with the original. A BPP-only view does not pass this gate.
+
+The external format findings are pinned at commit `e8435dd` in the
+[`GRAF` reference](https://github.com/HerbFargus/viper-racing-modding/blob/e8435ddce817eb37502d1dd1080b64ee27f44515/docs/reference/file-formats.md)
+and are secondary evidence until reconciled with our supplied bytes and the
+native loader. Unknown node behaviors remain explicitly open.
+
+The first paired race target is the documented Viper/Bemidji Quick Race at
+640x480: 3 laps, Easy AI, Arcade/Sprint, and seven opponents. Match the original
+and reconstruction setup and timestamped controls. Keep ideal-line motion
+disabled. Compare input delivery, wheel/body/contact state at matched ticks,
+presentation, race events/results, and return to setup. Existing synthetic or
+uncontrolled original captures remain instrumentation references, not numeric
+golden traces.
 
 ## Current evidence snapshot
 

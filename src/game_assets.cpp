@@ -233,6 +233,13 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
             " track.bpp terrain resource is missing or unsupported");
     }
     assets.terrain_ = *terrain;
+    const auto* track_graphics_entry = track_bundle.find(
+        "track.grf", TrackGraphicsResourcePayload::resource_type_code);
+    if (track_graphics_entry != nullptr) {
+        assets.track_graphics_ = parse_track_graphics_resource(
+            track_graphics_entry->attributes,
+            track_bundle.payload(*track_graphics_entry));
+    }
     constexpr std::uint32_t ideal_line_type = 0x494c494eU;
     const auto* ideal_line_entry = track_bundle.find("track.ild", ideal_line_type);
     if (ideal_line_entry == nullptr) {

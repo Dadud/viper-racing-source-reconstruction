@@ -1,5 +1,14 @@
 # Reconstruction status and completion plan
 
+> **Current status (2026-11-06):** The table and verification snapshot below
+> are historical. Normal startup uses the partially integrated PCAR body and
+> wheel simulation, with ideal-line motion disabled; powered driving remains
+> unresolved. The renderer now uses a perspective camera and parsed GRAF
+> track geometry, with native camera and visual parity still open. See
+> [feature acceptance](feature_acceptance_ledger.md),
+> [current milestones](next_acceptance_milestones.md), and
+> [GRAF evidence](native_graf_draw_tree.md) for newer findings.
+
 Updated: 2026-10-29. This snapshot is based on the source tree and the
 feature-by-feature evidence in [`completion_ledger.md`](completion_ledger.md).
 The old numeric scores were based on a substantially earlier prototype and

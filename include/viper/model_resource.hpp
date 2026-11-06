@@ -12,7 +12,9 @@ namespace viper {
 
 struct ModelVertex {
     // Eight packed little-endian float fields as stored in 32-byte FNIM rows.
-    // Position/normal/UV interpretation is provisional pending GPU declaration evidence.
+    // The external format reference maps these to position/normal/UV; native
+    // vertex-declaration evidence is still pending, so callers should label
+    // render use of fields 6-7 as secondary-evidence-driven.
     std::array<float, 8> fields{};
 };
 

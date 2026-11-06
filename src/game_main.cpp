@@ -28,6 +28,7 @@
 #include "viper/replay_file.hpp"
 #include "viper/network_race_state.hpp"
 #include "viper/render_transform.hpp"
+#include "viper/texture_resource.hpp"
 #include "directinput_keyboard_service.h"
 
 #include <array>
@@ -38,6 +39,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -51,6 +53,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -121,9 +124,21 @@ private:
 
 NcarSurfacePolarityStream g_ncar_surface_polarity_stream{};
 
-struct IdealLineVertex { float x; float y; };
-struct SurfaceVertex { float x; float y; float r; float g; float b; };
-struct CameraConstants { float center_x{}; float center_y{}; float zoom{1.0F}; float padding{}; };
+struct IdealLineVertex { float x; float y; float z; };
+struct SurfaceVertex { float x; float y; float z; float r; float g; float b; };
+struct CarVertex {
+    float x; float y; float z; float r; float g; float b; float u; float v;
+};
+struct CameraConstants {
+    std::array<float, 4> right_scale_x{};
+    std::array<float, 4> up_scale_y{};
+    std::array<float, 4> forward_near{};
+    std::array<float, 4> position_far{};
+    std::array<float, 4> world_basis_x{1.0F, 0.0F, 0.0F, 0.0F};
+    std::array<float, 4> world_basis_y{0.0F, 1.0F, 0.0F, 0.0F};
+    std::array<float, 4> world_basis_z{0.0F, 0.0F, 1.0F, 0.0F};
+    std::array<float, 4> world_position{};
+};
 
 std::uint32_t read_u32_le(const std::byte* bytes)
 {
@@ -187,6 +202,7 @@ struct Options {
     bool diagnostics_only{};
     bool route_motion_prototype{};
     std::optional<unsigned> smoke_frames;
+    std::optional<std::filesystem::path> capture_frame;
     std::optional<std::filesystem::path> record_trace;
     std::optional<std::filesystem::path> record_physics_tick_trace;
     std::optional<std::filesystem::path> play_trace;
@@ -209,7 +225,8 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--route-motion-prototype] [--load-replay PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--capture-frame PATH] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--route-motion-prototype] [--load-replay PATH] [--software] [--help]\n"
+        << "  --capture-frame PATH saves the first rendered scene as a 24-bit BMP; requires --track and --car and exits after that frame unless --smoke-frames is set.\n"
         << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges route-race snapshots.\n"
         << "  --network-slot N selects a zero-based local player grid slot for multiplayer.\n"
         << "  --load-replay PATH validates the v6 container and fixed engine-record header, then retains it; frame payload remains opaque.\n"
@@ -381,6 +398,9 @@ Options parse_options(const int argc, wchar_t** argv)
             if (!valid || frames == 0)
                 throw std::runtime_error("--smoke-frames requires a positive integer");
             options.smoke_frames = frames;
+        } else if (arg == L"--capture-frame") {
+            if (++i >= argc) throw std::runtime_error("--capture-frame requires an output path");
+            options.capture_frame = std::filesystem::path(argv[i]);
         } else if (arg == L"--data-dir") {
             if (++i >= argc) throw std::runtime_error("--data-dir requires a path");
             options.data_dir = argv[i];
@@ -403,6 +423,14 @@ Options parse_options(const int argc, wchar_t** argv)
         } else {
             throw std::runtime_error("unknown argument: " + std::filesystem::path(arg).string());
         }
+    }
+    if (!options.help && options.capture_frame) {
+        if (!options.track || !options.car)
+            throw std::runtime_error(
+                "--capture-frame requires explicit --track and --car selections");
+        if (options.capture_frame->empty())
+            throw std::runtime_error("--capture-frame output path cannot be empty");
+        if (!options.smoke_frames) options.smoke_frames = 1U;
     }
     return options;
 }
@@ -496,8 +524,18 @@ viper::GameAssets load_assets(const std::filesystem::path& root,
               << "Parsed " << assets.car_name() << " level-0 FNIM: " << assets.player_model().vertices.size() << " vertices, "
               << assets.player_model().material_groups.size() << " material groups, "
               << assets.player_model().section_counts[2] << " triangles; validated "
-              << assets.model_resource_count() << " FNIM resources total\n"
-              << "Required assets validated in " << assets.root().string() << '\n';
+              << assets.model_resource_count() << " FNIM resources total\n";
+    if (assets.track_graphics()) {
+        const auto grf = viper::summarize_track_graphics(*assets.track_graphics());
+        std::cout << "Parsed " << assets.track_name() << " GRAF scene: "
+                  << grf.chunk_count << " chunks, " << grf.corner_count
+                  << " corners, " << grf.face_count << " faces, "
+                  << grf.material_count << " materials; retained "
+                  << grf.opaque_bytes << " opaque scene bytes\n";
+    } else {
+        std::cout << "GRAF scene unavailable or unsupported; using BPP view fallback\n";
+    }
+    std::cout << "Required assets validated in " << assets.root().string() << '\n';
     constexpr std::array<std::string_view, viper::ai_driver_group_count> ai_group_names{
         "easy", "medium", "hard", "career1", "career2", "career3", "career4", "career5"};
     std::cout << "Parsed drivers.res AIDR v2 groups:";
@@ -1116,14 +1154,39 @@ std::optional<FrontendSelection> show_setup_frontend(
 }
 
 class D3DWindow {
+private:
+    struct CarTextureBinding {
+        ComPtr<ID3D11ShaderResourceView> view;
+        bool has_alpha{};
+        std::uint8_t wrap{1U};
+    };
+    struct CarDrawGroup {
+        UINT first_vertex{};
+        UINT vertex_count{};
+        ComPtr<ID3D11ShaderResourceView> texture_srv;
+        bool texture_has_alpha{};
+        std::uint8_t texture_wrap{1U};
+        std::optional<std::uint32_t> scene_node_offset;
+    };
+
 public:
     void set_vsync(const bool enabled) noexcept { vsync_interval_ = enabled ? 1U : 0U; }
 
     bool create(HWND hwnd, bool software,
                 const viper::TerrainSurfaceResourcePayload& terrain,
+                const viper::TrackGraphicsResourcePayload* track_graphics,
+                const float detail_level,
                 const viper::IdealLineTrackData& ideal_line,
                 const viper::ModelResource& player_model,
                 const viper::ModelResource& ai_model,
+                const std::optional<viper::TextureResource>& player_paint_texture,
+                const viper::ResourceBundle* ai_livery_bundle,
+                const std::span<const std::uint32_t> ai_paint_selectors,
+                const viper::ResourceBundle& player_car_bundle,
+                const viper::ResourceBundle& ai_car_bundle,
+                const viper::ResourceBundle& shared_texture_bundle,
+                const viper::ResourceBundle& common_texture_bundle,
+                const viper::ResourceBundle& track_bundle,
                 const std::size_t player_car_index,
                 const viper::TrackObjectTextTable& track_objects,
                 const std::string_view player_car_name,
@@ -1132,9 +1195,20 @@ public:
         try {
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
             extract_terrain_points(terrain);
+            track_graphics_ = track_graphics;
+            const float detail_factor = 2.0F - detail_level;
+            lod_scale_squared_ = std::isfinite(detail_factor)
+                ? detail_factor * detail_factor : 1.0F;
             player_model_ = &player_model;
             ai_model_ = &ai_model;
+            player_car_bundle_ = &player_car_bundle;
+            ai_car_bundle_ = &ai_car_bundle;
+            shared_texture_bundle_ = &shared_texture_bundle;
+            common_texture_bundle_ = &common_texture_bundle;
+            track_bundle_ = &track_bundle;
             player_car_index_ = player_car_index;
+            ai_paint_selectors_.assign(ai_paint_selectors.begin(),
+                ai_paint_selectors.end());
             const auto spawns = car_spawns(track_objects);
             if (spawns.empty()) throw std::runtime_error("track.obt has no usable obj car start position");
             const auto spline_nodes = viper::make_track_spline_index_nodes(ideal_line);
@@ -1224,8 +1298,11 @@ public:
             nullptr, 0, levels, static_cast<UINT>(std::size(levels)), D3D11_SDK_VERSION,
             &desc, &swap_chain_, &device_, &selected, &context_);
         if (FAILED(hr)) return false;
-        return create_target() && create_surface_pipeline() && create_line_pipeline() &&
-            update_surface_buffer() && update_car_buffer() && update_line_buffer();
+        return create_target() && create_surface_pipeline() &&
+            create_paint_texture(player_paint_texture) &&
+            create_ai_paint_textures(ai_livery_bundle) &&
+            create_material_texture_views() &&
+            update_surface_buffer() && update_track_buffer() && update_car_buffer();
     }
 
     bool resize(UINT width, UINT height)
@@ -1233,63 +1310,233 @@ public:
         if (!width || !height || !swap_chain_) return true;
         if (context_) context_->OMSetRenderTargets(0, nullptr, nullptr);
         target_.Reset();
+        depth_target_.Reset();
         if (FAILED(swap_chain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0))) return false;
         width_ = width;
         height_ = height;
-        return create_target() && update_surface_buffer() && update_car_buffer() && update_line_buffer();
+        return create_target() && update_surface_buffer() &&
+            update_track_buffer() && update_car_buffer();
     }
 
     bool render(const std::string_view hud_text,
                 const float focus_x, const float focus_z,
                 const std::array<float, 2>& camera_pan_clip,
-                const float camera_zoom)
+                const float camera_zoom,
+                const std::optional<std::filesystem::path>& capture_frame_path)
     {
-        if (!target_ || !context_ || !swap_chain_) return false;
-        constexpr float color[]{0.035f, 0.055f, 0.075f, 1.0f};
-        context_->OMSetRenderTargets(1, target_.GetAddressOf(), nullptr);
+        if (!target_ || !depth_target_ || !context_ || !swap_chain_ ||
+            car_poses_.empty() || width_ == 0U || height_ == 0U) return false;
+        constexpr float color[]{0.44f, 0.67f, 0.84f, 1.0f};
+        context_->OMSetRenderTargets(1, target_.GetAddressOf(), depth_target_.Get());
         D3D11_VIEWPORT viewport{0.0f, 0.0f, static_cast<float>(width_),
                                 static_cast<float>(height_), 0.0f, 1.0f};
         context_->RSSetViewports(1, &viewport);
         context_->ClearRenderTargetView(target_.Get(), color);
-        const auto focus = map_to_clip(focus_x, focus_z);
-        camera_constants_ = {focus[0] + camera_pan_clip[0],
-            focus[1] + camera_pan_clip[1], camera_zoom, 0.0F};
+        context_->ClearDepthStencilView(depth_target_.Get(),
+            D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0F, 0U);
+
+        const auto& vehicle = car_poses_[player_car_index_];
+        const auto normalize = [](std::array<float, 3> vector) {
+            const float length = std::sqrt(vector[0] * vector[0] +
+                vector[1] * vector[1] + vector[2] * vector[2]);
+            if (!(length > 1.0e-5F) || !std::isfinite(length))
+                return std::array<float, 3>{0.0F, 0.0F, 1.0F};
+            for (auto& component : vector) component /= length;
+            return vector;
+        };
+        const auto cross = [](const std::array<float, 3>& left,
+                              const std::array<float, 3>& right) {
+            return std::array<float, 3>{
+                left[1] * right[2] - left[2] * right[1],
+                left[2] * right[0] - left[0] * right[2],
+                left[0] * right[1] - left[1] * right[0]};
+        };
+        const auto vehicle_forward = normalize(
+            {vehicle[6], vehicle[7], vehicle[8]});
+        const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
+        const float chase_distance = 20.0F / zoom;
+        const float chase_height = 5.5F / zoom;
+        std::array<float, 3> target{
+            focus_x + vehicle_forward[0] * 5.0F,
+            vehicle[10] + 1.0F + vehicle_forward[1] * 5.0F +
+                camera_pan_clip[1] * 4.0F,
+            focus_z + vehicle_forward[2] * 5.0F};
+        std::array<float, 3> camera_position{
+            focus_x - vehicle_forward[0] * chase_distance,
+            vehicle[10] + chase_height,
+            focus_z - vehicle_forward[2] * chase_distance};
+        const auto camera_forward = normalize({
+            target[0] - camera_position[0],
+            target[1] - camera_position[1],
+            target[2] - camera_position[2]});
+        auto camera_right = normalize(cross({0.0F, 1.0F, 0.0F}, camera_forward));
+        if (std::abs(camera_right[0]) < 1.0e-5F &&
+            std::abs(camera_right[2]) < 1.0e-5F) {
+            camera_right = {1.0F, 0.0F, 0.0F};
+        }
+        for (std::size_t axis = 0; axis < 3U; ++axis) {
+            const float pan = camera_right[axis] * camera_pan_clip[0] * 4.0F;
+            target[axis] += pan;
+            camera_position[axis] += pan;
+        }
+        const auto camera_up = normalize(cross(camera_forward, camera_right));
+        const float near_plane = 0.1F;
+        const float focal_scale = 1.0F / std::tan(65.0F *
+            0.008726646259971648F);
+        const float aspect = static_cast<float>(width_) /
+            static_cast<float>(height_);
+        camera_constants_.right_scale_x = {camera_right[0], camera_right[1],
+            camera_right[2], focal_scale / aspect};
+        camera_constants_.up_scale_y = {camera_up[0], camera_up[1],
+            camera_up[2], focal_scale};
+        constexpr float native_far_distance = 1000.0F;
+        camera_constants_.forward_near = {camera_forward[0], camera_forward[1],
+            camera_forward[2], near_plane};
+        camera_constants_.position_far = {camera_position[0],
+            camera_position[1], camera_position[2], native_far_distance};
+        std::optional<viper::TrackGraphicsNodeSelection> selected_track_nodes;
+        if (track_graphics_ != nullptr && track_graphics_->scene_graph_complete &&
+            track_graphics_->scene_graph_geometry_matched) {
+            const viper::TrackGraphicsCamera scene_camera{
+                camera_position, camera_forward, native_far_distance, 4.0F,
+                lod_scale_squared_};
+            auto selection = viper::select_track_graphics_nodes(
+                *track_graphics_, scene_camera);
+            if (selection.traversal_complete)
+                selected_track_nodes = std::move(selection);
+        }
         context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
             &camera_constants_, 0U, 0U);
         context_->VSSetConstantBuffers(0U, 1U, camera_buffer_.GetAddressOf());
-        if (!surface_buffer_ || surface_vertex_count_ == 0U) return false;
-        const UINT surface_stride = sizeof(SurfaceVertex);
-        constexpr UINT surface_offset = 0;
+        const bool draw_track_scene = track_buffer_ && !track_draw_groups_.empty();
+        if (!draw_track_scene && (!surface_buffer_ || surface_vertex_count_ == 0U))
+            return false;
+        context_->OMSetDepthStencilState(depth_state_.Get(), 0U);
         context_->RSSetState(surface_rasterizer_.Get());
-        context_->IASetInputLayout(surface_input_layout_.Get());
-        context_->IASetVertexBuffers(0, 1, surface_buffer_.GetAddressOf(),
-            &surface_stride, &surface_offset);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0);
-        context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0);
-        context_->Draw(surface_vertex_count_, 0);
-        if (!line_buffer_ || ideal_line_vertex_count_ < 2U) return false;
-        const UINT stride = sizeof(IdealLineVertex);
-        constexpr UINT offset = 0;
-        context_->IASetInputLayout(line_input_layout_.Get());
-        context_->IASetVertexBuffers(0, 1, line_buffer_.GetAddressOf(), &stride, &offset);
-        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
-        context_->VSSetShader(line_vertex_shader_.Get(), nullptr, 0);
-        context_->PSSetShader(line_pixel_shader_.Get(), nullptr, 0);
-        context_->Draw(ideal_line_vertex_count_, 0);
+        if (draw_track_scene) {
+            const UINT track_stride = sizeof(CarVertex);
+            constexpr UINT track_offset = 0U;
+            context_->IASetInputLayout(car_input_layout_.Get());
+            context_->IASetVertexBuffers(0U, 1U, track_buffer_.GetAddressOf(),
+                &track_stride, &track_offset);
+            context_->VSSetShader(car_vertex_shader_.Get(), nullptr, 0U);
+            const auto draw_group = [&](const CarDrawGroup& group) {
+                if (!group.vertex_count) return;
+                const auto wrap_index = group.texture_wrap < car_sampler_states_.size()
+                    ? group.texture_wrap : std::uint8_t{0U};
+                auto* sampler = car_sampler_states_[wrap_index].Get();
+                context_->PSSetSamplers(0U, 1U, &sampler);
+                context_->OMSetDepthStencilState(group.texture_has_alpha
+                    ? car_transparent_depth_state_.Get() : depth_state_.Get(), 0U);
+                context_->OMSetBlendState(group.texture_has_alpha
+                    ? car_alpha_blend_state_.Get() : nullptr, nullptr, 0xffffffffU);
+                if (group.texture_srv.Get() != nullptr) {
+                    auto* resource_view = group.texture_srv.Get();
+                    context_->PSSetShaderResources(0U, 1U, &resource_view);
+                    context_->PSSetShader(car_textured_pixel_shader_.Get(), nullptr, 0U);
+                } else {
+                    context_->PSSetShader(car_pixel_shader_.Get(), nullptr, 0U);
+                }
+                context_->Draw(group.vertex_count, group.first_vertex);
+            };
+            if (selected_track_nodes) {
+                const auto draw_node_groups = [&](const auto& node_offsets,
+                    const std::vector<viper::TrackGraphicsFacingTransform>* transforms) {
+                    for (const auto node_offset : node_offsets) {
+                        camera_constants_.world_basis_x = {1.0F, 0.0F, 0.0F, 0.0F};
+                        camera_constants_.world_basis_y = {0.0F, 1.0F, 0.0F, 0.0F};
+                        camera_constants_.world_basis_z = {0.0F, 0.0F, 1.0F, 0.0F};
+                        camera_constants_.world_position = {};
+                        if (transforms != nullptr) {
+                            const auto transform = std::find_if(
+                                transforms->begin(), transforms->end(),
+                                [node_offset](const auto& candidate) {
+                                    return candidate.node_offset == node_offset;
+                                });
+                            if (transform != transforms->end()) {
+                                const auto& values = transform->basis_and_position;
+                                camera_constants_.world_basis_x =
+                                    {values[0], values[1], values[2], 0.0F};
+                                camera_constants_.world_basis_y =
+                                    {values[3], values[4], values[5], 0.0F};
+                                camera_constants_.world_basis_z =
+                                    {values[6], values[7], values[8], 0.0F};
+                                camera_constants_.world_position =
+                                    {values[9], values[10], values[11], 0.0F};
+                            }
+                        }
+                        context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
+                            &camera_constants_, 0U, 0U);
+                        const auto found = scene_group_ranges_.find(node_offset);
+                        if (found == scene_group_ranges_.end()) continue;
+                        for (std::size_t index = found->second.first;
+                             index < found->second.second; ++index)
+                            draw_group(track_draw_groups_[index]);
+                    }
+                };
+                draw_node_groups(selected_track_nodes->ordinary_node_offsets, nullptr);
+                draw_node_groups(selected_track_nodes->facing_mode_1_node_offsets,
+                    &selected_track_nodes->facing_mode_1_transforms);
+                draw_node_groups(selected_track_nodes->facing_mode_2_node_offsets,
+                    &selected_track_nodes->facing_mode_2_transforms);
+            } else {
+                for (const auto& group : track_draw_groups_) draw_group(group);
+            }
+            camera_constants_.world_basis_x = {1.0F, 0.0F, 0.0F, 0.0F};
+            camera_constants_.world_basis_y = {0.0F, 1.0F, 0.0F, 0.0F};
+            camera_constants_.world_basis_z = {0.0F, 0.0F, 1.0F, 0.0F};
+            camera_constants_.world_position = {};
+            context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
+                &camera_constants_, 0U, 0U);
+            context_->OMSetBlendState(nullptr, nullptr, 0xffffffffU);
+        } else {
+            const UINT surface_stride = sizeof(SurfaceVertex);
+            constexpr UINT surface_offset = 0;
+            context_->IASetInputLayout(surface_input_layout_.Get());
+            context_->IASetVertexBuffers(0U, 1U, surface_buffer_.GetAddressOf(),
+                &surface_stride, &surface_offset);
+            context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0U);
+            context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0U);
+            context_->Draw(surface_vertex_count_, 0U);
+        }
         if (car_buffer_ && !car_draw_groups_.empty()) {
-            const UINT car_stride = sizeof(SurfaceVertex);
+            const UINT car_stride = sizeof(CarVertex);
             constexpr UINT car_offset = 0;
             context_->RSSetState(surface_rasterizer_.Get());
-            context_->IASetInputLayout(surface_input_layout_.Get());
+            context_->IASetInputLayout(car_input_layout_.Get());
             context_->IASetVertexBuffers(0, 1, car_buffer_.GetAddressOf(), &car_stride, &car_offset);
             context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0);
-            context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0);
-            for (const auto& group : car_draw_groups_)
-                if (group.vertex_count) context_->Draw(group.vertex_count, group.first_vertex);
+            context_->VSSetShader(car_vertex_shader_.Get(), nullptr, 0);
+            for (const auto& group : car_draw_groups_) {
+                if (!group.vertex_count) continue;
+                const auto wrap_index = group.texture_wrap < car_sampler_states_.size()
+                    ? group.texture_wrap : std::uint8_t{0U};
+                auto* sampler = car_sampler_states_[wrap_index].Get();
+                context_->PSSetSamplers(0U, 1U, &sampler);
+                context_->OMSetDepthStencilState(group.texture_has_alpha
+                    ? car_transparent_depth_state_.Get() : depth_state_.Get(), 0U);
+                context_->OMSetBlendState(group.texture_has_alpha
+                    ? car_alpha_blend_state_.Get() : nullptr, nullptr, 0xffffffffU);
+                if (group.texture_srv.Get() != nullptr) {
+                    auto* resource_view = group.texture_srv.Get();
+                    context_->PSSetShaderResources(0U, 1U, &resource_view);
+                    context_->PSSetShader(car_textured_pixel_shader_.Get(), nullptr, 0U);
+                } else {
+                    ID3D11ShaderResourceView* no_resource = nullptr;
+                    context_->PSSetShaderResources(0U, 1U, &no_resource);
+                    context_->PSSetShader(car_pixel_shader_.Get(), nullptr, 0U);
+                }
+                context_->Draw(group.vertex_count, group.first_vertex);
+            }
+            ID3D11ShaderResourceView* no_resource = nullptr;
+            context_->PSSetShaderResources(0U, 1U, &no_resource);
+            context_->OMSetBlendState(nullptr, nullptr, 0xffffffffU);
+            context_->OMSetDepthStencilState(depth_state_.Get(), 0U);
         }
         if (!draw_hud(hud_text)) return false;
+        if (capture_frame_path && !save_frame_bmp(*capture_frame_path))
+            return false;
         return SUCCEEDED(swap_chain_->Present(vsync_interval_, 0));
     }
 
@@ -1354,6 +1601,112 @@ public:
     }
 
 private:
+    bool save_frame_bmp(const std::filesystem::path& path)
+    {
+        if (!device_ || !context_ || !swap_chain_ || width_ == 0U || height_ == 0U)
+            return false;
+        ComPtr<ID3D11Texture2D> back_buffer;
+        if (FAILED(swap_chain_->GetBuffer(0, IID_PPV_ARGS(&back_buffer))))
+            return false;
+        D3D11_TEXTURE2D_DESC staging_desc{};
+        back_buffer->GetDesc(&staging_desc);
+        if (staging_desc.Format != DXGI_FORMAT_R8G8B8A8_UNORM ||
+            staging_desc.SampleDesc.Count != 1U) {
+            std::cerr << "Frame capture only supports single-sample RGBA8 swap chains.\n";
+            return false;
+        }
+        staging_desc.Usage = D3D11_USAGE_STAGING;
+        staging_desc.BindFlags = 0U;
+        staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        staging_desc.MiscFlags = 0U;
+        ComPtr<ID3D11Texture2D> staging;
+        if (FAILED(device_->CreateTexture2D(&staging_desc, nullptr, &staging)))
+            return false;
+        context_->CopyResource(staging.Get(), back_buffer.Get());
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if (FAILED(context_->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped)))
+            return false;
+
+        const std::uint64_t row_bytes = static_cast<std::uint64_t>(width_) * 3U;
+        const std::uint64_t padded_row_bytes = (row_bytes + 3U) & ~std::uint64_t{3U};
+        const std::uint64_t image_size = padded_row_bytes * height_;
+        constexpr std::uint64_t bmp_header_size = 54U;
+        const std::uint64_t file_size = bmp_header_size + image_size;
+        if (mapped.RowPitch < width_ * 4U ||
+            image_size > std::numeric_limits<std::size_t>::max() ||
+            file_size > std::numeric_limits<std::uint32_t>::max()) {
+            context_->Unmap(staging.Get(), 0U);
+            std::cerr << "Frame capture dimensions exceed BMP limits.\n";
+            return false;
+        }
+        std::vector<std::uint8_t> pixels(static_cast<std::size_t>(image_size), 0U);
+        const auto* source = static_cast<const std::uint8_t*>(mapped.pData);
+        const auto output_row_bytes = static_cast<std::size_t>(padded_row_bytes);
+        for (UINT y = 0U; y < height_; ++y) {
+            const auto source_y = height_ - 1U - y;
+            const auto* source_row = source +
+                static_cast<std::size_t>(source_y) * mapped.RowPitch;
+            auto* output_row = pixels.data() +
+                static_cast<std::size_t>(y) * output_row_bytes;
+            for (UINT x = 0U; x < width_; ++x) {
+                const auto source_offset = static_cast<std::size_t>(x) * 4U;
+                const auto output_offset = static_cast<std::size_t>(x) * 3U;
+                output_row[output_offset] = source_row[source_offset + 2U];
+                output_row[output_offset + 1U] = source_row[source_offset + 1U];
+                output_row[output_offset + 2U] = source_row[source_offset];
+            }
+        }
+        context_->Unmap(staging.Get(), 0U);
+
+        std::array<std::uint8_t, bmp_header_size> header{};
+        const auto put_u16 = [&header](const std::size_t offset,
+                                      const std::uint16_t value) {
+            header[offset] = static_cast<std::uint8_t>(value & 0xffU);
+            header[offset + 1U] = static_cast<std::uint8_t>((value >> 8U) & 0xffU);
+        };
+        const auto put_u32 = [&header](const std::size_t offset,
+                                      const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte)
+                header[offset + byte] = static_cast<std::uint8_t>(
+                    (value >> (byte * 8U)) & 0xffU);
+        };
+        header[0] = static_cast<std::uint8_t>('B');
+        header[1] = static_cast<std::uint8_t>('M');
+        put_u32(2U, static_cast<std::uint32_t>(file_size));
+        put_u32(10U, static_cast<std::uint32_t>(bmp_header_size));
+        put_u32(14U, 40U);
+        put_u32(18U, width_);
+        put_u32(22U, height_);
+        put_u16(26U, 1U);
+        put_u16(28U, 24U);
+        put_u32(34U, static_cast<std::uint32_t>(image_size));
+
+        std::error_code error;
+        const auto parent = path.parent_path();
+        if (!parent.empty()) std::filesystem::create_directories(parent, error);
+        if (error) {
+            std::cerr << "Could not create frame capture directory: "
+                      << error.message() << '\n';
+            return false;
+        }
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            std::cerr << "Could not open frame capture path: " << path.string() << '\n';
+            return false;
+        }
+        output.write(reinterpret_cast<const char*>(header.data()),
+            static_cast<std::streamsize>(header.size()));
+        output.write(reinterpret_cast<const char*>(pixels.data()),
+            static_cast<std::streamsize>(pixels.size()));
+        if (!output) {
+            std::cerr << "Could not finish writing frame capture: "
+                      << path.string() << '\n';
+            return false;
+        }
+        std::cout << "Captured rendered frame: " << path.string() << '\n';
+        return true;
+    }
+
     bool draw_hud(const std::string_view text)
     {
         if (!device_ || !context_ || !hud_buffer_ || width_ == 0U || height_ == 0U)
@@ -1367,12 +1720,12 @@ private:
             const auto x1 = 2.0F * right / static_cast<float>(width_) - 1.0F;
             const auto y0 = 1.0F - 2.0F * top / static_cast<float>(height_);
             const auto y1 = 1.0F - 2.0F * bottom / static_cast<float>(height_);
-            vertices.insert(vertices.end(), {{x0, y0, color[0], color[1], color[2]},
-                {x1, y0, color[0], color[1], color[2]},
-                {x1, y1, color[0], color[1], color[2]},
-                {x0, y0, color[0], color[1], color[2]},
-                {x1, y1, color[0], color[1], color[2]},
-                {x0, y1, color[0], color[1], color[2]}});
+            vertices.insert(vertices.end(), {{x0, y0, 0.0F, color[0], color[1], color[2]},
+                {x1, y0, 0.0F, color[0], color[1], color[2]},
+                {x1, y1, 0.0F, color[0], color[1], color[2]},
+                {x0, y0, 0.0F, color[0], color[1], color[2]},
+                {x1, y1, 0.0F, color[0], color[1], color[2]},
+                {x0, y1, 0.0F, color[0], color[1], color[2]}});
         };
         constexpr float panel_x = 18.0F;
         constexpr float panel_y = 18.0F;
@@ -1440,14 +1793,10 @@ private:
         const UINT stride = sizeof(SurfaceVertex);
         constexpr UINT offset = 0U;
         context_->IASetInputLayout(surface_input_layout_.Get());
-        camera_constants_ = {};
-        camera_constants_.zoom = 1.0F;
-        context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
-            &camera_constants_, 0U, 0U);
-        context_->VSSetConstantBuffers(0U, 1U, camera_buffer_.GetAddressOf());
+        context_->OMSetDepthStencilState(hud_depth_state_.Get(), 0U);
         context_->IASetVertexBuffers(0U, 1U, hud_buffer_.GetAddressOf(), &stride, &offset);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        context_->VSSetShader(surface_vertex_shader_.Get(), nullptr, 0U);
+        context_->VSSetShader(hud_vertex_shader_.Get(), nullptr, 0U);
         context_->PSSetShader(surface_pixel_shader_.Get(), nullptr, 0U);
         context_->Draw(static_cast<UINT>(vertices.size()), 0U);
         return true;
@@ -1513,33 +1862,126 @@ private:
     bool create_surface_pipeline()
     {
         static constexpr char vertex_source[] =
-            "struct V { float2 p : POSITION; float3 c : COLOR; };\n"
+            "struct V { float3 p : POSITION; float3 c : COLOR; };\n"
             "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
-            "cbuffer Camera : register(b0) { float2 center; float zoom; float pad; };\n"
-            "O VSMain(V v) { O o; o.p=float4((v.p-center)*zoom,0.5,1); o.c=v.c; return o; }\n";
+            "cbuffer Camera : register(b0) { float4 rightScaleX; float4 upScaleY; float4 forwardNear; float4 positionFar; };\n"
+            "O VSMain(V v) { O o; float3 d=v.p-positionFar.xyz; float depth=dot(d,forwardNear.xyz); "
+            "float denominator=positionFar.w-forwardNear.w; "
+            "float clipZ=(positionFar.w/denominator)*depth-(positionFar.w*forwardNear.w/denominator); "
+            "o.p=float4(dot(d,rightScaleX.xyz)*rightScaleX.w, dot(d,upScaleY.xyz)*upScaleY.w, clipZ, depth); "
+            "o.c=v.c; return o; }\n";
+        static constexpr char hud_vertex_source[] =
+            "struct V { float3 p : POSITION; float3 c : COLOR; };\n"
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
+            "O VSMain(V v) { O o; o.p=float4(v.p.xy,0,1); o.c=v.c; return o; }\n";
         static constexpr char pixel_source[] =
             "struct O { float4 p : SV_POSITION; float3 c : COLOR; };\n"
             "float4 PSMain(O i) : SV_TARGET { return float4(i.c,1); }\n";
+        static constexpr char car_vertex_source[] =
+            "struct V { float3 p : POSITION; float3 c : COLOR; float2 uv : TEXCOORD0; };\n"
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; float2 uv : TEXCOORD0; };\n"
+            "cbuffer Camera : register(b0) { float4 rightScaleX; float4 upScaleY; float4 forwardNear; float4 positionFar; float4 worldBasisX; float4 worldBasisY; float4 worldBasisZ; float4 worldPosition; };\n"
+            "O VSMain(V v) { O o; float3 local=v.p-worldPosition.xyz; float3 worldP=worldPosition.xyz+worldBasisX.xyz*local.x+worldBasisY.xyz*local.y+worldBasisZ.xyz*local.z; float3 d=worldP-positionFar.xyz; float depth=dot(d,forwardNear.xyz); "
+            "float denominator=positionFar.w-forwardNear.w; "
+            "float clipZ=(positionFar.w/denominator)*depth-(positionFar.w*forwardNear.w/denominator); "
+            "o.p=float4(dot(d,rightScaleX.xyz)*rightScaleX.w, dot(d,upScaleY.xyz)*upScaleY.w, clipZ, depth); "
+            "o.c=v.c; o.uv=v.uv; return o; }\n";
+        static constexpr char car_pixel_source[] =
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; float2 uv : TEXCOORD0; };\n"
+            "float4 PSMain(O i) : SV_TARGET { return float4(i.c,1); }\n";
+        static constexpr char car_textured_pixel_source[] =
+            "Texture2D paintTexture : register(t0); SamplerState paintSampler : register(s0);\n"
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; float2 uv : TEXCOORD0; };\n"
+            "float4 PSMain(O i) : SV_TARGET { return paintTexture.Sample(paintSampler,i.uv) * float4(i.c,1); }\n";
         ComPtr<ID3DBlob> vertex_code;
+        ComPtr<ID3DBlob> hud_vertex_code;
         ComPtr<ID3DBlob> pixel_code;
+        ComPtr<ID3DBlob> car_vertex_code;
+        ComPtr<ID3DBlob> car_pixel_code;
+        ComPtr<ID3DBlob> car_textured_pixel_code;
         if (FAILED(compile_shader(vertex_source, "VSMain", "vs_4_0", vertex_code)) ||
-            FAILED(compile_shader(pixel_source, "PSMain", "ps_4_0", pixel_code))) return false;
+            FAILED(compile_shader(hud_vertex_source, "VSMain", "vs_4_0", hud_vertex_code)) ||
+            FAILED(compile_shader(pixel_source, "PSMain", "ps_4_0", pixel_code)) ||
+            FAILED(compile_shader(car_vertex_source, "VSMain", "vs_4_0", car_vertex_code)) ||
+            FAILED(compile_shader(car_pixel_source, "PSMain", "ps_4_0", car_pixel_code)) ||
+            FAILED(compile_shader(car_textured_pixel_source, "PSMain", "ps_4_0", car_textured_pixel_code))) return false;
         if (FAILED(device_->CreateVertexShader(vertex_code->GetBufferPointer(),
                 vertex_code->GetBufferSize(), nullptr, &surface_vertex_shader_)) ||
+            FAILED(device_->CreateVertexShader(hud_vertex_code->GetBufferPointer(),
+                hud_vertex_code->GetBufferSize(), nullptr, &hud_vertex_shader_)) ||
+            FAILED(device_->CreateVertexShader(car_vertex_code->GetBufferPointer(),
+                car_vertex_code->GetBufferSize(), nullptr, &car_vertex_shader_)) ||
             FAILED(device_->CreatePixelShader(pixel_code->GetBufferPointer(),
-                pixel_code->GetBufferSize(), nullptr, &surface_pixel_shader_))) return false;
+                pixel_code->GetBufferSize(), nullptr, &surface_pixel_shader_)) ||
+            FAILED(device_->CreatePixelShader(car_pixel_code->GetBufferPointer(),
+                car_pixel_code->GetBufferSize(), nullptr, &car_pixel_shader_)) ||
+            FAILED(device_->CreatePixelShader(car_textured_pixel_code->GetBufferPointer(),
+                car_textured_pixel_code->GetBufferSize(), nullptr, &car_textured_pixel_shader_))) return false;
         const D3D11_INPUT_ELEMENT_DESC elements[]{
-            {"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-            {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 2U * sizeof(float), D3D11_INPUT_PER_VERTEX_DATA, 0}};
+            {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 3U * sizeof(float), D3D11_INPUT_PER_VERTEX_DATA, 0}};
         if (FAILED(device_->CreateInputLayout(elements, static_cast<UINT>(std::size(elements)),
                 vertex_code->GetBufferPointer(), vertex_code->GetBufferSize(), &surface_input_layout_)))
             return false;
+        const D3D11_INPUT_ELEMENT_DESC car_elements[]{
+            {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0U, D3D11_INPUT_PER_VERTEX_DATA, 0U},
+            {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 3U * sizeof(float), D3D11_INPUT_PER_VERTEX_DATA, 0U},
+            {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 6U * sizeof(float), D3D11_INPUT_PER_VERTEX_DATA, 0U}};
+        if (FAILED(device_->CreateInputLayout(car_elements,
+                static_cast<UINT>(std::size(car_elements)), car_vertex_code->GetBufferPointer(),
+                car_vertex_code->GetBufferSize(), &car_input_layout_))) return false;
         D3D11_RASTERIZER_DESC raster{};
         raster.FillMode = D3D11_FILL_SOLID;
         raster.CullMode = D3D11_CULL_NONE;
         raster.DepthClipEnable = TRUE;
         if (FAILED(device_->CreateRasterizerState(&raster, &surface_rasterizer_)))
             return false;
+        D3D11_DEPTH_STENCIL_DESC depth_desc{};
+        depth_desc.DepthEnable = TRUE;
+        depth_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+        depth_desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+        depth_desc.StencilEnable = FALSE;
+        if (FAILED(device_->CreateDepthStencilState(&depth_desc, &depth_state_)))
+            return false;
+        D3D11_DEPTH_STENCIL_DESC hud_depth_desc{};
+        hud_depth_desc.DepthEnable = FALSE;
+        hud_depth_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+        hud_depth_desc.StencilEnable = FALSE;
+        if (FAILED(device_->CreateDepthStencilState(&hud_depth_desc, &hud_depth_state_)))
+            return false;
+        D3D11_DEPTH_STENCIL_DESC transparent_depth_desc = depth_desc;
+        transparent_depth_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+        if (FAILED(device_->CreateDepthStencilState(&transparent_depth_desc,
+                &car_transparent_depth_state_))) return false;
+        D3D11_BLEND_DESC blend_desc{};
+        auto& render_target_blend = blend_desc.RenderTarget[0];
+        render_target_blend.BlendEnable = TRUE;
+        render_target_blend.SrcBlend = D3D11_BLEND_SRC_ALPHA;
+        render_target_blend.DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+        render_target_blend.BlendOp = D3D11_BLEND_OP_ADD;
+        render_target_blend.SrcBlendAlpha = D3D11_BLEND_ONE;
+        render_target_blend.DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+        render_target_blend.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        render_target_blend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+        if (FAILED(device_->CreateBlendState(&blend_desc,
+                &car_alpha_blend_state_))) return false;
+        // File evidence associates 0 with unique decals and 1 with tiling.
+        // Value 2 is rare; mirror is a convention-based hypothesis until a
+        // native state-setter/capture confirms it.
+        constexpr std::array<D3D11_TEXTURE_ADDRESS_MODE, 3> address_modes{
+            D3D11_TEXTURE_ADDRESS_CLAMP,
+            D3D11_TEXTURE_ADDRESS_WRAP,
+            D3D11_TEXTURE_ADDRESS_MIRROR};
+        for (std::size_t wrap = 0; wrap < address_modes.size(); ++wrap) {
+            D3D11_SAMPLER_DESC sampler_desc{};
+            sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+            sampler_desc.AddressU = address_modes[wrap];
+            sampler_desc.AddressV = address_modes[wrap];
+            sampler_desc.AddressW = address_modes[wrap];
+            sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+            if (FAILED(device_->CreateSamplerState(&sampler_desc,
+                    &car_sampler_states_[wrap]))) return false;
+        }
         D3D11_BUFFER_DESC hud_desc{};
         hud_desc.ByteWidth = 65536U * sizeof(SurfaceVertex);
         hud_desc.Usage = D3D11_USAGE_DYNAMIC;
@@ -1555,6 +1997,230 @@ private:
         return SUCCEEDED(device_->CreateBuffer(&camera_desc, &camera_data, &camera_buffer_));
     }
 
+    bool create_paint_texture(
+        const std::optional<viper::TextureResource>& texture)
+    {
+        if (!texture) return true;
+        // The player body paint currently uses the opaque RGB565 stock variant.
+        // Do not silently render unsupported alpha-bearing material semantics.
+        if (texture->flags != 0U) return true;
+        if (!create_texture_srv(*texture, player_paint_srv_)) return false;
+        if (player_paint_srv_.Get() != nullptr) player_paint_wrap_ = texture->wrap;
+        return true;
+    }
+
+    bool create_ai_paint_textures(const viper::ResourceBundle* bundle)
+    {
+        if (bundle == nullptr) return true;
+        constexpr auto texture_type =
+            viper::resource_type_code('T', 'E', 'X', ' ');
+        for (std::size_t selector = 0; selector < ai_paint_srvs_.size(); ++selector) {
+            const auto name = "Viper" + std::to_string(selector + 1U) + ".tex";
+            const auto* entry = bundle->find(name, texture_type);
+            if (entry == nullptr) continue;
+            const auto texture = viper::parse_texture_payload(bundle->payload(*entry));
+            if (!texture || texture->flags != 0U) continue;
+            if (!create_texture_srv(*texture, ai_paint_srvs_[selector]))
+                return false;
+            if (ai_paint_srvs_[selector].Get() != nullptr)
+                ai_paint_wraps_[selector] = texture->wrap;
+        }
+        return true;
+    }
+
+    bool create_material_texture_views()
+    {
+        constexpr std::array<std::string_view, 3> shared_material_names{
+            "UCAR.tex", "WHEELS.tex", "EFFECTS.tex"};
+        for (const auto name : shared_material_names) {
+            (void)resolve_material_texture(*player_car_bundle_, name);
+            (void)resolve_material_texture(*ai_car_bundle_, name);
+        }
+        return true;
+    }
+
+    bool create_texture_srv(const viper::TextureResource& texture,
+        ComPtr<ID3D11ShaderResourceView>& resource_view)
+    {
+        if (texture.flags > 2U || texture.width == 0U || texture.height == 0U ||
+            texture.rgba.empty() || texture.rgba.size() !=
+                static_cast<std::size_t>(texture.width) * texture.height * 4U)
+            return true;
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = texture.width;
+        desc.Height = texture.height;
+        desc.MipLevels = 1U;
+        desc.ArraySize = 1U;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1U;
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        D3D11_SUBRESOURCE_DATA data{};
+        data.pSysMem = texture.rgba.data();
+        data.SysMemPitch = texture.width * 4U;
+        ComPtr<ID3D11Texture2D> image;
+        if (FAILED(device_->CreateTexture2D(&desc, &data, &image)) ||
+            FAILED(device_->CreateShaderResourceView(image.Get(), nullptr,
+                &resource_view))) {
+            OutputDebugStringA("failed to upload Viper Racing material texture\n");
+            resource_view.Reset();
+        }
+        return true;
+    }
+
+    CarTextureBinding resolve_material_texture(
+        const viper::ResourceBundle& primary_bundle,
+        const std::string_view material_name)
+    {
+        constexpr auto texture_type =
+            viper::resource_type_code('T', 'E', 'X', ' ');
+        const auto* entry = primary_bundle.find(material_name, texture_type);
+        const viper::ResourceBundle* source = &primary_bundle;
+        if (entry == nullptr) {
+            entry = shared_texture_bundle_->find(material_name, texture_type);
+            source = shared_texture_bundle_;
+        }
+        if (entry == nullptr) {
+            entry = common_texture_bundle_->find(material_name, texture_type);
+            source = common_texture_bundle_;
+        }
+        if (entry == nullptr) return {};
+        const auto found = material_texture_cache_.find(entry);
+        if (found != material_texture_cache_.end()) return found->second;
+        CarTextureBinding result{};
+        const auto texture = viper::parse_texture_payload(source->payload(*entry));
+        if (texture && create_texture_srv(*texture, result.view) &&
+            result.view.Get() != nullptr) {
+            result.has_alpha = texture->flags == 1U || texture->flags == 2U;
+            result.wrap = texture->wrap;
+        }
+        material_texture_cache_.emplace(entry, result);
+        return result;
+    }
+
+    bool update_track_buffer()
+    {
+        track_buffer_.Reset();
+        track_draw_groups_.clear();
+        scene_group_ranges_.clear();
+        if (track_graphics_ == nullptr || track_graphics_->chunks.empty()) return true;
+
+        struct OrderedChunk {
+            const viper::TrackGraphicsChunk* chunk{};
+            std::optional<std::uint32_t> scene_node_offset;
+        };
+        std::vector<CarVertex> vertices;
+        std::vector<OrderedChunk> ordered_chunks;
+        if (track_graphics_->scene_graph_complete &&
+            track_graphics_->scene_graph_geometry_matched) {
+            ordered_chunks.reserve(track_graphics_->chunks.size());
+            // race.bin 0x467B10 dispatches type 3 as ordinary scenery, then
+            // queues type 4 modes 1/2 for later passes; mode 4 is registered
+            // for dynamic lookup but is not drawn by this tree pass.
+            for (const auto accepted_type : {3U, 4U}) {
+                for (const auto& node : track_graphics_->scene_nodes) {
+                    if (node.type != accepted_type ||
+                        !node.has_runtime_model_handle ||
+                        (node.type == 4U && node.facing_mode != 1U)) continue;
+                    if (!node.parsed_chunk_index ||
+                        *node.parsed_chunk_index >= track_graphics_->chunks.size()) continue;
+                    ordered_chunks.push_back(
+                        {&track_graphics_->chunks[*node.parsed_chunk_index],
+                            node.source_offset});
+                }
+                if (accepted_type == 4U) {
+                    for (const auto& node : track_graphics_->scene_nodes) {
+                        if (node.type != 4U || !node.has_runtime_model_handle ||
+                            node.facing_mode != 2U ||
+                            !node.parsed_chunk_index ||
+                            *node.parsed_chunk_index >= track_graphics_->chunks.size()) continue;
+                        ordered_chunks.push_back(
+                            {&track_graphics_->chunks[*node.parsed_chunk_index],
+                                node.source_offset});
+                    }
+                }
+            }
+        }
+        if (!track_graphics_->scene_graph_complete ||
+            !track_graphics_->scene_graph_geometry_matched) {
+            ordered_chunks.clear();
+            ordered_chunks.reserve(track_graphics_->chunks.size());
+            for (const auto& chunk : track_graphics_->chunks) {
+                ordered_chunks.push_back({&chunk, std::nullopt});
+            }
+        }
+
+        for (const auto& ordered_chunk : ordered_chunks) {
+            const auto& chunk = *ordered_chunk.chunk;
+            for (const auto& material : chunk.materials) {
+                if (material.first_corner > material.end_corner ||
+                    material.end_corner > chunk.corners.size() ||
+                    material.first_face > material.end_face ||
+                    material.end_face > chunk.faces.size()) {
+                    return false;
+                }
+                CarDrawGroup group{};
+                group.scene_node_offset = ordered_chunk.scene_node_offset;
+                if (vertices.size() > std::numeric_limits<UINT>::max()) return false;
+                group.first_vertex = static_cast<UINT>(vertices.size());
+                if (!material.texture_name.empty()) {
+                    const auto texture = resolve_material_texture(
+                        *track_bundle_, material.texture_name);
+                    group.texture_srv = texture.view;
+                    group.texture_has_alpha = texture.has_alpha;
+                    group.texture_wrap = texture.wrap;
+                }
+                for (std::size_t face_index = material.first_face;
+                     face_index < material.end_face; ++face_index) {
+                    const auto& face = chunk.faces[face_index];
+                    for (const auto local_corner : face) {
+                        if (local_corner < material.first_corner ||
+                            local_corner >= material.end_corner) {
+                            return false;
+                        }
+                        const auto& corner = chunk.corners[local_corner];
+                        const auto packed = corner.packed_color;
+                        constexpr float channel_scale = 1.0F / 255.0F;
+                        // D3D-style AARRGGBB channel order is provisional;
+                        // the native GRAF vertex declaration is not recovered.
+                        const std::array<float, 3> color{
+                            static_cast<float>((packed >> 16U) & 0xffU) * channel_scale,
+                            static_cast<float>((packed >> 8U) & 0xffU) * channel_scale,
+                            static_cast<float>(packed & 0xffU) * channel_scale};
+                        vertices.push_back({corner.position[0], corner.position[1],
+                            corner.position[2], color[0], color[1], color[2],
+                            corner.uv[0], corner.uv[1]});
+                    }
+                }
+                const auto group_vertex_count = vertices.size() - group.first_vertex;
+                if (group_vertex_count > std::numeric_limits<UINT>::max()) return false;
+                group.vertex_count = static_cast<UINT>(group_vertex_count);
+                if (group.vertex_count != 0U) track_draw_groups_.push_back(std::move(group));
+            }
+        }
+        for (std::size_t index = 0; index < track_draw_groups_.size(); ++index) {
+            const auto& node_offset = track_draw_groups_[index].scene_node_offset;
+            if (!node_offset) continue;
+            const auto [found, inserted] = scene_group_ranges_.try_emplace(
+                *node_offset, std::pair{index, index + 1U});
+            if (!inserted) found->second.second = index + 1U;
+        }
+        if (vertices.empty()) return true;
+        if (vertices.size() > std::numeric_limits<UINT>::max() / sizeof(CarVertex))
+            return false;
+
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(CarVertex));
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA data{};
+        data.pSysMem = vertices.data();
+        ComPtr<ID3D11Buffer> buffer;
+        if (FAILED(device_->CreateBuffer(&desc, &data, &buffer))) return false;
+        track_buffer_ = std::move(buffer);
+        return true;
+    }
+
     bool update_surface_buffer()
     {
         if (!width_ || !height_ || terrain_points_.empty()) return true;
@@ -1563,13 +2229,12 @@ private:
         const float height_range = (std::max)(max_height_ - min_height_, 1.0e-5f);
         for (std::size_t index = 0; index < terrain_points_.size(); ++index) {
             const auto& point = terrain_points_[index];
-            const auto pos = map_to_clip(point[0], point[2]);
             const float elevation = std::clamp((point[1] - min_height_) / height_range, 0.0f, 1.0f);
             const auto& normal = terrain_normals_[index];
             const float light = 0.35f + 0.65f * std::clamp(
                 normal[0] * -0.35f + normal[1] * 0.8f + normal[2] * -0.45f,
                 0.0f, 1.0f);
-            vertices.push_back({pos[0], pos[1],
+            vertices.push_back({point[0], point[1], point[2],
                 (0.11f + 0.20f * elevation) * light,
                 (0.22f + 0.35f * elevation) * light,
                 (0.16f + 0.17f * elevation) * light});
@@ -1610,7 +2275,7 @@ private:
         if (!width_ || !height_ || player_model_ == nullptr || ai_model_ == nullptr ||
             player_model_->vertices.empty() || ai_model_->vertices.empty()) return true;
         if (ideal_line_points_.size() < 2U || car_poses_.empty()) return false;
-        std::vector<SurfaceVertex> vertices;
+        std::vector<CarVertex> vertices;
         std::vector<CarDrawGroup> groups;
         for (std::size_t car_index = 0; car_index < car_poses_.size(); ++car_index) {
             const auto& pose = car_poses_[car_index];
@@ -1620,6 +2285,36 @@ private:
                 CarDrawGroup draw_group{};
                 draw_group.first_vertex = static_cast<UINT>(vertices.size());
                 const auto material = model_group.material_name;
+                const bool is_viper_body = material.find("VIPER") != std::string::npos;
+                const bool finite_uvs = std::all_of(model_group.local_indices.begin(),
+                        model_group.local_indices.end(), [&](const auto local_index) {
+                            const auto vertex_index =
+                                static_cast<std::size_t>(model_group.first_vertex) + local_index;
+                            if (vertex_index >= model.vertices.size()) return false;
+                            const auto& fields = model.vertices[vertex_index].fields;
+                            return std::isfinite(fields[6]) && std::isfinite(fields[7]);
+                        });
+                if (is_viper_body && finite_uvs) {
+                    if (car_index == player_car_index_) {
+                        draw_group.texture_srv = player_paint_srv_;
+                        draw_group.texture_wrap = player_paint_wrap_;
+                    } else if (car_index < ai_paint_selectors_.size()) {
+                        const auto selector = ai_paint_selectors_[car_index];
+                        if (selector < ai_paint_srvs_.size()) {
+                            draw_group.texture_srv = ai_paint_srvs_[selector];
+                            draw_group.texture_wrap = ai_paint_wraps_[selector];
+                        }
+                    }
+                }
+                if (draw_group.texture_srv.Get() == nullptr && finite_uvs) {
+                    const auto& primary_bundle = car_index == player_car_index_
+                        ? *player_car_bundle_ : *ai_car_bundle_;
+                    const auto material_texture =
+                        resolve_material_texture(primary_bundle, material);
+                    draw_group.texture_srv = material_texture.view;
+                    draw_group.texture_has_alpha = material_texture.has_alpha;
+                    draw_group.texture_wrap = material_texture.wrap;
+                }
                 const std::array<float, 3> color = material.find("WHEEL") != std::string::npos
                     ? std::array<float, 3>{0.10f, 0.11f, 0.12f}
                     : material.find("EFFECT") != std::string::npos
@@ -1631,18 +2326,21 @@ private:
                     const auto vertex_index = static_cast<std::size_t>(model_group.first_vertex) + local_index;
                     if (vertex_index >= model.vertices.size()) return false;
                     const auto& model_vertex = model.vertices[vertex_index].fields;
-                    const auto world = viper::transform_vehicle_point_xz(
+                    const auto world = viper::transform_vehicle_point_xyz(
                         pose, {model_vertex[0], model_vertex[1], model_vertex[2]});
-                    const auto pos = map_to_clip(world.x, world.z);
-                    vertices.push_back({pos[0], pos[1], color[0], color[1], color[2]});
+                    const auto draw_color = draw_group.texture_srv.Get() != nullptr
+                        ? std::array<float, 3>{1.0F, 1.0F, 1.0F} : color;
+                    vertices.push_back({world.x, world.y, world.z,
+                        draw_color[0], draw_color[1], draw_color[2],
+                        model_vertex[6], model_vertex[7]});
                 }
                 draw_group.vertex_count = static_cast<UINT>(vertices.size()) - draw_group.first_vertex;
                 groups.push_back(draw_group);
             }
         }
-        if (vertices.size() > std::numeric_limits<UINT>::max() / sizeof(SurfaceVertex)) return false;
+        if (vertices.size() > std::numeric_limits<UINT>::max() / sizeof(CarVertex)) return false;
         D3D11_BUFFER_DESC desc{};
-        desc.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(SurfaceVertex));
+        desc.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(CarVertex));
         desc.Usage = D3D11_USAGE_IMMUTABLE;
         desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
         D3D11_SUBRESOURCE_DATA data{};
@@ -1654,7 +2352,6 @@ private:
         return true;
     }
 
-    struct CarDrawGroup { UINT first_vertex{}; UINT vertex_count{}; };
     bool create_line_pipeline()
     {
         static constexpr char vertex_source[] =
@@ -1708,18 +2405,49 @@ private:
     {
         ComPtr<ID3D11Texture2D> back_buffer;
         if (FAILED(swap_chain_->GetBuffer(0, IID_PPV_ARGS(&back_buffer)))) return false;
-        return SUCCEEDED(device_->CreateRenderTargetView(back_buffer.Get(), nullptr, &target_));
+        if (FAILED(device_->CreateRenderTargetView(back_buffer.Get(), nullptr, &target_)))
+            return false;
+        D3D11_TEXTURE2D_DESC depth_desc{};
+        depth_desc.Width = width_;
+        depth_desc.Height = height_;
+        depth_desc.MipLevels = 1U;
+        depth_desc.ArraySize = 1U;
+        depth_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        depth_desc.SampleDesc.Count = 1U;
+        depth_desc.Usage = D3D11_USAGE_DEFAULT;
+        depth_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        ComPtr<ID3D11Texture2D> depth_texture;
+        if (FAILED(device_->CreateTexture2D(&depth_desc, nullptr, &depth_texture)))
+            return false;
+        return SUCCEEDED(device_->CreateDepthStencilView(
+            depth_texture.Get(), nullptr, &depth_target_));
     }
 
     ComPtr<ID3D11Device> device_;
     ComPtr<ID3D11DeviceContext> context_;
     ComPtr<IDXGISwapChain> swap_chain_;
     ComPtr<ID3D11RenderTargetView> target_;
+    ComPtr<ID3D11DepthStencilView> depth_target_;
     ComPtr<ID3D11VertexShader> surface_vertex_shader_;
+    ComPtr<ID3D11VertexShader> hud_vertex_shader_;
+    ComPtr<ID3D11VertexShader> car_vertex_shader_;
     ComPtr<ID3D11PixelShader> surface_pixel_shader_;
+    ComPtr<ID3D11PixelShader> car_pixel_shader_;
+    ComPtr<ID3D11PixelShader> car_textured_pixel_shader_;
     ComPtr<ID3D11InputLayout> surface_input_layout_;
+    ComPtr<ID3D11InputLayout> car_input_layout_;
     ComPtr<ID3D11RasterizerState> surface_rasterizer_;
+    ComPtr<ID3D11DepthStencilState> depth_state_;
+    ComPtr<ID3D11DepthStencilState> hud_depth_state_;
+    ComPtr<ID3D11DepthStencilState> car_transparent_depth_state_;
+    ComPtr<ID3D11BlendState> car_alpha_blend_state_;
+    std::array<ComPtr<ID3D11SamplerState>, 3> car_sampler_states_{};
+    ComPtr<ID3D11ShaderResourceView> player_paint_srv_;
+    std::uint8_t player_paint_wrap_{1U};
+    std::array<ComPtr<ID3D11ShaderResourceView>, 7> ai_paint_srvs_{};
+    std::array<std::uint8_t, 7> ai_paint_wraps_{};
     ComPtr<ID3D11Buffer> surface_buffer_;
+    ComPtr<ID3D11Buffer> track_buffer_;
     ComPtr<ID3D11Buffer> hud_buffer_;
     ComPtr<ID3D11Buffer> camera_buffer_;
     ComPtr<ID3D11Buffer> car_buffer_;
@@ -1732,10 +2460,22 @@ private:
     std::vector<std::array<float, 3>> terrain_normals_;
     const viper::ModelResource* player_model_{};
     const viper::ModelResource* ai_model_{};
+    const viper::ResourceBundle* player_car_bundle_{};
+    const viper::ResourceBundle* ai_car_bundle_{};
+    const viper::ResourceBundle* shared_texture_bundle_{};
+    const viper::ResourceBundle* common_texture_bundle_{};
+    const viper::ResourceBundle* track_bundle_{};
+    const viper::TrackGraphicsResourcePayload* track_graphics_{};
     std::size_t player_car_index_{};
     std::vector<viper::BodyRenderTransform> car_poses_;
     std::vector<viper::CarTrackConstructionPlan> car_placement_plans_;
     std::vector<CarDrawGroup> car_draw_groups_;
+    std::vector<CarDrawGroup> track_draw_groups_;
+    std::unordered_map<std::uint32_t, std::pair<std::size_t, std::size_t>>
+        scene_group_ranges_;
+    float lod_scale_squared_{1.0F};
+    std::vector<std::uint32_t> ai_paint_selectors_;
+    std::map<const viper::ResourceEntry*, CarTextureBinding> material_texture_cache_;
     std::array<float, 4> map_bounds_{};
     float min_height_{};
     float max_height_{};
@@ -5197,6 +5937,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 }
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
+               std::optional<std::filesystem::path> capture_frame_path,
                const bool smoke_audio,
                const bool diagnostics_only,
                const bool route_motion_enabled,
@@ -5215,9 +5956,17 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::string_view track_name,
                const std::string_view car_name,
                const viper::TerrainSurfaceResourcePayload& terrain,
+               const viper::TrackGraphicsResourcePayload* track_graphics,
                const viper::IdealLineTrackData& ideal_line,
                const viper::ModelResource& player_model,
                const viper::ModelResource& ai_model,
+               const std::optional<viper::TextureResource>& player_paint_texture,
+               const viper::ResourceBundle* ai_livery_bundle,
+               const std::span<const std::uint32_t> ai_paint_selectors,
+               const viper::ResourceBundle& ai_car_bundle,
+               const viper::ResourceBundle& shared_texture_bundle,
+               const viper::ResourceBundle& common_texture_bundle,
+               const viper::ResourceBundle& track_bundle,
                const viper::TrackObjectTextTable& track_objects,
                const viper::ResourceBundle& car_bundle,
                const viper::CarFileResourcePayloads& player_car_resources,
@@ -5306,8 +6055,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
     state.window = hwnd;
-    if (!state.graphics.create(hwnd, software, terrain, ideal_line, player_model,
-            ai_model, player_car_index, track_objects, car_name,
+    if (!state.graphics.create(hwnd, software, terrain, track_graphics,
+            options.real("GX", "detail_level").value_or(1.0F), ideal_line, player_model,
+            ai_model, player_paint_texture, ai_livery_bundle,
+            ai_paint_selectors, car_bundle, ai_car_bundle,
+            shared_texture_bundle, common_texture_bundle, track_bundle,
+            player_car_index, track_objects, car_name,
             force_default_placement)) {
         std::cerr << "Could not initialize Direct3D 11. "
                   << (software ? "WARP initialization failed.\n" : "Try --software to use WARP.\n");
@@ -6784,11 +7537,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 : state.camera_anchor_world;
             if (render_frame && !state.graphics.render(state.hud_text(),
                     camera_focus[0], camera_focus[1], state.camera_pan_clip,
-                    state.camera_zoom)) {
+                    state.camera_zoom, capture_frame_path)) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
                 return 1;
             }
+            if (render_frame && capture_frame_path) capture_frame_path.reset();
             if (replay != nullptr) ++playback_frame;
             if (render_frame && smoke_frames && ++rendered_frames >= *smoke_frames) {
                 DestroyWindow(hwnd);
@@ -6816,6 +7570,62 @@ void report_start_grid(const viper::GameAssets& assets)
         std::cout << "  grid row " << row << ": " << directive.object_line << '\n';
     }
     std::cout << "  observed car placement directives: " << car_directives << '\n';
+}
+
+std::optional<viper::TextureResource> load_player_paint_texture(
+    const std::filesystem::path& config_directory,
+    const viper::GameOptions& options,
+    const std::string_view car_name)
+{
+    if (car_name != "viper" || config_directory.empty()) return std::nullopt;
+    const auto paintjob = options.integer("GLOBAL", "player_paintjob");
+    if (!paintjob || *paintjob < 0 || *paintjob > 8) return std::nullopt;
+    const auto path = config_directory / ("paint" + std::to_string(*paintjob) + ".tex");
+    std::ifstream input(path, std::ios::binary | std::ios::ate);
+    if (!input) return std::nullopt;
+    const auto end = input.tellg();
+    constexpr std::streamoff maximum_file_size = 16 * 1024 * 1024;
+    if (end <= 0 || end > maximum_file_size) {
+        std::cerr << "Ignoring player paint texture with invalid size: " << path.string() << '\n';
+        return std::nullopt;
+    }
+    std::vector<std::byte> bytes(static_cast<std::size_t>(end));
+    input.seekg(0, std::ios::beg);
+    if (!input.read(reinterpret_cast<char*>(bytes.data()),
+            static_cast<std::streamsize>(end))) {
+        std::cerr << "Could not read player paint texture: " << path.string() << '\n';
+        return std::nullopt;
+    }
+    auto texture = viper::parse_texture_file(bytes);
+    if (!texture) {
+        std::cerr << "Player paint texture format is unsupported: " << path.string() << '\n';
+        return std::nullopt;
+    }
+    std::cout << "Loaded player paint texture " << path.filename().string() << ": "
+              << texture->width << 'x' << texture->height << ".\n";
+    return texture;
+}
+
+std::optional<viper::ResourceBundle> load_ai_livery_bundle(
+    const std::filesystem::path& data_directory,
+    const std::int32_t opponent_strength)
+{
+    constexpr std::array<std::string_view, viper::ai_driver_group_count> names{
+        "easy.res", "medium.res", "hard.res", "career1.res", "career2.res",
+        "career3.res", "career4.res", "career5.res"};
+    if (opponent_strength < 0 ||
+        opponent_strength >= static_cast<std::int32_t>(names.size()))
+        return std::nullopt;
+    const auto path = data_directory / names[static_cast<std::size_t>(opponent_strength)];
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(path, error) || error) return std::nullopt;
+    try {
+        return viper::ResourceBundle::open(path);
+    } catch (const std::exception& error) {
+        std::cerr << "Ignoring invalid AI livery bundle " << path.string()
+                  << ": " << error.what() << '\n';
+        return std::nullopt;
+    }
 }
 
 int run_selected_race(const Options& options, const std::string_view track,
@@ -6857,6 +7667,8 @@ int run_selected_race(const Options& options, const std::string_view track,
         std::cerr << "Warning: player CSU version is not 1; native loader continues with its first 0x8c bytes\n";
     report_start_grid(assets);
     if (options.validate_assets) return 0;
+    const auto player_paint_texture = load_player_paint_texture(
+        setup_config_directory, assets.options(), assets.car_name());
     auto driver_order = viper::initialize_single_race_driver_order();
     constexpr std::array<std::string_view, viper::ai_driver_group_count> ai_name_profiles{
         "Easy", "Intermediate", "Hard", "Career1", "Career2", "Career3",
@@ -6911,6 +7723,18 @@ int run_selected_race(const Options& options, const std::string_view track,
     const auto entrants = viper::build_single_race_entrants(entrant_observation);
     if (!entrants.player_record_index)
         throw std::runtime_error("single-race setup could not resolve the human participant row");
+    std::vector<std::uint32_t> ai_paint_selectors(
+        static_cast<std::size_t>(entrants.participant_count),
+        std::numeric_limits<std::uint32_t>::max());
+    for (const auto& record : entrants.records) {
+        if (record.marker_value == 1U && record.word_at_0xc0 &&
+            record.record_index < ai_paint_selectors.size())
+            ai_paint_selectors[record.record_index] = *record.word_at_0xc0;
+    }
+    auto ai_livery_bundle = load_ai_livery_bundle(options.data_dir, opponent_strength);
+    if (entrants.participant_count > 1 && !ai_livery_bundle)
+        std::cerr << "AI paint texture bundle is unavailable for opponent profile "
+                  << opponent_strength << "; AI cars will use fallback materials.\n";
     std::cout << "Selected human grid slot: "
               << (*entrants.player_record_index + 1U) << " of "
               << entrants.participant_count << " (fresh single-race driver order)\n";
@@ -7009,7 +7833,8 @@ int run_selected_race(const Options& options, const std::string_view track,
         remote_player_car_index = remote_configuration.player_slot;
         std::cout << "Reconstructed clients agreed on race setup; replicating route-race state.\n";
     }
-    return run_window(options.software, options.smoke_frames, options.audio_smoke,
+    return run_window(options.software, options.smoke_frames, options.capture_frame,
+        options.audio_smoke,
         options.diagnostics_only || !options.route_motion_prototype,
         options.route_motion_prototype && !options.diagnostics_only,
         options.record_trace, options.record_physics_tick_trace,
@@ -7022,7 +7847,14 @@ int run_selected_race(const Options& options, const std::string_view track,
         assets.ai_car(),
         std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),
+        assets.track_graphics() ? &*assets.track_graphics() : nullptr,
         assets.ideal_line(), assets.player_model(), assets.ai_model(),
+        player_paint_texture,
+        ai_livery_bundle ? &*ai_livery_bundle : nullptr,
+        ai_paint_selectors,
+        assets.bundle("viper.car"), assets.bundle("race.res"),
+        assets.bundle("common.res"),
+        assets.bundle(std::string(assets.track_name()) + ".trk"),
         assets.track_objects(),
         assets.bundle(std::string(assets.car_name()) + ".car"),
         assets.player_car(), assets.player_car_setup(), assets.wheel_tires(),
