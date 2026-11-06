@@ -54,6 +54,11 @@ and extracted install contain no `.ilq` or `.ilg` entries found by the scan.
 Each opponent now also retains a candidate `0x428790` threshold and normalized
 profile derived from the fallback line's last node, its linked node and that
 opponent's profile. These remain candidates until per-car lookup is modeled.
+`make_ai_line_path` produces the first two native lookup names from the same
+group/difficulty/track/car key as ADNT, changing the extensions to `.ilq`
+and `.ilg` respectively. Each opponent retains its own two lookup names.
+These names do not by themselves prove that either resource is present or
+accepted by the legacy resource manager.
 
 The ACAR constructor obtains its model through `0x419FF0`, which returns the
 `+0x10` geometry object of the per-car manager created by `0x41AF00` and

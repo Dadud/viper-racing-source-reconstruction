@@ -93,6 +93,16 @@ std::optional<std::string> make_ai_note_path(const AINoteLookupKey& key,
     return path;
 }
 
+std::optional<std::string> make_ai_line_path(const AINoteLookupKey& key,
+                                              const AINotePathKind kind)
+{
+    auto path = make_ai_note_path(key, kind);
+    if (!path) return std::nullopt;
+    path->replace(path->size() - 3U, 3U,
+        kind == AINotePathKind::notes_directory ? "ilq" : "ilg");
+    return path;
+}
+
 std::optional<AINoteResource> parse_ai_note_resource(
     const std::uint32_t resource_version,
     const std::span<const std::byte> payload)

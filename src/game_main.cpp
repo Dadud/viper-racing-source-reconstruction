@@ -13,6 +13,7 @@
 #include "viper/race_loop_callbacks.hpp"
 #include "viper/race_progression.hpp"
 #include "viper/acar_curve_tracker.hpp"
+#include "viper/ai_notes_resource.hpp"
 #include "viper/route_opponent_ai.hpp"
 #include "viper/sound_resource.hpp"
 #include "viper/engine_sound_setup.hpp"
@@ -2693,6 +2694,8 @@ struct AcarSessionTuningInputs {
     std::array<std::uint32_t, 35> setup_words{};
     viper::AIDriverResource::Record raw_driver_profile{};
     viper::AcarTrackProfileWords track_profile_words{};
+    std::string notes_line_path;
+    std::string track_line_path;
 };
 
 // Persistent constructor state for one configured ACAR record. The inherited
@@ -6261,6 +6264,20 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     tuning_inputs.setup_words = selected_setup->setup.setup_words;
                     tuning_inputs.raw_driver_profile = *driver_profile;
                     tuning_inputs.track_profile_words = *profile_words;
+                    const viper::AINoteLookupKey line_key{
+                        selected_setup->driver_slot,
+                        static_cast<std::uint32_t>(*selected_ai_driver_group),
+                        *track_index, "viper"};
+                    const auto notes_line = viper::make_ai_line_path(
+                        line_key, viper::AINotePathKind::notes_directory);
+                    const auto track_line = viper::make_ai_line_path(
+                        line_key, viper::AINotePathKind::track_sidecar);
+                    if (!notes_line || !track_line) {
+                        stream_ok = false;
+                        break;
+                    }
+                    tuning_inputs.notes_line_path = *notes_line;
+                    tuning_inputs.track_line_path = *track_line;
                     body_state.session_tuning_inputs = std::move(tuning_inputs);
                     const auto body_plan =
                         viper::plan_ncar_body_constructor(*body_observation);

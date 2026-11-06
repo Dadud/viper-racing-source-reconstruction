@@ -140,6 +140,13 @@ void test_ai_note_resource()
             ".trk27cvipr.dnt", "native track sidecar path mismatch");
     require(make_ai_note_path(key, AINotePathKind::notes_directory) ==
             "*notes\\27cvipr.dnt", "native notes path mismatch");
+    require(make_ai_line_path(key, AINotePathKind::notes_directory) ==
+                "*notes\\27cvipr.ilq" &&
+            make_ai_line_path(key, AINotePathKind::track_sidecar) ==
+                ".trk27cvipr.ilg" &&
+            !make_ai_line_path(AINoteLookupKey{7U, 7U, 12U, "viper"},
+                AINotePathKind::track_sidecar),
+        "driver-specific AI line paths must use the native directory and extension");
     const AINoteLookupKey gt_key{2U, 7U, 12U, "vipergt"};
     require(make_ai_note_path(gt_key, AINotePathKind::track_sidecar) ==
             ".trk27cvgt.dnt", "vipergt note-name normalization mismatch");

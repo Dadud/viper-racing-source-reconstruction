@@ -28,6 +28,11 @@ enum class AINotePathKind : std::uint8_t {
     const AINoteLookupKey& key,
     AINotePathKind kind);
 
+// Builds the two driver-specific line candidates used by 0x419EC0.
+// Notes-directory lines use .ilq; track-sidecar lines use .ilg.
+[[nodiscard]] std::optional<std::string> make_ai_line_path(
+    const AINoteLookupKey& key, AINotePathKind kind);
+
 struct AINoteResource {
     static constexpr std::uint32_t resource_type_code = 0x41444e54U; // ADNT
     static constexpr std::size_t header_bytes = 0x40U;
