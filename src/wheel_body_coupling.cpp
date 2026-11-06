@@ -11,6 +11,40 @@
 
 namespace viper {
 
+bool initialize_ncar_embedded_curve_and_selector(
+    NcarBodyRuntimeObjectState& body, const std::span<const std::byte> record,
+    const bool fdiv_compatibility_enabled)
+{
+    const auto source = read_car_curve_source_record(record);
+    if (!source || record.size() < 0xccU) return false;
+    const auto word = [record](const std::size_t offset) {
+        std::uint32_t result{};
+        for (std::size_t i = 0; i < 4U; ++i)
+            result |= std::to_integer<std::uint32_t>(record[offset + i]) << (8U * i);
+        return result;
+    };
+    const auto curve = configure_acar_update_curve(0U, *source, fdiv_compatibility_enabled);
+    std::vector<NcarObjectFieldWrite> writes;
+    for (const auto& field : make_configured_update_curve_object_writes(curve, 0xbfcU))
+        writes.push_back({field.offset, field.width, field.value_bits});
+    constexpr float epsilon = std::bit_cast<float>(0x34000000U);
+    constexpr float scale = std::bit_cast<float>(0x3facfe73U);
+    constexpr float denominator = std::bit_cast<float>(0x3e587910U);
+    const float profile = std::bit_cast<float>(word(0xc8U));
+    const float selected_profile = std::fabs(profile) > epsilon
+        ? profile * scale : std::bit_cast<float>(0x3b03126fU);
+    writes.push_back({0xca0U, 4U, std::bit_cast<std::uint32_t>(denominator)});
+    writes.push_back({0xca4U, 4U, std::bit_cast<std::uint32_t>(1.0F / denominator)});
+    writes.push_back({0xcacU, 4U, std::bit_cast<std::uint32_t>(selected_profile)});
+    std::uint32_t count{};
+    for (; count < 7U; ++count)
+        if (!(std::bit_cast<float>(word(0x94U + count * 4U)) > 0.01F)) break;
+    writes.push_back({0xcb8U, 4U, count});
+    for (std::uint32_t i = 0; i < count; ++i)
+        writes.push_back({0xcc4U + i * 4U, 4U, word(0x94U + i * 4U)});
+    return apply_ncar_body_object_writes(body, writes);
+}
+
 namespace {
 
 using OrdinalPairPointer = std::optional<std::size_t>;

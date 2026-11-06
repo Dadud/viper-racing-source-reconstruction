@@ -966,6 +966,13 @@ geometry and signal scales from the entrant's own runtime record. The
 asset-backed wheel setup regression checks the response-scale write for all
 four wheels of each supplied car. This prepares persistent opponent state;
 the ACAR driver callbacks and physical update dispatch remain unconnected.
+Player and opponent construction now share
+`initialize_ncar_embedded_curve_and_selector`, which writes the configured
+curve and selector entries from each entrant's mapped record; the opponent
+also receives the common `0x42FF90` body `+0x50C` default. Asset-backed checks
+verify the curve and selector fields for all five supplied car records and
+reject a truncated record. The AI driver and wheel/body update callbacks are
+still required before these stored values can make opponents drive.
 
 `plan_acar_control_response` projects helper `0x42B570`, which runs between
 route steering and forward-candidate steering in `0x42B7B0`. It models the

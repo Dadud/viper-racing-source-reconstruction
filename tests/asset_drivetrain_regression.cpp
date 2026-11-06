@@ -82,6 +82,27 @@ int main(int argc, char** argv) {
             const auto source = viper::read_car_curve_source_record(record);
             require(source.has_value(), "curve source missing");
             const auto curve = viper::configure_acar_update_curve(0U, *source, false);
+            viper::NcarBodyRuntimeObjectState initialized_body{};
+            require(viper::initialize_ncar_embedded_curve_and_selector(initialized_body, record),
+                "asset embedded curve initialization failed");
+            for (const auto& field : viper::make_configured_update_curve_object_writes(curve, 0xbfcU)) {
+                if (field.width != 4U) continue;
+                const auto stored = viper::read_ncar_body_object_u32(initialized_body, field.offset);
+                require(stored && *stored == field.value_bits, "embedded curve field mismatch");
+            }
+            std::uint32_t expected_count{};
+            while (expected_count < 7U &&
+                    std::bit_cast<float>(word(record, 0x94U + expected_count * 4U)) > 0.01F)
+                ++expected_count;
+            const auto count = viper::read_ncar_body_object_u32(initialized_body, 0xcb8U);
+            require(count && *count == expected_count, "embedded selector count mismatch");
+            for (std::uint32_t i = 0; i < expected_count; ++i) {
+                const auto entry = viper::read_ncar_body_object_u32(initialized_body, 0xcc4U + i * 4U);
+                require(entry && *entry == word(record, 0x94U + i * 4U), "embedded selector entry mismatch");
+            }
+            require(!viper::initialize_ncar_embedded_curve_and_selector(
+                    initialized_body, std::span(record).first(0x80U)),
+                "truncated runtime records must fail embedded setup");
             const auto signal = viper::make_ncar_integrator_signal_state_from_runtime_record(record);
             const auto front = viper::derive_ncar_wheel_scalar_0x5c(record, 0U);
             const auto rear = viper::derive_ncar_wheel_scalar_0x5c(record, 2U);

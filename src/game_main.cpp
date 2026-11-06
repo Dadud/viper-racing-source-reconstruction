@@ -3173,66 +3173,10 @@ struct WindowState {
         }
         player_runtime_state.integrator_signal_constructor_state =
             *integrator_signal_state;
-        // The derived ACAR constructor configures its embedded curve and
-        // selector from the same mapped runtime car record. Persist the
-        // numeric fields consumed by the recovered PCAR callback branch.
-        const auto curve_source = viper::read_car_curve_source_record(
-            player_runtime_car_record);
-        if (!curve_source.has_value()) return false;
-        const auto configured_curve = viper::configure_acar_update_curve(
-            0U, *curve_source, host_fdiv_compatibility);
-        const auto runtime_word = [&](const std::uint32_t offset) {
-            std::uint32_t value{};
-            for (std::uint32_t byte = 0; byte < 4U; ++byte) {
-                value |= static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(
-                    player_runtime_car_record[offset + byte])) << (byte * 8U);
-            }
-            return value;
-        };
-        const auto runtime_float = [&](const std::uint32_t offset) {
-            return std::bit_cast<float>(runtime_word(offset));
-        };
-        std::array<viper::NcarObjectFieldWrite, 32> embedded_numeric_writes{};
-        std::size_t embedded_write_count{};
-        const auto write_embedded = [&](const std::uint32_t offset,
-                                        const std::uint8_t width,
-                                        const std::uint32_t bits) {
-            embedded_numeric_writes[embedded_write_count++] = {offset, width, bits};
-        };
-        const auto write_curve_float = [&](const std::uint32_t offset,
-                                           const float value) {
-            write_embedded(offset, 4U, std::bit_cast<std::uint32_t>(value));
-        };
-        for (const auto& curve_write :
-             viper::make_configured_update_curve_object_writes(
-                 configured_curve, 0xbfcU)) {
-            write_embedded(curve_write.offset, curve_write.width,
-                curve_write.value_bits);
-        }
-
-        constexpr float selector_epsilon = std::bit_cast<float>(0x34000000U);
-        constexpr float selector_scale = std::bit_cast<float>(0x3facfe73U);
-        constexpr float selector_denominator = std::bit_cast<float>(0x3e587910U);
-        const auto raw_profile = runtime_float(0xc8U);
-        const auto selector_profile = std::fabs(raw_profile) > selector_epsilon
-            ? raw_profile * selector_scale
-            : std::bit_cast<float>(0x3b03126fU);
-        write_curve_float(0xca0U, selector_denominator);
-        write_curve_float(0xca4U, 1.0F / selector_denominator);
-        write_curve_float(0xcacU, selector_profile);
-        std::uint32_t selector_count{};
-        for (; selector_count < 7U; ++selector_count) {
-            if (!(runtime_float(0x94U + selector_count * 4U) > 0.01F)) break;
-        }
-        write_embedded(0xcb8U, 4U, selector_count);
-        for (std::uint32_t index = 0; index < selector_count; ++index) {
-            write_embedded(0xcc4U + index * 4U, 4U,
-                runtime_word(0x94U + index * 4U));
-        }
-        if (!viper::apply_ncar_body_object_writes(
-                player_runtime_state.body_object,
-                std::span<const viper::NcarObjectFieldWrite>(
-                    embedded_numeric_writes.data(), embedded_write_count))) {
+        // Player and opponent cars share this embedded curve and selector setup.
+        if (!viper::initialize_ncar_embedded_curve_and_selector(
+                player_runtime_state.body_object, player_runtime_car_record,
+                host_fdiv_compatibility)) {
             player_runtime_car_record.clear();
             player_body_constructor_plan.reset();
             return false;
@@ -6335,7 +6279,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         {0xc8cU, 4U, std::bit_cast<std::uint32_t>(signal->limit_scale_0xc8c)},
                         {0xc90U, 4U, std::bit_cast<std::uint32_t>(signal->callback_scale_0xc90)}}};
                     if (!viper::apply_ncar_body_object_writes(body_state.body_object,
-                            shared_defaults)) {
+                            shared_defaults) ||
+                        !viper::initialize_ncar_embedded_curve_and_selector(
+                            body_state.body_object, record_bytes)) {
+                        stream_ok = false;
+                        break;
+                    }
+                    const viper::NcarObjectFieldWrite shared_integrator_default{
+                        0x50cU, 4U, std::bit_cast<std::uint32_t>(1.0F)};
+                    if (!viper::apply_ncar_body_object_writes(body_state.body_object,
+                            std::span(&shared_integrator_default, 1U))) {
                         stream_ok = false;
                         break;
                     }

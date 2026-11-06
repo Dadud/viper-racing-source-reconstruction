@@ -14,6 +14,12 @@
 
 namespace viper {
 
+// Materializes the numeric embedded curve and selector constructed for a car
+// from its mapped runtime record. Native pointer fields remain caller-owned.
+[[nodiscard]] bool initialize_ncar_embedded_curve_and_selector(
+    NcarBodyRuntimeObjectState& body, std::span<const std::byte> runtime_record,
+    bool fdiv_compatibility_enabled = false);
+
 inline constexpr std::uint32_t ncar_shared_zero_wheel_reference_address_0x508e80 =
     0x00508e80U;
 
