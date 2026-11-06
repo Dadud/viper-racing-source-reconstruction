@@ -72,6 +72,13 @@ struct IdealLineTrackData {
     std::size_t line_index,
     std::size_t channel = 0) noexcept;
 
+// Reads the three local attachment coordinates in the `camera` row of a
+// car's cockpit.tab BATS table. Returns nullopt when the row or any numeric
+// field is absent or malformed; callers can then apply the native constructor
+// fallback explicitly.
+[[nodiscard]] std::optional<std::array<float, 3>> parse_cockpit_camera_point(
+    const TrackObjectTextTable& table) noexcept;
+
 enum class TrackDirectiveKind {
     empty_or_unscannable,
     comment,

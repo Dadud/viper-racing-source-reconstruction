@@ -267,6 +267,15 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
             throw std::runtime_error(assets.track_name_ + " default.ili AI line is invalid");
     }
     assets.player_car_ = parse_car_file_resources(car_bundle, assets.car_name_, true);
+    if (const auto* cockpit_entry = car_bundle.find("cockpit.tab",
+            TrackObjectTextTable::bats_resource_type_code)) {
+        const auto cockpit_table = parse_track_object_text_table(
+            car_bundle.payload(*cockpit_entry));
+        if (cockpit_table) {
+            if (const auto camera_point = parse_cockpit_camera_point(*cockpit_table))
+                assets.player_camera_point_ = *camera_point;
+        }
+    }
     if (!assets.player_car_.car_file) {
         throw std::runtime_error(assets.car_name_ +
             " CARF version 6 resource is missing or invalid");
@@ -282,6 +291,15 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
         ai_car_bundle = &assets.bundles_[6];
     }
     assets.ai_car_ = parse_car_file_resources(*ai_car_bundle, "viper", false);
+    if (const auto* cockpit_entry = ai_car_bundle->find("cockpit.tab",
+            TrackObjectTextTable::bats_resource_type_code)) {
+        const auto cockpit_table = parse_track_object_text_table(
+            ai_car_bundle->payload(*cockpit_entry));
+        if (cockpit_table) {
+            if (const auto camera_point = parse_cockpit_camera_point(*cockpit_table))
+                assets.ai_camera_point_ = *camera_point;
+        }
+    }
     if (!assets.ai_car_.car_file)
         throw std::runtime_error("viper.car AI CARF version 6 resource is missing or invalid");
     for (std::size_t wheel_index = 0;

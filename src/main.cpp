@@ -204,7 +204,23 @@ int inspect_car(const std::filesystem::path& path, const std::string_view car_st
 {
     const auto bundle = viper::ResourceBundle::open(path);
     const auto resources = viper::parse_car_file_resources(bundle, car_stem, true);
+    std::array<float, 3> camera_point{-0.3F, 0.8F, 0.0F};
+    bool camera_point_from_cockpit = false;
+    if (const auto* cockpit = bundle.find("cockpit.tab",
+            viper::TrackObjectTextTable::bats_resource_type_code)) {
+        const auto table = viper::parse_track_object_text_table(bundle.payload(*cockpit));
+        if (table) {
+            if (const auto point = viper::parse_cockpit_camera_point(*table)) {
+                camera_point = *point;
+                camera_point_from_cockpit = true;
+            }
+        }
+    }
     std::cout << "bundle\t" << path.string() << '\n'
+              << "camera_point_source\t"
+              << (camera_point_from_cockpit ? "cockpit.tab" : "native fallback") << '\n'
+              << "camera_point\t" << camera_point[0] << '\t'
+              << camera_point[1] << '\t' << camera_point[2] << '\n'
               << "car_resource\t" << resources.names.car_file_resource_name << '\n'
               << "car_payload\t";
     if (resources.car_file) {

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -330,6 +331,38 @@ std::optional<std::string_view> track_object_text_line(
     }
     const auto* end = std::find(begin, begin + available, '\0');
     return std::string_view(begin, static_cast<std::size_t>(end - begin));
+}
+
+std::optional<std::array<float, 3>> parse_cockpit_camera_point(
+    const TrackObjectTextTable& table) noexcept
+{
+    const auto trim = [](std::string_view value) noexcept {
+        const auto is_space = [](const char ch) noexcept {
+            return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+        };
+        while (!value.empty() && is_space(value.front())) value.remove_prefix(1U);
+        while (!value.empty() && is_space(value.back())) value.remove_suffix(1U);
+        return value;
+    };
+
+    for (std::size_t row = 0U; row < table.line_count; ++row) {
+        const auto label = track_object_text_line(table, row, 0U);
+        if (!label || !equals_ascii_case_insensitive(trim(*label), "camera")) continue;
+
+        std::array<float, 3> point{};
+        for (std::size_t axis = 0U; axis < point.size(); ++axis) {
+            const auto field = track_object_text_line(table, row, axis + 1U);
+            if (!field) return std::nullopt;
+            const auto value = trim(*field);
+            if (value.empty()) return std::nullopt;
+            const auto parsed = std::from_chars(value.data(),
+                value.data() + value.size(), point[axis], std::chars_format::general);
+            if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() ||
+                !std::isfinite(point[axis])) return std::nullopt;
+        }
+        return point;
+    }
+    return std::nullopt;
 }
 
 TrackDirectiveObservation classify_track_directive(

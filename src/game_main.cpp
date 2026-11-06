@@ -11,6 +11,7 @@
 #include "viper/scene_font_8x8.hpp"
 #include "viper/race_participants.hpp"
 #include "viper/race_loop_callbacks.hpp"
+#include "viper/race_camera_control.hpp"
 #include "viper/race_progression.hpp"
 #include "viper/acar_curve_tracker.hpp"
 #include "viper/ai_notes_resource.hpp"
@@ -1198,12 +1199,23 @@ public:
             ideal_line_points_ = extract_ideal_line_points(ideal_line);
             extract_terrain_points(terrain);
             track_graphics_ = track_graphics;
+            terrain_surface_ = &terrain;
             const float detail_factor = 2.0F - detail_level;
             lod_scale_squared_ = std::isfinite(detail_factor)
                 ? detail_factor * detail_factor : 1.0F;
             player_model_ = &player_model;
             ai_model_ = &ai_model;
             player_car_bundle_ = &player_car_bundle;
+            player_camera_point_ = {-0.3F, 0.8F, 0.0F};
+            if (const auto* cockpit = player_car_bundle.find("cockpit.tab",
+                    viper::TrackObjectTextTable::bats_resource_type_code)) {
+                const auto table = viper::parse_track_object_text_table(
+                    player_car_bundle.payload(*cockpit));
+                if (table) {
+                    if (const auto point = viper::parse_cockpit_camera_point(*table))
+                        player_camera_point_ = *point;
+                }
+            }
             ai_car_bundle_ = &ai_car_bundle;
             shared_texture_bundle_ = &shared_texture_bundle;
             common_texture_bundle_ = &common_texture_bundle;
@@ -1324,6 +1336,7 @@ public:
                 const float focus_x, const float focus_z,
                 const std::array<float, 2>& camera_pan_clip,
                 const float camera_zoom,
+                const bool native_camera_follow,
                 const std::optional<std::filesystem::path>& capture_frame_path)
     {
         if (!target_ || !depth_target_ || !context_ || !swap_chain_ ||
@@ -1353,35 +1366,72 @@ public:
                 left[2] * right[0] - left[0] * right[2],
                 left[0] * right[1] - left[1] * right[0]};
         };
-        const auto vehicle_forward = normalize(
-            {vehicle[6], vehicle[7], vehicle[8]});
-        const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
-        const float chase_distance = 20.0F / zoom;
-        const float chase_height = 5.5F / zoom;
-        std::array<float, 3> target{
-            focus_x + vehicle_forward[0] * 5.0F,
-            vehicle[10] + 1.0F + vehicle_forward[1] * 5.0F +
-                camera_pan_clip[1] * 4.0F,
-            focus_z + vehicle_forward[2] * 5.0F};
-        std::array<float, 3> camera_position{
-            focus_x - vehicle_forward[0] * chase_distance,
-            vehicle[10] + chase_height,
-            focus_z - vehicle_forward[2] * chase_distance};
-        const auto camera_forward = normalize({
-            target[0] - camera_position[0],
-            target[1] - camera_position[1],
-            target[2] - camera_position[2]});
-        auto camera_right = normalize(cross({0.0F, 1.0F, 0.0F}, camera_forward));
-        if (std::abs(camera_right[0]) < 1.0e-5F &&
-            std::abs(camera_right[2]) < 1.0e-5F) {
-            camera_right = {1.0F, 0.0F, 0.0F};
+        std::array<float, 3> camera_position{};
+        std::array<float, 3> camera_forward{};
+        std::array<float, 3> camera_right{};
+        std::array<float, 3> camera_up{};
+        if (native_camera_follow) {
+            viper::RaceCameraMode0Input camera_input{};
+            camera_input.vehicle_transform_0x38 = vehicle;
+            camera_input.local_camera_point_0x47c = player_camera_point_;
+            if (terrain_surface_ != nullptr) {
+                const auto surface = viper::sample_terrain_resource(*terrain_surface_,
+                    {vehicle[9], vehicle[10], vehicle[11]}, true);
+                camera_input.ground_sample_found = surface.query_succeeded;
+                camera_input.ground_sample = surface.plane_normal;
+            }
+            // The runtime has not yet reconstructed body field +0xEA8; the
+            // native constructor initializes it to zero, so retain that value
+            // until the live body-state adapter publishes its later updates.
+            camera_input.vehicle_offset_factor_0xea8 = 0.0F;
+            const auto native_camera = viper::update_race_camera_mode_0(
+                camera_mode_0_state_, camera_input);
+            const auto& transform = native_camera.transform;
+            camera_position = {transform[9], transform[10], transform[11]};
+            camera_right = normalize({transform[0], transform[1], transform[2]});
+            camera_up = normalize({transform[3], transform[4], transform[5]});
+            camera_forward = normalize({transform[6], transform[7], transform[8]});
+
+            const float zoom_ratio = std::clamp(camera_zoom / 1.6F, 0.21875F, 2.8125F);
+            const std::array<float, 3> vehicle_position{
+                vehicle[9], vehicle[10], vehicle[11]};
+            for (std::size_t axis = 0; axis < 3U; ++axis) {
+                camera_position[axis] = vehicle_position[axis] +
+                    (camera_position[axis] - vehicle_position[axis]) / zoom_ratio +
+                    camera_right[axis] * camera_pan_clip[0] * 4.0F +
+                    camera_up[axis] * camera_pan_clip[1] * 4.0F;
+            }
+        } else {
+            const auto vehicle_forward = normalize(
+                {vehicle[6], vehicle[7], vehicle[8]});
+            const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
+            const float chase_distance = 20.0F / zoom;
+            const float chase_height = 5.5F / zoom;
+            std::array<float, 3> target{
+                focus_x + vehicle_forward[0] * 5.0F,
+                vehicle[10] + 1.0F + vehicle_forward[1] * 5.0F +
+                    camera_pan_clip[1] * 4.0F,
+                focus_z + vehicle_forward[2] * 5.0F};
+            camera_position = {
+                focus_x - vehicle_forward[0] * chase_distance,
+                vehicle[10] + chase_height,
+                focus_z - vehicle_forward[2] * chase_distance};
+            camera_forward = normalize({
+                target[0] - camera_position[0],
+                target[1] - camera_position[1],
+                target[2] - camera_position[2]});
+            camera_right = normalize(cross({0.0F, 1.0F, 0.0F}, camera_forward));
+            if (std::abs(camera_right[0]) < 1.0e-5F &&
+                std::abs(camera_right[2]) < 1.0e-5F) {
+                camera_right = {1.0F, 0.0F, 0.0F};
+            }
+            for (std::size_t axis = 0; axis < 3U; ++axis) {
+                const float pan = camera_right[axis] * camera_pan_clip[0] * 4.0F;
+                camera_position[axis] += pan;
+                target[axis] += pan;
+            }
+            camera_up = normalize(cross(camera_forward, camera_right));
         }
-        for (std::size_t axis = 0; axis < 3U; ++axis) {
-            const float pan = camera_right[axis] * camera_pan_clip[0] * 4.0F;
-            target[axis] += pan;
-            camera_position[axis] += pan;
-        }
-        const auto camera_up = normalize(cross(camera_forward, camera_right));
         const float near_plane = 0.1F;
         const float focal_scale = 1.0F / std::tan(65.0F *
             0.008726646259971648F);
@@ -2460,6 +2510,9 @@ private:
     std::vector<std::array<float, 2>> ideal_line_points_;
     std::vector<std::array<float, 3>> terrain_points_;
     std::vector<std::array<float, 3>> terrain_normals_;
+    const viper::TerrainSurfaceResourcePayload* terrain_surface_{};
+    std::array<float, 3> player_camera_point_{-0.3F, 0.8F, 0.0F};
+    viper::RaceCameraMode0State camera_mode_0_state_{};
     const viper::ModelResource* player_model_{};
     const viper::ModelResource* ai_model_{};
     const viper::ResourceBundle* player_car_bundle_{};
@@ -7782,7 +7835,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 : state.camera_anchor_world;
             if (render_frame && !state.graphics.render(state.hud_text(),
                     camera_focus[0], camera_focus[1], state.camera_pan_clip,
-                    state.camera_zoom, capture_frame_path)) {
+                    state.camera_zoom, state.camera_follow_player,
+                    capture_frame_path)) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
                 return 1;

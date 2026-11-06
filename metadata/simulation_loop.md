@@ -336,16 +336,35 @@ these effects.
 
 Mode 0 copies the selected vehicle transform and transforms the local camera
 point at `+0x47C` through its orientation into the camera position. It samples
-the world surface through `0x45F760`; a miss uses the vehicle's position-like
-triplet at transform indices 3..5, while a hit blends that triplet toward the
-sample point using the clamped plane-dot factor and the cached cosine of 30
-degrees. The selected target is low-pass filtered in persistent globals
+the world surface through `0x45F760`; a miss uses the vehicle's up-axis
+triplet at transform indices 3..5, while a hit blends that axis toward the
+returned terrain-plane normal using the clamped plane-dot factor and the cached
+cosine of 30 degrees. The selected target is low-pass filtered in persistent globals
 `0x507D00..0x507D08` with weights `0.050000012` and `0.95`. The branch forms a
 midpoint between that filtered target and the vehicle triplet, rebuilds and
 orthonormalizes the camera basis, and applies the vehicle-axis trailing offset
 from field `+0xEA8` at scale `-0.005`. `update_race_camera_mode_0` models these
 transform/state effects given the raw terrain-query result; the terrain query,
 common velocity setup, and common postprocess remain external.
+
+The mode-0 local camera point is initialized by the native car constructor,
+not synthesized by the race camera branch. At `0x433C00`, the constructor
+opens `<car>.car/cockpit.tab`, reads the row named `camera`, and stores its
+three numeric columns at `+0x47C..+0x484`; when that row is unavailable it
+writes the exact fallback `(-0.3, 0.8, 0.0)`. The Viper resource contains
+`cockpit.tab` as BATS version 0; its camera point is `(-0.408, 0.906, -0.791)`.
+The other four shipped car bundles (Sports, Sedan, Plane, and Exotic) do not
+contain `cockpit.tab` and therefore use the native fallback. The reconstruction
+parses this row through `parse_cockpit_camera_point` and exposes player and
+Viper-AI camera points from `GameAssets`. The normal follow view now calls
+`update_race_camera_mode_0` with the selected car transform, attachment point,
+and sampled terrain plane normal; the free camera remains available when follow
+mode is disabled. The camera uses body field `+0xEA8` as zero because its live
+body-state update is not yet connected. This integrates the modeled numeric
+camera branch, but the result has not been compared with an original camera
+capture, and the missing dynamic field can affect motion. Evidence: constructor
+instructions `0x433C5C..0x433D15`, camera branch `0x421120`, and BATS
+inventories of the five shipped car bundles.
 The shared look-at helper `0x4222A0` is also modeled: it rebuilds its matrix
 when squared target distance is at least 1 and either horizontal delta has
 magnitude at least 0.01. It normalizes the horizontal forward vector and the

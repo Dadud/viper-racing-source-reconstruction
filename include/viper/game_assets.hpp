@@ -48,6 +48,10 @@ public:
     { return ai_line_overrides_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const CarFileResourcePayloads& ai_car() const noexcept { return ai_car_; }
+    [[nodiscard]] const std::array<float, 3>& player_camera_point() const noexcept
+    { return player_camera_point_; }
+    [[nodiscard]] const std::array<float, 3>& ai_camera_point() const noexcept
+    { return ai_camera_point_; }
     [[nodiscard]] const std::optional<std::uint32_t>& track_index() const noexcept { return track_index_; }
     [[nodiscard]] const ModelResource& player_model() const noexcept { return player_model_; }
     [[nodiscard]] const ModelResource& ai_model() const noexcept { return ai_model_; }
@@ -81,6 +85,9 @@ private:
     AILineOverrideInventory ai_line_overrides_{AILineOverrideInventory::incomplete};
     CarFileResourcePayloads player_car_;
     CarFileResourcePayloads ai_car_;
+    // Native 0x433C00 fallback when cockpit.tab has no usable `camera` row.
+    std::array<float, 3> player_camera_point_{-0.3F, 0.8F, 0.0F};
+    std::array<float, 3> ai_camera_point_{-0.3F, 0.8F, 0.0F};
     std::optional<std::uint32_t> track_index_;
     ModelResource player_model_;
     ModelResource ai_model_;
