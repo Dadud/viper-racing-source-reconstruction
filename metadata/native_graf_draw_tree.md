@@ -99,12 +99,16 @@ test; it does not test horizontal or vertical frustum planes. The renderer now
 applies this predicate each frame using its chase-camera position/forward and
 the recovered 1000-unit axial limit; camera pose parity remains unverified.
 
-Camera setup at `0x0048940` copies camera position from its input matrix at
+Camera setup at `0x00448940` copies camera position from its input matrix at
 `+0x24` to `[0x00509B58..0x00509B60]` and its forward vector at `+0x18` to
-`[0x00509B48..0x00509B50]`. The function is called from scene-camera setup
-paths including `0x00410500` and `0x0045BD20`. This identifies the native camera
-state consumed by type-1 and type-2 selection, but the reconstruction's chase
-camera has not yet been mapped to those scene-camera matrices or conventions.
+`[0x00509B48..0x00509B50]`; it also derives the corresponding global view
+transform from the input basis and position. The routine is called with a
+stack-built matrix from `0x00410500` and with global matrix `0x0053A480` from
+`0x0045BD20`. The latter matrix is initialized to identity in the containing
+camera/scene setup path before those calls. This identifies the native camera
+state consumed by type-1 and type-2 selection, but does not yet map the
+reconstruction's race chase camera to either native call path or establish the
+matrix conventions used during an ordinary race.
 
 ## Reconstruction status
 
