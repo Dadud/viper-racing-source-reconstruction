@@ -204,7 +204,7 @@ target_sources(viper_physics_scheduler PRIVATE
 )
 target_include_directories(viper_physics_scheduler PUBLIC include)
 target_compile_features(viper_physics_scheduler PUBLIC cxx_std_20)
-target_link_libraries(viper_physics_scheduler PUBLIC viper_update_curve)
+target_link_libraries(viper_physics_scheduler PUBLIC viper_update_curve viper_ncar_model)
 target_link_libraries(viper_scene_model PUBLIC viper_physics_scheduler)
 
 add_library(viper_timed_event_queue src/timed_event_queue.cpp)

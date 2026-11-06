@@ -1,5 +1,7 @@
 #include "viper/physics_task_stream.hpp"
 #include "viper/physics_task_factory.hpp"
+#include "viper/acar_driver_ai.hpp"
+#include "viper/ncar_state.hpp"
 #include "viper/world_track_objects.hpp"
 
 #include <algorithm>
@@ -77,6 +79,23 @@ std::uint32_t read_u32_le(const std::span<const std::byte> bytes,
 int main()
 {
     try {
+        require(viper::plan_acar_prerace_control(0U, 29).throttle_bits_0xde0 == 0x3f800000U &&
+                viper::plan_acar_prerace_control(0U, 30).throttle_bits_0xde0 == 0U &&
+                viper::plan_acar_prerace_control(0x3f800000U, 49).throttle_bits_0xde0 == 0x3f800000U &&
+                viper::plan_acar_prerace_control(0x3f800000U, 50).throttle_bits_0xde0 == 0U &&
+                viper::plan_acar_prerace_control(0x3f7fffffU, 30).threshold == 30,
+            "ACAR pre-race throttle must use exact previous bits and native random boundaries");
+        viper::NcarBodyRuntimeObjectState prerace_body{};
+        require(!viper::apply_acar_prerace_control(prerace_body, 29) &&
+                !viper::read_ncar_body_object_u32(prerace_body, 0xde0U),
+            "pre-race control must reject an unavailable previous input");
+        const viper::NcarObjectFieldWrite prior_control{0xc34U, 4U, 0x3f800000U};
+        require(viper::apply_ncar_body_object_writes(prerace_body, std::span(&prior_control, 1U)) &&
+                viper::apply_acar_prerace_control(prerace_body, 49) &&
+                viper::read_ncar_body_object_u32(prerace_body, 0xde0U) == 0x3f800000U &&
+                viper::apply_acar_prerace_control(prerace_body, 50) &&
+                viper::read_ncar_body_object_u32(prerace_body, 0xde0U) == 0U,
+            "pre-race control must persist the selected throttle to the body");
         viper::PhysicsAcarRuntimeInitializationObservation ai_init{};
         ai_init.linked_object_value_0x18 = 2.0F;
         ai_init.last_model_node_value_0x18 = 4.0F;

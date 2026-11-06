@@ -1,12 +1,34 @@
 #include "viper/acar_driver_ai.hpp"
 
 #include "viper/legacy_fdiv.hpp"
+#include "viper/ncar_state.hpp"
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 
 namespace viper {
+
+AcarPreraceControlPlan plan_acar_prerace_control(
+    const std::uint32_t previous_value_bits_0xc34, const std::int32_t random_draw) noexcept
+{
+    AcarPreraceControlPlan plan{};
+    plan.threshold = previous_value_bits_0xc34 == 0x3f800000U ? 50 : 30;
+    plan.throttle_bits_0xde0 = random_draw < plan.threshold ? 0x3f800000U : 0U;
+    return plan;
+}
+
+std::optional<AcarPreraceControlPlan> apply_acar_prerace_control(
+    NcarBodyRuntimeObjectState& body, const std::int32_t random_draw) noexcept
+{
+    const auto previous = read_ncar_body_object_u32(body, 0xc34U);
+    if (!previous) return std::nullopt;
+    const auto plan = plan_acar_prerace_control(*previous, random_draw);
+    const NcarObjectFieldWrite write{0xde0U, 4U, plan.throttle_bits_0xde0};
+    if (!apply_ncar_body_object_writes(body, std::span(&write, 1U))) return std::nullopt;
+    return plan;
+}
+
 namespace {
 
 bool signed_bits_less(const float value, const std::uint32_t boundary) noexcept

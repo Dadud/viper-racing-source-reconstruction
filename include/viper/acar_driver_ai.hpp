@@ -11,6 +11,22 @@
 
 namespace viper {
 
+struct NcarBodyRuntimeObjectState;
+
+struct AcarPreraceControlPlan {
+    std::int32_t random_scale{100};
+    std::int32_t threshold{};
+    std::uint32_t throttle_bits_0xde0{};
+};
+
+// 0x42A930 consumes one 0x4193F0(100) draw and writes 0 or 1 via
+// 0x4331A0. The previous +0xC34 comparison is an exact DWORD comparison.
+[[nodiscard]] AcarPreraceControlPlan plan_acar_prerace_control(
+    std::uint32_t previous_value_bits_0xc34, std::int32_t random_draw) noexcept;
+// Applies the recovered setter to initialized byte-backed body state.
+[[nodiscard]] std::optional<AcarPreraceControlPlan> apply_acar_prerace_control(
+    NcarBodyRuntimeObjectState& body, std::int32_t random_draw) noexcept;
+
 struct AcarDriverRouteRecord {
     std::int16_t owner_0x00{};
     // Two XZ vectors consumed by 0x41F0A0 and 0x41F0E0.

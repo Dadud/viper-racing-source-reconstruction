@@ -30,6 +30,16 @@ projection. The retained analysis bundle is
 
 ### ACAR task callsite at `0x42AB20`
 
+The pre-race helper `0x42A930`, reached when body `+0x4FC < 2`, consumes one
+shared `0x4193F0(100)` draw and calls `0x4331A0` to write body `+0xDE0`.
+It compares the raw DWORD at `+0xC34` to `0x3F800000`: equality selects a
+threshold of 50, otherwise 30; the write is 1.0 when the signed draw is below
+that threshold, and zero otherwise. `plan_acar_prerace_control` and its
+byte-backed adapter model this branch and reject unavailable `+0xC34` state.
+The live opponent callback does not yet dispatch it: the native task ordering,
+shared random draw order and subsequent four-wheel integration must be joined
+before this can be treated as opponent physics.
+
 The checked-in x86 listing `disasm/engine_.text.asm` establishes the ACAR
 task's call order into the shared integrator. At entry `0x42AB20`, it compares
 body `+0x4FC` with 2. Values below 2 branch to `0x42A930` and then call
