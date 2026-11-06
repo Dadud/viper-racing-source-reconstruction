@@ -3566,11 +3566,6 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
             curve_factor_input.wheel_scalar_0x5c = spin_input.wheel_scalar_0x5c;
             curve_factor_input.derive_rolling_surface_speed = true;
         }
-        if (curve_factor_input.derive_rolling_surface_speed) {
-            curve_factor_input.rolling_surface_speed =
-                curve_factor_input.wheel_spin_rate_0x124 *
-                curve_factor_input.wheel_scalar_0x5c;
-        }
         if (input.derive_wheel_moment_vectors) {
             auto moment_input = input.wheel_moment_vector_inputs[wheel];
             moment_input.body_basis_0x38_to_0x58 =

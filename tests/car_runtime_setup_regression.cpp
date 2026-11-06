@@ -963,6 +963,37 @@ int main()
         ordinary_tire_factor_input.use_reference_speed_scale_0x1c = true;
         const auto ordinary_tire_response = viper::derive_tire_wheel_response(
             {}, ordinary_tire_factor_input);
+        auto wheel_spin_input = ordinary_tire_factor_input;
+        wheel_spin_input.derive_rolling_surface_speed = true;
+        wheel_spin_input.wheel_spin_rate_0x124 = 4.0F;
+        wheel_spin_input.wheel_scalar_0x5c = 0.5F;
+        wheel_spin_input.rolling_surface_speed = -123.0F;
+        const auto rolling_at_body_speed = viper::derive_tire_wheel_response(
+            {}, wheel_spin_input);
+        wheel_spin_input.wheel_spin_rate_0x124 = 8.0F;
+        const auto spinning_faster = viper::derive_tire_wheel_response(
+            {}, wheel_spin_input);
+        auto explicit_speed_input = wheel_spin_input;
+        explicit_speed_input.derive_rolling_surface_speed = false;
+        explicit_speed_input.rolling_surface_speed = 4.0F;
+        const auto explicit_speed = viper::derive_tire_wheel_response(
+            {}, explicit_speed_input);
+        require(rolling_at_body_speed.factors.lateral_ratio == 0.0F &&
+                spinning_faster.factors.lateral_ratio != 0.0F &&
+                spinning_faster.factors.lateral_ratio == explicit_speed.factors.lateral_ratio &&
+                spinning_faster.dynamics_component_0x2c == explicit_speed.dynamics_component_0x2c,
+            "tire response must derive rolling speed from the post-update wheel rate and wheel scalar");
+        auto matched_factors = rolling_at_body_speed.factors;
+        auto spinning_factors = spinning_faster.factors;
+        matched_factors.trigonometric_response = 1.0F;
+        spinning_factors.trigonometric_response = 1.0F;
+        const auto matched_force = viper::derive_wheel_tire_response_vector({
+            matched_factors, {1.0F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F}, 1.0F});
+        const auto spinning_force = viper::derive_wheel_tire_response_vector({
+            spinning_factors, {1.0F, 0.0F, 0.0F}, {0.0F, 1.0F, 0.0F}, 1.0F});
+        require(std::isfinite(matched_force.z) && std::isfinite(spinning_force.z) &&
+                matched_force.z != spinning_force.z,
+            "wheel-speed-derived slip must reach tire response vector assembly");
         const viper::TireWheelResponseFactors response_assembly_factors{
             2.0F, 3.0F, 29.0F, 5.0F, 7.0F, 11.0F, 13.0F,
             17.0F, 19.0F, 23.0F, 31.0F};

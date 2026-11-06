@@ -1385,9 +1385,12 @@ TireWheelResponseDerivation derive_tire_wheel_response(
         }
         low_speed_weight = std::abs(reference_speed) / reference_speed_limit;
     }
+    const float rolling_surface_speed = input.derive_rolling_surface_speed
+        ? input.wheel_spin_rate_0x124 * input.wheel_scalar_0x5c
+        : input.rolling_surface_speed;
     const auto ratios = derive_wheel_kinematic_ratios(
         input.lateral_velocity, input.longitudinal_velocity,
-        input.rolling_surface_speed, reference_speed);
+        rolling_surface_speed, reference_speed);
     const auto curves = evaluate_tire_response_curves(
         input.curves, curve_input);
     const auto slip_curve = evaluate_tire_slip_curve(

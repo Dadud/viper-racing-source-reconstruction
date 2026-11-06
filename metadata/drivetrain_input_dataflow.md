@@ -205,6 +205,14 @@ This establishes a source-backed path from that argument to the wheel
 spin-response input; it does not yet identify engine torque, prove that
 throttle supplies the argument, or establish original numeric parity.
 
+The live player's tire call set `derive_rolling_surface_speed`, but the shared
+response function previously ignored that flag and used its default zero
+rolling speed. The function now derives the `0x44345D` wheel-spin times
+`+0x5C` input itself; the separate four-wheel path uses the same behavior.
+Regression checks that matching wheel/body speed yields zero mismatch and
+that faster wheel rotation changes the tire response vector. Grounded vehicle
+acceleration and agreement with the original remain unverified.
+
 After the `+0xC98` animation-controller update, `0x431150` calls the virtual getter at PCAR
 `+0xCE4`, multiplies its result by `+0xDD0`, and stores `+0xDDC`. The selected
 D-block getter identity is resolved, while its runtime result is still bounded
