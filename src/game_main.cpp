@@ -2704,6 +2704,9 @@ struct AcarBodyRuntimeState {
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
+    std::array<viper::TireDefinition, 4> tire_definitions{};
+    std::array<viper::TireResponseCurveSet, 4> tire_response_curves{};
+    std::array<viper::TireTrigonometricTerms, 4> tire_trigonometric_terms{};
 };
 
 struct WindowState;
@@ -6307,6 +6310,35 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         stream_ok = false;
                         break;
                     }
+                    // The shared 0x433C00 initialization also supplies the
+                    // geometry and callback scales consumed by wheel updates.
+                    const auto callback_setup =
+                        viper::initialize_ncar_integrator_wheel_callback_setup_from_runtime_record(
+                            record_bytes);
+                    const auto signal = viper::make_ncar_integrator_signal_state_from_runtime_record(
+                        record_bytes);
+                    const float body_shift = std::bit_cast<float>(
+                        read_u32_le(record_bytes.data() + 0x128U));
+                    if (!callback_setup || !signal || !std::isfinite(body_shift)) {
+                        stream_ok = false;
+                        break;
+                    }
+                    const float scaled_body_shift = body_shift * 0.0174F;
+                    const std::array<viper::NcarObjectFieldWrite, 9> shared_defaults{{
+                        {0xd7cU, 4U, 0U},
+                        {0xd80U, 4U, std::bit_cast<std::uint32_t>(scaled_body_shift)},
+                        {0xd84U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd84)},
+                        {0xd88U, 4U, 0U},
+                        {0xd8cU, 4U, std::bit_cast<std::uint32_t>(scaled_body_shift)},
+                        {0xd90U, 4U, std::bit_cast<std::uint32_t>(callback_setup->value_0xd90)},
+                        {0xdccU, 4U, std::bit_cast<std::uint32_t>(callback_setup->angle_0xdcc)},
+                        {0xc8cU, 4U, std::bit_cast<std::uint32_t>(signal->limit_scale_0xc8c)},
+                        {0xc90U, 4U, std::bit_cast<std::uint32_t>(signal->callback_scale_0xc90)}}};
+                    if (!viper::apply_ncar_body_object_writes(body_state.body_object,
+                            shared_defaults)) {
+                        stream_ok = false;
+                        break;
+                    }
                     body_state.wheel_core_initialization =
                         viper::initialize_ncar_four_wheel_core({
                             record_bytes, ai_model.vertices,
@@ -6344,7 +6376,30 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         body_state.wheel_tire_setups[wheel] =
                             viper::initialize_ncar_wheel_tire_setup(
                                 record_bytes, wheel, ai_wheel_tires[wheel], false);
-                        if (!body_state.wheel_tire_setups[wheel].has_value()) {
+                        if (!body_state.wheel_tire_setups[wheel].has_value() ||
+                            !viper::apply_ncar_wheel_tire_response_scale(
+                                body_state.wheel_objects[wheel], wheel_offset,
+                                *body_state.wheel_tire_setups[wheel])) {
+                            stream_ok = false;
+                            break;
+                        }
+                        body_state.tire_definitions[wheel] = ai_wheel_tires[wheel];
+                        body_state.tire_response_curves[wheel] =
+                            viper::derive_tire_response_curves(ai_wheel_tires[wheel]);
+                        body_state.tire_trigonometric_terms[wheel] =
+                            viper::derive_tire_trigonometric_terms(ai_wheel_tires[wheel]);
+                        const auto& curves = body_state.tire_response_curves[wheel];
+                        const auto& trig = body_state.tire_trigonometric_terms[wheel];
+                        const std::array<float, 13> tire_fields{
+                            curves.quadratic.quadratic, curves.quadratic.linear,
+                            curves.linear.slope, curves.linear.intercept,
+                            curves.quadratic_scale_at_0x10, curves.quadratic_scale_at_0x14,
+                            curves.linear_scale_at_0x18, curves.input_limit_at_0x38,
+                            curves.input_slope_at_0x3c, trig.coefficient_0x1c,
+                            trig.coefficient_0x20, trig.coefficient_0x24,
+                            trig.coefficient_0x28};
+                        if (!std::all_of(tire_fields.begin(), tire_fields.end(),
+                                [](float value) { return std::isfinite(value); })) {
                             stream_ok = false;
                             break;
                         }

@@ -959,6 +959,14 @@ floor or the guarded quotient-derived floor; the model preserves raw DWORD
 comparisons and the `0x4D52BC` message call. Evidence: `0x42B450`
 `ev_c87026ab2af0c0804aa374fae72a416a83460f626bb9c2adfba092b4da9287e5`.
 
+The live ACAR constructor state now retains each selected tire definition and
+its derived response/trigonometric fields, and writes the tire response scale
+to wheel `+0x90`. It also materializes the shared `0x433C00` wheel-callback
+geometry and signal scales from the entrant's own runtime record. The
+asset-backed wheel setup regression checks the response-scale write for all
+four wheels of each supplied car. This prepares persistent opponent state;
+the ACAR driver callbacks and physical update dispatch remain unconnected.
+
 `plan_acar_control_response` projects helper `0x42B570`, which runs between
 route steering and forward-candidate steering in `0x42B7B0`. It models the
 direction-change squeeze path, auxiliary response decay, conditional edge

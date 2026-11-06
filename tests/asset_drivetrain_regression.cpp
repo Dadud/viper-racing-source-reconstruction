@@ -37,6 +37,10 @@ int main(int argc, char** argv) {
     try {
         const std::filesystem::path root(argv[1]);
         const auto common = viper::ResourceBundle::open(root / "common.res");
+        const auto* tire_entry = common.find("def_tire.tir", 0x54495245U);
+        require(tire_entry != nullptr, "default tire missing");
+        const auto tire = viper::parse_tire_resource(common.payload(*tire_entry));
+        require(tire.has_value(), "default tire invalid");
         const auto track = viper::ResourceBundle::open(root / "bemidji.trk");
         const auto* line_entry = track.find("track.ild", 0x494c494eU);
         require(line_entry != nullptr, "Bemidji track spline missing");
@@ -65,6 +69,16 @@ int main(int argc, char** argv) {
             require(viper::apply_car_file_runtime_mapping(record, *preparation.mapping), "car mapping failed");
             write_word(record, 0U, 0x50434152U);
             write_word(record, 4U, static_cast<std::uint32_t>(record.size()));
+            for (std::size_t wheel = 0; wheel < 4U; ++wheel) {
+                const auto base = 0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel);
+                viper::NcarWheelRuntimeObjectState object{};
+                const auto setup = viper::initialize_ncar_wheel_tire_setup(record, wheel, *tire, false);
+                require(setup && viper::apply_ncar_wheel_tire_response_scale(object, base, *setup),
+                    "asset tire scale could not initialize wheel");
+                const auto written = viper::read_ncar_wheel_object_u32(object, 0x90U);
+                require(written && *written == std::bit_cast<std::uint32_t>(setup->tire_response_object_0x2c),
+                    "asset tire scale must persist on each wheel");
+            }
             const auto source = viper::read_car_curve_source_record(record);
             require(source.has_value(), "curve source missing");
             const auto curve = viper::configure_acar_update_curve(0U, *source, false);
