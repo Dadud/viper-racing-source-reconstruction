@@ -44,6 +44,16 @@ their own ILIN data, so this finding is specifically about the separate
 `default.ili`/ADNT lookup resources and is not evidence that ideal-line data is
 absent.
 
+The ACAR constructor obtains its model through `0x419FF0`, which returns the
+`+0x10` geometry object of the per-car manager created by `0x41AF00` and
+`0x419E50`. That manager's `0x419D80` lookup walks AI line candidates; its
+geometry is therefore not automatically the race service's `track.ild`.
+`make_acar_model_node_observations` converts a normalized, independently selected
+AI ILIN resource into linked captures for the existing `0x429440` descriptor
+projection, including the fields needed by the later threshold calculation.
+Its synthetic-node regression tests the conversion and descriptor handoff; it
+does not resolve missing sidecars or establish live opponent driving.
+
 Evidence from `race.bin` (SHA-256
 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`):
 

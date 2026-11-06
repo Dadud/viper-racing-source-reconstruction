@@ -117,10 +117,35 @@ int main()
         write_curve_float(0U, 0x08U, -3.0F);
         write_curve_float(0U, 0x0cU, 2.0F);
         write_curve_float(0U, 0x10U, 4.0F);
+        write_curve_float(0U, 0x18U, 6.0F);
+        write_curve_float(0U, 0x1cU, 0.025F);
         write_curve_float(0U, 0x20U, 5.0F);
+        write_curve_float(0U, 0x38U, 8.0F);
         write_curve_float(0U, 0x3cU, 7.0F);
         track_curve.records[0][0x2aU] = std::byte{3};
         const auto curve_nodes = viper::make_track_curve_nodes(track_curve);
+        const auto model_nodes = viper::make_acar_model_node_observations(track_curve);
+        require(model_nodes && model_nodes->size() == 2U &&
+                (*model_nodes)[0].address == 1U && (*model_nodes)[0].next_address == 2U &&
+                (*model_nodes)[1].next_address == 1U &&
+                (*model_nodes)[0].scalar_at_0x1c == 0.025F &&
+                (*model_nodes)[0].value_0x18 == 6.0F &&
+                (*model_nodes)[0].value_0x20 == 5.0F &&
+                (*model_nodes)[0].value_0x38 == 8.0F,
+            "AI line nodes must preserve descriptor and threshold source values");
+        viper::PhysicsAcarTaskConstructorObservation descriptor_input{};
+        descriptor_input.model_data_present = true;
+        descriptor_input.model_data_object_address = 0x1000U;
+        descriptor_input.model_descriptor_count = 2U;
+        descriptor_input.model_descriptor_allocation_succeeded = true;
+        descriptor_input.helper_0x41b020_nonzero = true;
+        descriptor_input.model_nodes = *model_nodes;
+        const auto descriptors = viper::plan_physics_acar_task_constructor(descriptor_input);
+        require(!descriptors.model_helper_input_capture_incomplete &&
+                descriptors.model_descriptors.size() == 2U &&
+                descriptors.model_descriptors[0].source_node_address == 1U &&
+                descriptors.model_descriptors[1].source_node_address == 2U,
+            "AI line node captures must feed the recovered descriptor constructor");
         require(curve_nodes && curve_nodes->nodes.size() == 2U &&
                 curve_nodes->nodes[0].address == 1U &&
                 curve_nodes->nodes[0].next_address == 2U &&
@@ -136,6 +161,8 @@ int main()
         track_curve.next_indices[1] = 2U;
         require(!viper::make_track_curve_nodes(track_curve),
             "track curve adapter must reject an out-of-range link");
+        require(!viper::make_acar_model_node_observations(track_curve),
+            "AI line node adapter must reject an out-of-range link");
         viper::TrackCurveNodes straight_curve{};
         straight_curve.nodes = {
             {1U, 2U, 0.0F, 0.0F, 10.0F, 0.0F, 10.0F, 0.0F},

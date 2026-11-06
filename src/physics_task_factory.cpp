@@ -1,10 +1,12 @@
 #include "viper/physics_task_factory.hpp"
 #include "viper/legacy_fdiv.hpp"
+#include "viper/world_track_objects.hpp"
 
 #include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
+#include <limits>
 
 namespace viper {
 namespace {
@@ -1454,6 +1456,28 @@ PhysicsObstacleTaskConstructorPlan plan_physics_obstacle_task_constructor(
     }
     plan.cached_basis_copied = true;
     return plan;
+}
+
+std::optional<std::vector<PhysicsAcarModelNodeObservation>>
+make_acar_model_node_observations(const IdealLineTrackData& line)
+{
+    if (line.records.empty() || line.records.size() != line.next_indices.size() ||
+        line.records.size() >= std::numeric_limits<std::uint32_t>::max()) return std::nullopt;
+    std::vector<PhysicsAcarModelNodeObservation> nodes;
+    nodes.reserve(line.records.size());
+    for (std::size_t i = 0; i < line.records.size(); ++i) {
+        if (line.next_indices[i] >= line.records.size()) return std::nullopt;
+        const auto read_float = [&line, i](const std::size_t offset) {
+            std::uint32_t bits{};
+            for (std::size_t byte = 0; byte < 4U; ++byte)
+                bits |= std::to_integer<std::uint32_t>(line.records[i][offset + byte]) << (8U * byte);
+            return std::bit_cast<float>(bits);
+        };
+        nodes.push_back({static_cast<std::uint32_t>(i + 1U),
+            static_cast<std::uint32_t>(line.next_indices[i] + 1U),
+            read_float(0x1cU), read_float(0x18U), read_float(0x20U), read_float(0x38U)});
+    }
+    return nodes;
 }
 
 void initialize_acar_derived_constructor_prefix(

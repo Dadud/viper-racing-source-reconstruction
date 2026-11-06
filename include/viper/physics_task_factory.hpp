@@ -778,7 +778,15 @@ struct PhysicsAcarModelNodeObservation {
     std::uint32_t address{};
     std::uint32_t next_address{};
     float scalar_at_0x1c{};
+    float value_0x18{};
+    float value_0x20{};
+    float value_0x38{};
 };
+
+// Converts a normalized AI ILIN resource to synthetic linked-node captures.
+// The caller must establish that the resource is the AI-selected line.
+[[nodiscard]] std::optional<std::vector<PhysicsAcarModelNodeObservation>>
+make_acar_model_node_observations(const IdealLineTrackData& line);
 
 // ACAR extends the inherited 0xEF0-byte car body to 0x1080 bytes. Preserve
 // byte-level initialization information for the derived fields separately.
