@@ -4176,9 +4176,13 @@ struct WindowState {
                 const auto& contact = player_wheel_contact_observations[wheel];
                 const auto& suspension = player_wheel_update_results[wheel]
                     .suspension.base;
+                const auto& prior_point_velocity =
+                    tick.wheel_body_point_velocities_0x130[wheel];
+                if (!prior_point_velocity) return false;
                 const auto collision_input =
                     viper::make_ncar_wheel_collision_impulse_input_from_objects(
                         player_runtime_state.body_object, wheel_object,
+                        *prior_point_velocity,
                         contact.query_contact_normal,
                         player_wheel_update_results[wheel].contact.clamped_contact_depth,
                         suspension.threshold_adjustment,

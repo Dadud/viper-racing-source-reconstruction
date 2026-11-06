@@ -909,7 +909,8 @@ Evidence: `ev_57280023502a2833f346abb76e73c8e606ca8e74e86c5ff1b9e352026e217206`,
 assembly `0x0044254C..0x00442609`.
 
 For a later response branch, `0x442530` calls `0x42F100` with body position,
-velocity, mass, a 3-by-3 angular-response matrix, contact point, plane normal,
+the previously sampled `+0x130` point velocity, mass, a 3-by-3 angular-response
+matrix, wheel application point `+0xC8`, plane normal,
 and restitution `0.0`. The routine returns zero unless normal velocity is
 negative and the effective denominator is non-negligible. Otherwise its
 observed calculation is:
@@ -919,8 +920,15 @@ n = normalize(contact_normal)
 r = contact_point - body_center
 q = angular_response_matrix * (n x r)
 denominator = 1 / body_mass + n dot (r x q)
-response = -(1 + restitution) * (n dot body_velocity) / denominator
+response = -(1 + restitution) * (n dot point_velocity) / denominator
 ```
+
+The live player and composed four-wheel path now pass that prior-point
+velocity rather than body-center velocity; the composed path also uses the
+application point for the impulse arm. This matters when angular motion makes
+the wheel point move differently from the body center. A focused adapter
+fixture checks that a moving point can produce an impulse even when the body
+center has no supplied linear velocity.
 
 Positive results are capped at `100000`. This recovered calculation is
 implemented by `solve_normal_contact_impulse` in `src/vehicle_setup.cpp`. The

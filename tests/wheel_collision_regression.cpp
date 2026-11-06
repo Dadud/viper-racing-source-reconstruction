@@ -216,6 +216,32 @@ int main()
     require(std::abs(response.normal_response - 0.5F) < 1e-6F);
     require(std::abs(response.duration - 100.0F) < 1e-5F);
 
+    viper::NcarBodyRuntimeObjectState collision_body{};
+    std::array<viper::NcarObjectFieldWrite, 13> collision_body_fields{};
+    for (std::size_t i = 0; i < 3U; ++i)
+        collision_body_fields[i] = {0x5cU + static_cast<std::uint32_t>(i * 4U), 4U, 0U};
+    collision_body_fields[3] = {0x1f0U, 4U, std::bit_cast<std::uint32_t>(1.0F)};
+    for (std::size_t i = 0; i < 9U; ++i)
+        collision_body_fields[4U + i] = {0x264U + static_cast<std::uint32_t>(i * 4U), 4U,
+            std::bit_cast<std::uint32_t>(i % 4U == 0U ? 1.0F : 0.0F)};
+    require(viper::apply_ncar_body_object_writes(collision_body, collision_body_fields));
+    viper::NcarWheelRuntimeObjectState collision_wheel{};
+    const std::array<viper::NcarObjectFieldWrite, 4> collision_wheel_fields{{
+        {0x554U + 0xc8U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0x554U + 0xccU, 4U, 0U}, {0x554U + 0xd0U, 4U, 0U},
+        {0x554U + 0x20U, 1U, 0U}}};
+    require(viper::apply_ncar_wheel_object_writes(collision_wheel, 0x554U, collision_wheel_fields));
+    const auto rotating_collision = viper::make_ncar_wheel_collision_impulse_input_from_objects(
+        collision_body, collision_wheel, {0.0F, -2.0F, 0.0F},
+        {0.0F, 1.0F, 0.0F}, 0.1F, 0.5F, false);
+    require(rotating_collision && rotating_collision->body_velocity.y == -2.0F &&
+        rotating_collision->contact_point.x == 1.0F &&
+        viper::prepare_wheel_collision_impulse(*rotating_collision).applied);
+    require(!viper::make_ncar_wheel_collision_impulse_input_from_objects(
+        collision_body, collision_wheel,
+        {0.0F, std::numeric_limits<float>::quiet_NaN(), 0.0F},
+        {0.0F, 1.0F, 0.0F}, 0.1F, 0.5F, false));
+
     viper::NcarPointImpulseAccumulator accumulator{};
     std::uint8_t damage_flag = 0U;
     auto application = viper::apply_wheel_collision_impulse(

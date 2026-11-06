@@ -3189,6 +3189,7 @@ std::optional<WheelCollisionImpulseInput>
 make_ncar_wheel_collision_impulse_input_from_objects(
     const NcarBodyRuntimeObjectState& body,
     const NcarWheelRuntimeObjectState& wheel,
+    const PhysicsVector3& prior_contact_point_velocity,
     const PhysicsVector3& contact_normal,
     const float contact_depth,
     const float contact_threshold_response_0x28,
@@ -3222,9 +3223,12 @@ make_ncar_wheel_collision_impulse_input_from_objects(
 
     WheelCollisionImpulseInput input{};
     if (!read_body_vector(0x05cU, input.body_center) ||
-        !read_body_vector(0x234U, input.body_velocity)) {
+        !std::isfinite(prior_contact_point_velocity.x) ||
+        !std::isfinite(prior_contact_point_velocity.y) ||
+        !std::isfinite(prior_contact_point_velocity.z)) {
         return std::nullopt;
     }
+    input.body_velocity = prior_contact_point_velocity;
     const auto body_mass = read_body_float(0x1f0U);
     if (!body_mass) return std::nullopt;
     input.body_mass = *body_mass;
@@ -3699,8 +3703,8 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
         collision_input.body_center = kinematics_at_step_start.position;
         collision_input.body_velocity = kinematics_at_step_start.linear_velocity;
         if (input.wheel_contact_pipeline_enabled) {
-            collision_input.contact_point =
-                result.wheel_contact_states[wheel].contact_point_0x130;
+            collision_input.body_velocity = result.wheel_point_velocities_0x43e9b0[wheel];
+            collision_input.contact_point = wheel_application_point;
         }
         result.wheel_collisions.wheel_results[wheel] = apply_wheel_collision_impulse(
             result.point_impulse_state,

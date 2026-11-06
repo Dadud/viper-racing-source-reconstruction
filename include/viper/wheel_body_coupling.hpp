@@ -558,12 +558,14 @@ make_ncar_integrator_mode_force_input_from_objects(
     const std::array<NcarWheelRuntimeObjectState, 4>& wheels) noexcept;
 
 // Builds the source-backed 0x42F100 operands from the shared PCAR body and
-// wheel objects. Contact geometry/threshold come from the current wheel pass;
+// wheel objects. The velocity is the prior contact-point velocity sampled
+// before the terrain query, while contact geometry/threshold come from the current wheel pass;
 // the unresolved global 0x50878C damage gate remains optional.
 [[nodiscard]] std::optional<WheelCollisionImpulseInput>
 make_ncar_wheel_collision_impulse_input_from_objects(
     const NcarBodyRuntimeObjectState& body,
     const NcarWheelRuntimeObjectState& wheel,
+    const PhysicsVector3& prior_contact_point_velocity,
     const PhysicsVector3& contact_normal,
     float contact_depth,
     float contact_threshold_response_0x28,
