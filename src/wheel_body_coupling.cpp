@@ -417,6 +417,36 @@ make_ncar_integrator_signal_state_from_runtime_record(
     return result;
 }
 
+std::optional<float> derive_ncar_wheel_scalar_0x5c(
+    const std::span<const std::byte> runtime_record,
+    const std::size_t wheel_index) noexcept
+{
+    if (wheel_index >= 4U || runtime_record.size() < 0x148U)
+        return std::nullopt;
+    const auto read_float = [&](const std::size_t offset) {
+        std::uint32_t bits{};
+        for (std::size_t i = 0U; i < 4U; ++i)
+            bits |= static_cast<std::uint32_t>(
+                std::to_integer<std::uint8_t>(runtime_record[offset + i])) << (i * 8U);
+        return std::bit_cast<float>(bits);
+    };
+    const bool front = wheel_index < 2U;
+    const auto diameter = read_float(front ? 0x138U : 0x144U);
+    const auto width = read_float(front ? 0x130U : 0x13cU);
+    const auto aspect = read_float(front ? 0x134U : 0x140U);
+    if (!std::isfinite(diameter) || !std::isfinite(width) || !std::isfinite(aspect))
+        return std::nullopt;
+    // Native code stores both the diameter term and width term as floats
+    // before adding the aspect contribution; x87 parity remains unverified.
+    const auto diameter_term = static_cast<float>(
+        static_cast<long double>(diameter) * 0.0127F);
+    const auto width_term = static_cast<float>(
+        static_cast<long double>(width) * 0.001F);
+    const auto result = static_cast<float>(static_cast<long double>(diameter_term) +
+        static_cast<long double>(width_term) * static_cast<long double>(aspect) * 0.01F);
+    return std::isfinite(result) ? std::optional<float>{result} : std::nullopt;
+}
+
 std::optional<float> derive_ncar_integrator_signal_multiplier(
     const float value_0x5b0,
     const float value_0x8f8,

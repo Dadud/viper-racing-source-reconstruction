@@ -47,6 +47,26 @@ int main()
     require(signal_constructor_state->limit_scale_0xc8c == 8.0F);
     require(signal_constructor_state->callback_scale_0xc90 == 0.02F);
     require(signal_constructor_state->smoothed_value_0xc94 == 0.0F);
+    std::array<std::byte, 0x148U> wheel_setup_record{};
+    const auto write_setup_float = [&](const std::size_t offset, const float value) {
+        const auto bits = std::bit_cast<std::uint32_t>(value);
+        for (std::size_t i = 0U; i < 4U; ++i)
+            wheel_setup_record[offset + i] = std::byte((bits >> (8U * i)) & 0xffU);
+    };
+    write_setup_float(0x130U, 200.0F);
+    write_setup_float(0x134U, 50.0F);
+    write_setup_float(0x138U, 16.0F);
+    write_setup_float(0x13cU, 240.0F);
+    write_setup_float(0x140U, 40.0F);
+    write_setup_float(0x144U, 18.0F);
+    for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
+        const auto value = viper::derive_ncar_wheel_scalar_0x5c(wheel_setup_record, wheel);
+        require(value.has_value());
+        require(std::abs(*value - (wheel < 2U ? 0.3032F : 0.3246F)) < 1e-6F);
+    }
+    require(!viper::derive_ncar_wheel_scalar_0x5c(wheel_setup_record, 4U));
+    require(!viper::derive_ncar_wheel_scalar_0x5c(
+        std::span<const std::byte>(wheel_setup_record.data(), 0x147U), 0U));
     const auto signal_multiplier =
         viper::derive_ncar_integrator_signal_multiplier(
             2.0F, 10.0F, 0.25F, 2.0F, 3.0F);

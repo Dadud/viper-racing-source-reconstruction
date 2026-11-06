@@ -654,9 +654,13 @@ struct NcarIntegratorSignalInput {
 make_ncar_integrator_signal_state_from_runtime_record(
     std::span<const std::byte> runtime_record) noexcept;
 
+// Projects the 0x441C10 wheel +0x5C setup from the runtime record. Wheels
+// 0/1 use the front fields and wheels 2/3 use the rear fields.
+[[nodiscard]] std::optional<float> derive_ncar_wheel_scalar_0x5c(
+    std::span<const std::byte> runtime_record, std::size_t wheel_index) noexcept;
+
 // Models constructor 0x434700's +0xDD0 weighted interpolation and scaling.
-// The two object fields and 0x4C7D48 constant remain explicit inputs until
-// their storage/value provenance has been established.
+// The wheel values and 0x4C7D48 constant remain explicit inputs.
 [[nodiscard]] std::optional<float>
 derive_ncar_integrator_signal_multiplier(
     float value_0x5b0,

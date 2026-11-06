@@ -128,6 +128,22 @@ pair update.
 
 ## PCAR constructor and tick boundary follow-up (2026-11-04)
 
+**Correction, 2026-11-06:** PCAR `+0x5B0` and `+0x8F8` alias wheel 0
+and wheel 2 `+0x5C`, respectively: wheel bases are `+0x554 + 0x1A4*i`.
+The earlier wheel-constructor exclusion below is wrong. `0x00441AE4`
+initializes every wheel `+0x5C` to `1.0`, and wheel setup `0x00441C10`
+subsequently writes it from its first input structure. For wheel indices 0/1,
+the setup stores `input[+0x138] * 0.0127 + (input[+0x130] * 0.001) *
+(input[+0x134] * 0.01)`; for indices 2/3 it uses offsets `+0x144`, `+0x13C`,
+and `+0x140` respectively. Constants were read from the supplied `race.bin`
+at `0x4C8870`, `0x4C8874`, and `0x4C885C`. `0x00433C00` retains its first
+argument in EBP at `0x00433C12`, passes that same pointer as the first setup
+argument at `0x004344BB`, and calls `0x00441C10` for all four wheels before
+reading these fields at `0x0043470C..0x00434718`. This is the runtime-record
+pointer already used for the constructor's `+0x90` input. Reconstruct the
+four setup writes and their x87 arithmetic before deriving `+0xDD0`; later
+mutations and the remaining controller inputs still need investigation.
+
 The full checked-in `engine_.text.asm` listing was searched for direct body
 displacements `+0x5B0`, `+0x8F8`, and `+0xDD0`, and for the `0x431150` call
 sequence. Constructor `0x434700..0x434756` forms the `+0xDD0` multiplier from
@@ -162,10 +178,9 @@ forward the same PCAR base. `0x43E490` calls `0x4375C0` on subobject `+0x6C`
 and initializes another group at `+0x2B0`; its inspected direct stores remain
 within those base/subobject ranges. The four wheel constructor calls beginning
 at `0x42FFC7` initialize children at `+0x554 + 0x1A4*i` with `0x4419A0`.
-That initializer clears known wheel fields, including wheel `+0x124`, but is
-not a PCAR-body copy and does not cover `+0x5B0/+0x8F8`. This strengthens the
-bounded constructor exclusion; indirect callbacks and writes through computed
-aliases are still not ruled out.
+That initializer clears known wheel fields, including wheel `+0x124`. The
+later correction above identifies `+0x5C` as the alias of the two body fields,
+including its initialization and subsequent setup writes.
 
 The next decisive observation is a write watch on the newly allocated PCAR
 body's `+0x5B0` and `+0x8F8`, armed before constructor `0x434700` and kept
