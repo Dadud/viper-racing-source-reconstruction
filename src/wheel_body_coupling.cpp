@@ -1846,6 +1846,62 @@ advance_ncar_integrator_child_control_in_body(
     return result;
 }
 
+std::optional<NcarDrivetrainControlResult>
+advance_ncar_drivetrain_control_in_body_and_wheels(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::span<const std::byte> runtime_record,
+    const std::uint32_t first_wheel_object_offset,
+    const bool fdiv_compatibility_enabled)
+{
+    auto next_body = body;
+    auto next_wheels = wheels;
+    const auto flag = read_ncar_body_object_u8(next_body, 0xc3cU);
+    const auto curve_gate = read_ncar_body_object_u8(next_body, 0xc3dU);
+    const auto signal_bits = read_ncar_body_object_u32(next_body, 0xc7cU);
+    const auto de0_bits = read_ncar_body_object_u32(next_body, 0xde0U);
+    const auto multiplier_bits = read_ncar_body_object_u32(next_body, 0xdd0U);
+    const auto ramp_gate = read_ncar_body_object_u8(next_body, 0xbe4U);
+    const auto prior_getter = read_ncar_body_object_u32(next_body, 0xd70U);
+    if (!flag || !curve_gate || !signal_bits || !de0_bits || !multiplier_bits ||
+        !ramp_gate || !prior_getter ||
+        !std::isfinite(std::bit_cast<float>(*de0_bits)) ||
+        !std::isfinite(std::bit_cast<float>(*signal_bits))) return std::nullopt;
+    NcarIntegratorCurveGateState gate_state{*flag, std::bit_cast<float>(*de0_bits)};
+    const auto gate = advance_ncar_integrator_curve_gate(
+        gate_state, {*curve_gate, *signal_bits, *curve_gate});
+    const std::array<NcarObjectFieldWrite, 2> gate_writes{{
+        {0xc3cU, 1U, gate_state.parent_flag_0xc3c},
+        {0xde0U, 4U, std::bit_cast<std::uint32_t>(gate_state.value_0xde0)}}};
+    if (!apply_ncar_body_object_writes(next_body, gate_writes)) return std::nullopt;
+    const auto selector = advance_ncar_integrator_child_control_in_body(
+        next_body, next_wheels, runtime_record, first_wheel_object_offset,
+        fdiv_compatibility_enabled);
+    if (!selector) return std::nullopt;
+    auto getter_wheels = next_wheels;
+    const auto pair = advance_ncar_selected_wheel_pair_target_in_wheels(
+        runtime_record, getter_wheels, first_wheel_object_offset, 0.0F);
+    if (!pair) return std::nullopt;
+    const auto ddc = derive_ncar_selected_pair_value_0xddc(
+        *pair, std::bit_cast<float>(*multiplier_bits));
+    if (!ddc) return std::nullopt;
+    std::array<NcarObjectFieldWrite, 3> writes{{
+        {0xddcU, 4U, std::bit_cast<std::uint32_t>(*ddc)},
+        {0xe49U, 1U, gate_state.parent_flag_0xc3c},
+        {0xc7cU, 4U, 0x3f800000U}}};
+    const bool force_ramp = *ramp_gate != 0U &&
+        std::bit_cast<std::int32_t>(*prior_getter) > 0x44fa0000;
+    if (!apply_ncar_body_object_writes(next_body,
+            std::span<const NcarObjectFieldWrite>(writes.data(), force_ramp ? 3U : 2U)))
+        return std::nullopt;
+    const auto signal_pair = advance_ncar_signal_pair_in_body_and_wheels(
+        next_body, next_wheels, runtime_record, first_wheel_object_offset);
+    if (!signal_pair) return std::nullopt;
+    body = std::move(next_body);
+    wheels = std::move(next_wheels);
+    return NcarDrivetrainControlResult{gate, *selector, *signal_pair, *ddc};
+}
+
 bool accumulate_wheel_tire_body_force(
     NcarForceMomentAccumulator& body_accumulator,
     const WheelTireBasisUpdateResult& wheel_response,

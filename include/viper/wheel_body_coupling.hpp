@@ -1126,6 +1126,23 @@ advance_ncar_integrator_child_control_in_body(
     std::uint32_t first_wheel_object_offset,
     bool fdiv_compatibility_enabled = false);
 
+struct NcarDrivetrainControlResult {
+    NcarIntegratorCurveGateResult gate{};
+    NcarIntegratorChildControlStepResult selector{};
+    NcarSignalPairBodyResult signal_pair{};
+    float selected_pair_value_0xddc{};
+};
+
+// Projects the 0x431150 curve gate, selector, pair getter and signal setters
+// in sequence. All body and wheel changes are committed together.
+[[nodiscard]] std::optional<NcarDrivetrainControlResult>
+advance_ncar_drivetrain_control_in_body_and_wheels(
+    NcarBodyRuntimeObjectState& body,
+    std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::span<const std::byte> runtime_record,
+    std::uint32_t first_wheel_object_offset,
+    bool fdiv_compatibility_enabled = false);
+
 enum class FourWheelBodyStepInputGroup : std::uint32_t {
     wheel_runtime_state = 1U << 0U,
     contact_and_surface_state = 1U << 1U,

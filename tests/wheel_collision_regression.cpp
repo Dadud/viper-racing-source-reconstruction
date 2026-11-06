@@ -506,4 +506,53 @@ int main()
         integrated_wheels, runtime_record, first_wheel_offset) &&
         selector_body.bytes == selector_before_failure.bytes &&
         selector_body.initialized_bytes == selector_before_failure.initialized_bytes);
+
+    auto drivetrain_body = saved_curve_body;
+    require(viper::apply_ncar_body_object_writes(drivetrain_body, controller_fields) &&
+        viper::apply_ncar_body_object_writes(drivetrain_body, selector_fields) &&
+        viper::apply_ncar_body_object_writes(drivetrain_body, signal_fields));
+    const std::array<viper::NcarObjectFieldWrite, 4> drivetrain_fields{{
+        {0xdd0U, 4U, std::bit_cast<std::uint32_t>(0.5F)},
+        {0xbe4U, 1U, 0U}, {0xd70U, 4U, 0U}, {0xc3cU, 1U, 0U}}};
+    require(viper::apply_ncar_body_object_writes(drivetrain_body, drivetrain_fields));
+    auto drivetrain_wheels = integrated_wheels;
+    const auto drivetrain = viper::advance_ncar_drivetrain_control_in_body_and_wheels(
+        drivetrain_body, drivetrain_wheels, runtime_record, first_wheel_offset);
+    require(drivetrain && drivetrain->selected_pair_value_0xddc == 3.0F &&
+        drivetrain->selector.child.previous_index_0x1c == 2 &&
+        drivetrain->selector.child.selected_value_0x18 == 20.0F &&
+        viper::read_ncar_body_object_u32(drivetrain_body, 0xddcU) ==
+            std::bit_cast<std::uint32_t>(3.0F) &&
+        viper::read_ncar_body_object_u8(drivetrain_body, 0xe49U) == 0U &&
+        drivetrain->signal_pair.controller.controller.observed_value_0x28 == 120.0F);
+    const auto drivetrain_before_failure = drivetrain_body;
+    const auto drivetrain_wheels_before_failure = drivetrain_wheels;
+    require(!viper::advance_ncar_drivetrain_control_in_body_and_wheels(
+        drivetrain_body, drivetrain_wheels,
+        std::span<const std::byte>(runtime_record.data(), 0xc3U), first_wheel_offset) &&
+        drivetrain_body.bytes == drivetrain_before_failure.bytes &&
+        drivetrain_body.initialized_bytes == drivetrain_before_failure.initialized_bytes);
+    for (std::size_t i = 0; i < drivetrain_wheels.size(); ++i)
+        require(drivetrain_wheels[i].bytes == drivetrain_wheels_before_failure[i].bytes &&
+            drivetrain_wheels[i].initialized_bytes ==
+                drivetrain_wheels_before_failure[i].initialized_bytes);
+    auto gated_body = saved_curve_body;
+    require(viper::apply_ncar_body_object_writes(gated_body, controller_fields) &&
+        viper::apply_ncar_body_object_writes(gated_body, selector_fields) &&
+        viper::apply_ncar_body_object_writes(gated_body, signal_fields) &&
+        viper::apply_ncar_body_object_writes(gated_body, drivetrain_fields));
+    const std::array<viper::NcarObjectFieldWrite, 4> gate_fields{{
+        {0xc3dU, 1U, 1U}, {0xc7cU, 4U, 0U}, {0xbe4U, 1U, 1U},
+        {0xd70U, 4U, std::bit_cast<std::uint32_t>(2001.0F)}}};
+    require(viper::apply_ncar_body_object_writes(gated_body, gate_fields));
+    auto gated_wheels = integrated_wheels;
+    const auto gated = viper::advance_ncar_drivetrain_control_in_body_and_wheels(
+        gated_body, gated_wheels, runtime_record, first_wheel_offset);
+    require(gated && gated->gate.curve_byte_0x40_written &&
+        gated->gate.setter_0x4331a0_reached &&
+        viper::read_ncar_body_object_u32(gated_body, 0xde0U) ==
+            std::bit_cast<std::uint32_t>(1.0F) &&
+        viper::read_ncar_body_object_u8(gated_body, 0xe49U) == 1U &&
+        viper::read_ncar_body_object_u32(gated_body, 0xc7cU) ==
+            std::bit_cast<std::uint32_t>(1.0F));
 }

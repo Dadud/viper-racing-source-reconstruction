@@ -108,8 +108,9 @@ the getter reads wheel `+0x128`, and the setter writes wheel `+0xE4`. The active
 
 **2026-11-06 update:** The player step now reads the initialized wheel `+0x128`
 values, evaluates the selected D-block getter, and stores its product with
-constructor `+0xDD0` to body `+0xDDC` before wheel updates. This does not
-execute the D-block setters or establish a throttle-to-torque path. The
+constructor `+0xDD0` to body `+0xDDC` before wheel updates. The combined
+drivetrain update now also executes the D-block setters; its effect on powered
+driving has not been verified. The
 finite-input `0x43FFC0` projection now models its enabled branch: it stores
 the scaled selected-pair getter at controller `+0x28/+0x10`, clamps the
 negative damping product to `[-400, 400]`, and multiplies the sum of that
@@ -125,23 +126,21 @@ moment argument, leaving accumulation and callback order to the caller.
 Constructor `0x434663..0x43466F` supplies controller `+0x08` as the float
 with bits `0x3E587910`; `0x43F910` stores its reciprocal at `+0x0C` and the
 profile-derived argument at `+0x14`. The runtime already retains these as
-body `+0xCA0/+0xCA4/+0xCAC`, respectively. The controller setters and this
-integrator are not yet wired into the live player step; signal and callback
-state must be sourced together before doing so.
+body `+0xCA0/+0xCA4/+0xCAC`, respectively. The live player step calls the
+combined modeled controller and integrator sequence described below.
 
 `advance_ncar_controller_setter_in_body_and_wheels` now connects this
 controller projection to the selected pair and persistent wheel state. It
 uses the current wheel getters, writes only the selected wheel endpoints,
 and applies the disabled branch's body-moment update. Body and wheels are
-committed together after validation. The caller still supplies the signal and
-must place the call in the original tick sequence; it is not yet used by the
-live player step.
+committed together after validation. The combined drivetrain update supplies
+the signal and invokes this operation in the recovered tick sequence.
 
 `advance_ncar_signal_pair_in_body_and_wheels` now joins the signal smoother,
 curve setter and controller setter in the `0x43F830` order. It samples both
 getters before either setter and commits the whole body/wheel update only on
-success. It expects the surrounding selector and ramp gates to be updated by
-its caller and is not yet installed in the live tick. The live tick's curve
+success. The surrounding selector and ramp gates are updated by the combined
+drivetrain operation in the live tick. The live tick's curve
 getter sample was moved after wheel updates to match `0x4313F2`.
 
 The signal pair's other child is the curve object at parent `+0xBFC`: its
@@ -157,16 +156,15 @@ composes the prefix, base integrator, and tail in native order, retaining the
 getter sampled before the integrator for the later calculations. It returns
 the body-moment delta and state updates for a caller to apply. The parent constructor now retains
 the numeric defaults used by that child; native pointer links are represented
-by the model rather than fabricated in the byte-backed object. This composed
-setter and the ordered controller interactions remain unconnected to the live step;
-host floating-point behavior is not established as x87-bit-exact.
+by the model rather than fabricated in the byte-backed object. Host
+floating-point behavior is not established as x87-bit-exact.
 
 `advance_ncar_curve_setter_in_body` bridges that operation to the initialized
 byte-backed body: it reads the curve, body axis and existing moment, then
 commits the getter, curve accumulators, flags and updated body moment together.
 Missing or non-finite inputs leave the body untouched. The caller must supply
 the native setter argument and execute it at the correct point in the tick;
-the adapter is not yet called by the live player simulation.
+the combined drivetrain update now supplies both.
 
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
@@ -197,9 +195,8 @@ at zero. The curve child at `+0xC80` is parent `+0xBFC`, and the controller
 child at `+0xC84` is parent `+0xC98`. The helper's differential, clamp,
 smoothing, and opposite setter arguments are modeled, and the constructor now
 writes the two record-derived scales into the session-owned body bytes. The
-controller getter's state inputs and both getter values' semantic units remain
-unresolved, so the helper output is not yet wired into the fixed-step wheel
-pair update.
+helper now runs in the fixed-step wheel-pair update, but the semantic units and
+behavioral correspondence of its getter values remain unverified.
 
 ## PCAR constructor and tick boundary follow-up (2026-11-04)
 
@@ -322,11 +319,11 @@ The full `0x431150` ordering is also explicit in the listing: set selector
 `+0x64/+0x5C` from PCAR `+0xDE0/+0xDEC`; invoke selector update `0x43FAE0`;
 read selected pair getter `+0xCE4`, multiply by `+0xDD0`, and store `+0xDDC`;
 copy parent flag `+0xC3C` to `+0xE49`; conditionally raise signal `+0xC7C`;
-run `0x43F830`; pass `max(+0xDE4,+0xDE8)` to the selected pair setter;
-copy the two per-wheel scalar results; then call `0x442530` four times.
-The selector and signal helper models now exist, but the session-owned game tick
-still does not execute this full chain. In particular, unresolved constructor
-inputs and callback child state prevent a faithful end-to-end invocation. The
+run `0x43F830`; call the shared wheel-scalar callback using `+0xDE4/+0xDE8`;
+copy the resulting per-wheel scalars; then call `0x442530` four times.
+The session-owned tick now executes the modeled selector and signal sequence
+before the wheel updates. It has not been checked against a live original or
+verified as a complete simulation of `0x431150`. The
 wheel-pair setter can affect `+0xE4`, a spin-response input, but neither the
 static call sequence nor the route-free comparison establishes that this is
 the engine torque producer. Powered longitudinal control remains the first
