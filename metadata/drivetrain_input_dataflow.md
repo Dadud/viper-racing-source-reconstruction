@@ -47,6 +47,12 @@ The `0x431150` integrator copies PCAR `+0xDE0` and `+0xDEC` into controller
 `+0x534` at `0x438299..0x4382A4`. This establishes that the option gates the
 controller; it does not establish clutch or gearbox actuation.
 
+The final selection written by `0x43FAE0` comes from the current previous
+index at controller `+0x1C`, which can differ from the requested index at
+`+0x24` while the shift state machine runs. The recovered model retains the
+seven indexed values separately and keeps neutral disabled until that previous
+index changes. Indices beyond the available seven-entry table are rejected.
+
 Constructor `0x4346A9..0x4347A4` configures three paired state blocks at
 `+0xD04/+0xD24/+0xD44`. `0x43F6F0` stores its arguments at block `+0x14`,
 `+0x1C`, and `+0x18`; `0x43F710` stores endpoint pointers at `+4/+8`.

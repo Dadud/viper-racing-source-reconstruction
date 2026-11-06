@@ -366,6 +366,9 @@ NcarAnimationControllerResult advance_ncar_animation_controller(
     const NcarAnimationControllerObservation& observation) noexcept
 {
     NcarAnimationControllerResult result{};
+    if (child.selection_index_0x24 > 7 || child.previous_index_0x1c > 7)
+        return result;
+    result.input_complete = true;
     const auto as_float = [](const std::uint32_t bits) noexcept {
         return std::bit_cast<float>(bits);
     };
@@ -375,7 +378,8 @@ NcarAnimationControllerResult advance_ncar_animation_controller(
     auto child_argument = child.value_at_child_0x64;
     auto selected_value = child.selection_index_0x24 < 1
         ? child.selected_value_0x18
-        : observation.selected_value_for_index;
+        : observation.selected_values_by_index[
+            static_cast<std::size_t>(child.selection_index_0x24 - 1)];
     const auto callback_value = observation.callback_value_0x50;
     const auto child_limit = observation.child_value_0x3c;
     const auto upper_value = observation.child_value_0x34 + 1000.0F;
@@ -487,12 +491,13 @@ NcarAnimationControllerResult advance_ncar_animation_controller(
         }
     }
 
-    child.selected_value_0x18 = child.selection_index_0x24 < 1
-        ? (child.selection_index_0x24 < 0
+    child.selected_value_0x18 = child.previous_index_0x1c < 1
+        ? (child.previous_index_0x1c < 0
             ? -child.negative_index_value_0x2c
             : 0.0F)
-        : observation.selected_value_for_index;
-    child.enabled_0x58 = child.selection_index_0x24 == 0 ? 0U : 1U;
+        : observation.selected_values_by_index[
+            static_cast<std::size_t>(child.previous_index_0x1c - 1)];
+    child.enabled_0x58 = child.previous_index_0x1c == 0 ? 0U : 1U;
     targets.value_target_0x2c = child_argument;
     result.wrote_value_target_0x2c = true;
     result.child_value_callback_argument = child_argument;

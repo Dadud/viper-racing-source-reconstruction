@@ -3350,6 +3350,7 @@ FourWheelBodyStepResult advance_four_wheel_body_step(
     result.missing_input_groups = result.required_input_groups &
         ~input.resolved_input_groups;
     result.input_complete = result.integrator_timer.input_complete &&
+        result.integrator_child_control.controller.input_complete &&
         result.missing_input_groups == 0U;
     result.embedded_records.input_complete =
         input.embedded_record_count_0x7b == 0U;

@@ -983,7 +983,8 @@ struct NcarIntegratorChildControlResult {
 struct NcarAnimationControllerObservation {
     std::uint8_t mode_byte{};
     bool child_override_flag_0x41{};
-    float selected_value_for_index{};
+    // Entries for positive indices 1..7 at controller +0x2C..+0x44.
+    std::array<float, 7> selected_values_by_index{};
     float callback_value_0x4c{};
     float callback_value_0x50{};
     float child_value_0x34{};
@@ -997,6 +998,7 @@ struct NcarAnimationControllerTargets {
 };
 
 struct NcarAnimationControllerResult {
+    bool input_complete{};
     bool wrote_value_target_0x2c{};
     std::uint32_t child_value_callback_argument{};
     bool wrote_ramp_target_0x00{};

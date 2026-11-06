@@ -10,6 +10,49 @@
 
 int main()
 {
+    viper::NcarAnimationControllerObservation shift_observation{};
+    shift_observation.mode_byte = 1U;
+    shift_observation.callback_value_0x50 = 2000.0F;
+    shift_observation.selected_values_by_index = {10.0F, 20.0F, 30.0F};
+    viper::NcarIntegratorChildControl shifting{};
+    shifting.previous_index_0x1c = 2;
+    shifting.selection_index_0x24 = 3;
+    shifting.animation_state_0x68 = 1;
+    shifting.ramp_value_0x60 = 1.0F;
+    viper::NcarAnimationControllerTargets shift_targets{};
+    auto shift_result = viper::advance_ncar_animation_controller(
+        shifting, shift_targets, shift_observation);
+    if (!shift_result.input_complete || shifting.previous_index_0x1c != 2 ||
+        shifting.selected_value_0x18 != 20.0F || shifting.enabled_0x58 != 1U) {
+        std::cerr << "0x43FAE0 did not retain the previous gear during a shift.\n";
+        return EXIT_FAILURE;
+    }
+    shifting.previous_index_0x1c = 0;
+    shifting.selection_index_0x24 = 2;
+    shifting.animation_state_0x68 = 1;
+    shifting.ramp_value_0x60 = 1.0F;
+    shift_result = viper::advance_ncar_animation_controller(
+        shifting, shift_targets, shift_observation);
+    if (!shift_result.input_complete || shifting.selected_value_0x18 != 0.0F ||
+        shifting.enabled_0x58 != 0U) {
+        std::cerr << "0x43FAE0 did not keep neutral disabled during a shift.\n";
+        return EXIT_FAILURE;
+    }
+    shift_observation.mode_byte = 0U;
+    shifting.selection_index_0x24 = 3;
+    shift_result = viper::advance_ncar_animation_controller(
+        shifting, shift_targets, shift_observation);
+    if (!shift_result.input_complete || shifting.previous_index_0x1c != 3 ||
+        shifting.selected_value_0x18 != 30.0F || shifting.enabled_0x58 != 1U) {
+        std::cerr << "0x43FAE0 manual mode did not select the requested value.\n";
+        return EXIT_FAILURE;
+    }
+    shifting.selection_index_0x24 = 8;
+    if (viper::advance_ncar_animation_controller(shifting, shift_targets,
+            shift_observation).input_complete) {
+        std::cerr << "0x43FAE0 accepted an unavailable table entry.\n";
+        return EXIT_FAILURE;
+    }
     viper::NcarIntegratorChildControl controller_getter_state{};
     controller_getter_state.enabled_0x58 = 1U;
     controller_getter_state.selected_value_0x18 = 2.0F;
