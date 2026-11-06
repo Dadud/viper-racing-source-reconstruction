@@ -1456,6 +1456,14 @@ PhysicsObstacleTaskConstructorPlan plan_physics_obstacle_task_constructor(
     return plan;
 }
 
+void initialize_acar_derived_constructor_prefix(
+    PhysicsAcarDerivedRuntimeState& state) noexcept
+{
+    state = {};
+    constexpr std::size_t first = 0x1054U - PhysicsAcarDerivedRuntimeState::base_offset;
+    std::fill_n(state.initialized_bytes.begin() + first, 7U * 4U, 1U);
+}
+
 PhysicsAcarTaskConstructorPlan plan_physics_acar_task_constructor(
     const PhysicsAcarTaskConstructorObservation& observation)
 {

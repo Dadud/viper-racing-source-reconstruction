@@ -966,6 +966,12 @@ geometry and signal scales from the entrant's own runtime record. The
 asset-backed wheel setup regression checks the response-scale write for all
 four wheels of each supplied car. This prepares persistent opponent state;
 the ACAR driver callbacks and physical update dispatch remain unconnected.
+Each live ACAR now additionally owns byte-tracked storage for the derived
+`0xEF0..0x107F` tail of the `0x1080`-byte object. The constructor prefix
+initializes only its seven unconditional cleared DWORDs at `+0x1054..+0x106F`;
+the native `+0x4F4 = 2` store is applied to the inherited body after its common
+initialization. Unresolved profile, allocation and callback-pointer fields
+remain uninitialized, rather than being interpreted as zero.
 Player and opponent construction now share
 `initialize_ncar_embedded_curve_and_selector`, which writes the configured
 curve and selector entries from each entrant's mapped record; the opponent

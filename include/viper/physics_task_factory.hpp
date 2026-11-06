@@ -780,6 +780,20 @@ struct PhysicsAcarModelNodeObservation {
     float scalar_at_0x1c{};
 };
 
+// ACAR extends the inherited 0xEF0-byte car body to 0x1080 bytes. Preserve
+// byte-level initialization information for the derived fields separately.
+struct PhysicsAcarDerivedRuntimeState {
+    static constexpr std::uint32_t base_offset = 0xef0U;
+    static constexpr std::size_t byte_count = 0x190U;
+    std::array<std::byte, byte_count> bytes{};
+    std::array<std::uint8_t, byte_count> initialized_bytes{};
+};
+
+// Applies only the unconditional seven DWORD clears at 0x42860A..0x428619.
+// Pointer, profile, and subsequent initialization stores need their own inputs.
+void initialize_acar_derived_constructor_prefix(
+    PhysicsAcarDerivedRuntimeState& state) noexcept;
+
 struct PhysicsAcarModelDescriptorProjection {
     std::optional<std::uint32_t> descriptor_address;
     std::vector<PhysicsTaskObjectFieldWrite> writes;

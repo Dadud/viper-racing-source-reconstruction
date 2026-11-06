@@ -2701,6 +2701,7 @@ struct AcarBodyRuntimeState {
     viper::ConfiguredCarTaskStreamBinding stream_binding{};
     std::optional<AcarSessionTuningInputs> session_tuning_inputs;
     viper::NcarBodyRuntimeObjectState body_object{};
+    viper::PhysicsAcarDerivedRuntimeState derived_object{};
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -6217,6 +6218,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     // ACAR, without treating it as a constructed/registered
                     // ACAR callback object.
                     AcarBodyRuntimeState body_state{};
+                    viper::initialize_acar_derived_constructor_prefix(body_state.derived_object);
                     body_state.stream_binding = binding;
                     AcarSessionTuningInputs tuning_inputs{};
                     tuning_inputs.entrant_index = binding.configured_car_index;
@@ -6232,8 +6234,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             read_u32_le(record_bytes.data() + 0x194U));
                     const auto common_initializer =
                         viper::plan_ncar_object_initialization({});
-                    const std::array<viper::NcarObjectFieldWrite, 1> acar_vtable_write{{
-                        {0x00U, 4U, 0x004c7b78U}}};
+                    const std::array<viper::NcarObjectFieldWrite, 2> acar_vtable_write{{
+                        {0x00U, 4U, 0x004c7b78U}, {0x4f4U, 4U, 2U}}};
                     std::array<float, 12> transform{};
                     for (std::size_t lane = 0U; lane < transform.size(); ++lane) {
                         transform[lane] = std::bit_cast<float>(read_u32_le(
@@ -6245,12 +6247,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             body_state.body_object,
                             constructor_subobjects.writes) ||
                         !viper::apply_ncar_body_object_writes(
-                            body_state.body_object, acar_vtable_write) ||
-                        !viper::apply_ncar_body_object_writes(
                             body_state.body_object,
                             common_initializer.writes_before_backend_refresh) ||
                         !viper::copy_ncar_runtime_record_transform_to_body(
-                            body_state.body_object, transform)) {
+                            body_state.body_object, transform) ||
+                        !viper::apply_ncar_body_object_writes(
+                            body_state.body_object, acar_vtable_write)) {
                         stream_ok = false;
                         break;
                     }

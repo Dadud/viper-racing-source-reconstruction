@@ -77,6 +77,16 @@ std::uint32_t read_u32_le(const std::span<const std::byte> bytes,
 int main()
 {
     try {
+        viper::PhysicsAcarDerivedRuntimeState acar_derived{};
+        viper::initialize_acar_derived_constructor_prefix(acar_derived);
+        for (std::size_t i = 0; i < acar_derived.bytes.size(); ++i) {
+            const auto offset = i + acar_derived.base_offset;
+            const bool cleared = offset >= 0x1054U && offset < 0x1070U;
+            require((acar_derived.initialized_bytes[i] != 0U) == cleared,
+                "ACAR derived prefix must mark only its seven cleared words");
+            if (cleared) require(acar_derived.bytes[i] == std::byte{},
+                "ACAR derived prefix must clear all seven words");
+        }
         viper::IdealLineTrackData track_curve{};
         track_curve.records.resize(2U);
         track_curve.next_indices = {1U, 0U};
