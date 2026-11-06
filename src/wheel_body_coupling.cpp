@@ -1088,8 +1088,12 @@ advance_ncar_wheel_spin_preprojection_in_objects(
     const auto velocity_y = read_body_float(0x238U);
     const auto velocity_z = read_body_float(0x23cU);
     if (!velocity_x || !velocity_y || !velocity_z) return std::nullopt;
-    const auto high_speed_projection = project_body_point_velocity_0x442530(
-        {*velocity_x, *velocity_y, *velocity_z}, body_transform);
+    // 0x44294A uses the ordinary +0x50/+0x54/+0x58 dot product. The
+    // separate suspension projection at 0x442Fxx uses a different order.
+    const auto high_speed_projection = static_cast<float>(
+        static_cast<long double>(body_transform[6]) * *velocity_x +
+        static_cast<long double>(body_transform[7]) * *velocity_y +
+        static_cast<long double>(body_transform[8]) * *velocity_z);
     if (!std::isfinite(high_speed_projection)) return std::nullopt;
 
     const WheelSpinPreprojectionInput input{

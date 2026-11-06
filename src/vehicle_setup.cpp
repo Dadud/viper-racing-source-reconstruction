@@ -368,7 +368,7 @@ WheelSpinPreprojectionResult update_wheel_spin_preprojection(
     response = rate_blend.signed_response_local;
     const auto spin_rate = rate_blend.rate_0x124;
     const auto blend = rate_blend.blend;
-    auto additional_response = input.wheel_scalar_0x5c != 0.0F
+    auto additional_response = input.damage_flag_0x20 == 0U && input.wheel_scalar_0x5c != 0.0F
         ? input.numerator_0xe4 / input.wheel_scalar_0x5c
         : 0.0F;
     const auto gated_mode = input.gate_0x160 && input.mode_0x15c == 0;

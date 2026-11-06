@@ -596,6 +596,43 @@ int main()
                             expected.filter_0x17c)},
                 "spin/filter callback must persist its finite intermediate wheel fields");
 
+            auto traction_wheel = wheel;
+            require(viper::apply_ncar_wheel_object_writes(
+                        traction_wheel, wheel_base, wheel_fields),
+                "traction test must restore the original wheel state");
+            const viper::NcarObjectFieldWrite traction_state{
+                wheel_base + 0x174U, 4U, std::bit_cast<std::uint32_t>(3.0F)};
+            require(viper::apply_ncar_wheel_object_writes(traction_wheel, wheel_base,
+                        std::span<const viper::NcarObjectFieldWrite>(&traction_state, 1U)),
+                "traction test must initialize the slip filter");
+            auto traction_body = body;
+            const std::array<viper::NcarObjectFieldWrite, 3> traction_velocity{{
+                {0x234U, 4U, 0U},
+                {0x238U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+                {0x23cU, 4U, std::bit_cast<std::uint32_t>(8.0F)}}};
+            require(viper::apply_ncar_body_object_writes(traction_body, traction_velocity),
+                "traction test must initialize distinct vertical and forward speeds");
+            const auto traction = viper::advance_ncar_wheel_spin_preprojection_in_objects(
+                traction_wheel, wheel_base, traction_body);
+            const auto expected_traction = viper::update_wheel_spin_preprojection({
+                2.0F, 1.25F, 2.5F, 0.8F, 0.1F, 0.2F, 0.4F, 10.0F, 1.0F,
+                0.5F, 3.0F, 0.1F, 8.0F, 0, 0, 0U, true, true});
+            const auto swapped_traction = viper::update_wheel_spin_preprojection({
+                2.0F, 1.25F, 2.5F, 0.8F, 0.1F, 0.2F, 0.4F, 10.0F, 1.0F,
+                0.5F, 3.0F, 0.1F, 2.0F, 0, 0, 0U, true, true});
+            require(traction && traction->response_local_0x90 ==
+                        expected_traction.response_local_0x90 &&
+                    traction->response_local_0x90 != swapped_traction.response_local_0x90,
+                "traction control must project velocity through body +0x50/+0x54/+0x58 in native order");
+            const auto damaged_drive = viper::update_wheel_spin_preprojection({
+                2.0F, 1.25F, 2.5F, 0.8F, 0.1F, 0.2F, 0.4F, 10.0F, 1.0F,
+                100.0F, 3.0F, 0.1F, 8.0F, 0, 0, 1U, true, true});
+            const auto damaged_without_drive = viper::update_wheel_spin_preprojection({
+                2.0F, 1.25F, 2.5F, 0.8F, 0.1F, 0.2F, 0.4F, 10.0F, 1.0F,
+                0.0F, 3.0F, 0.1F, 8.0F, 0, 0, 1U, true, true});
+            require(damaged_drive.response_local_0x90 == damaged_without_drive.response_local_0x90,
+                "damaged wheel must discard the drivetrain response before spin integration");
+
             auto high_spin_wheel = wheel;
             const std::array<viper::NcarObjectFieldWrite, 1> high_spin_rate{{
                 {wheel_base + 0x124U, 4U,

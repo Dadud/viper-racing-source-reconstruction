@@ -876,6 +876,14 @@ operations. It stores `+0xA8 = +0x124 * +0x5C`; when global byte `0x50878C`
 distance from the point behind wheel pointer `+0x10` to wheel coordinates
 `+0x14..+0x1C` and sets flag `+0x20` only when the value is greater than the
 supplied threshold (`0x4C88D8`). Existing flag state is preserved otherwise.
+
+In the later traction-control branch, `0x44294A..0x442967` projects body
+linear velocity through `+0x50/+0x54/+0x58` in ordinary X/Y/Z order. This is
+distinct from the earlier suspension projection's `+0x50/+0x58/+0x54` order;
+the persistent wheel adapter now uses the correct traction projection. The
+damage gate at `0x44288F..0x442897` also clears the `+0xE4` drivetrain
+contribution before spin integration for a damaged wheel. Focused regressions
+exercise both differences; original runtime parity remains unverified.
 The global and constants remain explicit inputs, so callers control runtime
 state without hiding environmental reads in the portable helper.
 
