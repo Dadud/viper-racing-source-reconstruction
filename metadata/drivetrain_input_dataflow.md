@@ -359,6 +359,12 @@ A noninteractive synthetic constructor/configuration fixture advances three
 drivetrain steps including a selection change. This checks initialized state
 and finite outputs, not asset-backed gameplay or original numeric parity.
 
+Constructor ordering also matters for curve `+0x10` (body `+0xC0C`):
+`0x433C00` configures it to 1000, then `0x42FF90` calls `0x433AA0`, whose
+`0x4338C0` helper clears it at `0x43390C`. The player initialization now
+applies that reset after curve configuration. The constructor-based fixture
+checks both the intermediate 1000 and the final zero before advancing ticks.
+
 Next bounded source target: trace writes/copies feeding body `+0x5B0` and
 `+0x8F8` during all PCAR construction paths, including helper arguments and
 base-pointer changes around `0x42FF90 -> 0x43E490 -> 0x433C00`. If the listing

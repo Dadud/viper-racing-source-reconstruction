@@ -626,6 +626,13 @@ int main()
         require(viper::apply_ncar_body_object_writes(startup_body,
             std::span<const viper::NcarObjectFieldWrite>(&write, 1U)));
     }
+    require(viper::read_ncar_body_object_u32(startup_body, 0xc0cU) ==
+        std::bit_cast<std::uint32_t>(1000.0F));
+    const viper::NcarObjectFieldWrite startup_curve_reset{
+        0xc0cU, 4U, startup_initializer.cleared_field_0xc0c};
+    require(viper::apply_ncar_body_object_writes(startup_body,
+        std::span<const viper::NcarObjectFieldWrite>(&startup_curve_reset, 1U)) &&
+        viper::read_ncar_body_object_u32(startup_body, 0xc0cU) == 0U);
     const std::array<viper::NcarObjectFieldWrite, 15> startup_setup{{
         {0x050U, 4U, 0U}, {0x054U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
         {0x058U, 4U, 0U}, {0x258U, 4U, 0U}, {0x25cU, 4U, 0U}, {0x260U, 4U, 0U},

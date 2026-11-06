@@ -3435,6 +3435,10 @@ struct WindowState {
             [](const viper::NcarObjectFieldWrite& write) {
                 return write.offset == 0xd70U && write.width_bytes == 4U;
             });
+        // 0x433AA0 subsequently calls 0x4338C0, which clears the curve
+        // getter after 0x433C00 configured it to its temporary startup value.
+        const viper::NcarObjectFieldWrite curve_reset{
+            0xc0cU, 4U, pcar_initializer.cleared_field_0xc0c};
         if (e44_initializer ==
                 pcar_initializer.writes_before_backend_refresh.end() ||
             d70_initializer ==
@@ -3444,7 +3448,10 @@ struct WindowState {
                 pcar_initializer.writes_before_backend_refresh) ||
             !viper::apply_ncar_body_object_writes(
                 player_runtime_state.body_object,
-                std::span<const viper::NcarObjectFieldWrite>(&*d70_initializer, 1U))) {
+                std::span<const viper::NcarObjectFieldWrite>(&*d70_initializer, 1U)) ||
+            !viper::apply_ncar_body_object_writes(
+                player_runtime_state.body_object,
+                std::span<const viper::NcarObjectFieldWrite>(&curve_reset, 1U))) {
             player_runtime_state = {};
             return false;
         }
