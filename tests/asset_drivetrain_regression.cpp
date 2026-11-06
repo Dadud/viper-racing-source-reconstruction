@@ -107,6 +107,31 @@ int main(int argc, char** argv) {
             const auto front = viper::derive_ncar_wheel_scalar_0x5c(record, 0U);
             const auto rear = viper::derive_ncar_wheel_scalar_0x5c(record, 2U);
             require(signal && front && rear, "constructor signal missing");
+            std::array<viper::NcarWheelRuntimeObjectState, 4> signal_wheels{};
+            for (std::size_t i = 0; i < signal_wheels.size(); ++i) {
+                const auto base = 0x554U + 0x1a4U * static_cast<std::uint32_t>(i);
+                const auto value = viper::derive_ncar_wheel_scalar_0x5c(record, i);
+                require(value.has_value(), "wheel signal source missing");
+                const viper::NcarObjectFieldWrite field{base + 0x5cU, 4U,
+                    std::bit_cast<std::uint32_t>(*value)};
+                require(viper::apply_ncar_wheel_object_writes(signal_wheels[i], base,
+                    std::span(&field, 1U)), "wheel signal setup failed");
+            }
+            viper::NcarBodyRuntimeObjectState signal_body{};
+            require(viper::initialize_ncar_wheel_signal_inputs(signal_body, signal_wheels, record),
+                "wheel-derived signal initialization failed");
+            require(viper::read_ncar_body_object_u32(signal_body, 0x5b0U) ==
+                        std::bit_cast<std::uint32_t>(*front) &&
+                    viper::read_ncar_body_object_u32(signal_body, 0x8f8U) ==
+                        std::bit_cast<std::uint32_t>(*rear) &&
+                    viper::read_ncar_body_object_u32(signal_body, 0xdc4U) == word(record, 0xb4U) &&
+                    viper::read_ncar_body_object_u32(signal_body, 0xdd0U).has_value() &&
+                    viper::read_ncar_body_object_u32(signal_body, 0xdd4U).has_value() &&
+                    viper::read_ncar_body_object_u32(signal_body, 0xdd8U).has_value(),
+                "wheel-derived signal fields must retain car-specific inputs");
+            signal_wheels[0] = {};
+            require(!viper::initialize_ncar_wheel_signal_inputs(signal_body, signal_wheels, record),
+                "missing wheel source must fail signal initialization");
             const auto multiplier = viper::derive_ncar_integrator_signal_multiplier(
                 *front, *rear, std::bit_cast<float>(word(record, 0xb4U)),
                 std::bit_cast<float>(word(record, 0x90U)), std::bit_cast<float>(0x3dd67750U));

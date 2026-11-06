@@ -11,6 +11,35 @@
 
 namespace viper {
 
+bool initialize_ncar_wheel_signal_inputs(NcarBodyRuntimeObjectState& body,
+    const std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    const std::span<const std::byte> record) noexcept
+{
+    if (record.size() < 0xecU) return false;
+    const auto read_word = [record](const std::size_t offset) {
+        std::uint32_t result{};
+        for (std::size_t i = 0; i < 4U; ++i)
+            result |= std::to_integer<std::uint32_t>(record[offset + i]) << (8U * i);
+        return result;
+    };
+    const auto front = read_ncar_wheel_object_u32(wheels[0], 0x5cU);
+    const auto rear = read_ncar_wheel_object_u32(wheels[2], 0x5cU);
+    const auto pair = initialize_ncar_wheel_pair_scales_from_runtime_record(record);
+    if (!front || !rear || !pair) return false;
+    const auto selector = read_word(0xb4U);
+    const auto multiplier = derive_ncar_integrator_signal_multiplier(
+        std::bit_cast<float>(*front), std::bit_cast<float>(*rear),
+        std::bit_cast<float>(selector), std::bit_cast<float>(read_word(0x90U)),
+        std::bit_cast<float>(0x3dd67750U));
+    if (!multiplier) return false;
+    const std::array<NcarObjectFieldWrite, 6> writes{{
+        {0x5b0U, 4U, *front}, {0x8f8U, 4U, *rear}, {0xdc4U, 4U, selector},
+        {0xdd0U, 4U, std::bit_cast<std::uint32_t>(*multiplier)},
+        {0xdd4U, 4U, std::bit_cast<std::uint32_t>(pair->first_scale_0xdd4)},
+        {0xdd8U, 4U, std::bit_cast<std::uint32_t>(pair->second_scale_0xdd8)}}};
+    return apply_ncar_body_object_writes(body, writes);
+}
+
 bool initialize_ncar_embedded_curve_and_selector(
     NcarBodyRuntimeObjectState& body, const std::span<const std::byte> record,
     const bool fdiv_compatibility_enabled)

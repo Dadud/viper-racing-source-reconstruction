@@ -20,6 +20,12 @@ namespace viper {
     NcarBodyRuntimeObjectState& body, std::span<const std::byte> runtime_record,
     bool fdiv_compatibility_enabled = false);
 
+// Materializes the shared 0x433C00/0x434700 wheel-derived signal inputs.
+[[nodiscard]] bool initialize_ncar_wheel_signal_inputs(
+    NcarBodyRuntimeObjectState& body,
+    const std::array<NcarWheelRuntimeObjectState, 4>& wheels,
+    std::span<const std::byte> runtime_record) noexcept;
+
 inline constexpr std::uint32_t ncar_shared_zero_wheel_reference_address_0x508e80 =
     0x00508e80U;
 

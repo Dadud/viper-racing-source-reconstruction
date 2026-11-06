@@ -6358,6 +6358,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         }
                     }
                     if (!stream_ok) break;
+                    if (!viper::initialize_ncar_wheel_signal_inputs(
+                            body_state.body_object, body_state.wheel_objects,
+                            record_bytes)) {
+                        stream_ok = false;
+                        break;
+                    }
                     state.ai_acar_body_states.push_back(std::move(body_state));
                 }
             }

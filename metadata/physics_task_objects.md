@@ -973,6 +973,11 @@ also receives the common `0x42FF90` body `+0x50C` default. Asset-backed checks
 verify the curve and selector fields for all five supplied car records and
 reject a truncated record. The AI driver and wheel/body update callbacks are
 still required before these stored values can make opponents drive.
+`initialize_ncar_wheel_signal_inputs` now also initializes each opponent's
+body wheel aliases, selector, signal multiplier and wheel-pair scales from
+that entrant's wheel state and runtime record. The asset-backed regression
+checks all supplied cars and verifies that an absent wheel source fails rather
+than producing invented values. It does not execute an opponent driving tick.
 
 `plan_acar_control_response` projects helper `0x42B570`, which runs between
 route steering and forward-candidate steering in `0x42B7B0`. It models the
