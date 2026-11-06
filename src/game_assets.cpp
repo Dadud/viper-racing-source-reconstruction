@@ -259,6 +259,7 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
             " track.ild could not be normalized");
     }
     assets.ideal_line_ = *normalized_ideal_line;
+    assets.ai_line_overrides_ = inventory_ai_line_overrides(root);
     if (const auto* ai_line_entry = track_bundle.find("default.ili", ideal_line_type)) {
         const auto ai_line = parse_ideal_line_resource(ai_line_entry->attributes,
             track_bundle.payload(*ai_line_entry));

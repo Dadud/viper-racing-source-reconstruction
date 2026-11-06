@@ -2,6 +2,7 @@
 
 #include "viper/language_resource.hpp"
 #include "viper/ai_driver_resource.hpp"
+#include "viper/ai_notes_resource.hpp"
 #include "viper/game_options.hpp"
 #include "viper/model_resource.hpp"
 #include "viper/resource_bundle.hpp"
@@ -43,6 +44,8 @@ public:
     [[nodiscard]] const IdealLineTrackData& ideal_line() const noexcept { return ideal_line_; }
     [[nodiscard]] const std::optional<IdealLineTrackData>& ai_default_line() const noexcept
     { return ai_default_line_; }
+    [[nodiscard]] AILineOverrideInventory ai_line_overrides() const noexcept
+    { return ai_line_overrides_; }
     [[nodiscard]] const CarFileResourcePayloads& player_car() const noexcept { return player_car_; }
     [[nodiscard]] const CarFileResourcePayloads& ai_car() const noexcept { return ai_car_; }
     [[nodiscard]] const std::optional<std::uint32_t>& track_index() const noexcept { return track_index_; }
@@ -75,6 +78,7 @@ private:
     std::array<std::byte, 0x8c> ai_vehicle_setup_{};
     IdealLineTrackData ideal_line_;
     std::optional<IdealLineTrackData> ai_default_line_;
+    AILineOverrideInventory ai_line_overrides_{AILineOverrideInventory::incomplete};
     CarFileResourcePayloads player_car_;
     CarFileResourcePayloads ai_car_;
     std::optional<std::uint32_t> track_index_;

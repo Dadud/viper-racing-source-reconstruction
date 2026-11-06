@@ -7,8 +7,12 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <filesystem>
 
 namespace viper {
+
+class ResourceBundle;
+struct ResourceEntry;
 
 struct AINoteLookupKey {
     std::uint32_t entrant_group{}; // Native per-entrant value reduced modulo 7.
@@ -32,6 +36,27 @@ enum class AINotePathKind : std::uint8_t {
 // Notes-directory lines use .ilq; track-sidecar lines use .ilg.
 [[nodiscard]] std::optional<std::string> make_ai_line_path(
     const AINoteLookupKey& key, AINotePathKind kind);
+
+enum class AILineOverrideInventory : std::uint8_t { none, present, incomplete };
+
+// Conservative inventory of loose .ilq/.ilg files and indexed overrides in
+// the data tree. Expected .ilg entries in drivers.res are handled by key.
+// Any unreadable directory or bundle makes the inventory incomplete.
+[[nodiscard]] AILineOverrideInventory inventory_ai_line_overrides(
+    const std::filesystem::path& root);
+
+enum class AILineSelectionStatus : std::uint8_t {
+    driver_line, default_line, unresolved_overrides, invalid_key
+};
+struct AILineSelection {
+    AILineSelectionStatus status{AILineSelectionStatus::invalid_key};
+    const ResourceEntry* driver_entry{}; // owned by the supplied driver bundle
+};
+// Resolves the stock driver-bundle candidate only after higher-priority
+// override sources were inventoried. Payload validation remains the caller's job.
+[[nodiscard]] AILineSelection select_stock_ai_line(
+    const ResourceBundle& drivers, const AINoteLookupKey& key,
+    AILineOverrideInventory overrides);
 
 struct AINoteResource {
     static constexpr std::uint32_t resource_type_code = 0x41444e54U; // ADNT

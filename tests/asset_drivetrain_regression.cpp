@@ -4,6 +4,7 @@
 #include "viper/world_track_objects.hpp"
 #include "viper/acar_curve_tracker.hpp"
 #include "viper/physics_task_factory.hpp"
+#include "viper/ai_notes_resource.hpp"
 
 #include <array>
 #include <bit>
@@ -11,6 +12,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <chrono>
 #include <iostream>
 #include <span>
 #include <stdexcept>
@@ -37,6 +40,60 @@ int main(int argc, char** argv) {
     if (argc != 2) return 2;
     try {
         const std::filesystem::path root(argv[1]);
+        require(viper::inventory_ai_line_overrides(root) == viper::AILineOverrideInventory::none,
+            "supplied data must have no higher-priority AI line overrides");
+        require(viper::inventory_ai_line_overrides(root / "missing_ai_line_directory") ==
+                viper::AILineOverrideInventory::incomplete,
+            "an unreadable AI resource inventory must not select a fallback");
+        const auto test_directory = std::filesystem::temp_directory_path() /
+            ("viper_ai_inventory_" + std::to_string(
+                std::chrono::steady_clock::now().time_since_epoch().count()));
+        require(std::filesystem::create_directory(test_directory), "could not create inventory fixture");
+        const auto override_path = test_directory / "example.ILQ";
+        { std::ofstream override_file(override_path); require(override_file.good(), "could not create override fixture"); }
+        const auto override_inventory = viper::inventory_ai_line_overrides(test_directory);
+        std::filesystem::remove(override_path);
+        std::filesystem::remove(test_directory);
+        require(override_inventory == viper::AILineOverrideInventory::present,
+            "loose AI override detection must be case insensitive");
+        const auto driver_lines = viper::ResourceBundle::open(root / "drivers.res");
+        std::size_t valid_driver_line_count{};
+        std::size_t valid_driver_note_count{};
+        for (const auto& entry : driver_lines.entries()) {
+            if (entry.type_code == 0x494c494eU && entry.name.ends_with(".ilg")) {
+                const auto raw = viper::parse_ideal_line_resource(entry.attributes, driver_lines.payload(entry));
+                require(raw && viper::normalize_ideal_line_resource(*raw, 0U),
+                    "driver-specific AI line is invalid");
+                ++valid_driver_line_count;
+            } else if (entry.type_code == viper::AINoteResource::resource_type_code &&
+                       entry.name.ends_with(".dnt")) {
+                require(viper::parse_ai_note_resource(entry.attributes, driver_lines.payload(entry)).has_value(),
+                    "driver note resource is invalid");
+                ++valid_driver_note_count;
+            }
+        }
+        require(valid_driver_line_count > 0U && valid_driver_note_count > 0U,
+            "driver bundle must expose AI lines and notes");
+        const viper::AINoteLookupKey stock_key{0U, 0U, 0U, "viper"};
+        const auto driver_line = viper::select_stock_ai_line(
+            driver_lines, stock_key, viper::AILineOverrideInventory::none);
+        require(driver_line.status == viper::AILineSelectionStatus::driver_line &&
+                driver_line.driver_entry != nullptr, "stock driver line must resolve by exact key");
+        const auto raw_driver_line = viper::parse_ideal_line_resource(
+            driver_line.driver_entry->attributes, driver_lines.payload(*driver_line.driver_entry));
+        const auto normalized_driver_line = raw_driver_line
+            ? viper::normalize_ideal_line_resource(*raw_driver_line, 0U) : std::nullopt;
+        require(normalized_driver_line &&
+                viper::make_acar_model_node_observations(*normalized_driver_line).has_value(),
+            "selected driver line must provide AI model nodes");
+        require(viper::select_stock_ai_line(driver_lines, stock_key,
+                    viper::AILineOverrideInventory::present).status ==
+                    viper::AILineSelectionStatus::unresolved_overrides,
+            "a higher-priority override must prevent selecting the stock line");
+        require(viper::select_stock_ai_line(driver_lines,
+                    {0U, 0U, 0U, "plane"}, viper::AILineOverrideInventory::none).status ==
+                    viper::AILineSelectionStatus::default_line,
+            "a missing stock driver line must select the default fallback");
         const auto common = viper::ResourceBundle::open(root / "common.res");
         const auto* tire_entry = common.find("def_tire.tir", 0x54495245U);
         require(tire_entry != nullptr, "default tire missing");

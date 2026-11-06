@@ -2710,6 +2710,11 @@ struct AcarBodyRuntimeState {
     // Per-car note lookup and final native descriptor selection are unresolved.
     const std::vector<viper::AcarDescriptorGeometry>* default_descriptor_candidate{};
     std::optional<viper::AcarLineThresholdCandidate> default_line_threshold_candidate;
+    bool default_line_selected{};
+    std::optional<viper::TrackCurveNodes> driver_curve_nodes;
+    std::optional<std::vector<viper::PhysicsAcarModelNodeObservation>> driver_model_nodes;
+    std::vector<viper::AcarDescriptorGeometry> driver_descriptor_geometry;
+    std::optional<viper::AcarLineThresholdCandidate> driver_line_threshold;
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -5924,6 +5929,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const std::span<const std::uint32_t> configured_car_record_tags,
                const viper::SingleRaceAISetupPlan* const selected_ai_setups,
                const viper::AIDriverResource& ai_driver_resource,
+               const viper::ResourceBundle& ai_driver_bundle,
                const std::optional<viper::AIDriverGroup> selected_ai_driver_group,
                const std::optional<std::uint32_t> track_index,
                const viper::CarFileResourcePayloads& ai_car_resources,
@@ -5934,6 +5940,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::TrackGraphicsResourcePayload* track_graphics,
                const viper::IdealLineTrackData& ideal_line,
                const viper::IdealLineTrackData* ai_default_line,
+               const viper::AILineOverrideInventory ai_line_overrides,
                const viper::ModelResource& player_model,
                const viper::ModelResource& ai_model,
                const std::optional<viper::TextureResource>& player_paint_texture,
@@ -6242,6 +6249,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     AcarBodyRuntimeState body_state{};
                     if (!state.ai_default_descriptor_geometry.empty())
                         body_state.default_descriptor_candidate = &state.ai_default_descriptor_geometry;
+                    body_state.default_line_selected = body_state.default_descriptor_candidate &&
+                        ai_line_overrides == viper::AILineOverrideInventory::none;
                     viper::initialize_acar_derived_constructor_prefix(body_state.derived_object);
                     const auto profile_words = track_index
                         ? viper::select_acar_track_profile_words(*driver_profile, *track_index, 0U)
@@ -6278,6 +6287,32 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     }
                     tuning_inputs.notes_line_path = *notes_line;
                     tuning_inputs.track_line_path = *track_line;
+                    const auto selection = viper::select_stock_ai_line(
+                        ai_driver_bundle, line_key, ai_line_overrides);
+                    body_state.default_line_selected =
+                        selection.status == viper::AILineSelectionStatus::default_line &&
+                        body_state.default_descriptor_candidate != nullptr;
+                    if (selection.status == viper::AILineSelectionStatus::driver_line) {
+                        const auto* entry = selection.driver_entry;
+                        const auto raw_line = viper::parse_ideal_line_resource(
+                            entry->attributes, ai_driver_bundle.payload(*entry));
+                        const auto line = raw_line
+                            ? viper::normalize_ideal_line_resource(*raw_line, 0U) : std::nullopt;
+                        if (!line) {
+                            body_state.default_line_selected = body_state.default_descriptor_candidate != nullptr;
+                        } else {
+                            body_state.driver_curve_nodes = viper::make_track_curve_nodes(*line);
+                            body_state.driver_model_nodes = viper::make_acar_model_node_observations(*line);
+                            if (!body_state.driver_curve_nodes || !body_state.driver_model_nodes) {
+                                stream_ok = false;
+                                break;
+                            }
+                            body_state.driver_descriptor_geometry = viper::make_acar_descriptor_geometry(
+                                *body_state.driver_model_nodes);
+                            body_state.driver_line_threshold = viper::plan_acar_line_threshold_candidate(
+                                *body_state.driver_model_nodes, profile_words->value_0x1028);
+                        }
+                    }
                     body_state.session_tuning_inputs = std::move(tuning_inputs);
                     const auto body_plan =
                         viper::plan_ncar_body_constructor(*body_observation);
@@ -7961,13 +7996,14 @@ int run_selected_race(const Options& options, const std::string_view track,
         participant_names,
         configured_car_record_tags,
         selected_ai_setups ? &*selected_ai_setups : nullptr,
-        assets.ai_drivers(), selected_ai_driver_group,
+        assets.ai_drivers(), assets.bundle("drivers.res"), selected_ai_driver_group,
         assets.track_index(),
         assets.ai_car(),
         std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),
         assets.track_graphics() ? &*assets.track_graphics() : nullptr,
         assets.ideal_line(), assets.ai_default_line() ? &*assets.ai_default_line() : nullptr,
+        assets.ai_line_overrides(),
         assets.player_model(), assets.ai_model(),
         player_paint_texture,
         ai_livery_bundle ? &*ai_livery_bundle : nullptr,

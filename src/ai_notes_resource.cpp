@@ -1,7 +1,9 @@
 #include "viper/ai_notes_resource.hpp"
+#include "viper/resource_bundle.hpp"
 
 #include <algorithm>
 #include <cstdio>
+#include <system_error>
 
 namespace viper {
 namespace {
@@ -101,6 +103,57 @@ std::optional<std::string> make_ai_line_path(const AINoteLookupKey& key,
     path->replace(path->size() - 3U, 3U,
         kind == AINotePathKind::notes_directory ? "ilq" : "ilg");
     return path;
+}
+
+AILineOverrideInventory inventory_ai_line_overrides(const std::filesystem::path& root)
+{
+    const auto extension = [](std::string value) {
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c);
+        });
+        return value;
+    };
+    std::error_code ec;
+    std::filesystem::recursive_directory_iterator it(root, ec), end;
+    if (ec) return AILineOverrideInventory::incomplete;
+    for (; it != end; it.increment(ec)) {
+        if (ec) return AILineOverrideInventory::incomplete;
+        const bool symlink = it->is_symlink(ec);
+        if (ec || symlink) return AILineOverrideInventory::incomplete;
+        const bool regular = it->is_regular_file(ec);
+        if (ec) return AILineOverrideInventory::incomplete;
+        if (!regular) continue;
+        const auto ext = extension(it->path().extension().string());
+        if (ext == ".ilq" || ext == ".ilg") return AILineOverrideInventory::present;
+        if (ext != ".res" && ext != ".trk" && ext != ".car") continue;
+        try {
+            const auto bundle = ResourceBundle::open(it->path());
+            for (const auto& entry : bundle.entries()) {
+                const auto entry_ext = extension(std::filesystem::path(entry.name).extension().string());
+                // The stock driver bundle is the expected source of .ilg
+                // resources and is resolved by exact key later.
+                const auto bundle_name = extension(it->path().filename().string());
+                if (entry_ext == ".ilq" ||
+                    (entry_ext == ".ilg" && bundle_name != "drivers.res"))
+                    return AILineOverrideInventory::present;
+            }
+        } catch (...) {
+            return AILineOverrideInventory::incomplete;
+        }
+    }
+    return ec ? AILineOverrideInventory::incomplete : AILineOverrideInventory::none;
+}
+
+AILineSelection select_stock_ai_line(const ResourceBundle& drivers,
+    const AINoteLookupKey& key, const AILineOverrideInventory overrides)
+{
+    const auto path = make_ai_line_path(key, AINotePathKind::track_sidecar);
+    if (!path) return {};
+    if (overrides != AILineOverrideInventory::none)
+        return {AILineSelectionStatus::unresolved_overrides, nullptr};
+    const auto* entry = drivers.find(std::string_view(*path).substr(4U), 0x494c494eU);
+    return entry ? AILineSelection{AILineSelectionStatus::driver_line, entry}
+                 : AILineSelection{AILineSelectionStatus::default_line, nullptr};
 }
 
 std::optional<AINoteResource> parse_ai_note_resource(

@@ -77,6 +77,7 @@ add_library(viper_ai_resources
 )
 target_include_directories(viper_ai_resources PUBLIC include)
 target_compile_features(viper_ai_resources PUBLIC cxx_std_20)
+target_link_libraries(viper_ai_resources PUBLIC viper_resource_bundle)
 
 add_library(viper_model_resource src/model_resource.cpp)
 target_include_directories(viper_model_resource PUBLIC include)
@@ -543,7 +544,7 @@ if(BUILD_TESTING)
         tests/asset_drivetrain_regression.cpp)
     target_link_libraries(viper_asset_drivetrain_regression PRIVATE
         viper_scene_model viper_resource_bundle viper_wheel_body_coupling
-        viper_pcar_model)
+        viper_pcar_model viper_ai_resources)
     if(EXISTS "${CMAKE_SOURCE_DIR}/../game_install/GameData/common.res")
         add_test(NAME asset_drivetrain_regression COMMAND viper_asset_drivetrain_regression
             "${CMAKE_SOURCE_DIR}/../game_install/GameData")

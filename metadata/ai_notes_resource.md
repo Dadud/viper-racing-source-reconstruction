@@ -29,20 +29,22 @@ yet reconstructed, so the parser exposes those raw values without claiming
 full native acceptance. The new parser is not yet wired into `GameAssets`:
 the shipped extraction contains `drivers.res` but no loose `.dnt` sidecars, and
 the legacy game resource-set lookup path still needs integration. An earlier
-inventory found no loose `.dnt` or `.ili` files and no matching entries in
-`*.res` bundles, but overlooked the `.trk` bundles. A subsequent RST0 scan
-found both `default.ili` and `rdefault.ili` in every one of the eight track
-bundles; no `.dnt` entries were found there. This corrects the earlier claim
-that the default ILIN fallback was unavailable. The installer media was also
+inventory found no loose `.dnt` or `.ili` files but incorrectly missed indexed
+entries. A corrected RST0 scan found 524 `.ilg` driver lines and 695 `.dnt`
+notes in `drivers.res`, plus both `default.ili` and `rdefault.ili` in every
+track bundle. This corrects the earlier claims that those resources were
+unavailable. The installer media was also
 checked: the `DATA1.CAB`, `_USER1.CAB`, and `_SYS1.CAB` cabinets contain
 no loose `.ili` or `.dnt` files. Installer-extracted `drivers.res`,
 `bemidji.trk`, and `common.res` are byte-identical to the corresponding files
 in the installed game-data directory. The installer therefore confirms the
 same available resource set; it does not prove that other retail releases or
 user installations lack additional resources. The normal-orientation default
-AI line is now parsed and retained separately from `track.ild`, and the session
-prepares its curve and descriptor-node inputs. Full per-car fallback selection,
-ADNT checks and AI callback dispatch remain unimplemented.
+AI line is parsed separately from `track.ild`. When a conservative inventory
+finds no higher-priority overrides, each opponent selects its exact `.ilg`
+entry from `drivers.res`, falling back to the track default when absent or
+invalid. The session prepares that line's curve, nodes, descriptor geometry and
+threshold. Full override lookup, ADNT checks and AI dispatch remain unimplemented.
 The node-dependent `0x429440` descriptor geometry is also calculated once from
 the default candidate and made available to each opponent, without asserting
 that per-car note lookup selected it or inventing optional note data. The
@@ -50,10 +52,11 @@ asset-backed regression checks both default variants on all eight tracks.
 The `0x419EC0` jump table tries the `*notes\` `.ilq` candidate, then the
 `.trk` `.ilg` candidate, then `default.ili` or `rdefault.ili` by orientation;
 reverse mode has a further normal-default fallback. The supplied track bundles
-and extracted install contain no `.ilq` or `.ilg` entries found by the scan.
+contain no `.ilq` or `.ilg` entries; 524 `.ilg` entries are in `drivers.res`.
 Each opponent now also retains a candidate `0x428790` threshold and normalized
 profile derived from the fallback line's last node, its linked node and that
-opponent's profile. These remain candidates until per-car lookup is modeled.
+opponent's profile. The matching stock driver line is now selected when the
+inventory establishes that no higher-priority override is present.
 `make_ai_line_path` produces the first two native lookup names from the same
 group/difficulty/track/car key as ADNT, changing the extensions to `.ilq`
 and `.ilg` respectively. Each opponent retains its own two lookup names.
