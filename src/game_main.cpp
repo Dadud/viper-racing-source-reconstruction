@@ -4565,6 +4565,7 @@ struct WindowState {
                 body_center_z && body_velocity_x && body_velocity_y &&
                 body_velocity_z && body_angular_x && body_angular_y &&
                 body_angular_z && contact_observation.body_query_enabled &&
+                contact_observation.query_succeeded &&
                 axis_x_bits && axis_y_bits && axis_z_bits &&
                 std::isfinite(*body_center_x) && std::isfinite(*body_center_y) &&
                 std::isfinite(*body_center_z) && std::isfinite(*body_velocity_x) &&
@@ -4592,9 +4593,7 @@ struct WindowState {
                     const auto forward_axis =
                         viper::transform_wheel_local_axis_0x422f30(
                             local_forward_axis, body_basis);
-                    const auto contact_normal = contact_observation.query_succeeded
-                        ? contact_observation.query_contact_normal
-                        : viper::PhysicsVector3{0.0F, 1.0F, 0.0F};
+                    const auto contact_normal = contact_observation.query_contact_normal;
                     const auto projection =
                         viper::project_wheel_point_velocity_onto_contact_axes(
                             point_velocity, forward_axis, contact_normal);

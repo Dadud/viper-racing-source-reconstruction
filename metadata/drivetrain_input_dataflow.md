@@ -174,6 +174,13 @@ when the required projection and tire inputs are available. It does not assume
 the resulting response vector is zero. Cases where those inputs are unavailable
 and parity with original no-contact output remain unverified.
 
+The noninteractive test now carries a no-contact reset through a nonzero tire
+response vector and the wheel exit-rate stores. A failed `0x45F760` query
+returns without writing its normal output (`0x45F78D..0x45F7B7`); the player
+path no longer substitutes an invented upward normal in that case. It leaves
+the later response and rate update unavailable until a source-backed normal is
+known, so a failed-query wheel can still miss finalization.
+
 `advance_ncar_curve_setter_in_body` bridges that operation to the initialized
 byte-backed body: it reads the curve, body axis and existing moment, then
 commits the getter, curve accumulators, flags and updated body moment together.

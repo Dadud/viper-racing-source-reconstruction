@@ -458,6 +458,40 @@ int main()
                     viper::read_ncar_wheel_object_u32(airborne_wheel, 0x180U) == 0U &&
                     viper::read_ncar_wheel_object_u32(airborne_wheel, 0x11cU) == 0U,
                 "no-contact reset must still compute the response from remaining slip");
+            const std::array<viper::NcarObjectFieldWrite, 7> airborne_rate_fields{{
+                {wheel_base + 0x110U, 4U, 0U},
+                {wheel_base + 0x114U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+                {wheel_base + 0x118U, 4U, 0U},
+                {wheel_base + 0x124U, 4U, std::bit_cast<std::uint32_t>(2.0F)},
+                {wheel_base + 0x038U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+                {wheel_base + 0x020U, 1U, 0U}, {wheel_base + 0x120U, 1U, 0U}}};
+            require(viper::apply_ncar_wheel_object_writes(
+                        airborne_wheel, wheel_base, airborne_rate_fields),
+                "no-contact response and rate fields must be initialized");
+            auto airborne_factors = response.factors;
+            airborne_factors.trigonometric_response = airborne->trigonometric_response;
+            airborne_factors.forward_ratio = 1.0F;
+            airborne_factors.ratio_normalization = 1.0F;
+            airborne_factors.lateral_blend = 1.0F;
+            airborne_factors.lateral_direction_factor = 1.0F;
+            airborne_factors.low_speed_weight = 1.0F;
+            airborne_factors.forward_curve_value = 1.0F;
+            const viper::PhysicsVector3 airborne_forward{1.0F, 0.0F, 0.0F};
+            const auto airborne_vector =
+                viper::advance_ncar_wheel_tire_response_vectors_in_object(
+                    airborne_wheel, wheel_base, airborne_factors,
+                    airborne_forward, {0.0F, 1.0F, 0.0F}, 1.0F);
+            require(airborne_vector && airborne_vector->response_vector_0xf4_0xfc.x != 0.0F,
+                "no-contact response vector can remain nonzero after history reset");
+            const viper::WheelSpinPreprojectionResult airborne_spin{
+                2.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+            const auto airborne_rate = viper::advance_ncar_wheel_rate_finalization_in_object(
+                airborne_wheel, wheel_base, airborne_spin,
+                airborne_vector->response_vector_0xf4_0xfc, airborne_forward);
+            require(airborne_rate && airborne_rate->rate_0x124 != 2.0F &&
+                    viper::read_ncar_wheel_object_u32(airborne_wheel, 0x128U) ==
+                        std::bit_cast<std::uint32_t>(airborne_rate->auxiliary_rate_0x128),
+                "no-contact tire response must reach the wheel exit-rate stores");
 
             viper::NcarWheelRuntimeObjectState unresolved{};
             const auto unresolved_before = unresolved;
