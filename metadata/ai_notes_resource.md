@@ -27,22 +27,22 @@ DWORD line value, then compares them with ADNT header fields. It also compares
 a redundant header check; the exact helper semantics for these checks are not
 yet reconstructed, so the parser exposes those raw values without claiming
 full native acceptance. The new parser is not yet wired into `GameAssets`:
-the shipped extraction contains `drivers.res` but no `.dnt` sidecars, and the
-legacy game resource-set lookup path still needs integration. A fresh inventory
-of the extracted install found no loose `.dnt` or `.ili` files, and all
-`*.res` bundles under `GameData` were scanned by their RST0 indices for names
-or type tags containing `dnt`, `ili`, `note`, or `adnt`; none matched. This
-means the native `default.ili`/ADNT fallback chain cannot be satisfied from the
-available extracted install. This was checked against the original installer
-media as well: the `DATA1.CAB`, `_USER1.CAB`, and `_SYS1.CAB` cabinets contain
+the shipped extraction contains `drivers.res` but no loose `.dnt` sidecars, and
+the legacy game resource-set lookup path still needs integration. An earlier
+inventory found no loose `.dnt` or `.ili` files and no matching entries in
+`*.res` bundles, but overlooked the `.trk` bundles. A subsequent RST0 scan
+found both `default.ili` and `rdefault.ili` in every one of the eight track
+bundles; no `.dnt` entries were found there. This corrects the earlier claim
+that the default ILIN fallback was unavailable. The installer media was also
+checked: the `DATA1.CAB`, `_USER1.CAB`, and `_SYS1.CAB` cabinets contain
 no loose `.ili` or `.dnt` files. Installer-extracted `drivers.res`,
 `bemidji.trk`, and `common.res` are byte-identical to the corresponding files
 in the installed game-data directory. The installer therefore confirms the
 same available resource set; it does not prove that other retail releases or
-user installations lack these resources. The `.trk` bundles still contain
-their own ILIN data, so this finding is specifically about the separate
-`default.ili`/ADNT lookup resources and is not evidence that ideal-line data is
-absent.
+user installations lack additional resources. The normal-orientation default
+AI line is now parsed and retained separately from `track.ild`, and the session
+prepares its curve and descriptor-node inputs. Full per-car fallback selection,
+ADNT checks and AI callback dispatch remain unimplemented.
 
 The ACAR constructor obtains its model through `0x419FF0`, which returns the
 `+0x10` geometry object of the per-car manager created by `0x41AF00` and

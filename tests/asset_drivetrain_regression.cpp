@@ -3,6 +3,7 @@
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/world_track_objects.hpp"
 #include "viper/acar_curve_tracker.hpp"
+#include "viper/physics_task_factory.hpp"
 
 #include <array>
 #include <bit>
@@ -41,6 +42,22 @@ int main(int argc, char** argv) {
         require(tire_entry != nullptr, "default tire missing");
         const auto tire = viper::parse_tire_resource(common.payload(*tire_entry));
         require(tire.has_value(), "default tire invalid");
+        for (const std::string name : {"bemidji", "dundas", "hastings", "heaven",
+                "kenyon", "limbo", "nfield", "uptown"}) {
+            const auto bundle = viper::ResourceBundle::open(root / (name + ".trk"));
+            for (const auto* resource_name : {"default.ili", "rdefault.ili"}) {
+                const auto* entry = bundle.find(resource_name, 0x494c494eU);
+                require(entry != nullptr, "AI line missing from track bundle");
+                const auto payload = viper::parse_ideal_line_resource(entry->attributes, bundle.payload(*entry));
+                require(payload.has_value(), "AI line payload invalid");
+                const auto line_data = viper::normalize_ideal_line_resource(*payload, 0U);
+                require(line_data.has_value(), "AI line normalization failed");
+                const auto nodes = viper::make_acar_model_node_observations(*line_data);
+                require(nodes && nodes->size() == line_data->records.size() && !nodes->empty() &&
+                        nodes->back().next_address == nodes->front().address,
+                    "AI line descriptors must form a complete circular list");
+            }
+        }
         const auto track = viper::ResourceBundle::open(root / "bemidji.trk");
         const auto* line_entry = track.find("track.ild", 0x494c494eU);
         require(line_entry != nullptr, "Bemidji track spline missing");

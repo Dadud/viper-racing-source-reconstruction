@@ -1,5 +1,10 @@
 # Playable reconstruction completion ledger
 
+The historical 2026-10-24 AI-sidecar inventory below missed resources embedded
+inside `.trk` files. All eight supplied track bundles contain `default.ili` and
+`rdefault.ili`; see [AI note resources](ai_notes_resource.md) for the corrected
+inventory and remaining opponent-integration gaps.
+
 ## 2026-11-05 update
 
 Applied a function-level evidence workflow based on incremental game

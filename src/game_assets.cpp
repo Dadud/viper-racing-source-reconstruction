@@ -259,6 +259,12 @@ GameAssets GameAssets::load(const std::filesystem::path& root,
             " track.ild could not be normalized");
     }
     assets.ideal_line_ = *normalized_ideal_line;
+    if (const auto* ai_line_entry = track_bundle.find("default.ili", ideal_line_type)) {
+        const auto ai_line = parse_ideal_line_resource(ai_line_entry->attributes,
+            track_bundle.payload(*ai_line_entry));
+        if (!ai_line || !(assets.ai_default_line_ = normalize_ideal_line_resource(*ai_line, 0U)))
+            throw std::runtime_error(assets.track_name_ + " default.ili AI line is invalid");
+    }
     assets.player_car_ = parse_car_file_resources(car_bundle, assets.car_name_, true);
     if (!assets.player_car_.car_file) {
         throw std::runtime_error(assets.car_name_ +

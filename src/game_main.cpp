@@ -2905,6 +2905,8 @@ struct WindowState {
     std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
     std::vector<AcarCurveSourceRuntimeState> ai_acar_curve_sources;
     std::vector<AcarBodyRuntimeState> ai_acar_body_states;
+    std::optional<viper::TrackCurveNodes> ai_default_curve_nodes;
+    std::optional<std::vector<viper::PhysicsAcarModelNodeObservation>> ai_default_model_nodes;
     std::optional<viper::PlayerPcarTaskBinding> player_pcar_task_binding;
     std::vector<viper::PhysicsStatTaskRuntimeState> inactive_stat_task_states;
     std::optional<viper::NcarBodyConstructorPlan> player_body_constructor_plan;
@@ -5923,6 +5925,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const viper::TerrainSurfaceResourcePayload& terrain,
                const viper::TrackGraphicsResourcePayload* track_graphics,
                const viper::IdealLineTrackData& ideal_line,
+               const viper::IdealLineTrackData* ai_default_line,
                const viper::ModelResource& player_model,
                const viper::ModelResource& ai_model,
                const std::optional<viper::TextureResource>& player_paint_texture,
@@ -6000,6 +6003,12 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << "Upgrade overlays are not requested in this race path.\n";
     state.playback_active = playback_trace != nullptr;
     state.route = extract_ideal_line_points(ideal_line);
+    if (ai_default_line != nullptr) {
+        state.ai_default_curve_nodes = viper::make_track_curve_nodes(*ai_default_line);
+        state.ai_default_model_nodes = viper::make_acar_model_node_observations(*ai_default_line);
+        if (!state.ai_default_curve_nodes || !state.ai_default_model_nodes)
+            std::cerr << "AI default line could not be prepared for opponent initialization.\n";
+    }
     state.physical_track_curve = viper::make_track_curve_nodes(ideal_line);
     if (state.physical_track_curve) {
         state.physical_track_iterator_ready =
@@ -7926,7 +7935,8 @@ int run_selected_race(const Options& options, const std::string_view track,
         std::clamp(selected_laps, 1U, 99U),
         assets.track_name(), assets.car_name(), assets.terrain(),
         assets.track_graphics() ? &*assets.track_graphics() : nullptr,
-        assets.ideal_line(), assets.player_model(), assets.ai_model(),
+        assets.ideal_line(), assets.ai_default_line() ? &*assets.ai_default_line() : nullptr,
+        assets.player_model(), assets.ai_model(),
         player_paint_texture,
         ai_livery_bundle ? &*ai_livery_bundle : nullptr,
         ai_paint_selectors,
