@@ -366,12 +366,15 @@ applies that reset after curve configuration. The constructor-based fixture
 checks both the intermediate 1000 and the final zero before advancing ticks.
 
 `asset_drivetrain_regression` reads the external car bundles and default
-setup resources, maps their real numeric fields, and runs 64 drivetrain
-updates for each of the five supplied cars. It covers neutral and a selected
-controller state with fixed synthetic wheel getters; it does not launch the
-game or validate vehicle movement, full session construction, user-specific
-setups, or agreement with original-game measurements. CTest registers this
-check when the external `GameData/common.res` is available.
+setup resources, maps their real numeric fields, and runs 128 drivetrain
+updates for each of the five supplied cars. The first 64 cover neutral and a
+selected controller state with fixed wheel getters. The next 64 construct
+resource-derived wheel cores and feed updated wheel rates back to the
+drivetrain; each car produces a changed wheel rate. That phase explicitly uses
+a zero tire-response vector and fixed body pose, so it does not validate ground
+contact, vehicle movement, full session construction, user-specific setups,
+or agreement with original-game measurements. The check never launches the
+game; CTest registers it when external `GameData/common.res` is available.
 
 Next bounded source target: trace writes/copies feeding body `+0x5B0` and
 `+0x8F8` during all PCAR construction paths, including helper arguments and

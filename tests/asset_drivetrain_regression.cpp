@@ -111,7 +111,61 @@ int main(int argc, char** argv) {
             }
             require(viper::read_ncar_body_object_u8(body, 0xcf0U) == 1U,
                 "selected controller did not become active");
-            std::cout << car << ": 64 finite drivetrain updates\n";
+            // Exercise the feedback path with resource-derived wheel core
+            // values. The zero tire vector is an explicit fixture input;
+            // this is not a ground-contact or vehicle-motion simulation.
+            const auto body_observation =
+                viper::make_ncar_body_constructor_observation_from_runtime_record(
+                    record, 0U, false);
+            require(body_observation.has_value(), "body constructor inputs missing");
+            const auto body_plan = viper::plan_ncar_body_constructor(*body_observation);
+            const auto wheel_core = viper::initialize_ncar_four_wheel_core({
+                record, {}, body_plan.scaled_dimensions_0x1f0_to_0x1fc[0], false, false});
+            require(wheel_core.input_complete, "wheel core setup incomplete");
+            std::array<viper::NcarObjectFieldWrite, 12> pose{};
+            for (std::size_t i = 0; i < 9U; ++i)
+                pose[i] = {0x38U + static_cast<std::uint32_t>(i * 4U), 4U,
+                    std::bit_cast<std::uint32_t>(i % 4U == 0U ? 1.0F : 0.0F)};
+            for (std::size_t i = 0; i < 3U; ++i)
+                pose[9U + i] = {0x234U + static_cast<std::uint32_t>(i * 4U), 4U, 0U};
+            require(viper::apply_ncar_body_object_writes(body, pose), "body pose failed");
+            for (std::size_t i = 0; i < wheels.size(); ++i) {
+                const auto base = 0x554U + 0x1a4U * static_cast<std::uint32_t>(i);
+                const auto wheel_plan = viper::plan_ncar_wheel_constructor(
+                    base, viper::NcarWheelConstructorObservation{});
+                require(wheel_core.wheels[i].has_value() &&
+                    viper::materialize_ncar_wheel_constructor(wheels[i], base, wheel_plan) &&
+                    viper::apply_ncar_wheel_core_initialization(wheels[i], base, *wheel_core.wheels[i]),
+                    "wheel initialization failed");
+                const std::array<viper::NcarObjectFieldWrite, 3> controls{{
+                    {base + 0x160U, 1U, 0U}, {base + 0x15cU, 4U, 1U},
+                    {base + 0x164U, 4U, 1U}}};
+                require(viper::apply_ncar_wheel_object_writes(wheels[i], base, controls),
+                    "wheel control initialization failed");
+            }
+            bool wheel_rate_changed = false;
+            for (int tick = 0; tick < 64; ++tick) {
+                const auto step = viper::advance_ncar_drivetrain_control_in_body_and_wheels(
+                    body, wheels, record, 0x554U);
+                if (!step) throw std::runtime_error(car + " coupled drivetrain step " + std::to_string(tick) + " failed");
+                for (std::size_t i = 0; i < wheels.size(); ++i) {
+                    const auto base = 0x554U + 0x1a4U * static_cast<std::uint32_t>(i);
+                    require(viper::advance_ncar_wheel_update_prefix_in_object(wheels[i], base).has_value(),
+                        "wheel prefix failed");
+                    const auto spin = viper::advance_ncar_wheel_spin_preprojection_in_objects(wheels[i], base, body);
+                    require(spin.has_value(), "wheel spin failed");
+                    const auto rate = viper::advance_ncar_wheel_rate_finalization_in_object(
+                        wheels[i], base, *spin, {}, {});
+                    require(rate && std::isfinite(rate->rate_0x124), "wheel rate failed");
+                    wheel_rate_changed |= rate->rate_0x124 != 0.0F;
+                }
+                const auto getter = viper::read_ncar_body_object_u32(body, 0xc0cU);
+                require(getter.has_value(), "curve sample missing");
+                const viper::NcarObjectFieldWrite sample{0xd70U, 4U, *getter};
+                require(viper::apply_ncar_body_object_writes(body, std::span(&sample, 1U)), "curve sample failed");
+            }
+            require(wheel_rate_changed, "selected drivetrain did not change any wheel rate");
+            std::cout << car << ": 128 finite drivetrain updates; wheel rate changed\n";
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
