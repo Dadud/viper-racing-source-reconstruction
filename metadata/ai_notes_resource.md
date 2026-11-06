@@ -28,8 +28,11 @@ bytes at ILIN object `+0xDC` (normalized row 3, offsets `+4..+0xB`). Successful
 header/key and payload-size checks. The separate redundant check is used in
 the mismatch-report path and is not needed for the successful branch.
 `ai_note_matches_line` implements the bounded success check; the runtime now
-retains validated stock notes and their raw DWORD pairs per opponent. Their
-consumption by AI descriptor callbacks remains unconnected.
+retains validated stock notes and their raw DWORD pairs per opponent. For the
+normal single-race gate state it now creates host-owned `0x429440` descriptor
+values from the selected line and those pairs, or zero pairs when no validated
+note is found. The native object pointers and later AI callbacks remain
+unconnected; synthetic node IDs are not original-process pointers.
 The shipped extraction contains `drivers.res` but no loose `.dnt` sidecars.
 The legacy game resource-set lookup path still needs integration. An earlier
 inventory found no loose `.dnt` or `.ili` files but incorrectly missed indexed

@@ -97,6 +97,19 @@ int main(int argc, char** argv) {
                 note_pairs->front()[0] == word(stock_note->node_payload, 0U) &&
                 note_pairs->front()[1] == word(stock_note->node_payload, 4U),
             "validated driver note must supply a pair for each AI line node");
+        const auto driver_nodes = viper::make_acar_model_node_observations(*normalized_driver_line);
+        const auto descriptors = viper::make_acar_runtime_descriptors(*driver_nodes,
+            std::span<const std::array<std::uint32_t, 2>>(*note_pairs), false);
+        require(descriptors && descriptors->size() == note_pairs->size() &&
+                descriptors->front().note_pair_0x04 == note_pairs->front() &&
+                descriptors->back().note_pair_0x04 == note_pairs->back() &&
+                descriptors->back().node_id_0x14 == driver_nodes->back().address,
+            "validated stock notes must initialize the corresponding AI descriptors");
+        const auto gated_descriptors = viper::make_acar_runtime_descriptors(*driver_nodes,
+            std::span<const std::array<std::uint32_t, 2>>(*note_pairs), true);
+        require(gated_descriptors && gated_descriptors->front().note_pair_0x04 ==
+                std::array<std::uint32_t, 2>{},
+            "gated note lookup must clear descriptor note pairs");
         require(viper::select_stock_ai_line(driver_lines, stock_key,
                     viper::AILineOverrideInventory::present).status ==
                     viper::AILineSelectionStatus::unresolved_overrides,

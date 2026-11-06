@@ -1501,6 +1501,29 @@ std::vector<AcarDescriptorGeometry> make_acar_descriptor_geometry(
     return result;
 }
 
+std::optional<std::vector<PhysicsAcarRuntimeDescriptor>> make_acar_runtime_descriptors(
+    const std::span<const PhysicsAcarModelNodeObservation> nodes,
+    const std::optional<std::span<const std::array<std::uint32_t, 2>>> note_pairs,
+    const bool note_lookup_gated)
+{
+    if (nodes.empty() || (!note_lookup_gated && note_pairs && note_pairs->size() != nodes.size()))
+        return std::nullopt;
+    const auto geometry = make_acar_descriptor_geometry(nodes);
+    std::vector<PhysicsAcarRuntimeDescriptor> result;
+    result.reserve(nodes.size());
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        if (nodes[i].address == 0U ||
+            nodes[i].next_address != nodes[(i + 1U) % nodes.size()].address)
+            return std::nullopt;
+        PhysicsAcarRuntimeDescriptor descriptor{};
+        if (!note_lookup_gated && note_pairs) descriptor.note_pair_0x04 = (*note_pairs)[i];
+        descriptor.mapped_scalar_0x10 = geometry[i].mapped_scalar;
+        descriptor.node_id_0x14 = geometry[i].node_id;
+        result.push_back(descriptor);
+    }
+    return result;
+}
+
 void initialize_acar_derived_constructor_prefix(
     PhysicsAcarDerivedRuntimeState& state) noexcept
 {

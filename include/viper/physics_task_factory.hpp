@@ -822,6 +822,23 @@ struct PhysicsAcarModelDescriptorProjection {
     bool copied_blend_pair{};
 };
 
+struct PhysicsAcarRuntimeDescriptor {
+    std::uint16_t value_0x00{};
+    std::uint16_t value_0x02{};
+    std::array<std::uint32_t, 2> note_pair_0x04{};
+    std::uint8_t flag_0x0c{};
+    float mapped_scalar_0x10{};
+    std::uint32_t node_id_0x14{}; // synthetic, not a native pointer
+};
+
+// Builds the host-owned descriptor array from the selected line and either
+// validated note pairs or a confirmed absent/gated note source.
+[[nodiscard]] std::optional<std::vector<PhysicsAcarRuntimeDescriptor>>
+make_acar_runtime_descriptors(
+    std::span<const PhysicsAcarModelNodeObservation> nodes,
+    std::optional<std::span<const std::array<std::uint32_t, 2>>> note_pairs,
+    bool note_lookup_gated);
+
 struct PhysicsAcarTaskConstructorObservation {
     std::uint32_t object_address{};
     std::uint32_t registration_count_before{};

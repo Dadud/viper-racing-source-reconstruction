@@ -2717,6 +2717,7 @@ struct AcarBodyRuntimeState {
     std::optional<viper::AcarLineThresholdCandidate> driver_line_threshold;
     std::optional<viper::AINoteResource> selected_driver_note;
     std::optional<std::vector<std::array<std::uint32_t, 2>>> selected_driver_note_pairs;
+    std::optional<std::vector<viper::PhysicsAcarRuntimeDescriptor>> descriptors;
     std::array<viper::NcarWheelRuntimeObjectState, 4> wheel_objects{};
     std::optional<viper::NcarFourWheelCoreInitialization> wheel_core_initialization;
     std::array<std::optional<viper::NcarWheelTireSetup>, 4> wheel_tire_setups{};
@@ -6333,6 +6334,21 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                                     body_state.selected_driver_note = std::move(*note);
                             }
                         }
+                    }
+                    const auto* selected_nodes = body_state.driver_model_nodes
+                        ? &*body_state.driver_model_nodes
+                        : (body_state.default_line_selected && state.ai_default_model_nodes
+                            ? &*state.ai_default_model_nodes : nullptr);
+                    if (selected_nodes && ai_line_overrides == viper::AILineOverrideInventory::none) {
+                        std::optional<std::span<const std::array<std::uint32_t, 2>>> pairs;
+                        if (body_state.selected_driver_note_pairs)
+                            pairs = std::span<const std::array<std::uint32_t, 2>>(
+                                *body_state.selected_driver_note_pairs);
+                        // Normal single-race has the 0x41B020 and 0x426E50
+                        // gates clear; confirmed absent/invalid notes use zeros.
+                        body_state.descriptors = viper::make_acar_runtime_descriptors(
+                            *selected_nodes, pairs, false);
+                        if (!body_state.descriptors) { stream_ok = false; break; }
                     }
                     body_state.session_tuning_inputs = std::move(tuning_inputs);
                     const auto body_plan =
