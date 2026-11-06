@@ -12,6 +12,7 @@
 #include "viper/race_participants.hpp"
 #include "viper/race_loop_callbacks.hpp"
 #include "viper/race_progression.hpp"
+#include "viper/acar_curve_tracker.hpp"
 #include "viper/route_opponent_ai.hpp"
 #include "viper/sound_resource.hpp"
 #include "viper/engine_sound_setup.hpp"
@@ -2863,6 +2864,10 @@ struct WindowState {
     std::size_t player_car_index{};
     std::vector<std::string> participant_names;
     viper::RouteMotionState motion{};
+    std::optional<viper::TrackCurveNodes> physical_track_curve;
+    viper::TrackPositionIteratorState physical_track_iterator{};
+    viper::PhysicalRaceLapState physical_lap_state{};
+    bool physical_track_iterator_ready{};
     std::vector<viper::RouteMotionState> opponent_motions;
     std::vector<viper::RouteOpponentAiState> opponent_ai_states;
     std::vector<viper::RouteOpponentAiDecision> last_opponent_ai_decisions;
@@ -5093,6 +5098,43 @@ struct WindowState {
                 // The physical path has no route adapter to advance its
                 // displayed clock. Count only completed fixed simulation steps.
                 viper::advance_race_clock(motion.race, 0.016F);
+                if (physical_track_iterator_ready && physical_track_curve) {
+                    std::array<float, 9> basis{};
+                    std::array<float, 3> position{};
+                    std::array<float, 3> local_point{};
+                    bool available = true;
+                    const auto read_float = [&](const std::uint32_t offset, float& out) {
+                        const auto bits = viper::read_ncar_body_object_u32(
+                            player_runtime_state.body_object, offset);
+                        if (!bits) { available = false; return; }
+                        out = std::bit_cast<float>(*bits);
+                        if (!std::isfinite(out)) available = false;
+                    };
+                    for (std::size_t i = 0; i < basis.size(); ++i)
+                        read_float(0x38U + static_cast<std::uint32_t>(4U * i), basis[i]);
+                    for (std::size_t i = 0; i < position.size(); ++i) {
+                        read_float(0x5cU + static_cast<std::uint32_t>(4U * i), position[i]);
+                        read_float(0xd7cU + static_cast<std::uint32_t>(4U * i), local_point[i]);
+                    }
+                    if (available) {
+                        const auto point = viper::race_tracking_point_xz(basis, position, local_point);
+                        const auto tracking = viper::update_track_position_iterator(
+                            physical_track_iterator, *physical_track_curve, point[0], point[1]);
+                        if (tracking.status == viper::TrackPositionIteratorStatus::updated) {
+                            const bool completed = viper::observe_physical_race_category(
+                                physical_lap_state, tracking.category_changed,
+                                tracking.current_category, motion.race.elapsed_seconds, target_laps);
+                            if (completed) {
+                                motion.race.completed_laps = physical_lap_state.native_crossing_count - 1U;
+                                motion.race.finished = physical_lap_state.finished;
+                                lap_completed = true;
+                            }
+                        } else {
+                            physical_track_iterator_ready = false;
+                            std::cerr << "Physical lap tracking stopped: track iterator failed.\n";
+                        }
+                    }
+                }
             }
             ++physics_step_count;
         }
@@ -5998,6 +6040,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
               << "Upgrade overlays are not requested in this race path.\n";
     state.playback_active = playback_trace != nullptr;
     state.route = extract_ideal_line_points(ideal_line);
+    state.physical_track_curve = viper::make_track_curve_nodes(ideal_line);
+    if (state.physical_track_curve) {
+        state.physical_track_iterator_ready =
+            viper::initialize_track_position_iterator(state.physical_track_iterator,
+                *state.physical_track_curve, 0.0F, 0.0F) ==
+            viper::TrackPositionIteratorStatus::updated;
+    }
+    if (!state.physical_track_iterator_ready && !route_motion_enabled)
+        std::cerr << "Physical lap tracking unavailable: track iterator initialization failed.\n";
     state.player_car_index = player_car_index;
     state.target_laps = std::max(1U, target_laps);
     state.title_base = std::wstring(L"Viper Racing — ") +

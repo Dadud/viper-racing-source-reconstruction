@@ -333,7 +333,7 @@ the local original disassembly at `0x43D110..0x43D383` and
 `0x41E180..0x41E248`. `race_tracking_point_xz` models the position transform
 only, with host floating-point precision. The initialization and linked-curve
 state, crossing semantics, and full caller cadence still need to be recovered
-before using this to award laps in the physical race.
+before claiming verified original parity.
 
 `make_track_curve_nodes` maps the normalized track rows into the existing
 `0x41D4F0`/`0x41D3A0` curve projections: position, tangent, denominator,
@@ -353,7 +353,16 @@ supplied initial position and marks the next update for a fresh seek; later
 updates use `0x41D4F0` and report the old and new category. Missing nodes and
 incomplete curve projections are explicit failures rather than inferred race
 progress. Timing-history writes, geometry-key updates, native caller cadence,
-and the service's lap/result state are not yet connected.
+and the full service result behavior remain incomplete. The ordinary physical
+runtime now feeds its simulated body transform and local tracking offset to
+this iterator after each physics step. Its category-one transition follows
+the `0x43D110` crossing counter: the first crossing establishes the counter,
+and subsequent crossings complete laps until the counter exceeds the target.
+This fixed-step placement is provisional: the original service callback cadence,
+timing-history and timing origin still require matched original verification.
+Tracker failures disable lap tracking and produce a diagnostic; they do not
+award a lap. An external-asset regression verifies Bemidji initialization, but
+neither that check nor synthetic transition tests demonstrate a complete race.
 
 The geometry key at `+0x54` is distinct from the placement base key: `0x41E070` writes the
 last ILIN row's endpoint sum to `+0x5C`, and the `0x45CE10` stack layout maps

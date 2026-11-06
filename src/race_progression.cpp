@@ -36,6 +36,23 @@ void advance_race_clock(
     state.elapsed_seconds += delta_seconds;
 }
 
+bool observe_physical_race_category(PhysicalRaceLapState& state,
+    const bool category_changed, const std::uint8_t current_category,
+    const float current_time, const std::uint32_t target_laps) noexcept
+{
+    if (state.finished || !category_changed || current_category != 1U ||
+        !std::isfinite(current_time)) return false;
+    ++state.native_crossing_count;
+    const bool completed = state.native_crossing_count > 1U;
+    if (completed) {
+        state.last_lap_time = current_time - state.lap_start_time;
+        state.lap_start_time = current_time;
+        state.finished = state.native_crossing_count > target_laps;
+    }
+    state.last_crossing_time = current_time;
+    return completed;
+}
+
 bool observe_race_route_transition(
     RaceProgressionState& state,
     const std::size_t next_segment,

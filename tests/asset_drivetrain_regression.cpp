@@ -2,6 +2,7 @@
 #include "viper/pcar_control_update.hpp"
 #include "viper/wheel_body_coupling.hpp"
 #include "viper/world_track_objects.hpp"
+#include "viper/acar_curve_tracker.hpp"
 
 #include <array>
 #include <bit>
@@ -36,6 +37,20 @@ int main(int argc, char** argv) {
     try {
         const std::filesystem::path root(argv[1]);
         const auto common = viper::ResourceBundle::open(root / "common.res");
+        const auto track = viper::ResourceBundle::open(root / "bemidji.trk");
+        const auto* line_entry = track.find("track.ild", 0x494c494eU);
+        require(line_entry != nullptr, "Bemidji track spline missing");
+        const auto line = viper::parse_ideal_line_resource(
+            line_entry->attributes, track.payload(*line_entry));
+        require(line.has_value(), "Bemidji track spline invalid");
+        const auto normalized = viper::normalize_ideal_line_resource(*line, 0U);
+        require(normalized.has_value(), "Bemidji track normalization failed");
+        const auto track_curve = viper::make_track_curve_nodes(*normalized);
+        require(track_curve.has_value(), "Bemidji track curve invalid");
+        viper::TrackPositionIteratorState iterator{};
+        require(viper::initialize_track_position_iterator(iterator, *track_curve, 0.0F, 0.0F) ==
+                    viper::TrackPositionIteratorStatus::updated,
+            "Bemidji track iterator initialization failed");
         for (const std::string car : {"viper", "sports", "sedan", "exotic", "plane"}) {
             const auto bundle = viper::ResourceBundle::open(root / (car + ".car"));
             const auto resources = viper::parse_car_file_resources(bundle, car, true);

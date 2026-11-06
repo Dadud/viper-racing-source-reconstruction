@@ -37,6 +37,21 @@ int main()
             "released and unbound controls must remain inactive");
 
         viper::RaceProgressionState state{};
+        viper::PhysicalRaceLapState physical_laps{};
+        require(!viper::observe_physical_race_category(physical_laps, true, 2U, 1.0F, 2U) &&
+                !viper::observe_physical_race_category(physical_laps, false, 1U, 2.0F, 2U) &&
+                physical_laps.native_crossing_count == 0U,
+            "only a category change into one advances native lap state");
+        require(!viper::observe_physical_race_category(physical_laps, true, 1U, 3.0F, 2U) &&
+                physical_laps.native_crossing_count == 1U && !physical_laps.finished,
+            "the first category-one transition starts native crossing state");
+        require(viper::observe_physical_race_category(physical_laps, true, 1U, 13.0F, 2U) &&
+                physical_laps.last_lap_time == 13.0F && !physical_laps.finished,
+            "the second transition completes the first lap");
+        require(viper::observe_physical_race_category(physical_laps, true, 1U, 25.0F, 2U) &&
+                physical_laps.last_lap_time == 12.0F && physical_laps.finished &&
+                !viper::observe_physical_race_category(physical_laps, true, 1U, 30.0F, 2U),
+            "the target crossing must finish and freeze the lap state");
         viper::RaceProgressionState physical_clock{};
         for (int i = 0; i < 5; ++i)
             viper::advance_race_clock(physical_clock, 0.016F);

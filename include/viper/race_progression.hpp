@@ -22,6 +22,21 @@ struct RaceProgressionState {
     bool finished{};
 };
 
+struct PhysicalRaceLapState {
+    std::uint32_t native_crossing_count{};
+    float last_crossing_time{};
+    float lap_start_time{};
+    float last_lap_time{};
+    bool finished{};
+};
+
+// Models the ordinary entrant's category-1 transition in 0x43D110. The
+// first crossing starts the counter; subsequent crossings complete laps.
+[[nodiscard]] bool observe_physical_race_category(
+    PhysicalRaceLapState& state, bool category_changed,
+    std::uint8_t current_category, float current_time,
+    std::uint32_t target_laps) noexcept;
+
 struct RouteMotionState {
     std::size_t route_segment{};
     float route_fraction{};
