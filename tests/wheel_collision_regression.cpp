@@ -147,6 +147,46 @@ int main()
         curve_result->tail.mode_0x40 == 0U && curve_result->tail.mode_0x41 == 0U);
     curve_step.body_axis_0x50[0] = std::numeric_limits<float>::quiet_NaN();
     require(!viper::project_ncar_curve_setter(curve_step));
+    viper::NcarBodyRuntimeObjectState curve_body{};
+    const auto empty_curve_body = curve_body;
+    require(!viper::advance_ncar_curve_setter_in_body(curve_body, 10.0F) &&
+        curve_body.bytes == empty_curve_body.bytes &&
+        curve_body.initialized_bytes == empty_curve_body.initialized_bytes);
+    constexpr std::array<std::uint32_t, 25> curve_offsets{{
+        0xc04U, 0xc08U, 0xc0cU, 0xc10U, 0xc20U, 0xc24U, 0xc28U,
+        0xc2cU, 0xc30U, 0xc34U, 0xc38U, 0xc40U, 0xc44U, 0xc48U,
+        0xc4cU, 0xc50U, 0xc54U, 0xc64U, 0xc68U, 0x50U, 0x54U,
+        0x58U, 0x258U, 0x25cU, 0x260U}};
+    std::array<viper::NcarObjectFieldWrite, 25> curve_zero_writes{};
+    for (std::size_t i = 0; i < curve_offsets.size(); ++i)
+        curve_zero_writes[i] = {curve_offsets[i], 4U, 0U};
+    const std::array<viper::NcarObjectFieldWrite, 10> curve_values{{
+        {0xc04U, 4U, std::bit_cast<std::uint32_t>(5.0F)},
+        {0xc08U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xc0cU, 4U, std::bit_cast<std::uint32_t>(500.0F)},
+        {0xc20U, 4U, std::bit_cast<std::uint32_t>(400.0F)},
+        {0xc38U, 4U, std::bit_cast<std::uint32_t>(1000.0F)},
+        {0xc64U, 4U, std::bit_cast<std::uint32_t>(401.0F)},
+        {0x54U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0x25cU, 4U, std::bit_cast<std::uint32_t>(7.0F)},
+        {0xc3cU, 1U, 1U}, {0xc3dU, 1U, 1U}}};
+    require(viper::apply_ncar_body_object_writes(curve_body, curve_zero_writes) &&
+        viper::apply_ncar_body_object_writes(curve_body, curve_values));
+    const auto body_result = viper::advance_ncar_curve_setter_in_body(curve_body, 10.0F);
+    require(body_result &&
+        viper::read_ncar_body_object_u32(curve_body, 0xc0cU) ==
+            std::bit_cast<std::uint32_t>(body_result->integrator.value_0x10) &&
+        viper::read_ncar_body_object_u32(curve_body, 0xc24U) ==
+            std::bit_cast<std::uint32_t>(body_result->tail.accumulator_0x28) &&
+        std::abs(std::bit_cast<float>(*viper::read_ncar_body_object_u32(curve_body, 0x25cU)) -
+            (7.0F + body_result->integrator.body_moment_delta[1])) < 1e-4F &&
+        viper::read_ncar_body_object_u8(curve_body, 0xc3cU) == 0U &&
+        viper::read_ncar_body_object_u8(curve_body, 0xc3dU) == 0U);
+    const auto saved_curve_body = curve_body;
+    require(!viper::advance_ncar_curve_setter_in_body(curve_body,
+        std::numeric_limits<float>::infinity()) &&
+        curve_body.bytes == saved_curve_body.bytes &&
+        curve_body.initialized_bytes == saved_curve_body.initialized_bytes);
     require(!viper::make_ncar_integrator_signal_state_from_runtime_record(
         std::span<const std::byte>(signal_runtime_record.data(), 0x6bU)));
     signal_runtime_record[0x68U] = std::byte{0U};

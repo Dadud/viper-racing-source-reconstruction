@@ -135,6 +135,13 @@ by the model rather than fabricated in the byte-backed object. This composed
 setter and the ordered controller interactions remain unconnected to the live step;
 host floating-point behavior is not established as x87-bit-exact.
 
+`advance_ncar_curve_setter_in_body` bridges that operation to the initialized
+byte-backed body: it reads the curve, body axis and existing moment, then
+commits the getter, curve accumulators, flags and updated body moment together.
+Missing or non-finite inputs leave the body untouched. The caller must supply
+the native setter argument and execute it at the correct point in the tick;
+the adapter is not yet called by the live player simulation.
+
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
 only the wheel `+0xE4` fields reached by the selected block. The Windows

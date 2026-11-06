@@ -142,6 +142,13 @@ struct NcarCurveSetterResult {
 [[nodiscard]] std::optional<NcarCurveSetterResult>
 project_ncar_curve_setter(const NcarCurveSetterInput& input) noexcept;
 
+// Reads the initialized curve and body fields, then commits all setter writes
+// together. Returns no value and leaves the body untouched if input is absent
+// or non-finite. The caller must provide the native setter argument and order.
+[[nodiscard]] std::optional<NcarCurveSetterResult>
+advance_ncar_curve_setter_in_body(
+    NcarBodyRuntimeObjectState& body, float setter_argument) noexcept;
+
 struct NcarSelectedWheelPairTargetResult {
     // Constructor selector: 0 selects +0xD24, 1 selects +0xD04, and 2
     // selects +0xD44. The raw +0xB4 bit comparisons are preserved.

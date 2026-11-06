@@ -2426,6 +2426,62 @@ std::optional<NcarCurveSetterResult> project_ncar_curve_setter(
     return NcarCurveSetterResult{*prefix, *integrator, *tail};
 }
 
+std::optional<NcarCurveSetterResult> advance_ncar_curve_setter_in_body(
+    NcarBodyRuntimeObjectState& body, const float setter_argument) noexcept
+{
+    NcarCurveSetterInput input{};
+    input.prefix.setter_argument = setter_argument;
+    auto& curve = input.prefix.curve;
+    const std::array<std::pair<std::uint32_t, float*>, 25> fields{{
+        {0xc04U, &input.body_scale_0x08}, {0xc08U, &input.inverse_scale_0x0c},
+        {0xc0cU, &input.prefix.getter_value_0x10}, {0xc10U, &curve.subtract_scale_0x14},
+        {0xc20U, &input.value_0x24}, {0xc24U, &input.accumulator_0x28},
+        {0xc28U, &input.prefix.control_value_0x2c}, {0xc2cU, &input.prefix.derived_value_0x30},
+        {0xc30U, &curve.gate_value_0x34}, {0xc34U, &curve.blend_value_0x38},
+        {0xc38U, &curve.cutoff_0x3c}, {0xc40U, &curve.quadratic_0x44},
+        {0xc44U, &curve.linear_0x48}, {0xc48U, &curve.intercept_0x4c},
+        {0xc4cU, &curve.coefficient_0x50}, {0xc50U, &curve.offset_0x54},
+        {0xc54U, &curve.penalty_0x58}, {0xc64U, &input.value_0x68},
+        {0xc68U, &input.accumulator_0x6c},
+        {0x50U, &input.body_axis_0x50[0]}, {0x54U, &input.body_axis_0x50[1]},
+        {0x58U, &input.body_axis_0x50[2]},
+        // The accumulators are read separately below before any writes.
+        {0x258U, nullptr}, {0x25cU, nullptr}, {0x260U, nullptr}}};
+    std::array<float, 3> moment{};
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        const auto bits = read_ncar_body_object_u32(body, fields[index].first);
+        if (!bits) return std::nullopt;
+        const auto value = std::bit_cast<float>(*bits);
+        if (!std::isfinite(value)) return std::nullopt;
+        if (fields[index].second) *fields[index].second = value;
+        else moment[index - 22U] = value;
+    }
+    const auto mode40 = read_ncar_body_object_u8(body, 0xc3cU);
+    const auto mode41 = read_ncar_body_object_u8(body, 0xc3dU);
+    if (!mode40 || !mode41) return std::nullopt;
+    curve.mode_0x40 = *mode40;
+    curve.mode_0x41 = *mode41;
+    const auto result = project_ncar_curve_setter(input);
+    if (!result) return std::nullopt;
+    for (std::size_t i = 0; i < moment.size(); ++i) {
+        moment[i] += result->integrator.body_moment_delta[i];
+        if (!std::isfinite(moment[i])) return std::nullopt;
+    }
+    const auto bits = [](const float value) { return std::bit_cast<std::uint32_t>(value); };
+    const std::array<NcarObjectFieldWrite, 10> writes{{
+        {0xc34U, 4U, bits(result->prefix.blended_value_0x38)},
+        {0xc0cU, 4U, bits(result->integrator.value_0x10)},
+        {0xc24U, 4U, bits(result->tail.accumulator_0x28)},
+        {0xc68U, 4U, bits(result->tail.accumulator_0x6c)},
+        {0xc70U, 4U, bits(result->tail.coupling_0x74)},
+        {0xc3cU, 1U, result->tail.mode_0x40},
+        {0xc3dU, 1U, result->tail.mode_0x41},
+        {0x258U, 4U, bits(moment[0])}, {0x25cU, 4U, bits(moment[1])},
+        {0x260U, 4U, bits(moment[2])}}};
+    if (!apply_ncar_body_object_writes(body, writes)) return std::nullopt;
+    return result;
+}
+
 std::optional<NcarSelectedWheelPairTargetResult>
 advance_ncar_selected_wheel_pair_target(
     const NcarSelectedWheelPairTargetInput& input) noexcept
