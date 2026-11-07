@@ -236,12 +236,7 @@ ACAR bodies and wheels remain at constructor state. The normal renderer now
 reads each retained ACAR body's 3x3 basis and world position instead of
 assuming the separate graphics pose remains authoritative. This is a pose
 ownership correction only: it does not advance the ACAR task or make the
-opponents move. These poses, prototype speeds, and stale constructor snapshots
-must not be converted into timer rows.
-The session also does not create the ACAR manager pointer registry. The native
-setup walks registered object pointers and leaves unregistered ordinal rows
-zero-filled, so the player body alone cannot stand in for all descriptor
-slots.
+opponents move.
 
 The retained ACAR constructor projection now includes the directly observed
 manager-registration store `body[+0x4FC] = 0` from `0x43CA90 -> 0x43CA00`.
@@ -250,15 +245,17 @@ pointer/sidecar registration, live ordinal rows, and ACAR callback remain
 unimplemented. The store must not be read as proof that the production session
 has a complete manager registry or moving opponents.
 
-The next implementation boundary is to add persistent physical update state
-for each ACAR and reproduce its ordered callback producers before the shared
-integrator. Once all participant bodies and the native registration set are
-current, the race session can retain the one-update-lagged registry snapshot
-and materialize ordinal rows from each registered body's `+0x5C/+0x64/
-+0x234/+0x23C` fields, preserve unregistered slots as zero rows, and pass the
-complete span with the player's native `+0x510` ordinal. Until then,
-`ordinal_rows_resolved` must remain false; constructor defaults and route
-motion are not valid substitutes for current participant physics.
+The session now assembles the fixed quick-race participant rows by each
+constructed body's native `+0x510` ordinal and retains the last completed
+snapshot across fixed steps. It resolves the player's selected pair from the
+prior snapshot and records row completeness, pair presence, and X/Z deltas in
+the physics trace. This follows the native post-callback refresh order and is
+diagnostic only: ACAR callbacks are still absent, so opponent positions and
+velocities remain constructor values in these rows after tick zero. The timer
+does not consume this snapshot, and the trace must not be interpreted as
+original-game parity. The next runtime boundary is advancing ACAR task state
+and rebuilding the same snapshot after those callbacks before connecting it
+to the player's timer.
 
 The portable resolver constructs and sorts only the requested row because
 the timer consumes one row entry; the native descriptor itself constructs all
@@ -272,9 +269,10 @@ from initialized byte-backed body objects into ordinal-ordered row inputs. It
 fails when any slot's registration state is unresolved, when registration and
 body ownership disagree, or when a registered object's consumed bytes are
 uninitialized or non-finite. Explicitly unregistered slots retain zero values.
-This closes the body-byte adapter only; the live session still does not provide
-its full manager slot map or dispatch the ACAR callbacks that refresh current
-opponent bodies, and therefore does not pass these rows to the physics timer.
+The session supplies the selected quick-race slot map from its configured
+PCAR/ACAR bodies. Other modes and unrepresented registered object types still
+need their own registry inventory; live timer consumption remains disconnected
+until ACAR callbacks refresh current opponent bodies.
 
 Each portable row now carries an explicit `registration_resolved` observation.
 The lookup rejects a span with any missing registration observation instead

@@ -2832,6 +2832,10 @@ struct PlayerPhysicsTickContext {
     std::optional<std::uint32_t> race_tracking_node;
     std::optional<float> race_tracking_fraction;
     std::optional<std::uint32_t> race_crossing_count;
+    bool session_ordinal_rows_resolved{};
+    std::optional<bool> session_player_pair_present;
+    std::optional<float> session_player_pair_delta_x;
+    std::optional<float> session_player_pair_delta_z;
     bool body_kinematics_input_ready{};
     bool body_kinematics_non_finite{};
     bool body_kinematics_reader_inventory_mismatch{};
@@ -3019,6 +3023,11 @@ struct WindowState {
     std::vector<viper::ConfiguredCarTaskStreamBinding> configured_car_stream_bindings;
     std::vector<AcarCurveSourceRuntimeState> ai_acar_curve_sources;
     std::vector<AcarBodyRuntimeState> ai_acar_body_states;
+    // Row snapshot from the last completed reconstructed task pass. The
+    // original manager refreshes after object callbacks, so the next fixed
+    // step must observe this retained snapshot before it is replaced.
+    std::vector<viper::NcarOrdinalPairRowInput> session_ordinal_pair_rows;
+    bool session_ordinal_pair_rows_ready{};
     std::optional<viper::TrackCurveNodes> ai_default_curve_nodes;
     std::optional<std::vector<viper::PhysicsAcarModelNodeObservation>> ai_default_model_nodes;
     std::vector<viper::AcarDescriptorGeometry> ai_default_descriptor_geometry;
@@ -5117,6 +5126,8 @@ struct WindowState {
         const auto outer_update_index = player_outer_update_count++;
         bool lap_completed = false;
         for (std::int32_t step = 0; step < schedule.steps; ++step) {
+            if (!session_ordinal_pair_rows_ready)
+                (void)refresh_session_ordinal_pair_rows();
             // Every opponent in this fixed step decides from the same traffic
             // snapshot. The player occupies its rendered entrant slot.
             auto route_participant_snapshot = opponent_motions;
@@ -5138,6 +5149,25 @@ struct WindowState {
             // Native dispatch consumes the current timer before incrementing it.
             tick_context.simulation_time_seconds =
                 static_cast<float>(physics_step_count) * 0.016F;
+            if (session_ordinal_pair_rows_ready) {
+                const auto ordinal = viper::read_ncar_body_object_u32(
+                    player_runtime_state.body_object, 0x510U);
+                if (ordinal) {
+                    const auto pair = viper::resolve_ncar_ordinal_pair_lookup(
+                        session_ordinal_pair_rows, *ordinal);
+                    if (pair.input_complete) {
+                        tick_context.session_ordinal_rows_resolved = true;
+                        tick_context.session_player_pair_present =
+                            pair.record.has_value();
+                        if (pair.record) {
+                            tick_context.session_player_pair_delta_x =
+                                pair.record->position_delta_x_0x04;
+                            tick_context.session_player_pair_delta_z =
+                                pair.record->position_delta_z_0x08;
+                        }
+                    }
+                }
+            }
             player_physics_ticks_this_update.push_back(tick_context);
             // The PCAR callback prefix stores control-derived body scalars;
             // then 0x431150 updates the selector and paired drivetrain
@@ -5276,6 +5306,10 @@ struct WindowState {
                     }
                 }
             }
+            // 0x420750 rebuilds the manager's pair rows after all task
+            // callbacks. Retain the just-completed session snapshot so the
+            // next fixed step observes it before any replacement.
+            (void)refresh_session_ordinal_pair_rows();
             ++physics_step_count;
         }
         if (lap_completed) refresh_title(true);
@@ -5772,6 +5806,58 @@ struct WindowState {
             return true;
         }
         return false;
+    }
+
+    bool refresh_session_ordinal_pair_rows()
+    {
+        session_ordinal_pair_rows.clear();
+        session_ordinal_pair_rows_ready = false;
+        const auto participant_count = opponent_motions.size();
+        if (participant_count == 0U ||
+            ai_acar_body_states.size() + 1U != participant_count ||
+            player_car_index >= participant_count) {
+            return false;
+        }
+        std::vector<viper::NcarOrdinalPairBodySource> slots(
+            participant_count, {false, false, nullptr});
+        std::vector<bool> configured_cars_seen(participant_count, false);
+        configured_cars_seen[player_car_index] = true;
+        const auto register_body = [&](
+            const viper::NcarBodyRuntimeObjectState& body) {
+            const auto ordinal_bits = viper::read_ncar_body_object_u32(body, 0x510U);
+            if (!ordinal_bits) return false;
+            const auto ordinal = static_cast<std::size_t>(*ordinal_bits);
+            if (ordinal >= participant_count || slots[ordinal].registration_resolved)
+                return false;
+            slots[ordinal] = {true, true, &body};
+            return true;
+        };
+        if (!register_body(player_runtime_state.body_object)) {
+            return false;
+        }
+        for (const auto& ai_body : ai_acar_body_states) {
+            const auto car = ai_body.stream_binding.configured_car_index;
+            if (car >= participant_count || car == player_car_index ||
+                configured_cars_seen[car]) {
+                return false;
+            }
+            configured_cars_seen[car] = true;
+            if (!register_body(ai_body.body_object)) return false;
+        }
+        if (!std::all_of(configured_cars_seen.begin(), configured_cars_seen.end(),
+                [](const bool seen) { return seen; }) ||
+            !std::all_of(slots.begin(), slots.end(),
+                [](const auto& slot) {
+                    return slot.registration_resolved && slot.registered &&
+                        slot.body != nullptr;
+                })) {
+            return false;
+        }
+        auto rows = viper::materialize_ncar_ordinal_pair_rows(slots);
+        if (!rows || rows->size() != participant_count) return false;
+        session_ordinal_pair_rows = std::move(*rows);
+        session_ordinal_pair_rows_ready = true;
+        return true;
     }
 
     bool results_ready() const noexcept
@@ -7117,7 +7203,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",race_tracking_x,race_tracking_z,race_tracking_status"
             ",race_tracking_previous_category,race_tracking_category"
             ",race_tracking_category_changed,race_tracking_node"
-            ",race_tracking_fraction,race_crossing_count";
+            ",race_tracking_fraction,race_crossing_count"
+            ",session_ordinal_rows_resolved,session_player_pair_present"
+            ",session_player_pair_delta_x,session_player_pair_delta_z";
         physics_tick_trace << '\n';
         physics_tick_trace << std::setprecision(9);
         if (!physics_tick_trace) {
@@ -7831,6 +7919,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (tick.race_tracking_fraction) physics_tick_trace << *tick.race_tracking_fraction;
                     physics_tick_trace << ',';
                     if (tick.race_crossing_count) physics_tick_trace << *tick.race_crossing_count;
+                    physics_tick_trace << ',' << tick.session_ordinal_rows_resolved << ',';
+                    if (tick.session_player_pair_present)
+                        physics_tick_trace << static_cast<unsigned>(
+                            *tick.session_player_pair_present);
+                    physics_tick_trace << ',';
+                    if (tick.session_player_pair_delta_x)
+                        physics_tick_trace << *tick.session_player_pair_delta_x;
+                    physics_tick_trace << ',';
+                    if (tick.session_player_pair_delta_z)
+                        physics_tick_trace << *tick.session_player_pair_delta_z;
                     physics_tick_trace << std::dec << std::setfill(' ') << '\n';
                     if (!physics_tick_trace) {
                         std::cerr << "Could not write physics tick trace.\n";
