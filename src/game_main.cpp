@@ -1234,6 +1234,7 @@ public:
                 const viper::ResourceBundle& shared_texture_bundle,
                 const viper::ResourceBundle& common_texture_bundle,
                 const viper::ResourceBundle& track_bundle,
+                const std::string_view track_name,
                 const std::size_t player_car_index,
                 const viper::TrackObjectTextTable& track_objects,
                 const std::string_view player_car_name,
@@ -1244,6 +1245,11 @@ public:
             extract_terrain_points(terrain);
             track_graphics_ = track_graphics;
             terrain_surface_ = &terrain;
+            // race.bin 0x463020 selects the procedural sky's fixed world
+            // center by track name before building the radius-500 sky mesh.
+            sky_center_x_ = track_name == "nfield" ? -75.0F
+                : track_name == "heaven" ? -40.0F : -25.0F;
+            sky_center_z_ = 200.0F;
             wobble_model_ids_.clear();
             wobble_scene_node_offsets_.clear();
             for (std::size_t row = 1U; row < track_objects.line_count; ++row) {
@@ -1693,6 +1699,13 @@ public:
                 }
                 context_->Draw(group.vertex_count, group.first_vertex);
             };
+            camera_constants_.world_basis_x = {1.0F, 0.0F, 0.0F, 0.0F};
+            camera_constants_.world_basis_y = {0.0F, 1.0F, 0.0F, 0.0F};
+            camera_constants_.world_basis_z = {0.0F, 0.0F, 1.0F, 0.0F};
+            camera_constants_.world_position = {};
+            context_->UpdateSubresource(camera_buffer_.Get(), 0U, nullptr,
+                &camera_constants_, 0U, 0U);
+            for (const auto& group : sky_draw_groups_) draw_group(group);
             if (selected_track_nodes) {
                 const auto draw_node_groups = [&](const auto& node_offsets,
                     const std::vector<viper::TrackGraphicsFacingTransform>* transforms) {
@@ -2361,6 +2374,19 @@ private:
 
     bool create_material_texture_views()
     {
+        constexpr auto texture_type =
+            viper::resource_type_code('T', 'E', 'X', ' ');
+        for (std::size_t index = 0U; index < sky_texture_srvs_.size(); ++index) {
+            const auto name = "sky" + std::to_string(index + 1U) + ".tex";
+            const auto* entry = track_bundle_->find(name, texture_type);
+            if (entry == nullptr) continue;
+            const auto texture = viper::parse_texture_payload(
+                track_bundle_->payload(*entry));
+            if (!texture || texture->flags != 0U) continue;
+            if (!create_texture_srv(*texture, sky_texture_srvs_[index]))
+                return false;
+            sky_texture_wraps_[index] = texture->wrap;
+        }
         constexpr std::array<std::string_view, 3> shared_material_names{
             "UCAR.tex", "WHEELS.tex", "EFFECTS.tex"};
         for (const auto name : shared_material_names) {
@@ -2445,6 +2471,7 @@ private:
     {
         track_buffer_.Reset();
         track_draw_groups_.clear();
+        sky_draw_groups_.clear();
         scene_group_ranges_.clear();
         if (track_graphics_ == nullptr || track_graphics_->chunks.empty()) return true;
 
@@ -2552,6 +2579,55 @@ private:
                 if (group_vertex_count > std::numeric_limits<UINT>::max()) return false;
                 group.vertex_count = static_cast<UINT>(group_vertex_count);
                 if (group.vertex_count != 0U) track_draw_groups_.push_back(std::move(group));
+            }
+        }
+
+        // race.bin 0x45FFBB builds the procedural "sky model" by calling
+        // 0x460800 with 16 angular slices. The builder uses a 500-unit
+        // horizontal radius and four skyN.tex materials. Preserve the
+        // verified panorama seam order sky1 -> sky2 -> sky3 -> sky4; each
+        // texture occupies one quarter of the cylinder. The sidewall's exact
+        // vertical coordinates still need a recovered native vertex dump;
+        // keep the conservative scene-scale range until the cap is decoded.
+        constexpr std::size_t sky_segments = 16U;
+        constexpr float sky_radius = 500.0F;
+        constexpr float sky_bottom = 0.0F;
+        constexpr float sky_top = 150.0F;
+        constexpr float full_turn = 6.28318530717958647692F;
+        const bool sky_textures_available = std::all_of(
+            sky_texture_srvs_.begin(), sky_texture_srvs_.end(),
+            [](const auto& texture) { return texture.Get() != nullptr; });
+        if (sky_textures_available) {
+            for (std::size_t segment = 0U; segment < sky_segments; ++segment) {
+                const auto texture_index = segment / (sky_segments / 4U);
+                const auto subsegment = segment % (sky_segments / 4U);
+                const float u0 = static_cast<float>(subsegment) / 4.0F;
+                const float u1 = static_cast<float>(subsegment + 1U) / 4.0F;
+                const float angle0 = full_turn * static_cast<float>(segment) /
+                    static_cast<float>(sky_segments);
+                const float angle1 = full_turn * static_cast<float>(segment + 1U) /
+                    static_cast<float>(sky_segments);
+                const auto x0 = sky_center_x_ + sky_radius * std::cos(angle0);
+                const auto z0 = sky_center_z_ + sky_radius * std::sin(angle0);
+                const auto x1 = sky_center_x_ + sky_radius * std::cos(angle1);
+                const auto z1 = sky_center_z_ + sky_radius * std::sin(angle1);
+                const CarVertex top_left{x0, sky_top, z0, 1.0F, 1.0F, 1.0F, u0, 0.0F};
+                const CarVertex top_right{x1, sky_top, z1, 1.0F, 1.0F, 1.0F, u1, 0.0F};
+                const CarVertex bottom_left{x0, sky_bottom, z0,
+                    1.0F, 1.0F, 1.0F, u0, 1.0F};
+                const CarVertex bottom_right{x1, sky_bottom, z1,
+                    1.0F, 1.0F, 1.0F, u1, 1.0F};
+                const auto first_vertex = static_cast<UINT>(vertices.size());
+                vertices.insert(vertices.end(), {top_left, top_right, bottom_left,
+                    top_right, bottom_right, bottom_left});
+                if (subsegment == 0U) {
+                    CarDrawGroup group{};
+                    group.first_vertex = first_vertex;
+                    group.texture_srv = sky_texture_srvs_[texture_index];
+                    group.texture_wrap = sky_texture_wraps_[texture_index];
+                    sky_draw_groups_.push_back(std::move(group));
+                }
+                sky_draw_groups_.back().vertex_count += 6U;
             }
         }
         for (std::size_t index = 0; index < track_draw_groups_.size(); ++index) {
@@ -2799,6 +2875,10 @@ private:
     ComPtr<ID3D11DepthStencilState> car_transparent_depth_state_;
     ComPtr<ID3D11BlendState> car_alpha_blend_state_;
     std::array<ComPtr<ID3D11SamplerState>, 3> car_sampler_states_{};
+    std::array<ComPtr<ID3D11ShaderResourceView>, 4> sky_texture_srvs_{};
+    std::array<std::uint8_t, 4> sky_texture_wraps_{};
+    float sky_center_x_{-25.0F};
+    float sky_center_z_{200.0F};
     ComPtr<ID3D11ShaderResourceView> player_paint_srv_;
     std::uint8_t player_paint_wrap_{1U};
     std::array<ComPtr<ID3D11ShaderResourceView>, 7> ai_paint_srvs_{};
@@ -2834,6 +2914,7 @@ private:
     std::vector<viper::CarTrackConstructionPlan> car_placement_plans_;
     std::vector<CarDrawGroup> car_draw_groups_;
     std::vector<CarDrawGroup> track_draw_groups_;
+    std::vector<CarDrawGroup> sky_draw_groups_;
     std::unordered_map<std::uint32_t, std::pair<std::size_t, std::size_t>>
         scene_group_ranges_;
     std::unordered_set<std::uint32_t> wobble_model_ids_;
@@ -6665,7 +6746,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             options.real("GX", "detail_level").value_or(1.0F), ideal_line, player_model,
             ai_model, player_paint_texture, ai_livery_bundle,
             ai_paint_selectors, car_bundle, ai_car_bundle,
-            shared_texture_bundle, common_texture_bundle, track_bundle,
+            shared_texture_bundle, common_texture_bundle, track_bundle, track_name,
             player_car_index, track_objects, car_name,
             force_default_placement)) {
         std::cerr << "Could not initialize Direct3D 11. "

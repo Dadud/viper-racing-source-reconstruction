@@ -120,6 +120,26 @@ Mode 7 retains the prior cache. The reconstructed transition path has been
 captured once, but still needs matched native frame values; position-change
 refreshes and other camera-global transitions remain open.
 
+### Procedural sky prototype (2026-11-07)
+
+The native startup path calls `0x463020` to set the sky center before invoking
+the `0x460800` builder. The track-name branches select X `-75` for `nfield`,
+`-40` for `heaven`, and `-25` otherwise; Z is `200` in all three branches.
+The builder receives 16 angular slices, uses radius `500`, and creates
+`sky1.tex` through `sky4.tex`. The renderer now uses the native fixed center
+and draws the four supplied textures in the seam order observed in their
+decoded pixels. The current sidewall's vertical range and UV subdivision are
+still approximations; a taller-shell experiment produced invalid/black
+coverage and was discarded. The native builder's separate cap primitive has
+not been reconstructed yet.
+
+A bounded 640x480 capture at race startup (route motion disabled) confirms the
+track-specific center removes the previous center-offset artifacts, but a
+large uncovered/incorrect sky area remains and the stadium view is still far
+from the original. Capture: `captures/viper-bemidji-sky-native-center-retest.bmp`
+(stored beside the extracted assets, outside this source repository). This is
+an implementation milestone, not visual parity evidence.
+
 ## Limits and next evidence
 
 The parser inventories linked nodes and maps active geometry to chunks. The
