@@ -1460,7 +1460,7 @@ public:
             camera_up = normalize(cross(camera_forward, camera_right));
         }
         const float near_plane = 0.1F;
-        const float focal_scale = 1.0F / std::tan(65.0F *
+        const float focal_scale = 1.0F / std::tan(50.0F *
             0.008726646259971648F);
         const float aspect = static_cast<float>(width_) /
             static_cast<float>(height_);

@@ -30,6 +30,15 @@ a large black wedge, crude track textures, and lighting/material differences
 remain visible. The capture is kept outside the source repository at
 `../captures/viper-bemidji-chase-wide.bmp`; no game process remains running.
 
+Compared that frame with the retained original Bemidji race-start capture at
+`../analysis/reference_captures/physics_dispatch_20261025/original_race_start.png`.
+The reconstruction's vehicle scale and horizon placement were visibly off, so
+the development view's vertical field of view was narrowed from 65 to 50
+degrees. A new silent WARP capture confirms the larger vehicle framing and
+preserved full 3D track; player/AI placement in the view, the black geometry
+wedge, texture artifacts, and missing native lighting still need correction.
+Latest frame: `../captures/viper-bemidji-chase-50deg.bmp`.
+
 The historical 2026-10-24 AI-sidecar inventory below missed indexed resources:
 all eight supplied track bundles contain `default.ili` and `rdefault.ili`, and
 `drivers.res` contains 524 `.ilg` lines and 695 `.dnt` notes. See [AI note
