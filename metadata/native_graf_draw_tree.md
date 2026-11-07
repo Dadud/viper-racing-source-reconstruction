@@ -153,13 +153,9 @@ the three basis vectors, using the process FDIV-compatibility branch when
 enabled. Constructor `0x436ED0` seeds basis storage from the matched mode-4
 resource entry and links its intrusive node.
 
-This closes the producer for the WOBL task object's physical basis/position,
-but not the render bridge: the visual matrix consumes a 12-DWORD buffered
-record, and the inspected callback does not write that buffer or call the
-visual object's matrix setter. The next exact step is to trace the writer and
-tick/slot selection for the `0x25720` buffer consumed by `0x63530`; until then,
-copying the physics object directly into the render matrix would skip an
-unresolved native interpolation/snapshot boundary.
+This closes the producer for the WOBL task object's physical basis/position.
+The render bridge uses a separate snapshot writer and matrix setter; its
+record offset and state-ring selection are traced below.
 
 ### Candidate shared transform-snapshot writer
 
@@ -174,24 +170,22 @@ world position, then copies the object's 16-bit marker at `+0x10` to record
 `+0x00`. This is structurally the same matrix-plus-marker shape consumed by
 visual updater `0x63530` and installed by `0x63570`.
 
-This narrows the writer candidate substantially, but does not yet prove that
-`&state[+0x7DC]` aliases the WOBL visual object's `+0x34` buffer or that both
-paths use the same ring slot. The remaining join is through `0x421120`'s
-buffer setup and the scene-update offset passed to `0x63530`; map those pointer
-and tick values before wiring the reconstruction. The previous broad claim
-that the transform producer was unidentified should be read as a remaining
-buffer-alias/timing question, not an absence of a native WOBL snapshot writer.
+The supplied address is the base of a per-state snapshot area. Both `task+0x08`
+and `visual+0x34` are byte cursors into that area, not pointers to independent
+transform buffers. Their equality for a WOBL row follows from the shared
+serialized-record cursor described below; only the selected state-ring entry
+and update timing remain to be matched.
 
 ### Shared state-ring selector and remaining frame join (2026-11-06)
 
-The render-side callback receives the same *kind* of state-tail pointer used by
+The render-side callback receives the state snapshot-tail pointer used by
 physics callbacks. `0x425880` selects the state manager using index
 `[0x4D4DE0]`, copies its `0xF6` DWORD state prefix to the caller's frame
 workspace, copies the trailing `+0x3D8` block, and returns the selected state
 object's `+0x7DC` address. In `0x45BC20`, that return value is kept in `EBX`
 and passed unchanged to every registered visual object's `0x63530` updater.
-Therefore the updater's supplied value is an address within the selected state
-object, rather than a small byte offset or a renderer-owned matrix address.
+Therefore the updater's supplied value is the base address for that frame's
+dynamic-object records.
 
 The simulation path in `0x4207C0` selects through `[0x4D4888]` and
 `0x4C5AC0`; both `0x4C5A80` (used by `0x425880`) and `0x4C5AC0` index the same
@@ -200,13 +194,20 @@ state object's `+0x7DC` address to each task's vtable `+0x14`, including WOBL
 writer `0x4371C0`. This establishes a common state-ring layout and matching
 tail offset on the two paths.
 
-It does **not** establish that `[0x4D4888]` and `[0x4D4DE0]` select the same
-ring entry at a given display frame, or that `0x4371C0` writes the exact
-record slice read by `0x63530`: the writer computes its destination as
-`[task+0x08] + supplied_state_address`, while the visual updater reads from
-`[visual+0x34] + supplied_state_address`. The task and visual base pointers,
-ring-index progression, and any scaling/offset convention between those bases
-still need to be joined. The correct next analysis is to identify the backing
-buffer and role of the task's `+0x08` and visual `+0x34` fields, then compare
-the index producers at `0x420625..0x420673` and `0x4255BC..0x4255CE` before
-implementing dynamic mode-4 rendering.
+The per-object offset is now resolved. Loader `0x4224D0` passes the record's
+byte cursor through factory `0x422580`; base constructor `0x4375C0` stores it
+at task `+0x08`. Visual serializer `0x425720` stores the current shared
+serialization cursor at visual `+0x34`. The renderer computes
+`state_tail + visual_cursor`; WOBL writer `0x4371C0` computes
+`state_tail + task_cursor`. Both cursors refer to the same serialized WOBL
+record in the shared buffer, so the writer and reader address the same
+12-DWORD record layout. This closes the buffer-alias question.
+
+The remaining exactness gap is ring selection and timing: simulation uses
+`[0x4D4888]`, while render snapshot selection uses `[0x4D4DE0]`. Both select
+through the manager table at `0x56AFB4`, but their per-frame relationship has
+not been recovered. Before connecting this to the reconstruction, trace those
+index producers and identify which adjacent state snapshots the native renderer
+uses. The reconstruction also still needs runtime WOBL task state and a
+mode-4 draw path; static GRAF registration alone does not animate or draw these
+instances.
