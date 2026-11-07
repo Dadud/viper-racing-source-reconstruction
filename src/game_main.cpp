@@ -588,6 +588,24 @@ std::filesystem::path resolve_setup_config_directory(
     return {};
 }
 
+std::int32_t load_race_camera_mode(
+    const std::filesystem::path& config_directory)
+{
+    std::int32_t mode = 5;
+    const auto path = config_directory / "options.cfg";
+    std::error_code error;
+    if (config_directory.empty() ||
+        !std::filesystem::is_regular_file(path, error) || error) return mode;
+    try {
+        const auto options = viper::GameOptions::load(path);
+        mode = options.integer("CONTROL", "race_camera").value_or(mode);
+    } catch (const std::exception& e) {
+        std::cerr << "Ignoring invalid race-camera preference: " << e.what() << '\n';
+    }
+    // race setup maps camera mode 12 to mode 4 before entering the race loop.
+    return mode == 12 ? 4 : mode;
+}
+
 std::string configured_track_stem(const std::filesystem::path& data_dir,
                                   const viper::GameOptions& options)
 {
@@ -1389,6 +1407,10 @@ public:
                 const std::array<float, 2>& camera_pan_clip,
                 const float camera_zoom,
                 const float camera_response_0xea8,
+                const std::int32_t native_camera_mode,
+                const std::array<float, 3>& native_camera_anchor,
+                const std::array<float, 3>& native_camera_velocity,
+                const bool native_camera_vehicle_flag_0x4ec,
                 const bool native_camera_follow,
                 const std::optional<std::span<const std::uint32_t>>
                     runtime_wobl_resource_ids,
@@ -1425,7 +1447,8 @@ public:
         std::array<float, 3> camera_forward{};
         std::array<float, 3> camera_right{};
         std::array<float, 3> camera_up{};
-        if (native_camera_follow) {
+        if (native_camera_follow && native_camera_mode == 0) {
+            native_camera_cache_initialized_ = false;
             viper::RaceCameraMode0Input camera_input{};
             camera_input.vehicle_transform_0x38 = vehicle;
             camera_input.local_camera_point_0x47c = player_camera_point_;
@@ -1453,7 +1476,33 @@ public:
                     camera_right[axis] * camera_pan_clip[0] * 4.0F +
                     camera_up[axis] * camera_pan_clip[1] * 4.0F;
             }
+        } else if (native_camera_follow &&
+            native_camera_mode >= 4 && native_camera_mode <= 7) {
+            viper::RaceCameraModeState mode{};
+            viper::store_race_camera_mode(mode, native_camera_mode);
+            if (!native_camera_cache_initialized_ ||
+                native_camera_cache_mode_ != native_camera_mode) {
+                native_camera_cached_transform_ = vehicle;
+                native_camera_cache_mode_ = native_camera_mode;
+                native_camera_cache_initialized_ = true;
+            }
+            viper::RaceCameraModes4To7Input camera_input{};
+            camera_input.cached_transform = native_camera_cached_transform_;
+            camera_input.camera_anchor_position = native_camera_anchor;
+            camera_input.vehicle_velocity = native_camera_velocity;
+            camera_input.global_0x508760_is_zero = true;
+            camera_input.vehicle_flag_0x4ec = native_camera_vehicle_flag_0x4ec;
+            viper::RaceCameraModes4To7Output native_camera{};
+            if (!viper::prepare_race_camera_modes_4_to_7_output(
+                    mode, camera_input, native_camera)) return false;
+            native_camera_cached_transform_ = native_camera.cached_transform;
+            const auto& transform = native_camera.transform;
+            camera_position = {transform[9], transform[10], transform[11]};
+            camera_right = normalize({transform[0], transform[1], transform[2]});
+            camera_up = normalize({transform[3], transform[4], transform[5]});
+            camera_forward = normalize({transform[6], transform[7], transform[8]});
         } else {
+            native_camera_cache_initialized_ = false;
             const auto vehicle_forward = normalize(
                 {vehicle[6], vehicle[7], vehicle[8]});
             const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
@@ -2667,6 +2716,9 @@ private:
     const viper::TerrainSurfaceResourcePayload* terrain_surface_{};
     std::array<float, 3> player_camera_point_{-0.3F, 0.8F, 0.0F};
     viper::RaceCameraMode0State camera_mode_0_state_{};
+    std::array<float, 12> native_camera_cached_transform_{};
+    std::int32_t native_camera_cache_mode_{5};
+    bool native_camera_cache_initialized_{};
     const viper::ModelResource* player_model_{};
     const viper::ModelResource* ai_model_{};
     const viper::ResourceBundle* player_car_bundle_{};
@@ -3239,10 +3291,11 @@ struct WindowState {
     bool route_motion_enabled{};
     bool paused{};
     bool return_to_frontend{};
-    // Start in the visible exterior chase view. The recovered mode-0 camera
-    // uses the cockpit.tab attachment point and can place the development
-    // renderer inside opaque car geometry; F3 still switches to that camera.
-    bool camera_follow_player{false};
+    // Follow the race_camera setting from options.cfg by default. F3 switches
+    // to the explicitly reconstructed free chase view; F4 restores the native
+    // mode selected by the user's configuration.
+    bool camera_follow_player{true};
+    std::int32_t native_race_camera_mode{5};
     std::array<float, 2> camera_anchor_world{};
     std::array<float, 2> camera_pan_clip{};
     float camera_zoom{1.6F};
@@ -6350,6 +6403,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                const bool smoke_audio,
                const bool diagnostics_only,
                const bool route_motion_enabled,
+               const std::int32_t native_race_camera_mode,
                const std::optional<std::filesystem::path>& record_trace,
                const std::optional<std::filesystem::path>& record_physics_tick_trace,
                const std::vector<TraceInputFrame>* playback_trace,
@@ -6407,6 +6461,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     WindowState state;
     state.diagnostics_only = diagnostics_only;
     state.route_motion_enabled = route_motion_enabled;
+    state.native_race_camera_mode = native_race_camera_mode;
+    std::cout << "Selected native race camera mode "
+              << state.native_race_camera_mode << ".\n";
     if (state.diagnostics_only)
         std::cout << "Diagnostics-only mode: route motion disabled.\n";
     state.network_session = network_session;
@@ -8352,9 +8409,32 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     state.player_runtime_state.body_object, 0xea8U)) {
                 camera_response_0xea8 = std::bit_cast<float>(*response_bits);
             }
+            const auto read_body_float = [&](const std::uint32_t offset) {
+                const auto bits = viper::read_ncar_body_object_u32(
+                    state.player_runtime_state.body_object, offset);
+                return bits ? std::bit_cast<float>(*bits) : 0.0F;
+            };
+            const auto camera_vehicle_transform =
+                state.graphics.car_transform(state.player_car_index);
+            const std::array<float, 3> camera_local_anchor{
+                read_body_float(0x28U), read_body_float(0x2cU),
+                read_body_float(0x30U)};
+            const auto camera_anchor_point = viper::transform_vehicle_point_xyz(
+                camera_vehicle_transform, camera_local_anchor);
+            const std::array<float, 3> camera_anchor{
+                camera_anchor_point.x, camera_anchor_point.y,
+                camera_anchor_point.z};
+            const std::array<float, 3> camera_velocity{
+                read_body_float(0x234U), read_body_float(0x238U),
+                read_body_float(0x23cU)};
+            const bool camera_vehicle_flag =
+                viper::read_ncar_body_object_u8(
+                    state.player_runtime_state.body_object, 0x4ecU).value_or(0U) != 0U;
             if (render_frame && !state.graphics.render(state.hud_text(),
                     camera_focus[0], camera_focus[1], state.camera_pan_clip,
                     state.camera_zoom, camera_response_0xea8,
+                    state.native_race_camera_mode, camera_anchor,
+                    camera_velocity, camera_vehicle_flag,
                     state.camera_follow_player,
                     state.physics_task_runtime_collection.has_value()
                         ? std::optional<std::span<const std::uint32_t>>{
@@ -8662,6 +8742,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         options.audio_smoke,
         options.diagnostics_only || !options.route_motion_prototype,
         options.route_motion_prototype && !options.diagnostics_only,
+        load_race_camera_mode(setup_config_directory),
         options.record_trace, options.record_physics_tick_trace,
         playback_trace, hold_results_for_frontend,
         *entrants.player_record_index,

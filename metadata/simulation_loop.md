@@ -356,10 +356,22 @@ writes the exact fallback `(-0.3, 0.8, 0.0)`. The Viper resource contains
 The other four shipped car bundles (Sports, Sedan, Plane, and Exotic) do not
 contain `cockpit.tab` and therefore use the native fallback. The reconstruction
 parses this row through `parse_cockpit_camera_point` and exposes player and
-Viper-AI camera points from `GameAssets`. The normal follow view now calls
+Viper-AI camera points from `GameAssets`. The explicit mode-0 camera path calls
 `update_race_camera_mode_0` with the selected car transform, attachment point,
-and sampled terrain plane normal; the free camera remains available when follow
-mode is disabled. The camera's body field `+0xEA8` update is now reconstructed:
+and sampled terrain plane normal. Startup now reads `CONTROL/race_camera` from
+`GameRoot/Config/options.cfg` (native default 5; setup normalizes 12 to 4) and
+uses that mode by default. Modes 4 through 7 are connected to
+`prepare_race_camera_modes_4_to_7_output`, using the player's transformed body
+anchor at `+0x28`, velocity at `+0x234`, and flag at `+0x4EC`; the renderer
+seeds the camera cache from the vehicle on first use or a mode change, then
+retains the helper's cache output across frames. It still assumes global
+`0x508760` is zero. One silent 640x480 WARP capture verifies the mode-4 path
+builds and draws; preserving the cache does not visibly change the stationary
+grid capture and is not a parity result. Framing and trackside geometry still
+differ visibly from the original, and native global-state transitions are not
+yet connected. F3 selects the
+development chase view and F4 restores the configured mode. The camera's body
+field `+0xEA8` update is now reconstructed:
 after body integration, the runtime
 forms impulse `+0x200 * (+0x24C..+0x254)`, projects it onto the normalized side
 axis derived from the updated orientation fields `+0x50/+0x58`, and updates `+0xEA8` as

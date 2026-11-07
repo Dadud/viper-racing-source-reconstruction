@@ -106,18 +106,22 @@ all eight tracks also have zero duplicate WOBL model IDs.
 Facing-model offsets use the reference's observed local-to-world mapping and
 retain the facing ID. Packed vertex color is interpreted as `0xAARRGGBB` for
 the current D3D path; that channel interpretation has not been confirmed
-against the native vertex declaration. The current scene uses the
-reconstruction's chase-camera pose. Its projection now uses the recovered
-native 70-degree FOV and 1-to-1000 view range, but position/orientation and
-race-camera mode parity remain open.
+against the native vertex declaration. Its projection now uses the recovered
+native 70-degree FOV and 1-to-1000 view range. Startup reads the configured
+race-camera mode; modes 4-7 pass their reconstructed camera transforms to the
+renderer. A 640x480 mode-4 capture confirms this path draws, but its view still
+differs visibly from the original, so camera position/orientation parity is
+open. The mode-4 cached transform is seeded from the vehicle on first use or a
+mode change and then retained across frames; global camera-state transitions
+have not been integrated.
 
 ## Limits and next evidence
 
 The parser inventories linked nodes and maps active geometry to chunks. The
 renderer now applies the recovered type-1 axial visibility check and type-2
 distance intervals, plus type-4 mode pass distance bounds, using the
-reconstructed chase-camera position/forward and native default settings.
-Camera pose parity, mode-4 live instance transforms/animation, lighting, and
+reconstructed camera position/forward and native default settings. Camera pose
+parity, mode-4 live instance transforms/animation, lighting, and
 transparent material ordering remain open. Mode 1 assumes the reconstructed chase camera
 has no roll; both basis orientations need visual comparison against the native
 renderer. The new
@@ -127,8 +131,8 @@ coordinates and a normalized world-forward vector.
 
 [`native_graf_draw_tree.md`](native_graf_draw_tree.md) records the recovered
 dispatcher, raw-link semantics, LOD interval formula, settings path, and native
-axial depth test and projection parameters. Next, map the reconstructed chase
-camera to the native camera matrix and reproduce mode-4 instance
+axial depth test and projection parameters. Next, compare the configured mode-4
+camera against the native camera matrix and reproduce mode-4 instance
 transforms/animation. Confirm packed color interpretation from the actual vertex
 declaration and compare a controlled normal-camera capture before visual
 acceptance. Both Release targets compiled with Visual Studio 18, and the
