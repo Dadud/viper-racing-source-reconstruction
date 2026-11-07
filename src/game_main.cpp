@@ -7090,11 +7090,16 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             return 1;
         }
     }
-    if ((!smoke_frames || smoke_audio) &&
+    // Trace/physics diagnostics never need sound output or a DirectSound
+    // device. Keep these bounded replay runs silent and independent of the
+    // machine's audio device state; explicit smoke-audio runs remain enabled.
+    const bool initialize_audio = smoke_audio ||
+        (!diagnostics_only && !smoke_frames);
+    if (initialize_audio &&
         !state.audio.initialize(hwnd, car_bundle, car_name)) {
         std::cerr << "DirectSound initialization or engine sample loading failed; "
                      "running without audio.\n";
-    } else if (!smoke_frames || smoke_audio) {
+    } else if (initialize_audio) {
         std::cout << "DirectSound loaded " << state.audio.sound_count()
                   << " SFX0 PCM engine resources across "
                   << state.audio.band_count()
