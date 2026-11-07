@@ -24,7 +24,7 @@ jobs:
       - name: Run complete configured regression suite
         # CTest's default parallelism can overload the UI and localhost-network
         # smoke tests on hosted Windows runners; keep execution deterministic.
-        run: ctest --test-dir build -C Release --no-tests=error --parallel 1 --output-on-failure --output-junit build/ctest-results.xml
+        run: ctest --test-dir build -C Release --no-tests=error --parallel 1 --output-on-failure --output-junit "${{ github.workspace }}/build/ctest-results.xml"
 
       - name: Upload CTest report
         if: always()
