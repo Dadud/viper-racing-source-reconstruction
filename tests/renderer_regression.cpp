@@ -1,4 +1,5 @@
 #include "viper/scene_car_update.hpp"
+#include "viper/track_graphics_resource.hpp"
 
 #include <array>
 #include <cstdint>
@@ -75,6 +76,41 @@ void test_selector_matrix()
     const auto zero_raster = plan_scene_renderer_submit_targets(unknown);
     check(!zero_raster.complete,
         "zero raster selector branch must require mode 0x50D118");
+}
+
+void test_mode_four_initial_pose()
+{
+    using namespace viper;
+    TrackGraphicsResourcePayload resource{};
+    resource.scene_graph_complete = true;
+    resource.scene_graph_geometry_matched = true;
+    TrackGraphicsChunk chunk{};
+    chunk.center = {12.5F, -3.0F, 41.25F};
+    resource.chunks.push_back(chunk);
+    TrackGraphicsSceneNode node{};
+    node.source_offset = 0U;
+    node.type = 4U;
+    node.facing_mode = 4U;
+    node.has_runtime_model_handle = true;
+    node.parsed_chunk_index = 0U;
+    node.facing_id = 17U;
+    resource.scene_nodes.push_back(node);
+    resource.facing_registry_node_offsets[17U] = 0U;
+
+    const TrackGraphicsCamera camera{{0.0F, 0.0F, 0.0F},
+        {0.0F, 0.0F, 1.0F}};
+    const auto selected = select_track_graphics_nodes(resource, camera);
+    check(selected.traversal_complete &&
+            selected.registered_mode_4_node_offsets == std::vector<std::uint32_t>{0U},
+        "registered mode-4 node must remain selectable");
+    check(selected.registered_mode_4_transforms.size() == 1U,
+        "registered mode-4 node must receive its initial transform");
+    constexpr std::array<float, 12> expected{
+        1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F,
+        0.0F, 0.0F, 1.0F, 12.5F, -3.0F, 41.25F};
+    check(selected.registered_mode_4_transforms[0].node_offset == 0U &&
+            selected.registered_mode_4_transforms[0].basis_and_position == expected,
+        "mode-4 initial pose must use identity basis and source model center");
 }
 
 std::array<viper::SceneRenderRowRecord, 2> make_source()
@@ -230,6 +266,7 @@ int main()
 {
     try {
         test_selector_matrix();
+        test_mode_four_initial_pose();
         test_environment_palette_callback();
         test_mode_two_and_existing_callback();
         std::cout << "renderer regression checks passed\n";

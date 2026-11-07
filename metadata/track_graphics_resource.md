@@ -57,11 +57,14 @@ sphere visibility, and type-4 modes are submitted in later passes or registered
 for dynamic lookup. The D3D renderer now traverses the raw graph links with the
 native node gates per frame and submits selected type-3/type-4 nodes in ordinary,
 mode-1, and mode-2 pass order, including native 300-unit facing cutoffs and
-the mode-2 0.1-unit singularity guard. It omits type-4 mode 4 from drawing, as
-the native ordinary tree pass only registers those handles. Type-4 basis
-transforms now apply for modes 1 and 2. Valid mode-4 IDs map to their first
-active graph node; dynamic registry consumers remain unresolved. See [`native_graf_draw_tree.md`](native_graf_draw_tree.md)
-for the function-level evidence and remaining implementation sequence.
+the mode-2 0.1-unit singularity guard. The ordinary tree pass still only
+registers type-4 mode 4; a separate renderer pass now draws meshes referenced
+by track `obj wobble` rows at their GRAF center with identity basis. This
+startup placement is an inference; live physics snapshot matrices and wobble
+motion are not wired. Type-4 basis transforms apply for modes 1 and 2. Valid
+mode-4 IDs map to their first active graph node. See
+[`native_graf_draw_tree.md`](native_graf_draw_tree.md) for the function-level
+evidence and remaining implementation sequence.
 
 | Track | Graph nodes | Geometry nodes | Empty placeholders | Active geometry = parsed chunks | LOD nodes | Registered facing nodes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -103,8 +106,8 @@ The parser inventories linked nodes and maps active geometry to chunks. The
 renderer now applies the recovered type-1 axial visibility check and type-2
 distance intervals, plus type-4 mode pass distance bounds, using the
 reconstructed chase-camera position/forward and native default settings.
-Camera pose parity, mode-4 instance transforms/animation, lighting, and transparent
-material ordering remain open. Mode 1 assumes the reconstructed chase camera
+Camera pose parity, mode-4 live instance transforms/animation, lighting, and
+transparent material ordering remain open. Mode 1 assumes the reconstructed chase camera
 has no roll; both basis orientations need visual comparison against the native
 renderer. The new
 read-only `--inspect-grf-view BUNDLE RESOURCE X Y Z FX FY FZ [DETAIL_LEVEL]`

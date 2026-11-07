@@ -27,10 +27,10 @@ at `+0x38`: modes 1 and 2 are queued for later passes, and mode 4 is registered
 in a separate 512-entry lookup table rather than drawn by the ordinary tree
 pass. The reconstruction derives handle availability from the loader rule,
 applies parent gates, and submits selected type 3 and type 4 mode 1/2 groups by
-pass category. Modes 1 and 2 now have reconstructed transforms. The loader's
-512-slot mode-4 ID table is reconstructed for static resource lookup; the
-dynamic object constructor/draw path is identified but not connected to the
-reconstruction's world-object renderer.
+pass category. Modes 1 and 2 now have reconstructed transforms. Mode-4 models
+referenced by `obj wobble` rows now enter the 3D track pass at their parsed GRAF
+center with identity basis. This is a static placement inference; the live
+WOBL snapshot matrix and runtime update are not connected yet.
 
 The later mode-1 and mode-2 passes both reject facing centers at squared
 camera distance `>= 90000` (`0x00467AF0` initializes that cutoff to 300 units).
@@ -55,9 +55,12 @@ Constructor `0x00463600` reads the ID at instance-record `+0x18`, calls lookup
 instance record. Its draw method at `0x00463640` submits that handle with
 the object transform. Track parser `0x0045D5D0` constructs this object from an
 `obj wobble` record; its `+0x18` integer therefore selects the registered GRAF
-model. The reconstruction's read-only `--inspect-wobble-models` command checks
-that source-record-to-registry link. The object's changing runtime transform
-and wobble update path remain unimplemented.
+model. The reconstruction's `--inspect-wobble-models` command verifies that
+source-record-to-registry link, and the normal renderer now submits those
+referenced mode-4 meshes using the GRAF center as their static position. The
+object's changing runtime transform and wobble update path remain unimplemented;
+the identity-basis startup placement remains an inference until compared with
+the original instance matrix.
 
 The separate physics WOBL task constructor `0x00436ED0` uses the same record
 `+0x18` as an ID into the shared WOBL resource table. Its vtable at

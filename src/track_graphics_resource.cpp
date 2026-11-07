@@ -554,6 +554,14 @@ TrackGraphicsNodeSelection select_track_graphics_nodes(
                             node.source_offset) {
                             result.registered_mode_4_node_offsets.push_back(
                                 node.source_offset);
+                            const auto& center = resource.chunks[
+                                *node.parsed_chunk_index].center;
+                            result.registered_mode_4_transforms.push_back({
+                                node.source_offset,
+                                {1.0F, 0.0F, 0.0F,
+                                 0.0F, 1.0F, 0.0F,
+                                 0.0F, 0.0F, 1.0F,
+                                 center[0], center[1], center[2]}});
                         }
                     } else if (node.facing_mode == 1U || node.facing_mode == 2U) {
                         const auto& center = resource.chunks[

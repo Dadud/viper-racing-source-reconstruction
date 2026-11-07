@@ -57,6 +57,7 @@
 #include <string_view>
 #include <system_error>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -1200,6 +1201,32 @@ public:
             extract_terrain_points(terrain);
             track_graphics_ = track_graphics;
             terrain_surface_ = &terrain;
+            wobble_model_ids_.clear();
+            wobble_scene_node_offsets_.clear();
+            for (std::size_t row = 1U; row < track_objects.line_count; ++row) {
+                const auto line = viper::track_object_text_line(track_objects, row);
+                if (!line) continue;
+                const auto directive = viper::classify_track_directive(*line);
+                if (directive.kind == viper::TrackDirectiveKind::end) break;
+                if (directive.kind != viper::TrackDirectiveKind::object) continue;
+                std::array<char, 256> wobble_type{};
+                int model_id = 0;
+                const std::string object_line(directive.object_line);
+                const int fields = ::sscanf_s(object_line.c_str(),
+                    "obj wobble %255s %d", wobble_type.data(),
+                    static_cast<unsigned>(wobble_type.size()), &model_id);
+                if (fields < 2) continue;
+                const auto record = viper::make_wobble_track_record({
+                    wobble_type.data(), static_cast<std::uint32_t>(fields), model_id});
+                if (!record) continue;
+                const auto id = record->parsed_parameter_0x18;
+                wobble_model_ids_.insert(static_cast<std::uint32_t>(id));
+                if (track_graphics_ != nullptr) {
+                    const auto node_offset = viper::lookup_registered_facing_node(
+                        *track_graphics_, id);
+                    if (node_offset) wobble_scene_node_offsets_.insert(*node_offset);
+                }
+            }
             const float detail_factor = 2.0F - detail_level;
             lod_scale_squared_ = std::isfinite(detail_factor)
                 ? detail_factor * detail_factor : 1.0F;
@@ -1530,6 +1557,16 @@ public:
                     &selected_track_nodes->facing_mode_1_transforms);
                 draw_node_groups(selected_track_nodes->facing_mode_2_node_offsets,
                     &selected_track_nodes->facing_mode_2_transforms);
+                std::vector<std::uint32_t> selected_wobble_nodes;
+                selected_wobble_nodes.reserve(
+                    selected_track_nodes->registered_mode_4_node_offsets.size());
+                for (const auto node_offset :
+                     selected_track_nodes->registered_mode_4_node_offsets) {
+                    if (wobble_scene_node_offsets_.contains(node_offset))
+                        selected_wobble_nodes.push_back(node_offset);
+                }
+                draw_node_groups(selected_wobble_nodes,
+                    &selected_track_nodes->registered_mode_4_transforms);
             } else {
                 for (const auto& group : track_draw_groups_) draw_group(group);
             }
@@ -2188,6 +2225,19 @@ private:
                             {&track_graphics_->chunks[*node.parsed_chunk_index],
                                 node.source_offset});
                     }
+                    for (const auto& node : track_graphics_->scene_nodes) {
+                        if (node.type != 4U || node.facing_mode != 4U ||
+                            !node.facing_id || !node.has_runtime_model_handle ||
+                            !node.parsed_chunk_index ||
+                            !wobble_model_ids_.contains(*node.facing_id) ||
+                            *node.parsed_chunk_index >= track_graphics_->chunks.size()) continue;
+                        const auto registered = viper::lookup_registered_facing_node(
+                            *track_graphics_, static_cast<std::int32_t>(*node.facing_id));
+                        if (!registered || *registered != node.source_offset) continue;
+                        ordered_chunks.push_back(
+                            {&track_graphics_->chunks[*node.parsed_chunk_index],
+                                node.source_offset});
+                    }
                 }
             }
         }
@@ -2526,6 +2576,8 @@ private:
     std::vector<CarDrawGroup> track_draw_groups_;
     std::unordered_map<std::uint32_t, std::pair<std::size_t, std::size_t>>
         scene_group_ranges_;
+    std::unordered_set<std::uint32_t> wobble_model_ids_;
+    std::unordered_set<std::uint32_t> wobble_scene_node_offsets_;
     float lod_scale_squared_{1.0F};
     std::vector<std::uint32_t> ai_paint_selectors_;
     std::map<const viper::ResourceEntry*, CarTextureBinding> material_texture_cache_;

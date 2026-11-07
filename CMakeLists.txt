@@ -390,7 +390,8 @@ if(BUILD_TESTING)
     target_link_libraries(viper_career_file_store_regression PRIVATE viper_frontend_model)
     add_test(NAME career_file_store_regression COMMAND viper_career_file_store_regression)
     add_executable(viper_renderer_regression tests/renderer_regression.cpp)
-    target_link_libraries(viper_renderer_regression PRIVATE viper_scene_model)
+    target_link_libraries(viper_renderer_regression PRIVATE
+        viper_scene_model viper_track_graphics_resource)
     add_test(NAME renderer_regression COMMAND viper_renderer_regression)
     add_executable(viper_track_table_regression tests/track_table_regression.cpp)
     target_link_libraries(viper_track_table_regression PRIVATE

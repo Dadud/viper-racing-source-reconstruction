@@ -130,6 +130,10 @@ struct TrackGraphicsNodeSelection {
     std::vector<std::uint32_t> registered_mode_4_node_offsets;
     std::vector<TrackGraphicsFacingTransform> facing_mode_1_transforms;
     std::vector<TrackGraphicsFacingTransform> facing_mode_2_transforms;
+    // Static placement inference for referenced mode-4 models: identity
+    // orientation at the GRAF center. Live WOBL snapshots can replace these
+    // per frame once physics task dispatch is connected and compared.
+    std::vector<TrackGraphicsFacingTransform> registered_mode_4_transforms;
     bool traversal_complete{};
 };
 
