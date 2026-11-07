@@ -7313,6 +7313,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace << static_cast<unsigned>(
                                 *tick.wheel_suspension_reset_contact[wheel]);
                         }
+                        physics_tick_trace << ',';
                         if (tick.wheel_steering_0xdc_after_tick[wheel])
                             physics_tick_trace <<
                                 *tick.wheel_steering_0xdc_after_tick[wheel];

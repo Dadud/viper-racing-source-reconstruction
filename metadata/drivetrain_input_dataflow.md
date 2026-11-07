@@ -435,6 +435,21 @@ continues to test deterministic playback, steering response, force pipeline,
 and zero ideal-line motion, and prints the longitudinal comparison without
 pretending the powered-driving acceptance condition has passed.
 
+**2026-11-06 telemetry follow-up:** One silent Viper/Bemidji route-disabled
+playback used 32 neutral, 64 throttle, 32 neutral, 32 brake, and 32 neutral
+ticks. The corrected physics CSV has 664 header fields and 664 fields on every
+sample. Mean sampled throttle during its hold was `0.874625`; mean selected
+signal `+0xDDC` was `-55.021502`, and rear wheel pair outputs `+0xE4` averaged
+`82.733568` and `-65.678216`. This demonstrates that this schedule reached the
+modeled selected signal and rear wheel outputs. It does not establish
+longitudinal acceleration: the body was still falling when throttle began,
+wheel contact was intermittent, and the body bounced through the remainder of
+the capture. Treat the trace at
+`../../analysis/reference_captures/reconstruction_drivetrain_20261106_ticks.csv`
+as an input-path diagnostic, not an acceptance baseline or original-game
+comparison. The first capture had a row delimiter defect and was discarded;
+the reported values come only from the corrected capture.
+
 ## Current source-reconstruction target
 
 The fixed tick projects callback controls into PCAR `+0xDE0/+0xDE4`, updates
