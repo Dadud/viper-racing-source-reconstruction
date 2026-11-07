@@ -21,10 +21,15 @@ dispatch. The renderer now applies the recovered visibility/LOD gates per
 frame and submits the selected ordinary and facing groups in pass categories.
 Modes 1, 2, and configured modes 4-7 use reconstructed camera/facing behavior,
 and the normal spline-placement view now keeps the asphalt and lane markings
-visible after correcting the culling-axis sign separately from projection. The
-arena and side geometry still differ visibly from the original. Native
-camera-global transitions, mode-4 live transforms, materials, and scene
-alignment remain open. Modes 1 and 2 use reconstructed native bases. Keep full 3D scene parity
+visible after correcting the culling-axis sign separately from projection.
+Tracing `0x00420480` and `0x00422260` showed that the cache begins as identity,
+then modes 4-6 seed it from the vehicle transform with velocity and height
+offsets on a mode transition; mode 7 retains the prior cache. The reconstructed
+transition now follows that path and needs visual comparison.
+The arena, start lights, car framing, and side geometry remain visibly different
+from the original. Native camera-global transitions, mode-4 live transforms,
+materials, and scene alignment remain open. Modes 1 and 2 use reconstructed
+native bases. Keep full 3D scene parity
 as the first visual acceptance gate, ahead of screenshot or driving acceptance.
 See [`native_graf_draw_tree.md`](native_graf_draw_tree.md).
 

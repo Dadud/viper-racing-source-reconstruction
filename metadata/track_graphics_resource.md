@@ -111,9 +111,14 @@ native 70-degree FOV and 1-to-1000 view range. Startup reads the configured
 race-camera mode; modes 4-7 pass their reconstructed camera transforms to the
 renderer. A 640x480 mode-4 capture confirms this path draws, but its view still
 differs visibly from the original, so camera position/orientation parity is
-open. The mode-4 cached transform is seeded from the vehicle on first use or a
-mode change and then retained across frames; global camera-state transitions
-have not been integrated.
+open. The mode-4 cache now follows both observed paths: race setup at
+`0x00420480` seeds global `0x00507D10` with a 3x4 identity matrix, then the
+mode-transition predicate at `0x00422260` returns true for modes 4, 5 and 6.
+The caller copies the current vehicle transform and biases its cached position
+by `-40 * velocity` plus 10 world units of height before the camera update.
+Mode 7 retains the prior cache. The reconstructed transition path has been
+captured once, but still needs matched native frame values; position-change
+refreshes and other camera-global transitions remain open.
 
 ## Limits and next evidence
 

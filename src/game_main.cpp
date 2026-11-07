@@ -1448,7 +1448,7 @@ public:
         std::array<float, 3> camera_right{};
         std::array<float, 3> camera_up{};
         if (native_camera_follow && native_camera_mode == 0) {
-            native_camera_cache_initialized_ = false;
+            native_camera_cache_mode_ = native_camera_mode;
             viper::RaceCameraMode0Input camera_input{};
             camera_input.vehicle_transform_0x38 = vehicle;
             camera_input.local_camera_point_0x47c = player_camera_point_;
@@ -1480,11 +1480,31 @@ public:
             native_camera_mode >= 4 && native_camera_mode <= 7) {
             viper::RaceCameraModeState mode{};
             viper::store_race_camera_mode(mode, native_camera_mode);
-            if (!native_camera_cache_initialized_ ||
-                native_camera_cache_mode_ != native_camera_mode) {
-                native_camera_cached_transform_ = vehicle;
-                native_camera_cache_mode_ = native_camera_mode;
+            if (!native_camera_cache_initialized_) {
+                // race.bin 0x420480 initializes global 0x507D10 to the 3x4
+                // identity; 0x422260 may replace it on a mode transition.
+                native_camera_cached_transform_ = {
+                    1.0F, 0.0F, 0.0F,
+                    0.0F, 1.0F, 0.0F,
+                    0.0F, 0.0F, 1.0F,
+                    0.0F, 0.0F, 0.0F};
                 native_camera_cache_initialized_ = true;
+            }
+            if (native_camera_cache_mode_ != native_camera_mode) {
+                // race.bin 0x422260 returns true for modes 4, 5 and 6.
+                // 0x42128F then copies the current vehicle transform and
+                // biases the cached camera position by -40 * velocity plus
+                // 10 world units of height (constants 0x4C7730/0x4C7724).
+                if (native_camera_mode >= 4 && native_camera_mode <= 6) {
+                    native_camera_cached_transform_ = vehicle;
+                    native_camera_cached_transform_[9] -=
+                        40.0F * native_camera_velocity[0];
+                    native_camera_cached_transform_[10] +=
+                        10.0F - 40.0F * native_camera_velocity[1];
+                    native_camera_cached_transform_[11] -=
+                        40.0F * native_camera_velocity[2];
+                }
+                native_camera_cache_mode_ = native_camera_mode;
             }
             viper::RaceCameraModes4To7Input camera_input{};
             camera_input.cached_transform = native_camera_cached_transform_;
@@ -1502,7 +1522,7 @@ public:
             camera_up = normalize({transform[3], transform[4], transform[5]});
             camera_forward = normalize({transform[6], transform[7], transform[8]});
         } else {
-            native_camera_cache_initialized_ = false;
+            native_camera_cache_mode_ = native_camera_mode;
             const auto vehicle_forward = normalize(
                 {vehicle[6], vehicle[7], vehicle[8]});
             const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
@@ -2754,7 +2774,7 @@ private:
     std::array<float, 3> player_camera_point_{-0.3F, 0.8F, 0.0F};
     viper::RaceCameraMode0State camera_mode_0_state_{};
     std::array<float, 12> native_camera_cached_transform_{};
-    std::int32_t native_camera_cache_mode_{5};
+    std::int32_t native_camera_cache_mode_{};
     bool native_camera_cache_initialized_{};
     const viper::ModelResource* player_model_{};
     const viper::ModelResource* ai_model_{};
