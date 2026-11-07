@@ -1130,25 +1130,38 @@ resolves the mismatch.
 
 ### Next powered-driving capture gate
 
-The modeled PCAR callback, selector/signal update, wheel pair, wheel contacts,
-tire response and body-force path are now connected to the route-free fixed
-tick. The constructor-derived `+0x5B0/+0x8F8` inputs have also been identified
-as wheel 0/2 `+0x5C` scalars and are initialized from the car setup. These are
-implementation facts, not proof of powered acceleration or parity: the
-checked native slices still do not identify a sourced engine/gear torque
-producer, and no matched original driving trace validates the complete chain.
+The route-free fixed tick now connects the modeled PCAR callback,
+selector/signal update, Engine/Clutch/Transmission setters, selected wheel
+pair, wheel contacts, tire response, and body-force path. The constructor-
+derived `+0x5B0/+0x8F8` inputs are wheel 0/2 `+0x5C` scalars. The checked
+native code and linked subobjects establish the powertrain producer chain;
+its runtime state reaches wheel `+0xE4`. These implementation facts do not
+establish a grounded powered race or numerical parity.
 
-The next acceptance gate is source-first: continue tracing native engine,
-gearbox, clutch and differential state into the selected D-block and wheel
-`+0xE4` producer, then document a complete operand chain before changing the
-runtime. Use existing offline diagnostics and route-disabled traces to find
-host-side omissions. Original-client comparison is optional evidence work and
-must use a materially new, bounded launch strategy; do not repeat the failed
-runner configuration or launch repeated gameplay sessions. Any eventual
-capture must preserve identity from the selected `0x4C8188` callback through
-the `0x431150` integrator, prove throttle/neutral/brake delivery, and align
-body, wheel and force samples. The existing `pcar_source_field_watch_mock`
-checks probe control flow only and is not original-client evidence.
+The immediate blocker is persistent wheel support. In the latest ordinary-
+placement, route-free 192-tick trace, every terrain query succeeded, while
+end-of-tick contact stayed active on only 45–53 ticks per wheel. Of the
+suspension resets, most were caused by negative projected depth; smaller
+groups came from the contact-direction gate or negative adjusted response.
+The body bounced and left the usable grounded-drive envelope, so the trace
+cannot validate acceleration. Trace-derived causes are recorded in
+`metadata/drivetrain_input_dataflow.md`; they are evidence for the current
+reconstruction only, not grounds for tuning constants.
+
+Next, close the native contact-state path before changing force values:
+recover the global distance/damage gate and full call ordering around
+`0x442530`, then compare the reconstructed transform, direction and signed
+depth producers against the exact local disassembly. `0x443F00` is already
+documented as an empty routine in this build; do not treat it as an unknown
+contact callback. Use existing offline traces and focused diagnostics; do not
+launch the game repeatedly. Keep negative signed depth inactive unless new
+source evidence changes that predicate. Once ordinary placement maintains
+contact for a full controlled interval, use one bounded original comparison
+only if a materially different launch strategy can produce aligned
+PCAR/wheel samples. The capture must distinguish input delivery, contact
+transitions, wheel `+0xE4`, tire response and body force. The existing
+`pcar_source_field_watch_mock` checks probe control flow only and is not
+original-client evidence.
 
 The existing `tools/run_original_pcar_capture.py` enforces the official ISO
 engine hash, writes JSONL externally and terminates only process IDs it
