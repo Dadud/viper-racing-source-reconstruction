@@ -654,3 +654,17 @@ at commit `b72d263` has source for Engine, Clutch, Transmission, Differential,
 and Shaft. It targets v1.0 for standalone operation and is not integrated into
 this reconstruction; the local v1.1 executable and its disassembly remain the
 primary evidence for this project's target build.
+
+The bounded 192-tick reconstruction trace
+`../analysis/reference_captures/reconstruction_powertrain_stage_eb59541_ticks.csv`
+separates the two known suspension-reset causes using the native predicate
+(`adjusted_response` has sign bit set above negative zero, or contact is
+inactive). Across wheels 0–3, reset counts were 147/140/143/139. Of those,
+35/34/35/34 ticks per wheel failed the contact gate; 103/98/79/74 passed the
+gate but had negative projected depth; and 9/8/29/31 had nonnegative projected
+depth with negative adjusted response. The categories partition each wheel's
+reset ticks in this capture. Most observed resets therefore came from negative
+projected depth, with a smaller response-sign contribution. This local trace
+does not establish which input first diverged from the original. The reusable
+offline summarizer is `tools/analyze_wheel_suspension_trace.ps1`. These counts
+are diagnostic evidence only, not a physics-parity result.
