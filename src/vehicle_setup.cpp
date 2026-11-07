@@ -826,6 +826,12 @@ float evaluate_wheel_piecewise_response(const WheelPiecewiseTerms& terms,
     return response <= 0.0F ? 0.0F : response;
 }
 
+bool ncar_body_contact_query_gate_passed(
+    const std::uint32_t parent_body_0x48_bits) noexcept
+{
+    return std::bit_cast<std::int32_t>(parent_body_0x48_bits) > 0;
+}
+
 WheelContactResult update_wheel_contact(
     WheelContactState& state,
     const WheelContactObservation& observation) noexcept

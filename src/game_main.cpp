@@ -3876,7 +3876,8 @@ struct WindowState {
             // collision, tire-response, and body-integration stages below.
             viper::WheelContactObservation observation{};
             observation.body_query_enabled =
-                std::bit_cast<std::int32_t>(body_basis[4]) > 0;
+                viper::ncar_body_contact_query_gate_passed(
+                    std::bit_cast<std::uint32_t>(body_basis[4]));
             tick.wheel_contact_query_gate_passed[wheel] =
                 static_cast<std::uint8_t>(observation.body_query_enabled ? 1U : 0U);
             observation.reset_feature_hook_active = false;

@@ -41,6 +41,12 @@ viper::WheelCollisionImpulseInput make_input()
 
 int main()
 {
+    require(viper::ncar_body_contact_query_gate_passed(0x3f800000U));
+    require(viper::ncar_body_contact_query_gate_passed(0x00000001U));
+    require(!viper::ncar_body_contact_query_gate_passed(0x00000000U));
+    require(!viper::ncar_body_contact_query_gate_passed(0x80000000U));
+    require(!viper::ncar_body_contact_query_gate_passed(0xbf800000U));
+
     viper::NcarIntegratorSignalState precision_state{};
     precision_state.value_bits_0xc7c = 0x3e947f4cU;
     precision_state.limit_scale_0xc8c = 100.0F;

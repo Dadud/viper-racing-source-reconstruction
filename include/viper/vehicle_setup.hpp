@@ -1038,6 +1038,9 @@ advance_ncar_wheel_suspension_with_history(
 
 // Models the query/result branch and direct contact stores in 0x442530.
 // The ray/ground query and global hook are supplied as observations.
+// The parent body's `+0x48` DWORD gate is a signed compare against zero.
+[[nodiscard]] bool ncar_body_contact_query_gate_passed(
+    std::uint32_t parent_body_0x48_bits) noexcept;
 [[nodiscard]] WheelContactResult update_wheel_contact(
     WheelContactState& state,
     const WheelContactObservation& observation) noexcept;
