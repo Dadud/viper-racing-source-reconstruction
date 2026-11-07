@@ -2829,6 +2829,19 @@ struct PlayerPhysicsTickContext {
     std::optional<float> pcar_body_sample_0xd70_after_tick;
     std::optional<float> pcar_drive_signal_multiplier_0xdd0_after_tick;
     std::optional<float> pcar_selected_signal_0xddc_after_tick;
+    // Powertrain state at the end of each fixed step. PCAR +0xBFC is the
+    // Engine, +0xC7C the Clutch, and +0xC98 the Transmission.
+    std::optional<float> engine_throttle_0xc28_after_tick;
+    std::optional<float> engine_smoothed_throttle_0xc34_after_tick;
+    std::optional<float> transmission_ratio_0xcb0_after_tick;
+    std::optional<std::int32_t> transmission_active_gear_0xcb4_after_tick;
+    std::optional<std::int32_t> transmission_requested_gear_0xcbc_after_tick;
+    std::optional<std::uint8_t> transmission_in_gear_0xcf0_after_tick;
+    std::optional<float> transmission_throttle_0xcfc_after_tick;
+    std::optional<float> transmission_clutch_0xcf4_after_tick;
+    std::optional<float> transmission_clutch_applied_0xcf8_after_tick;
+    std::optional<std::int32_t> transmission_shift_state_0xd00_after_tick;
+    std::optional<float> clutch_engagement_0xc7c_after_tick;
     std::array<std::optional<float>, 6> body_constructor_wheel_geometry_after_tick{};
     std::optional<std::uint8_t> pcar_sound_getter_gate_0x508a40_after_tick;
     std::optional<float> pcar_sound_getter_0x44_selected_value_after_tick;
@@ -4535,6 +4548,25 @@ struct WindowState {
             if (bits.has_value())
                 tick.body_state_after_tick[index] = std::bit_cast<float>(*bits);
         }
+        const auto read_body_i32 = [this](const std::uint32_t offset)
+            -> std::optional<std::int32_t> {
+            const auto bits = viper::read_ncar_body_object_u32(
+                player_runtime_state.body_object, offset);
+            return bits ? std::optional<std::int32_t>{
+                std::bit_cast<std::int32_t>(*bits)} : std::nullopt;
+        };
+        tick.engine_throttle_0xc28_after_tick = read_body_float(0xc28U);
+        tick.engine_smoothed_throttle_0xc34_after_tick = read_body_float(0xc34U);
+        tick.transmission_ratio_0xcb0_after_tick = read_body_float(0xcb0U);
+        tick.transmission_active_gear_0xcb4_after_tick = read_body_i32(0xcb4U);
+        tick.transmission_requested_gear_0xcbc_after_tick = read_body_i32(0xcbcU);
+        tick.transmission_in_gear_0xcf0_after_tick =
+            viper::read_ncar_body_object_u8(player_runtime_state.body_object, 0xcf0U);
+        tick.transmission_throttle_0xcfc_after_tick = read_body_float(0xcfcU);
+        tick.transmission_clutch_0xcf4_after_tick = read_body_float(0xcf4U);
+        tick.transmission_clutch_applied_0xcf8_after_tick = read_body_float(0xcf8U);
+        tick.transmission_shift_state_0xd00_after_tick = read_body_i32(0xd00U);
+        tick.clutch_engagement_0xc7c_after_tick = read_body_float(0xc7cU);
         for (std::size_t index = 0U; index <
                 tick.body_constructor_wheel_geometry_after_tick.size(); ++index) {
             const std::uint32_t offset = 0xd7cU +
@@ -6877,7 +6909,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",pcar_sound_getter_gate_0x508a40"
             ",pcar_sound_getter_0x44_selected_value"
             ",pcar_drive_signal_multiplier_0xdd0"
-            ",pcar_selected_signal_0xddc";
+            ",pcar_selected_signal_0xddc"
+            ",engine_throttle_0xc28,engine_smoothed_throttle_0xc34"
+            ",transmission_ratio_0xcb0,transmission_active_gear_0xcb4"
+            ",transmission_requested_gear_0xcbc,transmission_in_gear_0xcf0"
+            ",transmission_throttle_0xcfc,transmission_clutch_0xcf4"
+            ",transmission_clutch_applied_0xcf8,transmission_shift_state_0xd00"
+            ",clutch_engagement_0xc7c";
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_suspension_reset_contact"
@@ -7307,6 +7345,36 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (tick.pcar_selected_signal_0xddc_after_tick)
                         physics_tick_trace <<
                             *tick.pcar_selected_signal_0xddc_after_tick;
+                    for (const auto value : {
+                            tick.engine_throttle_0xc28_after_tick,
+                            tick.engine_smoothed_throttle_0xc34_after_tick,
+                            tick.transmission_ratio_0xcb0_after_tick}) {
+                        physics_tick_trace << ',';
+                        if (value) physics_tick_trace << *value;
+                    }
+                    for (const auto value : {
+                            tick.transmission_active_gear_0xcb4_after_tick,
+                            tick.transmission_requested_gear_0xcbc_after_tick}) {
+                        physics_tick_trace << ',';
+                        if (value) physics_tick_trace << *value;
+                    }
+                    physics_tick_trace << ',';
+                    if (tick.transmission_in_gear_0xcf0_after_tick)
+                        physics_tick_trace << static_cast<unsigned>(
+                            *tick.transmission_in_gear_0xcf0_after_tick);
+                    for (const auto value : {
+                            tick.transmission_throttle_0xcfc_after_tick,
+                            tick.transmission_clutch_0xcf4_after_tick,
+                            tick.transmission_clutch_applied_0xcf8_after_tick}) {
+                        physics_tick_trace << ',';
+                        if (value) physics_tick_trace << *value;
+                    }
+                    physics_tick_trace << ',';
+                    if (tick.transmission_shift_state_0xd00_after_tick)
+                        physics_tick_trace << *tick.transmission_shift_state_0xd00_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.clutch_engagement_0xc7c_after_tick)
+                        physics_tick_trace << *tick.clutch_engagement_0xc7c_after_tick;
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_active_after_tick[wheel]) {

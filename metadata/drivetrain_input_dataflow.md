@@ -3,9 +3,11 @@
 Target: `GameBin/race.bin`, SHA-256
 `f9d6bd3ee1b9e8a7e101bf4cc3c4712969176255111bcf76a85d82568096da56`.
 The checked-in `disasm/engine_.text.asm` is the instruction source for the
-addresses below. This note follows the PCAR control path and distinguishes it
-from the live wheel-rate producer; it does not claim the entire executable has
-no engine or transmission subsystem.
+addresses below. This note follows the PCAR control and powertrain paths and
+distinguishes source-derived implementation from runtime and original-game
+verification. Earlier sections preserve the scope of the initial bounded
+control-path audit; the reconciliation section at the end records later
+findings that supersede its conclusion about the torque producer.
 
 ## Control ramp and PCAR callback
 
@@ -24,15 +26,16 @@ passes them through setters to PCAR `+0xDE0`, `+0xDE4`, and `+0xDE8` (with the
 throttle multiplier on `+0xDE0`). At `0x43872F` it calls the shared integrator
 `0x431150`. That integrator copies `+0xDE0` to the embedded object at `+0xC98`
 (`0x431295..0x4312A4`). Constructor and consumer evidence identify this child
-as a gear-candidate scoring and shift-state controller: it receives the
-configured ratio candidates, scores them against the linked curve, and keeps
-requested and active indices separate during a shift. The integrator passes
+as the Transmission: it receives configured ratio candidates, manages
+requested and active indices during a shift, and links to the Engine and
+Clutch objects. The integrator passes
 `+0xDE4/+0xDE8` through virtual slot `+0x4C` at
 `0x431317..0x43135D`; the selected entries at vtables `0x4C7F6C` and
 `0x4C858C` resolve to `0x432170`, which writes four wheel `+0xE0` values.
-Those values feed steering/low-speed wheel response. The reviewed path does
-not establish an engine torque producer or a path carrying engine RPM,
-clutch torque, or differential torque into body force or wheel rate.
+Those values feed steering/low-speed wheel response. This initially reviewed
+control chain alone did not establish the Engine torque producer or delivery
+into body force; later constructor and call-path analysis below identifies
+that separate path.
 
 ## Asset fields that configure the selector and curve
 
@@ -58,10 +61,13 @@ labels and payload offsets are independently documented by the
 [modding reference CARF map](https://github.com/HerbFargus/viper-racing-modding/blob/experiments/vrmod/cf.py);
 the scale/blend and runtime offsets above come from the reconstruction's
 `map_car_file_runtime_fields` implementation and native-constructor trace.
-`configure_acar_update_curve` derives coefficients from these values, but the
-reviewed consumer uses the curve as a candidate score. Neither these field
-names nor the scoring coefficients demonstrate that the score produces engine
-or wheel torque.
+`configure_acar_update_curve` derives coefficients from these values. The
+Transmission's gear-candidate scoring is distinct from Engine torque
+evaluation: local v1.1 disassembly identifies `0x4402E0` as the Engine torque
+setter, `0x4404D0` as its curve evaluator, and `0x43F980` as the linked shaft
+torque integrator. See the reconciliation below. The CARF field labels remain
+secondary format evidence; the local binary's field accesses and call path are
+the primary evidence.
 
 A literal-address search across the checked-in instruction listing finds
 references to `0x5093F4`, `0x509320`, and `0x5093B8` only in global
@@ -564,9 +570,46 @@ force. Therefore the coefficient names and values are not evidence for a
 throttle torque law. Keep this model confined to the source-observed selector
 until a separate force-producing consumer is identified.
 
-This is a bounded conclusion for the reviewed call chain, not a claim that no
-other engine/transmission producer exists. The ratio and selector setup and
-the `+0x5B0/+0x8F8` constructor provenance are now resolved. The next decisive
-task is to trace the live upstream writer of wheel/body longitudinal force or
-velocity, including indirect consumers of the per-step records, and establish
-whether it consumes the selected ratio, curve output, or throttle state.
+This bounded conclusion applied to the reviewed selector-score call chain,
+not to the complete engine/transmission system. The following later evidence
+supersedes the prior statement that an upstream torque producer had yet to be
+identified.
+
+## 2026-11-06 powertrain reconciliation
+
+The local v1.1 `race.bin` disassembly and constructor links identify PCAR
+`+0xBFC` as Engine, `+0xC7C` as Clutch, and `+0xC98` as Transmission. The
+Engine getter at `0x43F970` reads RPM at child `+0x10`. Engine setter
+`0x4402E0` consumes throttle and curve state, evaluates the torque curve via
+`0x4404D0`, and integrates shaft torque through `0x43F980`. Transmission
+update `0x43FAE0` reads its linked Engine, updates gear/shift state and
+ratio, and writes throttle/clutch controls through `0x4402C0` and `0x43F8E0`.
+The Clutch update `0x43F830` joins the curve and Transmission signal pair.
+This establishes the source-side powertrain producer chain independently of
+the selector candidate scoring performed by `0x43FDD0`/`0x4404A0`.
+
+The reconstruction models these linked subobjects and their fixed-step
+updates, selected D-block pair output, wheel `+0xE4` input, wheel spin/tire
+response, and body-force accumulation. Asset-backed neutral/accelerator
+fixtures show a distinct wheel response, but hold body pose fixed and omit
+ground traction. A prior silent 192-tick trace reached the PCAR selected signal
+and rear-wheel `+0xE4`, but used an unsuitable forced grid placement and had
+intermittent contact; it is diagnostic only. Therefore the model now has an
+evidenced Engine/Clutch/Transmission-to-wheel response path, while correct
+grounded acceleration, complete collision/force behavior, x87 numerical
+parity, and comparison against the original remain unverified. Do not describe
+the producer itself as absent; the playable powered-race acceptance gate is
+still open.
+
+The diagnostic CSV now captures Engine throttle/smoothed throttle, Transmission
+ratio, active/requested gear, in-gear flag, throttle, clutch values and shift
+state, plus Clutch engagement. These taps are sampled from the persistent
+byte-backed PCAR object after each fixed update and are for tracing state
+flow—not proof of correct force delivery.
+
+As an independent semantic reference, the public
+[Viper Racing source port](https://github.com/HerbFargus/viper-racing-port/tree/b72d263)
+at commit `b72d263` has source for Engine, Clutch, Transmission, Differential,
+and Shaft. It targets v1.0 for standalone operation and is not integrated into
+this reconstruction; the local v1.1 executable and its disassembly remain the
+primary evidence for this project's target build.

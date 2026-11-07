@@ -21,9 +21,14 @@ behavior. Normal startup disables route-kinematic motion; the explicit
 disabled, the player render pose comes from the integrated PCAR body state; the
 live step accumulates finalized suspension and three tire-response force calls,
 gravity, supported mode force, and source-backed wheel collision impulses. The
-engine/gear-to-wheel torque producer and original numeric parity remain
-unresolved, so this mode is not an accepted driving simulation.
-No required system below is accepted as complete.
+Engine/Clutch/Transmission-to-selected-wheel response path is now modeled and
+has local, asset-backed response checks; grounded powered acceleration and
+original numerical parity remain unverified, so this mode is not an accepted
+driving simulation.
+No required system below is accepted as complete. The dated drivetrain notes
+below include earlier findings that predate the Engine/Clutch/Transmission
+integration; the latest state and limits are summarized in
+[`drivetrain_input_dataflow.md`](drivetrain_input_dataflow.md).
 
 The 2026-11-03 route-disabled fixed-step regression was strengthened to require
 the `yaw_control=1` authored steering interval to produce measurable PCAR body

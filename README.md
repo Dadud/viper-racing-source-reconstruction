@@ -28,8 +28,10 @@ For a Viper player, the renderer resolves `GLOBAL/player_paintjob` to
 textures are loaded when supported resources exist. Material ordering,
 sampler modes, lighting, and visual parity remain under reconstruction.
 These recovered stages still do not make a playable or original-matched race:
-engine/gear torque production is unresolved, and steering, collision, AI
-physics, numeric parity, and physical race progression need further evidence.
+the Engine/Clutch/Transmission torque path and selected wheel response are
+modeled, but grounded powered acceleration and numerical parity have not been
+verified. Steering, collision, AI physics, and physical race progression also
+need further evidence.
 Ideal-line route motion is disabled by default; `--route-motion-prototype`
 enables a clearly labeled non-physical demo for manual inspection. No
 acceptance or regression test uses it as a driver or oracle. Keyboard bindings

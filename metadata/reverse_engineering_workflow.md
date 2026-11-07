@@ -40,6 +40,14 @@ recovered layout instead of importing an entire unrelated toolchain. This was
 applied to TEX and FNIM using the
 [Viper Racing Modding `experiments` reference at commit `e8435dd`](https://github.com/HerbFargus/viper-racing-modding/tree/e8435ddce817eb37502d1dd1080b64ee27f44515).
 
+For powertrain semantics, the
+[Viper Racing source port at commit `b72d263`](https://github.com/HerbFargus/viper-racing-port/tree/b72d263)
+provides an independent Engine/Clutch/Transmission/Differential/Shaft model.
+Use it to help name and navigate behavior only: its standalone executable
+targets v1.0, while this reconstruction targets the locally supplied v1.1
+`race.bin`. Confirm layouts and calls against the local binary before adopting
+any behavior; the port is not a drop-in runtime replacement.
+
 The same reference also closes an important visual-rendering gap: its pinned
 `GRAF` findings describe `track.grf` as the rendered scene graph, with typed
 nodes, per-chunk corner/material/face ranges, and multiple materials within a
