@@ -3778,6 +3778,10 @@ struct WindowState {
             *body_velocity_x, *body_velocity_y, *body_velocity_z};
         const viper::PhysicsVector3 body_angular_velocity{
             *body_angular_x, *body_angular_y, *body_angular_z};
+        // Native 0x442530 copies car basis +0x44..+0x4c into the direction
+        // operand used by the terrain-normal dot gate. Preserve that exact
+        // lane: inverting it to force more contacts would break the native
+        // predicate.
         const auto body_up = viper::PhysicsVector3{
             body_basis[3], body_basis[4], body_basis[5]};
         // Contact queries use the session-owned PCAR transform and wheel

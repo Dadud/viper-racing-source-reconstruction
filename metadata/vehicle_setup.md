@@ -685,6 +685,14 @@ its wheel direction and those plane coefficients against `0.1`; it also
 excludes surface value `0xE` from that contact-response branch. The enum's
 meaning is not established.
 
+The dot-product operand is the car basis vector at `+0x44..+0x4C`: the native
+caller copies those three fields to its local vector at `0x4429F1..0x442A0C`
+and uses them in the plane-normal dot product at `0x442C71..0x442C8B`. The live
+reconstruction reads the corresponding `body_basis[3..5]` values. The saved
+trace's contact-gate rejections therefore do not justify flipping this vector;
+the next comparison target is the selected terrain plane/normal and the wheel
+query point at `+0xC8`.
+
 The direct contact branch is modeled by `update_wheel_contact`. Each wheel
 update first clears feature `+0x19C`; when the body query gate is enabled, the
 ground query may then write its feature output there. The branch requires
