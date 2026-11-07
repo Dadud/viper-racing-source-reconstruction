@@ -267,6 +267,15 @@ because this row reconstruction uses dynamic storage. Comparator operation
 order is preserved, but binary64 intermediate precision is not proven to
 match the original x87 extended precision for adversarial cancellation cases.
 
+`materialize_ncar_ordinal_pair_rows` now copies the four exact source fields
+from initialized byte-backed body objects into ordinal-ordered row inputs. It
+fails when any slot's registration state is unresolved, when registration and
+body ownership disagree, or when a registered object's consumed bytes are
+uninitialized or non-finite. Explicitly unregistered slots retain zero values.
+This closes the body-byte adapter only; the live session still does not provide
+its full manager slot map or dispatch the ACAR callbacks that refresh current
+opponent bodies, and therefore does not pass these rows to the physics timer.
+
 Each portable row now carries an explicit `registration_resolved` observation.
 The lookup rejects a span with any missing registration observation instead
 of silently interpreting default-initialized rows as unregistered. A row known

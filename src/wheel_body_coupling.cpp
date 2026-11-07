@@ -290,6 +290,42 @@ void quicksort_ordinal_pair_pointers(
 
 } // namespace
 
+std::optional<std::vector<NcarOrdinalPairRowInput>>
+materialize_ncar_ordinal_pair_rows(
+    const std::span<const NcarOrdinalPairBodySource> ordinal_slots)
+{
+    std::vector<NcarOrdinalPairRowInput> rows;
+    rows.reserve(ordinal_slots.size());
+    for (const auto& slot : ordinal_slots) {
+        if (!slot.registration_resolved || slot.registered != (slot.body != nullptr))
+            return std::nullopt;
+        NcarOrdinalPairRowInput row{};
+        row.registration_resolved = true;
+        row.registered = slot.registered;
+        if (slot.registered) {
+            const auto read_finite_float = [slot](const std::uint32_t offset)
+                -> std::optional<float> {
+                const auto bits = read_ncar_body_object_u32(*slot.body, offset);
+                if (!bits) return std::nullopt;
+                const auto value = std::bit_cast<float>(*bits);
+                if (!std::isfinite(value)) return std::nullopt;
+                return value;
+            };
+            const auto x = read_finite_float(0x5cU);
+            const auto z = read_finite_float(0x64U);
+            const auto velocity_x = read_finite_float(0x234U);
+            const auto velocity_z = read_finite_float(0x23cU);
+            if (!x || !z || !velocity_x || !velocity_z) return std::nullopt;
+            row.position_x_0x5c = *x;
+            row.position_z_0x64 = *z;
+            row.velocity_x_0x234 = *velocity_x;
+            row.velocity_z_0x23c = *velocity_z;
+        }
+        rows.push_back(row);
+    }
+    return rows;
+}
+
 NcarOrdinalPairLookupResult resolve_ncar_ordinal_pair_lookup(
     const std::span<const NcarOrdinalPairRowInput> rows,
     const std::uint32_t ordinal)

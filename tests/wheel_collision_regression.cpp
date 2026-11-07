@@ -768,4 +768,31 @@ int main()
     require(viper::read_ncar_body_object_u8(startup_body, 0xcf0U) == 1U &&
         viper::read_ncar_body_object_u32(startup_body, 0xcb0U) ==
             std::bit_cast<std::uint32_t>(2.0F));
+
+    viper::NcarBodyRuntimeObjectState registered_body{};
+    const std::array<viper::NcarObjectFieldWrite, 4> pair_row_fields{{
+        {0x5cU, 4U, std::bit_cast<std::uint32_t>(12.5F)},
+        {0x64U, 4U, std::bit_cast<std::uint32_t>(-8.25F)},
+        {0x234U, 4U, std::bit_cast<std::uint32_t>(3.0F)},
+        {0x23cU, 4U, std::bit_cast<std::uint32_t>(-1.5F)}}};
+    require(viper::apply_ncar_body_object_writes(registered_body, pair_row_fields));
+    const std::array<viper::NcarOrdinalPairBodySource, 2> pair_row_sources{{
+        {true, true, &registered_body}, {true, false, nullptr}}};
+    const auto pair_rows = viper::materialize_ncar_ordinal_pair_rows(
+        pair_row_sources);
+    require(pair_rows && pair_rows->size() == 2U &&
+        (*pair_rows)[0].registration_resolved && (*pair_rows)[0].registered &&
+        (*pair_rows)[0].position_x_0x5c == 12.5F &&
+        (*pair_rows)[0].position_z_0x64 == -8.25F &&
+        (*pair_rows)[0].velocity_x_0x234 == 3.0F &&
+        (*pair_rows)[0].velocity_z_0x23c == -1.5F &&
+        (*pair_rows)[1].registration_resolved && !(*pair_rows)[1].registered &&
+        (*pair_rows)[1].position_x_0x5c == 0.0F &&
+        (*pair_rows)[1].velocity_z_0x23c == 0.0F);
+    const std::array<viper::NcarOrdinalPairBodySource, 1> unknown_pair_slot{{
+        {false, false, nullptr}}};
+    require(!viper::materialize_ncar_ordinal_pair_rows(unknown_pair_slot));
+    const std::array<viper::NcarOrdinalPairBodySource, 1> missing_body_pair_slot{{
+        {true, true, nullptr}}};
+    require(!viper::materialize_ncar_ordinal_pair_rows(missing_body_pair_slot));
 }

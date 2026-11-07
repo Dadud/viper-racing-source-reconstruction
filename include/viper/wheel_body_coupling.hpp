@@ -676,6 +676,21 @@ struct NcarOrdinalPairRowInput {
     float velocity_z_0x23c{};
 };
 
+// One explicitly observed slot in the manager's ordinal-indexed object table.
+// The body pointer is caller-owned; a resolved null slot is a known native
+// unregistered row and retains the table's zero-filled values.
+struct NcarOrdinalPairBodySource {
+    bool registration_resolved{};
+    bool registered{};
+    const NcarBodyRuntimeObjectState* body{};
+};
+
+// Copies body +0x5C/+0x64/+0x234/+0x23C into ordinal-ordered rows, matching
+// 0x419E80/0x41EC00. Every slot must have an explicit registration observation.
+[[nodiscard]] std::optional<std::vector<NcarOrdinalPairRowInput>>
+materialize_ncar_ordinal_pair_rows(
+    std::span<const NcarOrdinalPairBodySource> ordinal_slots);
+
 struct NcarOrdinalPairRecord {
     std::int16_t endpoint_a_ordinal_0x00{};
     std::int16_t endpoint_b_ordinal_0x02{};
