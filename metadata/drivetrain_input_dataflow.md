@@ -437,18 +437,25 @@ pretending the powered-driving acceptance condition has passed.
 
 **2026-11-06 telemetry follow-up:** One silent Viper/Bemidji route-disabled
 playback used 32 neutral, 64 throttle, 32 neutral, 32 brake, and 32 neutral
-ticks. The corrected physics CSV has 664 header fields and 664 fields on every
-sample. Mean sampled throttle during its hold was `0.874625`; mean selected
+ticks with the explicit `-grid` switch. That switch sets
+`force_default_placement_0x4dc1b0` and selects the track-basis/default pose;
+this is not the ordinary race-placement branch. The corrected physics CSV has
+664 header fields and 664 fields on every sample. Mean sampled throttle during
+its hold was `0.874625`; mean selected
 signal `+0xDDC` was `-55.021502`, and rear wheel pair outputs `+0xE4` averaged
 `82.733568` and `-65.678216`. This demonstrates that this schedule reached the
 modeled selected signal and rear wheel outputs. It does not establish
 longitudinal acceleration: the body was still falling when throttle began,
 wheel contact was intermittent, and the body bounced through the remainder of
-the capture. Treat the trace at
+the capture. The trace at
 `../../analysis/reference_captures/reconstruction_drivetrain_20261106_ticks.csv`
-as an input-path diagnostic, not an acceptance baseline or original-game
-comparison. The first capture had a row delimiter defect and was discarded;
-the reported values come only from the corrected capture.
+is an input-path diagnostic for the forced default-pose branch, not an
+ordinary-race acceptance baseline or original-game comparison. The first
+capture had a row delimiter defect and was discarded; the reported values
+come only from the corrected capture. The route-disabled ordinary-placement
+trace from 2026-11-03 reached wheel contact by tick 9 and remained in contact
+for 512 of 522 samples, but it predates these signal/pair trace columns and
+does not provide a matched throttle comparison.
 
 ## Current source-reconstruction target
 

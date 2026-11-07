@@ -116,24 +116,26 @@ try {
     }
     [System.IO.File]::WriteAllLines($rightCapture, $rightInputLines)
 
+    # Preserve ordinary race placement. Diagnostics-only disables route
+    # motion while leaving the physical player tick and contact solver active.
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only -grid --play-trace $capture --record-trace $replay `
+        --diagnostics-only --play-trace $capture --record-trace $replay `
         --record-tick-trace $replayTicks
     if ($LASTEXITCODE -ne 0) { throw "Trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only -grid --play-trace $neutralCapture `
+        --diagnostics-only --play-trace $neutralCapture `
         --record-tick-trace $neutralTicks
     if ($LASTEXITCODE -ne 0) { throw "Neutral trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only -grid --play-trace $brakeCapture `
+        --diagnostics-only --play-trace $brakeCapture `
         --record-tick-trace $brakeTicks
     if ($LASTEXITCODE -ne 0) { throw "Brake-control trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only -grid --play-trace $capture --record-trace $repeat `
+        --diagnostics-only --play-trace $capture --record-trace $repeat `
         --record-tick-trace $repeatTicks
     if ($LASTEXITCODE -ne 0) { throw "Repeated trace replay exited with $LASTEXITCODE" }
     & $GameExe --data-dir $DataDir --track bemidji --car viper --software `
-        --diagnostics-only -grid --play-trace $rightCapture `
+        --diagnostics-only --play-trace $rightCapture `
         --record-trace $rightReplay --record-tick-trace $rightReplayTicks
     if ($LASTEXITCODE -ne 0) { throw "Mirrored steering replay exited with $LASTEXITCODE" }
 
@@ -152,7 +154,7 @@ try {
     $yawOptions = [regex]::Replace($yawOptions, $yawPattern, 'yaw_control 1', 1)
     [System.IO.File]::WriteAllText($yawOptionsPath, $yawOptions)
     & $GameExe --data-dir $yawDataDir --track bemidji --car viper --software `
-        --diagnostics-only -grid --play-trace $capture `
+        --diagnostics-only --play-trace $capture `
         --record-trace $yawReplay --record-tick-trace $yawReplayTicks
     if ($LASTEXITCODE -ne 0) { throw "Yaw-control fixed-step replay exited with $LASTEXITCODE" }
 

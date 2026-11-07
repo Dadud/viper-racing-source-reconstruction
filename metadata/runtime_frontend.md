@@ -68,6 +68,13 @@ checks in its frame trace that the route-motion adapter ran zero steps. These ch
 exercise input/callback plumbing without treating ideal-line following as a
 driving surrogate. They still do not establish physical movement.
 
+The fixed-step driving replay keeps the ordinary race placement branch. Its
+`-grid` command-line switch is a distinct native override that forces the
+track-basis/default placement instead of normal race placement; use that flag
+only when that override itself is under test. Route motion remains disabled in
+the driving replay, so its vehicle movement comes from the simulated body and
+wheel state.
+
 `game_fixed_step_trace_replay_regression` checks deterministic short trace
 capture/playback from a 320-frame authored throttle/coast/steer/brake/coast
 schedule and requires those inputs to reach the PCAR control outputs on their
