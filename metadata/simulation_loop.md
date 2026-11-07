@@ -359,12 +359,17 @@ parses this row through `parse_cockpit_camera_point` and exposes player and
 Viper-AI camera points from `GameAssets`. The normal follow view now calls
 `update_race_camera_mode_0` with the selected car transform, attachment point,
 and sampled terrain plane normal; the free camera remains available when follow
-mode is disabled. The camera uses body field `+0xEA8` as zero because its live
-body-state update is not yet connected. This integrates the modeled numeric
-camera branch, but the result has not been compared with an original camera
-capture, and the missing dynamic field can affect motion. Evidence: constructor
-instructions `0x433C5C..0x433D15`, camera branch `0x421120`, and BATS
-inventories of the five shipped car bundles.
+mode is disabled. The camera's body field `+0xEA8` update is now reconstructed:
+after body integration, the runtime
+forms impulse `+0x200 * (+0x24C..+0x254)`, projects it onto the normalized side
+axis derived from the updated orientation fields `+0x50/+0x58`, and updates `+0xEA8` as
+`projected * 0x3C270364 + previous * 0x3F666666`. Degenerate side axes skip the
+update as in the source. The renderer reads that value from the session-owned
+body object. This integrates the modeled numeric camera branch, but the result
+has not been compared with an original camera capture; x87 rounding and
+camera-frame parity remain unverified. Evidence: constructor instructions
+`0x433C5C..0x433D15`, camera branch `0x421120`, body updater
+`0x431FA6..0x432020`, and BATS inventories of the five shipped car bundles.
 The shared look-at helper `0x4222A0` is also modeled: it rebuilds its matrix
 when squared target distance is at least 1 and either horizontal delta has
 magnitude at least 0.01. It normalizes the horizontal forward vector and the

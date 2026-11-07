@@ -2381,6 +2381,47 @@ initialize_ncar_wheel_pair_scales_from_runtime_record(
         first, second, first_scale, second_scale};
 }
 
+std::optional<NcarCameraResponseResult> advance_ncar_camera_response(
+    const NcarCameraResponseInput& input) noexcept
+{
+    if (!std::isfinite(input.body_step_factor_0x200) ||
+        !std::isfinite(input.previous_response_0xea8) ||
+        !std::all_of(input.force_0x24c.begin(), input.force_0x24c.end(),
+            [](const float value) { return std::isfinite(value); }) ||
+        !std::all_of(input.orientation_0x38.begin(), input.orientation_0x38.end(),
+            [](const float value) { return std::isfinite(value); })) return std::nullopt;
+
+    NcarCameraResponseResult result{};
+    result.impulse_x_0x288 = input.body_step_factor_0x200 * input.force_0x24c[0];
+    result.impulse_y_0x28c = input.body_step_factor_0x200 * input.force_0x24c[1];
+    result.impulse_z_0x290 = input.body_step_factor_0x200 * input.force_0x24c[2];
+    const float basis_x_0x50 = input.orientation_0x38[6];
+    const float basis_z_0x58 = input.orientation_0x38[8];
+    const float axis_length_squared = basis_x_0x50 * basis_x_0x50 +
+        basis_z_0x58 * basis_z_0x58;
+    if (!std::isfinite(result.impulse_x_0x288) ||
+        !std::isfinite(result.impulse_y_0x28c) ||
+        !std::isfinite(result.impulse_z_0x290) ||
+        !std::isfinite(axis_length_squared)) return std::nullopt;
+
+    result.response_0xea8 = input.previous_response_0xea8;
+    if (!(axis_length_squared > 0.001F)) return result;
+
+    const float inverse_axis_length = 1.0F / std::sqrt(axis_length_squared);
+    const float side_x = basis_x_0x50 * inverse_axis_length;
+    const float side_z = basis_z_0x58 * inverse_axis_length;
+    constexpr float response_scale = std::bit_cast<float>(0x3c270364U);
+    constexpr float response_retention = std::bit_cast<float>(0x3f666666U);
+    const float projected_impulse =
+        (result.impulse_x_0x288 * side_x +
+            result.impulse_z_0x290 * side_z) * response_scale;
+    result.response_0xea8 = projected_impulse +
+        input.previous_response_0xea8 * response_retention;
+    if (!std::isfinite(result.response_0xea8)) return std::nullopt;
+    result.response_updated = true;
+    return result;
+}
+
 std::optional<std::uint32_t> read_ncar_body_object_u32(
     const NcarBodyRuntimeObjectState& source,
     const std::uint32_t offset) noexcept

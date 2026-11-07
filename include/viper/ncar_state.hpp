@@ -887,6 +887,26 @@ struct NcarForceMomentAccumulator {
     std::array<float, 3> moment_0x258{};
 };
 
+struct NcarCameraResponseInput {
+    float body_step_factor_0x200{};
+    std::array<float, 3> force_0x24c{};
+    std::array<float, 9> orientation_0x38{};
+    float previous_response_0xea8{};
+};
+
+struct NcarCameraResponseResult {
+    float impulse_x_0x288{};
+    float impulse_y_0x28c{};
+    float impulse_z_0x290{};
+    float response_0xea8{};
+    bool response_updated{};
+};
+
+// Projects the filtered body-force impulse onto the horizontal body side axis
+// in 0x431150 and updates the camera response scalar at +0xEA8.
+[[nodiscard]] std::optional<NcarCameraResponseResult>
+advance_ncar_camera_response(const NcarCameraResponseInput& input) noexcept;
+
 // Models the shared 0x43E6F0 accumulator called by the NCAR integrator.
 // A near-zero vector is ignored; otherwise force and (point-center) x force
 // are added to the object's +0x24C and +0x258 vector fields.

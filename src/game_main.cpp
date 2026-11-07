@@ -1336,6 +1336,7 @@ public:
                 const float focus_x, const float focus_z,
                 const std::array<float, 2>& camera_pan_clip,
                 const float camera_zoom,
+                const float camera_response_0xea8,
                 const bool native_camera_follow,
                 const std::optional<std::filesystem::path>& capture_frame_path)
     {
@@ -1380,10 +1381,7 @@ public:
                 camera_input.ground_sample_found = surface.query_succeeded;
                 camera_input.ground_sample = surface.plane_normal;
             }
-            // The runtime has not yet reconstructed body field +0xEA8; the
-            // native constructor initializes it to zero, so retain that value
-            // until the live body-state adapter publishes its later updates.
-            camera_input.vehicle_offset_factor_0xea8 = 0.0F;
+            camera_input.vehicle_offset_factor_0xea8 = camera_response_0xea8;
             const auto native_camera = viper::update_race_camera_mode_0(
                 camera_mode_0_state_, camera_input);
             const auto& transform = native_camera.transform;
@@ -4380,6 +4378,33 @@ struct WindowState {
         if (!viper::apply_ncar_body_integration_kinematics_result(
                 player_runtime_state.body_object, result)) {
             return false;
+        }
+        const auto camera_step_bits = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object, 0x200U);
+        const auto camera_response_bits = viper::read_ncar_body_object_u32(
+            player_runtime_state.body_object, 0xea8U);
+        if (camera_step_bits && camera_response_bits) {
+            viper::NcarCameraResponseInput camera_response_input{};
+            camera_response_input.body_step_factor_0x200 =
+                std::bit_cast<float>(*camera_step_bits);
+            camera_response_input.force_0x24c = {
+                force_collection.accumulated_linear_force.x,
+                force_collection.accumulated_linear_force.y,
+                force_collection.accumulated_linear_force.z};
+            std::copy(result.orientation.orientation_matrix.begin(),
+                result.orientation.orientation_matrix.end(),
+                camera_response_input.orientation_0x38.begin());
+            camera_response_input.previous_response_0xea8 =
+                std::bit_cast<float>(*camera_response_bits);
+            const auto camera_response = viper::advance_ncar_camera_response(
+                camera_response_input);
+            if (camera_response && camera_response->response_updated) {
+                const std::array<viper::NcarObjectFieldWrite, 1> camera_write{{
+                    {0xea8U, 4U, std::bit_cast<std::uint32_t>(
+                        camera_response->response_0xea8)}}};
+                if (!viper::apply_ncar_body_object_writes(
+                        player_runtime_state.body_object, camera_write)) return false;
+            }
         }
         const std::array<viper::NcarObjectFieldWrite, 7> impulse_writes{{
             {0x294U, 4U, std::bit_cast<std::uint32_t>(
@@ -7833,9 +7858,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             const auto camera_focus = state.camera_follow_player
                 ? state.graphics.car_position(state.player_car_index)
                 : state.camera_anchor_world;
+            float camera_response_0xea8 = 0.0F;
+            if (const auto response_bits = viper::read_ncar_body_object_u32(
+                    state.player_runtime_state.body_object, 0xea8U)) {
+                camera_response_0xea8 = std::bit_cast<float>(*response_bits);
+            }
             if (render_frame && !state.graphics.render(state.hud_text(),
                     camera_focus[0], camera_focus[1], state.camera_pan_clip,
-                    state.camera_zoom, state.camera_follow_player,
+                    state.camera_zoom, camera_response_0xea8,
+                    state.camera_follow_player,
                     capture_frame_path)) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);
