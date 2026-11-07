@@ -16,9 +16,11 @@ struct TextureResource {
     std::uint32_t mip_count{};
     std::uint32_t width{};
     std::uint32_t height{};
-    // Decoded full-resolution level in row-major RGBA8 order. The smaller
-    // mip levels remain opaque source bytes and are not expanded here.
+    // Decoded full-resolution level in row-major RGBA8 order.
     std::vector<std::uint8_t> rgba;
+    // Decoded levels in D3D order: full resolution first, down to 1x1.
+    // rgba mirrors mip_rgba.front() for existing callers.
+    std::vector<std::vector<std::uint8_t>> mip_rgba;
 };
 
 // Parses the TEX payload after its 20-byte RES0/TEX /version-3/IMG! envelope.

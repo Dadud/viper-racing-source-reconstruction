@@ -273,6 +273,13 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(viper_texture_resource_regression
+        tests/texture_resource_regression.cpp)
+    target_link_libraries(viper_texture_resource_regression PRIVATE
+        viper_texture_resource)
+    add_test(NAME texture_resource_regression
+        COMMAND viper_texture_resource_regression)
+
     find_program(VIPER_PYTHON_EXECUTABLE NAMES python python3 python.exe)
     if(VIPER_PYTHON_EXECUTABLE)
         add_test(NAME original_capture_runner_config_regression

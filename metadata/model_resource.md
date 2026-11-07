@@ -197,15 +197,19 @@ The checked-in `disasm/engine_.text.asm` narrows the native path:
   layout; the five branches must be followed through `0x5AC80` and its callees
   before broader decoder support is implemented.
 
-The new `viper_texture_resource` library implements bounded base-mip decoding
+The new `viper_texture_resource` library implements bounded full-chain decoding
 for TEX flags `0x00` (RGB565), `0x01` (RGB565 plus the header colorkey), and
-`0x02` (ARGB4444). `viper_reconstruction --inspect-texture BUNDLE RESOURCE`
-reports its decoded dimensions and metadata without launching the game. It
-rejects flags `0x03`, whose four-byte-per-pixel encoding is still unknown. The
-renderer loads `Config/paintN.tex` from the selected
+`0x02` (ARGB4444). The 1x1 level is decoded from the duplicate header pixel;
+the 2x2 level is read from its padded 4x4 slot; levels 4x4 through the base are
+read from the tight-packed tail. This layout matches the external reference's
+byte accounting, including its constant 50-byte gap from naive tight packing.
+`viper_reconstruction --inspect-texture BUNDLE RESOURCE` reports its decoded
+dimensions, stored mip count, and expanded level count without launching the
+game. It rejects flags `0x03`, whose four-byte-per-pixel encoding is still
+unknown. The renderer loads `Config/paintN.tex` from the selected
 `GLOBAL/player_paintjob` for the human Viper, parses the standalone envelope,
-and uploads supported opaque RGB565 base-level pixels as an immutable D3D11
-texture. It samples that texture using FNIM fields 6-7 for human `VIPER.tex`
+and uploads all decoded levels as an immutable D3D11 texture. It samples that
+texture using FNIM fields 6-7 for human `VIPER.tex`
 groups; AI selectors use the entrant row's recovered `word_at_0xc0` value and
 the selected difficulty/career bundle's `Viper1.tex` through `Viper7.tex`.
 Other groups resolve their same-named TEX entry in the vehicle bundle, then

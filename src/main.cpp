@@ -1027,6 +1027,7 @@ int inspect_texture(const std::filesystem::path& path,
               << "wrap\t" << static_cast<unsigned>(texture->wrap) << '\n'
               << "color_key\t0x" << std::hex << texture->color_key << std::dec << '\n'
               << "mip_count\t" << texture->mip_count << '\n'
+              << "decoded_mip_levels\t" << texture->mip_rgba.size() << '\n'
               << "width\t" << texture->width << '\n'
               << "height\t" << texture->height << '\n'
               << "decoded_rgba_bytes\t" << texture->rgba.size() << '\n'

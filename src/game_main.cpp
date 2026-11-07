@@ -2374,23 +2374,31 @@ private:
         ComPtr<ID3D11ShaderResourceView>& resource_view)
     {
         if (texture.flags > 2U || texture.width == 0U || texture.height == 0U ||
-            texture.rgba.empty() || texture.rgba.size() !=
-                static_cast<std::size_t>(texture.width) * texture.height * 4U)
+            texture.mip_rgba.empty() || texture.mip_rgba.size() != texture.mip_count)
             return true;
+        std::vector<D3D11_SUBRESOURCE_DATA> mip_data(texture.mip_rgba.size());
+        for (std::size_t mip = 0U; mip < texture.mip_rgba.size(); ++mip) {
+            const auto mip_width = std::max(1U, texture.width >> mip);
+            const auto mip_height = std::max(1U, texture.height >> mip);
+            const auto& pixels = texture.mip_rgba[mip];
+            if (pixels.empty() || pixels.size() !=
+                    static_cast<std::size_t>(mip_width) * mip_height * 4U)
+                return true;
+            mip_data[mip].pSysMem = pixels.data();
+            mip_data[mip].SysMemPitch = mip_width * 4U;
+            mip_data[mip].SysMemSlicePitch = static_cast<UINT>(pixels.size());
+        }
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = texture.width;
         desc.Height = texture.height;
-        desc.MipLevels = 1U;
+        desc.MipLevels = texture.mip_count;
         desc.ArraySize = 1U;
         desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.SampleDesc.Count = 1U;
         desc.Usage = D3D11_USAGE_IMMUTABLE;
         desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        D3D11_SUBRESOURCE_DATA data{};
-        data.pSysMem = texture.rgba.data();
-        data.SysMemPitch = texture.width * 4U;
         ComPtr<ID3D11Texture2D> image;
-        if (FAILED(device_->CreateTexture2D(&desc, &data, &image)) ||
+        if (FAILED(device_->CreateTexture2D(&desc, mip_data.data(), &image)) ||
             FAILED(device_->CreateShaderResourceView(image.Get(), nullptr,
                 &resource_view))) {
             OutputDebugStringA("failed to upload Viper Racing material texture\n");
