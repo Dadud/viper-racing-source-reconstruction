@@ -2842,6 +2842,8 @@ struct PlayerPhysicsTickContext {
     std::optional<float> transmission_clutch_applied_0xcf8_after_tick;
     std::optional<std::int32_t> transmission_shift_state_0xd00_after_tick;
     std::optional<float> clutch_engagement_0xc7c_after_tick;
+    std::optional<float> engine_throttle_0xc28_after_drivetrain;
+    std::optional<std::int32_t> transmission_shift_state_0xd00_after_drivetrain;
     std::array<std::optional<float>, 6> body_constructor_wheel_geometry_after_tick{};
     std::optional<std::uint8_t> pcar_sound_getter_gate_0x508a40_after_tick;
     std::optional<float> pcar_sound_getter_0x44_selected_value_after_tick;
@@ -5109,6 +5111,18 @@ struct WindowState {
                     player_runtime_state.body_object,
                     player_runtime_state.wheel_objects,
                     player_runtime_car_record, 0x554U)) return false;
+            if (auto& tick = player_physics_ticks_this_update.back();
+                const auto bits = viper::read_ncar_body_object_u32(
+                    player_runtime_state.body_object, 0xc28U)) {
+                tick.engine_throttle_0xc28_after_drivetrain =
+                    std::bit_cast<float>(*bits);
+            }
+            if (auto& tick = player_physics_ticks_this_update.back();
+                const auto bits = viper::read_ncar_body_object_u32(
+                    player_runtime_state.body_object, 0xd00U)) {
+                tick.transmission_shift_state_0xd00_after_drivetrain =
+                    std::bit_cast<std::int32_t>(*bits);
+            }
             if (!update_player_integrator_wheel_scalars()) return false;
             update_player_wheel_contacts_from_body(
                 player_physics_ticks_this_update.back());
@@ -6915,7 +6929,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             ",transmission_requested_gear_0xcbc,transmission_in_gear_0xcf0"
             ",transmission_throttle_0xcfc,transmission_clutch_0xcf4"
             ",transmission_clutch_applied_0xcf8,transmission_shift_state_0xd00"
-            ",clutch_engagement_0xc7c";
+            ",clutch_engagement_0xc7c"
+            ",engine_throttle_0xc28_after_drivetrain"
+            ",transmission_shift_state_0xd00_after_drivetrain";
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_suspension_reset_contact"
@@ -7375,6 +7391,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     physics_tick_trace << ',';
                     if (tick.clutch_engagement_0xc7c_after_tick)
                         physics_tick_trace << *tick.clutch_engagement_0xc7c_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.engine_throttle_0xc28_after_drivetrain)
+                        physics_tick_trace << *tick.engine_throttle_0xc28_after_drivetrain;
+                    physics_tick_trace << ',';
+                    if (tick.transmission_shift_state_0xd00_after_drivetrain)
+                        physics_tick_trace <<
+                            *tick.transmission_shift_state_0xd00_after_drivetrain;
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_active_after_tick[wheel]) {

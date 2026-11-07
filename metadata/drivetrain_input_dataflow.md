@@ -607,6 +607,34 @@ state, plus Clutch engagement. These taps are sampled from the persistent
 byte-backed PCAR object after each fixed update and are for tracing state
 flow—not proof of correct force delivery.
 
+A single noninteractive run of the existing 192-tick neutral/throttle/coast/
+brake/coast input schedule used ordinary placement (`--track bemidji --car
+viper --software --diagnostics-only`, without `-grid`) and wrote a trace with
+192 data rows; every row matched the 675-column header. The Engine RPM getter
+column (`+0xC0C`) ranges from 10.79 to 1368.47 over the run. Engine throttle
+(`+0xC28`) is positive on 36 samples while Transmission state (`+0xD00`) is 1;
+RPM during those samples ranges from 23.85 to 419.01. A follow-up trace sampled
+throttle and shift state immediately after the composed drivetrain update;
+both values matched the end-of-tick fields on all 192 rows, ruling out a later
+wheel/contact stage as the source of the observation. The local `0x43FAE0`
+routine checks Engine stalled byte `+0x41` at `0x43FB62..0x43FB68` and resets
+shift state to 0 while stalled. The Engine update sets that byte from its RPM
+threshold, and the reconstruction's curve tail also updates parent `+0xC3D`.
+Thus the observed pattern is consistent with the native stall gate repeatedly
+re-entering shift state 1 while RPM is at or below 400; the final `419.01` RPM
+sample reflects the one-tick ordering around clearing the gate. The C3D value
+was not directly recorded in this capture, so this explanation is strongly
+supported by source and ordering but still needs that byte in a future capture
+before treating the runtime edge case as verified. A byte-backed regression
+now covers both normal shift throttle suppression and the stalled-engine reset
+path. The run's body contacts were intermittent (45/192, 52/192, 49/192, and
+53/192 samples by wheel), so this capture is not evidence of traction or a
+valid powered race. The private trace and input remain outside Git; their
+SHA-256 digests are
+`070031FDFF6A8E207A34D7F41EAA4C2FD7688549CF88814D5303D8803AC3F886` and
+`145EC4E50E9B90063E68F3A383320E38F6F796CFC663498C8D2735BBAEA74CF6`,
+respectively.
+
 As an independent semantic reference, the public
 [Viper Racing source port](https://github.com/HerbFargus/viper-racing-port/tree/b72d263)
 at commit `b72d263` has source for Engine, Clutch, Transmission, Differential,

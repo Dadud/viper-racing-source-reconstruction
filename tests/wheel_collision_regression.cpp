@@ -5,14 +5,21 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <source_location>
 #include <span>
 
 namespace {
-void require(const bool condition)
+void require(const bool condition,
+    const std::source_location location = std::source_location::current())
 {
-    if (!condition) std::abort();
+    if (!condition) {
+        std::fprintf(stderr, "wheel collision regression failed at line %u\n",
+            location.line());
+        std::abort();
+    }
 }
 
 viper::WheelCollisionImpulseInput make_input()
@@ -538,6 +545,58 @@ int main()
         viper::read_ncar_body_object_u32(selector_body, 0xc7cU) ==
             std::bit_cast<std::uint32_t>(0.5F) &&
         viper::read_ncar_body_object_u8(selector_body, 0xcf0U) == 1U);
+
+    // The native automatic shift enters state 1 on the gear-change tick,
+    // then suppresses Engine throttle on following state-1 updates.
+    auto automatic_shift_body = saved_curve_body;
+    const std::array<viper::NcarObjectFieldWrite, 12> automatic_shift_fields{{
+        {0xde0U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xdecU, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xcb0U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+        {0xcb4U, 4U, 1U}, {0xcbcU, 4U, 2U},
+        {0xcc4U, 4U, std::bit_cast<std::uint32_t>(10.0F)},
+        {0xcc8U, 4U, std::bit_cast<std::uint32_t>(20.0F)},
+        {0xcf8U, 4U, std::bit_cast<std::uint32_t>(1.0F)},
+        {0xd00U, 4U, 0U}, {0x534U, 1U, 1U}, {0xc3dU, 1U, 0U},
+        {0xc28U, 4U, std::bit_cast<std::uint32_t>(1.0F)}}};
+    require(viper::apply_ncar_body_object_writes(
+        automatic_shift_body, automatic_shift_fields));
+    auto automatic_shift_wheels = integrated_wheels;
+    const auto shift_entry = viper::advance_ncar_integrator_child_control_in_body(
+        automatic_shift_body, automatic_shift_wheels, runtime_record,
+        first_wheel_offset);
+    require(shift_entry && shift_entry->child.animation_state_0x68 == 1 &&
+        viper::read_ncar_body_object_u32(automatic_shift_body, 0xc28U) ==
+            std::bit_cast<std::uint32_t>(1.0F));
+    auto stalled_engine_body = automatic_shift_body;
+    auto stalled_engine_wheels = automatic_shift_wheels;
+    const viper::NcarObjectFieldWrite engine_stalled{0xc3dU, 1U, 1U};
+    require(viper::apply_ncar_body_object_writes(
+        stalled_engine_body,
+        std::span<const viper::NcarObjectFieldWrite>(&engine_stalled, 1U)));
+    const auto stalled_shift = viper::advance_ncar_integrator_child_control_in_body(
+        stalled_engine_body, stalled_engine_wheels, runtime_record,
+        first_wheel_offset);
+    require(stalled_shift && stalled_shift->child.animation_state_0x68 == 1 &&
+        viper::read_ncar_body_object_u32(stalled_engine_body, 0xc28U) ==
+            std::bit_cast<std::uint32_t>(1.0F));
+    const viper::NcarObjectFieldWrite engine_running{0xc3dU, 1U, 0U};
+    require(viper::apply_ncar_body_object_writes(
+        stalled_engine_body,
+        std::span<const viper::NcarObjectFieldWrite>(&engine_running, 1U)));
+    const auto resumed_shift = viper::advance_ncar_integrator_child_control_in_body(
+        stalled_engine_body, stalled_engine_wheels, runtime_record,
+        first_wheel_offset);
+    require(resumed_shift && resumed_shift->child.animation_state_0x68 == 1 &&
+        viper::read_ncar_body_object_u32(stalled_engine_body, 0xc28U) ==
+            std::bit_cast<std::uint32_t>(0.0F));
+    const auto shift_hold = viper::advance_ncar_integrator_child_control_in_body(
+        automatic_shift_body, automatic_shift_wheels, runtime_record,
+        first_wheel_offset);
+    require(shift_hold && shift_hold->child.animation_state_0x68 == 1 &&
+        viper::read_ncar_body_object_u32(automatic_shift_body, 0xc28U) ==
+            std::bit_cast<std::uint32_t>(0.0F));
+
     const viper::NcarObjectFieldWrite unavailable_index{0xcbcU, 4U, 7U};
     require(viper::apply_ncar_body_object_writes(selector_body,
         std::span<const viper::NcarObjectFieldWrite>(&unavailable_index, 1U)));
