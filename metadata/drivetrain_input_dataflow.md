@@ -306,15 +306,16 @@ initializes these aliases and computes `+0xDD0`, then projects the selected
 pair getter into `+0xDDC` during the fixed step. The mapping is source-backed;
 host floating-point arithmetic has not been shown bit-identical to x87.
 
-The constructor ranges were checked for those copy/alias possibilities. The
-PCAR allocator requests `0xEF0` bytes and then calls `0x4381E0 -> 0x43DFB0 ->
-0x42FF90 -> 0x43E490 -> 0x4375C0`; the base initializer writes its vtable and
-explicit fields, not a whole-object clear. `0x42FF90` calls `0x433C00`, whose
-observed bulk copies cover `+0x514` from a string, `+0xE6C` and `+0x38` from
-two 12-DWORD ranges, plus explicit nearby fields. None of those spans includes
-`+0x5B0` or `+0x8F8`. The reviewed constructor chain therefore does not source
-these values. Other callees, alternate base aliases and later mutation remain
-outside this conclusion; their actual values and origins are still unknown.
+The constructor ranges were checked for whole-object copies as well as the
+wheel aliases. The PCAR allocator requests `0xEF0` bytes and then calls
+`0x4381E0 -> 0x43DFB0 -> 0x42FF90 -> 0x43E490 -> 0x4375C0`; the base
+initializer writes its vtable and explicit fields, not a whole-object clear.
+`0x42FF90` calls `0x433C00`, whose observed bulk copies cover `+0x514` from a
+string, `+0xE6C` and `+0x38` from two 12-DWORD ranges, plus explicit nearby
+fields. Those spans do not include the body aliases `+0x5B0` and `+0x8F8`;
+their source is the explicit four-wheel setup path described above. This
+resolves their constructor provenance, while later mutation and the
+powertrain-to-force path remain open.
 
 A follow-up alias audit confirmed that `0x4381E0`, `0x43DFB0`, and `0x42FF90`
 forward the same PCAR base. `0x43E490` calls `0x4375C0` on subobject `+0x6C`
@@ -564,6 +565,8 @@ throttle torque law. Keep this model confined to the source-observed selector
 until a separate force-producing consumer is identified.
 
 This is a bounded conclusion for the reviewed call chain, not a claim that no
-other engine/transmission producer exists. The `+0x5B0/+0x8F8` constructor
-source watch and state correlation around the selected D block and live wheel
-`+0x124` writer remain the next decisive investigation.
+other engine/transmission producer exists. The ratio and selector setup and
+the `+0x5B0/+0x8F8` constructor provenance are now resolved. The next decisive
+task is to trace the live upstream writer of wheel/body longitudinal force or
+velocity, including indirect consumers of the per-step records, and establish
+whether it consumes the selected ratio, curve output, or throttle state.
