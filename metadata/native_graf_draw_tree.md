@@ -139,3 +139,45 @@ against the original in a controlled ordinary 3D view.
 The earlier statement that `0x00463600` copies the instance transform is incorrect. Its call to `0x00463510` passes the WOBL record and the address of visual object `+0x34` to the shared record serializer `0x00425720`. The visual matrix at `+0x04..+0x30` is initially identity (`0x00463440`).
 
 The scene update loop calls `0x00463530` for its registered visual objects (`0x0045BCC1`). That method adds a supplied offset to the record buffer at object `+0x34`, reads the leading 16-bit marker, and, when the marker changes or `0x00425830` requests an update, invokes virtual slot `+0x24` with that record pointer. The WOBL visual object's vtable at `0x004C9328` selects `0x00463570`, which copies twelve DWORDs from the record at `+0x04` into the visual matrix at object `+0x04`. This identifies the render-side handoff; the producer, timing, and correspondence of those buffered records to WOBL physics state still need tracing before connecting live motion.
+
+The physics-side callback is now bounded independently. WOBL vtable `0x4C8058`
+slot `+0x08` reaches `0x436F70`. If object dword `+0x470` is positive, the
+callback sets update counter `+0x4B0` to 20; while that counter is positive it
+calls `0x43ECE0`, decrements the counter, and damps angular velocity
+`+0x240..+0x248` by the native constant at `0x4C800C`. On the final counted
+update it clears those angular-velocity fields. It clears linear velocity
+`+0x234..+0x23C` and copies the shared-resource vector `+0x4A0..+0x4A8` into
+world position `+0x5C..+0x64`. The remaining tail clamps basis field `+0x54`
+against `0xBDB295EA`, derives cross-product-like basis updates, and normalizes
+the three basis vectors, using the process FDIV-compatibility branch when
+enabled. Constructor `0x436ED0` seeds basis storage from the matched mode-4
+resource entry and links its intrusive node.
+
+This closes the producer for the WOBL task object's physical basis/position,
+but not the render bridge: the visual matrix consumes a 12-DWORD buffered
+record, and the inspected callback does not write that buffer or call the
+visual object's matrix setter. The next exact step is to trace the writer and
+tick/slot selection for the `0x25720` buffer consumed by `0x63530`; until then,
+copying the physics object directly into the render matrix would skip an
+unresolved native interpolation/snapshot boundary.
+
+### Candidate shared transform-snapshot writer
+
+The game-loop path at `0x4207C0` iterates the task objects in `0x507D0C` and
+calls each task vtable's `+0x14` method with `EDI = &state[+0x7DC]`
+(`0x420880..0x420891`). The WOBL vtable read from the shipped PE maps slot
+`+0x14` to `0x4371C0`. That method writes a 12-DWORD record at
+`object[+0x08] + supplied_offset`: it copies the object's nine basis and
+three position words from `+0x38..+0x64` to record `+0x04..+0x30`, applies
+the object's local offset at `+0x28..+0x30` through its basis and adds the
+world position, then copies the object's 16-bit marker at `+0x10` to record
+`+0x00`. This is structurally the same matrix-plus-marker shape consumed by
+visual updater `0x63530` and installed by `0x63570`.
+
+This narrows the writer candidate substantially, but does not yet prove that
+`&state[+0x7DC]` aliases the WOBL visual object's `+0x34` buffer or that both
+paths use the same ring slot. The remaining join is through `0x421120`'s
+buffer setup and the scene-update offset passed to `0x63530`; map those pointer
+and tick values before wiring the reconstruction. The previous broad claim
+that the transform producer was unidentified should be read as a remaining
+buffer-alias/timing question, not an absence of a native WOBL snapshot writer.
