@@ -181,3 +181,32 @@ buffer setup and the scene-update offset passed to `0x63530`; map those pointer
 and tick values before wiring the reconstruction. The previous broad claim
 that the transform producer was unidentified should be read as a remaining
 buffer-alias/timing question, not an absence of a native WOBL snapshot writer.
+
+### Shared state-ring selector and remaining frame join (2026-11-06)
+
+The render-side callback receives the same *kind* of state-tail pointer used by
+physics callbacks. `0x425880` selects the state manager using index
+`[0x4D4DE0]`, copies its `0xF6` DWORD state prefix to the caller's frame
+workspace, copies the trailing `+0x3D8` block, and returns the selected state
+object's `+0x7DC` address. In `0x45BC20`, that return value is kept in `EBX`
+and passed unchanged to every registered visual object's `0x63530` updater.
+Therefore the updater's supplied value is an address within the selected state
+object, rather than a small byte offset or a renderer-owned matrix address.
+
+The simulation path in `0x4207C0` selects through `[0x4D4888]` and
+`0x4C5AC0`; both `0x4C5A80` (used by `0x425880`) and `0x4C5AC0` index the same
+manager-pointer table at `0x56AFB4`. The simulation loop passes its selected
+state object's `+0x7DC` address to each task's vtable `+0x14`, including WOBL
+writer `0x4371C0`. This establishes a common state-ring layout and matching
+tail offset on the two paths.
+
+It does **not** establish that `[0x4D4888]` and `[0x4D4DE0]` select the same
+ring entry at a given display frame, or that `0x4371C0` writes the exact
+record slice read by `0x63530`: the writer computes its destination as
+`[task+0x08] + supplied_state_address`, while the visual updater reads from
+`[visual+0x34] + supplied_state_address`. The task and visual base pointers,
+ring-index progression, and any scaling/offset convention between those bases
+still need to be joined. The correct next analysis is to identify the backing
+buffer and role of the task's `+0x08` and visual `+0x34` fields, then compare
+the index producers at `0x420625..0x420673` and `0x4255BC..0x4255CE` before
+implementing dynamic mode-4 rendering.
