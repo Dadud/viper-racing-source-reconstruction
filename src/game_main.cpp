@@ -1432,8 +1432,8 @@ public:
             const auto vehicle_forward = normalize(
                 {vehicle[6], vehicle[7], vehicle[8]});
             const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
-            const float chase_distance = 30.0F / zoom;
-            const float chase_height = 8.0F / zoom;
+            const float chase_distance = 16.0F / zoom;
+            const float chase_height = 6.0F / zoom;
             std::array<float, 3> target{
                 focus_x + vehicle_forward[0] * 5.0F,
                 vehicle[10] + 1.0F + vehicle_forward[1] * 5.0F +

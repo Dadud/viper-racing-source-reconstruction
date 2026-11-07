@@ -39,6 +39,14 @@ preserved full 3D track; player/AI placement in the view, the black geometry
 wedge, texture artifacts, and missing native lighting still need correction.
 Latest frame: `../captures/viper-bemidji-chase-50deg.bmp`.
 
+Reducing the chase offset from 30/8 to 16/6 world units (before the existing
+zoom scale) removes the foreground car that had obscured the player and brings
+the blue/white player car into a centered rear view, consistent with the
+retained original race-start image. A new silent capture verified this without
+using ideal-line placement. The HUD remains in the wrong layout; track
+textures/lighting and the black structure wedge are still visibly unlike the
+original. Latest frame: `../captures/viper-bemidji-chase-close.bmp`.
+
 The historical 2026-10-24 AI-sidecar inventory below missed indexed resources:
 all eight supplied track bundles contain `default.ili` and `rdefault.ili`, and
 `drivers.res` contains 524 `.ilg` lines and 695 `.dnt` notes. See [AI note
