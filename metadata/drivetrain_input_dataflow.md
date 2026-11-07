@@ -23,13 +23,45 @@ PCAR callback `0x4384D0` consumes the outputs at `0x43850F..0x43854D` and
 passes them through setters to PCAR `+0xDE0`, `+0xDE4`, and `+0xDE8` (with the
 throttle multiplier on `+0xDE0`). At `0x43872F` it calls the shared integrator
 `0x431150`. That integrator copies `+0xDE0` to the embedded object at `+0xC98`
-(`0x431295..0x4312A4`); constructor/setup evidence identifies this child as a
-selection/animation controller, not an engine or transmission object. The
-integrator passes `+0xDE4/+0xDE8` through virtual slot `+0x4C` at
+(`0x431295..0x4312A4`). Constructor and consumer evidence identify this child
+as a gear-candidate scoring and shift-state controller: it receives the
+configured ratio candidates, scores them against the linked curve, and keeps
+requested and active indices separate during a shift. The integrator passes
+`+0xDE4/+0xDE8` through virtual slot `+0x4C` at
 `0x431317..0x43135D`; the selected entries at vtables `0x4C7F6C` and
 `0x4C858C` resolve to `0x432170`, which writes four wheel `+0xE0` values.
 Those values feed steering/low-speed wheel response. The reviewed path does
-not carry a gear, engine RPM, clutch torque, or differential torque operand.
+not establish an engine torque producer or a path carrying engine RPM,
+clutch torque, or differential torque into body force or wheel rate.
+
+## Asset fields that configure the selector and curve
+
+`CarFilePayload::raw_words` is indexed from the start of the version-6 CARF
+payload. `map_car_file_runtime_fields` copies CARF payload words `0x3A..0x41`
+(payload byte offsets `0xE8..0x107`) into runtime-record `+0x94..+0xB0`, the
+eight ratio candidates. If the first CARF candidate at payload byte `0xE8` is
+near zero, it instead copies setup words `0x14..0x1B` from the CCS payload.
+The CARF signed integer at word `0x42` (payload byte `0x108`) is the gear count;
+the mapping clears higher ratio slots for counts below seven, six, or five.
+`initialize_ncar_embedded_curve_and_selector` consumes these runtime slots to
+initialize the indexed selector table. The runtime mapping and its consumer
+are the local evidence for this dataflow.
+
+The same mapping builds the curve source record consumed by
+`configure_acar_update_curve`: runtime `+0x68` is scaled CARF word `0x10`
+(payload byte `0x40`, `torque_max`); `+0x6C` is scaled word `0x0E`
+(`power_max`, byte `0x38`); `+0x70` is word `0x11` (`torque_rpm`, byte
+`0x44`); `+0x74` is word `0x0F` (`power_rpm`, byte `0x3C`); `+0x78` and
+`+0x7C` are words `0x12`/`0x13` (`idle_speed`/`redline`); `+0x80` and
+`+0x84` are words `0x14`/`0x15` (`engine_inertia`/`engine_drag`). These
+labels and payload offsets are independently documented by the
+[modding reference CARF map](https://github.com/HerbFargus/viper-racing-modding/blob/experiments/vrmod/cf.py);
+the scale/blend and runtime offsets above come from the reconstruction's
+`map_car_file_runtime_fields` implementation and native-constructor trace.
+`configure_acar_update_curve` derives coefficients from these values, but the
+reviewed consumer uses the curve as a candidate score. Neither these field
+names nor the scoring coefficients demonstrate that the score produces engine
+or wheel torque.
 
 A literal-address search across the checked-in instruction listing finds
 references to `0x5093F4`, `0x509320`, and `0x5093B8` only in global
