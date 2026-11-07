@@ -198,12 +198,11 @@ the combined drivetrain update now supplies both.
 `advance_ncar_selected_wheel_pair_target` now models the constructor-selected
 D-block hierarchy and `0x43F760` arithmetic; its byte-backed adapter writes
 only the wheel `+0xE4` fields reached by the selected block. The Windows
-fixed-step does not call this adapter yet. Its controller setter argument
-remains explicit because the active runtime's associated controller/curve
-setter path is not fully integrated.
-This establishes a source-backed path from that argument to the wheel
-spin-response input; it does not yet identify engine torque, prove that
-throttle supplies the argument, or establish original numeric parity.
+fixed-step now calls the composed selector/signal/pair update before the four
+wheel updates. This establishes the modeled runtime path from callback state
+through `+0xE4` to wheel spin response; it does not identify an engine torque
+producer, prove that this path yields physical acceleration, or establish
+original numeric parity.
 
 The live player's tire call set `derive_rolling_surface_speed`, but the shared
 response function previously ignored that flag and used its default zero
@@ -390,13 +389,16 @@ contact, vehicle movement, full session construction, user-specific setups,
 or agreement with original-game measurements. The check never launches the
 game; CTest registers it when external `GameData/common.res` is available.
 
-Next bounded source target: audit the wheel contact/tire response from the
-inputs at `0x442530` through the `+0x124` update at `0x443E9D` and the resulting
-force/moment writes consumed by body integration. Compare every production
-operand against the C++ adapter, especially the response-vector inputs and
-their contact gates. The PCAR `+0x5B0/+0x8F8` constructor source is resolved;
-the route-free physics comparison still shows no throttle propulsion. Keep
-route motion disabled in physics acceptance runs.
+**Status correction, 2026-11-06:** The bounded `0x442530` audit now covers
+the two wheel-point velocities, contact and suspension projections, damage
+gate, tire rolling-speed derivation, no-contact handling, rate finalization,
+collision impulse inputs, secondary forces, and body force/moment accumulation.
+Those operations are implemented in the route-free player tick. Focused
+fixtures establish the individual modeled paths, but neither original numeric
+parity nor powered acceleration is established. Do not repeat this completed
+wheel audit as the next task; continue into the separate upstream engine,
+gearbox, clutch, and differential producers and their handoff to the selected
+D-block / wheel `+0xE4` state. Keep route motion disabled in physics acceptance.
 
 ## Live wheel-rate writer and decoy writer
 
@@ -433,16 +435,17 @@ continues to test deterministic playback, steering response, force pipeline,
 and zero ideal-line motion, and prints the longitudinal comparison without
 pretending the powered-driving acceptance condition has passed.
 
-## Next source-reconstruction target
+## Current source-reconstruction target
 
-The checked-in listing resolves the control path through PCAR `+0xDE0/+0xDE4`,
-the selector and pair state, and the wheel `+0xE4` setter; it does not yet
-establish a complete engine/gear torque law. The next implementation target is
-the native contact/tire response at `0x442530` and its `+0x124` write at
-`0x443E9D`, followed through to body force integration. Compare its exact
-operands with the host adapter before changing the runtime. Do not infer a
-direct throttle-to-force formula from the existing uncontrolled or synthetic
-captures.
+The fixed tick projects callback controls into PCAR `+0xDE0/+0xDE4`, updates
+the selector and paired wheel `+0xE4` state, runs `0x442530`-modeled wheel
+contact/tire response, and accumulates wheel forces before body integration.
+The checked native slices do not yet establish a complete engine/gear torque
+producer or connect measured throttle to powered longitudinal acceleration.
+Trace the upstream engine, gearbox, clutch, differential, and selected
+D-block consumers before changing that behavior. Existing synthetic wheel
+fixtures only prove their local equations; route-free reconstruction traces
+still do not prove original parity or throttle propulsion.
 
 ## Controlled key selector evidence boundary
 

@@ -1130,35 +1130,30 @@ resolves the mismatch.
 
 ### Next powered-driving capture gate
 
-Do not wire the modeled PCAR signal multiplier or wheel-pair setter into the
-live tick yet. First run `tools/pcar_source_field_watch.js` against a controlled
-original Viper/Bemidji session and retain the raw capture outside Git. The
-capture is usable only if the constructor object, selected `0x4C8188` callback,
-and `0x431150` integrator body are identical, both `+0x5B0/+0x8F8` write
-provenance paths are recorded (or are demonstrably untouched through the
-first tick), and the watch resolves the actual selected thread and writer
-addresses inside `race.bin`. Correlate those events with the existing
-`tools/original_pcar_controlled_wheel_capture.js` fields for controller,
-selected D-block endpoints, wheel `+0xE4/+0x124/+0x128`, and sampled throttle,
-neutral, and brake inputs. Reject captures that lack verified input delivery,
-object identity, timing, or clean grid-start conditions. Then replay the same
-input schedule with ideal-line motion disabled and compare timestamp-aligned
-body velocity, wheel state, and force traces before implementing the sourced
-upstream behavior. Until that evidence exists, powered longitudinal response
-and complete Viper/Bemidji race acceptance remain open. The committed
-`pcar_source_field_watch_mock` CTest only checks agent script control flow; it
-is not a substitute for this original-client capture. The constructor-thread
-watchpoints now stay active after constructor return through setup callbacks,
-so writes before the first selected integrator tick are observable. The mock
-asserts a second field write after constructor return and rejects a capture if
-the watch is not retained; native/original behavior remains unverified. The
-`tools/run_original_pcar_capture.py` enforces the official ISO engine hash,
-requires sound initialized with effects/music volume zero and CD audio off,
-holds the expected canary semaphore, writes JSONL externally, and kills only
-the exact process IDs it launched. The `--direct-engine` path loads the
-video-memory hook and bounded PCAR agents before resuming `race.bin`; the
-launcher path attaches a child bridge before resuming the official launcher.
-Twelve instrumented attempts produced no video-memory query or PCAR callbacks.
+The modeled PCAR callback, selector/signal update, wheel pair, wheel contacts,
+tire response and body-force path are now connected to the route-free fixed
+tick. The constructor-derived `+0x5B0/+0x8F8` inputs have also been identified
+as wheel 0/2 `+0x5C` scalars and are initialized from the car setup. These are
+implementation facts, not proof of powered acceleration or parity: the
+checked native slices still do not identify a sourced engine/gear torque
+producer, and no matched original driving trace validates the complete chain.
+
+The next acceptance gate is source-first: continue tracing native engine,
+gearbox, clutch and differential state into the selected D-block and wheel
+`+0xE4` producer, then document a complete operand chain before changing the
+runtime. Use existing offline diagnostics and route-disabled traces to find
+host-side omissions. Original-client comparison is optional evidence work and
+must use a materially new, bounded launch strategy; do not repeat the failed
+runner configuration or launch repeated gameplay sessions. Any eventual
+capture must preserve identity from the selected `0x4C8188` callback through
+the `0x431150` integrator, prove throttle/neutral/brake delivery, and align
+body, wheel and force samples. The existing `pcar_source_field_watch_mock`
+checks probe control flow only and is not original-client evidence.
+
+The existing `tools/run_original_pcar_capture.py` enforces the official ISO
+engine hash, writes JSONL externally and terminates only process IDs it
+launched. Its `--direct-engine` and launcher modes use instrumented agents.
+Twelve recorded attempts produced no video-memory query or PCAR callbacks.
 The external manifest records the VIPER disc mounted in seven attempts,
 unmounted in two, and mount state unavailable in three; the mounted attempts
 still ended before a PCAR sample. Of the seven launcher-mode
@@ -1197,7 +1192,7 @@ The current launch/capture workflow remains unverified, and no physics
 inference is drawn from the failed attempts. All reconstruction driving checks
 continue to keep ideal-line motion disabled.
 
-The controlled state probe now reads configured throttle/brake type and
+The controlled state probe reads configured throttle/brake type and
 selector values from PCAR records `0x509328/0x509368`. It schedules neutral,
 throttle, neutral, brake, and neutral phases, and synthesizes a key only for a
 record whose resolved type is 1. Unsupported types remain untouched and
