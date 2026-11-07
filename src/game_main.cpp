@@ -6710,6 +6710,19 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         stream_ok = false;
                         break;
                     }
+                    // The shared base constructor's registered-object callback
+                    // (0x43CA90 -> 0x43CA00) resets body +0x4FC to zero. Keep
+                    // that direct body store in the retained ACAR constructor
+                    // state; manager sidecar allocation and the ACAR update
+                    // callback are still not projected here.
+                    const std::array<viper::NcarObjectFieldWrite, 1>
+                        acar_registration_body_writes{{{0x4fcU, 4U, 0U}}};
+                    if (!viper::apply_ncar_body_object_writes(
+                            body_state.body_object,
+                            acar_registration_body_writes)) {
+                        stream_ok = false;
+                        break;
+                    }
                     const auto* selected_curve = body_state.driver_curve_nodes
                         ? &*body_state.driver_curve_nodes
                         : (body_state.default_line_selected && state.ai_default_curve_nodes

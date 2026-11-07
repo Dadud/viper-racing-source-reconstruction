@@ -243,6 +243,13 @@ setup walks registered object pointers and leaves unregistered ordinal rows
 zero-filled, so the player body alone cannot stand in for all descriptor
 slots.
 
+The retained ACAR constructor projection now includes the directly observed
+manager-registration store `body[+0x4FC] = 0` from `0x43CA90 -> 0x43CA00`.
+This is only the body's post-registration mode field: the manager's indexed
+pointer/sidecar registration, live ordinal rows, and ACAR callback remain
+unimplemented. The store must not be read as proof that the production session
+has a complete manager registry or moving opponents.
+
 The next implementation boundary is to add persistent physical update state
 for each ACAR and reproduce its ordered callback producers before the shared
 integrator. Once all participant bodies and the native registration set are
