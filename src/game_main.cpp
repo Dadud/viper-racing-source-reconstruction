@@ -1182,16 +1182,18 @@ std::optional<FrontendSelection> show_setup_frontend(
 
 class D3DWindow {
 private:
+    enum class TextureAlphaMode : std::uint8_t { opaque, color_key, blended };
+
     struct CarTextureBinding {
         ComPtr<ID3D11ShaderResourceView> view;
-        bool has_alpha{};
+        TextureAlphaMode alpha_mode{TextureAlphaMode::opaque};
         std::uint8_t wrap{1U};
     };
     struct CarDrawGroup {
         UINT first_vertex{};
         UINT vertex_count{};
         ComPtr<ID3D11ShaderResourceView> texture_srv;
-        bool texture_has_alpha{};
+        TextureAlphaMode texture_alpha_mode{TextureAlphaMode::opaque};
         std::uint8_t texture_wrap{1U};
         std::optional<std::uint32_t> scene_node_offset;
     };
@@ -1529,14 +1531,17 @@ public:
                     ? group.texture_wrap : std::uint8_t{0U};
                 auto* sampler = car_sampler_states_[wrap_index].Get();
                 context_->PSSetSamplers(0U, 1U, &sampler);
-                context_->OMSetDepthStencilState(group.texture_has_alpha
+                const bool blended = group.texture_alpha_mode == TextureAlphaMode::blended;
+                context_->OMSetDepthStencilState(blended
                     ? car_transparent_depth_state_.Get() : depth_state_.Get(), 0U);
-                context_->OMSetBlendState(group.texture_has_alpha
+                context_->OMSetBlendState(blended
                     ? car_alpha_blend_state_.Get() : nullptr, nullptr, 0xffffffffU);
                 if (group.texture_srv.Get() != nullptr) {
                     auto* resource_view = group.texture_srv.Get();
                     context_->PSSetShaderResources(0U, 1U, &resource_view);
-                    context_->PSSetShader(car_textured_pixel_shader_.Get(), nullptr, 0U);
+                    context_->PSSetShader(group.texture_alpha_mode == TextureAlphaMode::color_key
+                        ? car_keyed_textured_pixel_shader_.Get()
+                        : car_textured_pixel_shader_.Get(), nullptr, 0U);
                 } else {
                     context_->PSSetShader(car_pixel_shader_.Get(), nullptr, 0U);
                 }
@@ -1632,14 +1637,17 @@ public:
                     ? group.texture_wrap : std::uint8_t{0U};
                 auto* sampler = car_sampler_states_[wrap_index].Get();
                 context_->PSSetSamplers(0U, 1U, &sampler);
-                context_->OMSetDepthStencilState(group.texture_has_alpha
+                const bool blended = group.texture_alpha_mode == TextureAlphaMode::blended;
+                context_->OMSetDepthStencilState(blended
                     ? car_transparent_depth_state_.Get() : depth_state_.Get(), 0U);
-                context_->OMSetBlendState(group.texture_has_alpha
+                context_->OMSetBlendState(blended
                     ? car_alpha_blend_state_.Get() : nullptr, nullptr, 0xffffffffU);
                 if (group.texture_srv.Get() != nullptr) {
                     auto* resource_view = group.texture_srv.Get();
                     context_->PSSetShaderResources(0U, 1U, &resource_view);
-                    context_->PSSetShader(car_textured_pixel_shader_.Get(), nullptr, 0U);
+                    context_->PSSetShader(group.texture_alpha_mode == TextureAlphaMode::color_key
+                        ? car_keyed_textured_pixel_shader_.Get()
+                        : car_textured_pixel_shader_.Get(), nullptr, 0U);
                 } else {
                     ID3D11ShaderResourceView* no_resource = nullptr;
                     context_->PSSetShaderResources(0U, 1U, &no_resource);
@@ -2059,18 +2067,26 @@ private:
             "Texture2D paintTexture : register(t0); SamplerState paintSampler : register(s0);\n"
             "struct O { float4 p : SV_POSITION; float3 c : COLOR; float2 uv : TEXCOORD0; };\n"
             "float4 PSMain(O i) : SV_TARGET { return paintTexture.Sample(paintSampler,i.uv) * float4(i.c,1); }\n";
+        static constexpr char car_keyed_textured_pixel_source[] =
+            "Texture2D paintTexture : register(t0); SamplerState paintSampler : register(s0);\n"
+            "struct O { float4 p : SV_POSITION; float3 c : COLOR; float2 uv : TEXCOORD0; };\n"
+            "float4 PSMain(O i) : SV_TARGET { float4 t=paintTexture.Sample(paintSampler,i.uv); "
+            "clip(t.a-0.5); return float4(t.rgb*i.c,1); }\n";
         ComPtr<ID3DBlob> vertex_code;
         ComPtr<ID3DBlob> hud_vertex_code;
         ComPtr<ID3DBlob> pixel_code;
         ComPtr<ID3DBlob> car_vertex_code;
         ComPtr<ID3DBlob> car_pixel_code;
         ComPtr<ID3DBlob> car_textured_pixel_code;
+        ComPtr<ID3DBlob> car_keyed_textured_pixel_code;
         if (FAILED(compile_shader(vertex_source, "VSMain", "vs_4_0", vertex_code)) ||
             FAILED(compile_shader(hud_vertex_source, "VSMain", "vs_4_0", hud_vertex_code)) ||
             FAILED(compile_shader(pixel_source, "PSMain", "ps_4_0", pixel_code)) ||
             FAILED(compile_shader(car_vertex_source, "VSMain", "vs_4_0", car_vertex_code)) ||
             FAILED(compile_shader(car_pixel_source, "PSMain", "ps_4_0", car_pixel_code)) ||
-            FAILED(compile_shader(car_textured_pixel_source, "PSMain", "ps_4_0", car_textured_pixel_code))) return false;
+            FAILED(compile_shader(car_textured_pixel_source, "PSMain", "ps_4_0", car_textured_pixel_code)) ||
+            FAILED(compile_shader(car_keyed_textured_pixel_source, "PSMain", "ps_4_0",
+                car_keyed_textured_pixel_code))) return false;
         if (FAILED(device_->CreateVertexShader(vertex_code->GetBufferPointer(),
                 vertex_code->GetBufferSize(), nullptr, &surface_vertex_shader_)) ||
             FAILED(device_->CreateVertexShader(hud_vertex_code->GetBufferPointer(),
@@ -2082,7 +2098,10 @@ private:
             FAILED(device_->CreatePixelShader(car_pixel_code->GetBufferPointer(),
                 car_pixel_code->GetBufferSize(), nullptr, &car_pixel_shader_)) ||
             FAILED(device_->CreatePixelShader(car_textured_pixel_code->GetBufferPointer(),
-                car_textured_pixel_code->GetBufferSize(), nullptr, &car_textured_pixel_shader_))) return false;
+                car_textured_pixel_code->GetBufferSize(), nullptr, &car_textured_pixel_shader_)) ||
+            FAILED(device_->CreatePixelShader(car_keyed_textured_pixel_code->GetBufferPointer(),
+                car_keyed_textured_pixel_code->GetBufferSize(), nullptr,
+                &car_keyed_textured_pixel_shader_))) return false;
         const D3D11_INPUT_ELEMENT_DESC elements[]{
             {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
             {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 3U * sizeof(float), D3D11_INPUT_PER_VERTEX_DATA, 0}};
@@ -2257,7 +2276,11 @@ private:
         const auto texture = viper::parse_texture_payload(source->payload(*entry));
         if (texture && create_texture_srv(*texture, result.view) &&
             result.view.Get() != nullptr) {
-            result.has_alpha = texture->flags == 1U || texture->flags == 2U;
+            result.alpha_mode = texture->flags == 1U
+                ? TextureAlphaMode::color_key
+                : texture->flags == 2U
+                    ? TextureAlphaMode::blended
+                    : TextureAlphaMode::opaque;
             result.wrap = texture->wrap;
         }
         material_texture_cache_.emplace(entry, result);
@@ -2346,7 +2369,7 @@ private:
                     const auto texture = resolve_material_texture(
                         *track_bundle_, material.texture_name);
                     group.texture_srv = texture.view;
-                    group.texture_has_alpha = texture.has_alpha;
+                    group.texture_alpha_mode = texture.alpha_mode;
                     group.texture_wrap = texture.wrap;
                 }
                 for (std::size_t face_index = material.first_face;
@@ -2491,7 +2514,7 @@ private:
                     const auto material_texture =
                         resolve_material_texture(primary_bundle, material);
                     draw_group.texture_srv = material_texture.view;
-                    draw_group.texture_has_alpha = material_texture.has_alpha;
+                    draw_group.texture_alpha_mode = material_texture.alpha_mode;
                     draw_group.texture_wrap = material_texture.wrap;
                 }
                 const std::array<float, 3> color = material.find("WHEEL") != std::string::npos
@@ -2613,6 +2636,7 @@ private:
     ComPtr<ID3D11PixelShader> surface_pixel_shader_;
     ComPtr<ID3D11PixelShader> car_pixel_shader_;
     ComPtr<ID3D11PixelShader> car_textured_pixel_shader_;
+    ComPtr<ID3D11PixelShader> car_keyed_textured_pixel_shader_;
     ComPtr<ID3D11InputLayout> surface_input_layout_;
     ComPtr<ID3D11InputLayout> car_input_layout_;
     ComPtr<ID3D11RasterizerState> surface_rasterizer_;

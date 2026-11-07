@@ -209,18 +209,21 @@ texture. It samples that texture using FNIM fields 6-7 for human `VIPER.tex`
 groups; AI selectors use the entrant row's recovered `word_at_0xc0` value and
 the selected difficulty/career bundle's `Viper1.tex` through `Viper7.tex`.
 Other groups resolve their same-named TEX entry in the vehicle bundle, then
-`race.res`; flags 1 and 2 use alpha blending with depth writes disabled. This
-implements the statically recovered candidate path together with the external
-UV-format lead; it does not establish original upload semantics. The extracted
+`race.res`. The reconstructed renderer treats flag 1's decoded binary color
+key as a cutout: zero-alpha samples are discarded and write depth. Flag 2's
+ARGB4444 samples use alpha blending with depth writes disabled. This follows
+the two distinct decoded pixel formats, but native per-format blending and
+depth-state parity have not been independently proven. The extracted
 data has Easy, Medium, Hard, and Career 1-4 livery bundles; `career5.res` is
 absent, so that profile retains fallback body colors. The parser copies the
 wrap byte to object offset `+0x17` at `0x4598E4`; the inspected texture
-creation routine `0x459ED0` does not consume it. Following the external
-format-reference inventory, the renderer maps 0 to clamp and 1 to wrap; it
-maps the one observed value 2 to mirror as a convention-based hypothesis.
-Transparent groups are drawn in model group order rather than sorted
-back-to-front. UV field order, wrap value 2, runtime path selection,
-remaining helper callers, driver-dependent keying, native lighting, and
+creation routine `0x459ED0` does not consume it. The native state updater maps
+zero to clamp and every nonzero value, including 2, to wrap; see
+[`texture_resource_inventory.md`](texture_resource_inventory.md) for the
+instruction-level evidence.
+Blended groups are drawn in model group order rather than sorted
+back-to-front. UV field order, runtime path selection,
+remaining helper callers, native color-key parity, native lighting, and
 independent pixel-level comparison remain open. The generic
 `0x4495E1`/`0x449740` IMG! compare/write routines are still not proven to
 implement this car texture path. Flags `0x03` remain unsupported until their
