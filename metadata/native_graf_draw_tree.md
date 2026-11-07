@@ -113,6 +113,16 @@ state consumed by type-1 and type-2 selection, but does not yet map the
 reconstruction's race chase camera to either native call path or establish the
 matrix conventions used during an ordinary race.
 
+The race-scene projection is now sourced independently of the camera pose.
+Initializer `0x0045FAE0` stores bit pattern `0x3F9C61AA` in the scene FOV
+global. Race draw setup `0x0045FB70` passes near plane `1.0`, far plane
+`1000.0`, and that FOV to `0x004488B0`; the projection helper `0x00449060`
+uses the half-angle tangent to form the perspective scale. The D3D renderer
+uses the same FOV bit pattern, `near=1`, and `far=1000`. This recovers the
+projection parameters, not the camera's position, orientation, or native race
+chase behavior. The reference screenshot is later than the grid-start capture,
+so their car placement cannot be treated as a same-tick comparison.
+
 ## Reconstruction status
 
 `TrackGraphicsSceneNode` preserves the LOD and visibility parameters, both raw

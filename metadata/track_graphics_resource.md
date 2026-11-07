@@ -106,8 +106,10 @@ all eight tracks also have zero duplicate WOBL model IDs.
 Facing-model offsets use the reference's observed local-to-world mapping and
 retain the facing ID. Packed vertex color is interpreted as `0xAARRGGBB` for
 the current D3D path; that channel interpretation has not been confirmed
-against the native vertex declaration. The current scene uses the reconstruction's
-perspective chase camera, not a recovered native camera.
+against the native vertex declaration. The current scene uses the
+reconstruction's chase-camera pose. Its projection now uses the recovered
+native 70-degree FOV and 1-to-1000 view range, but position/orientation and
+race-camera mode parity remain open.
 
 ## Limits and next evidence
 
@@ -125,8 +127,9 @@ coordinates and a normalized world-forward vector.
 
 [`native_graf_draw_tree.md`](native_graf_draw_tree.md) records the recovered
 dispatcher, raw-link semantics, LOD interval formula, settings path, and native
-axial depth test. Next, map the reconstructed chase camera to the native camera
-matrix and reproduce mode-4 instance transforms/animation. Confirm packed color interpretation from the actual vertex
+axial depth test and projection parameters. Next, map the reconstructed chase
+camera to the native camera matrix and reproduce mode-4 instance
+transforms/animation. Confirm packed color interpretation from the actual vertex
 declaration and compare a controlled normal-camera capture before visual
 acceptance. Both Release targets compiled with Visual Studio 18, and the
 read-only inventory reconfirmed all eight stock graphs and chunk mappings. The

@@ -1484,9 +1484,12 @@ public:
             }
             camera_up = normalize(cross(camera_forward, camera_right));
         }
-        const float near_plane = 0.1F;
-        const float focal_scale = 1.0F / std::tan(50.0F *
-            0.008726646259971648F);
+        // race.bin 0x45FAE0 seeds the native scene FOV global with
+        // 0x3F9C61AA. The race draw setup at 0x45FB70 passes near=1 and
+        // far=1000 to 0x4488B0; its projection helper uses tan(FOV/2).
+        constexpr float native_vertical_fov = std::bit_cast<float>(0x3F9C61AAU);
+        constexpr float near_plane = 1.0F;
+        const float focal_scale = 1.0F / std::tan(native_vertical_fov * 0.5F);
         const float aspect = static_cast<float>(width_) /
             static_cast<float>(height_);
         camera_constants_.right_scale_x = {camera_right[0], camera_right[1],
