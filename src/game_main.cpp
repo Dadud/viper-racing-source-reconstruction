@@ -2827,6 +2827,8 @@ struct PlayerPhysicsTickContext {
     std::optional<std::uint32_t> body_vehicle_ordinal_0x510_after_tick;
     std::optional<float> pcar_curve_getter_0xc0c_after_tick;
     std::optional<float> pcar_body_sample_0xd70_after_tick;
+    std::optional<float> pcar_drive_signal_multiplier_0xdd0_after_tick;
+    std::optional<float> pcar_selected_signal_0xddc_after_tick;
     std::array<std::optional<float>, 6> body_constructor_wheel_geometry_after_tick{};
     std::optional<std::uint8_t> pcar_sound_getter_gate_0x508a40_after_tick;
     std::optional<float> pcar_sound_getter_0x44_selected_value_after_tick;
@@ -2839,6 +2841,7 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_active_after_tick{};
     std::array<std::optional<std::uint8_t>, 4> wheel_suspension_reset_contact{};
     std::array<std::optional<float>, 4> wheel_steering_0xdc_after_tick{};
+    std::array<std::optional<float>, 4> wheel_pair_value_0xe4_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xe0_after_tick{};
     std::array<std::optional<float>, 4> wheel_value_0xa8_after_tick{};
     std::array<std::optional<viper::WheelSpinPreprojectionResult>, 4>
@@ -4550,6 +4553,10 @@ struct WindowState {
         tick.body_vehicle_ordinal_0x510_after_tick =
             viper::read_ncar_body_object_u32(
                 player_runtime_state.body_object, 0x510U);
+        tick.pcar_drive_signal_multiplier_0xdd0_after_tick =
+            read_body_float(0xdd0U);
+        tick.pcar_selected_signal_0xddc_after_tick =
+            read_body_float(0xddcU);
         for (std::size_t wheel = 0U; wheel < player_wheel_contact_states.size();
              ++wheel) {
             const auto& wheel_object = player_runtime_state.wheel_objects[wheel];
@@ -4879,6 +4886,7 @@ struct WindowState {
                 return std::bit_cast<float>(*bits);
             };
             tick.wheel_steering_0xdc_after_tick[wheel] = read_wheel_float(0x0dcU);
+            tick.wheel_pair_value_0xe4_after_tick[wheel] = read_wheel_float(0x0e4U);
             tick.wheel_value_0xe0_after_tick[wheel] = read_wheel_float(0x0e0U);
             tick.wheel_value_0xa8_after_tick[wheel] = read_wheel_float(0x0a8U);
             tick.wheel_angle_0xac_after_tick[wheel] = read_wheel_float(0x0acU);
@@ -6867,11 +6875,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             physics_tick_trace << ",body_integrator_timer_missing_offset_" << lane;
         physics_tick_trace << ",pcar_curve_getter_0xc0c,pcar_body_sample_0xd70"
             ",pcar_sound_getter_gate_0x508a40"
-            ",pcar_sound_getter_0x44_selected_value";
+            ",pcar_sound_getter_0x44_selected_value"
+            ",pcar_drive_signal_multiplier_0xdd0"
+            ",pcar_selected_signal_0xddc";
         for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
             physics_tick_trace << ",wheel" << wheel << "_contact_active"
                 << ",wheel" << wheel << "_suspension_reset_contact"
                 << ",wheel" << wheel << "_steering_0xdc"
+                << ",wheel" << wheel << "_pair_value_0xe4"
                 << ",wheel" << wheel << "_value_0xe0"
                 << ",wheel" << wheel << "_value_0xa8"
                 << ",wheel" << wheel << "_spin_rate_0x124"
@@ -7283,6 +7294,14 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     if (tick.pcar_sound_getter_0x44_selected_value_after_tick)
                         physics_tick_trace <<
                             *tick.pcar_sound_getter_0x44_selected_value_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.pcar_drive_signal_multiplier_0xdd0_after_tick)
+                        physics_tick_trace <<
+                            *tick.pcar_drive_signal_multiplier_0xdd0_after_tick;
+                    physics_tick_trace << ',';
+                    if (tick.pcar_selected_signal_0xddc_after_tick)
+                        physics_tick_trace <<
+                            *tick.pcar_selected_signal_0xddc_after_tick;
                     for (std::size_t wheel = 0U; wheel < 4U; ++wheel) {
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_active_after_tick[wheel]) {
@@ -7294,10 +7313,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                             physics_tick_trace << static_cast<unsigned>(
                                 *tick.wheel_suspension_reset_contact[wheel]);
                         }
-                        physics_tick_trace << ',';
                         if (tick.wheel_steering_0xdc_after_tick[wheel])
                             physics_tick_trace <<
                                 *tick.wheel_steering_0xdc_after_tick[wheel];
+                        physics_tick_trace << ',';
+                        if (tick.wheel_pair_value_0xe4_after_tick[wheel])
+                            physics_tick_trace <<
+                                *tick.wheel_pair_value_0xe4_after_tick[wheel];
                         physics_tick_trace << ',';
                         if (tick.wheel_value_0xe0_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_value_0xe0_after_tick[wheel];
