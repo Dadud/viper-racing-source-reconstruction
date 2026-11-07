@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstddef>
 #include <cstdio>
+#include <fstream>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -46,7 +47,9 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-stamp BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-image BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-texture BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --export-texture BUNDLE_PATH RESOURCE_NAME OUTPUT_BMP\n"
            << "       viper_reconstruction --inspect-grf BUNDLE_PATH RESOURCE_NAME\n"
+           << "       viper_reconstruction --inspect-grf-chunk BUNDLE_PATH RESOURCE_NAME CHUNK_INDEX\n"
            << "       viper_reconstruction --inspect-wobble-models TRACK_BUNDLE GRAF_RESOURCE\n"
            << "       viper_reconstruction --inspect-grf-view BUNDLE_PATH RESOURCE_NAME X Y Z FX FY FZ [DETAIL_LEVEL]\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
@@ -329,6 +332,95 @@ int inspect_track_graphics(const std::filesystem::path& path,
                       << material.end_corner << "\tfaces " << material.first_face
                       << ':' << material.end_face << '\n';
         }
+    }
+    return 0;
+}
+
+int inspect_track_graphics_chunk(const std::filesystem::path& path,
+    const std::string_view resource_name, const std::size_t chunk_index)
+{
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* entry = bundle.find(resource_name,
+        viper::TrackGraphicsResourcePayload::resource_type_code);
+    if (entry == nullptr)
+        throw std::runtime_error("GRAF resource not found: " +
+            std::string(resource_name));
+    const auto graphics = viper::parse_track_graphics_resource(
+        entry->attributes, bundle.payload(*entry));
+    if (!graphics || chunk_index >= graphics->chunks.size())
+        throw std::runtime_error("GRAF chunk index is invalid or the resource is malformed");
+    const auto& chunk = graphics->chunks[chunk_index];
+    auto minimum = chunk.corners.front().position;
+    auto maximum = minimum;
+    for (const auto& corner : chunk.corners) {
+        for (std::size_t axis = 0U; axis < 3U; ++axis) {
+            minimum[axis] = (std::min)(minimum[axis], corner.position[axis]);
+            maximum[axis] = (std::max)(maximum[axis], corner.position[axis]);
+        }
+    }
+    std::cout << std::fixed << std::setprecision(3)
+              << "chunk\t" << chunk_index << '\n'
+              << "source_offset\t0x" << std::hex << chunk.source_offset
+              << std::dec << '\n'
+              << "center\t" << chunk.center[0] << '\t' << chunk.center[1]
+              << '\t' << chunk.center[2] << '\n'
+              << "bounds_min\t" << minimum[0] << '\t' << minimum[1]
+              << '\t' << minimum[2] << '\n'
+              << "bounds_max\t" << maximum[0] << '\t' << maximum[1]
+              << '\t' << maximum[2] << '\n'
+              << "facing_model\t" << (chunk.facing_model ? 1 : 0) << '\n'
+              << "facing_id\t" << chunk.facing_id.value_or(0U) << '\n'
+              << "corners\t" << chunk.corners.size() << '\n'
+              << "faces\t" << chunk.faces.size() << '\n';
+    for (const auto& material : chunk.materials) {
+        std::array<float, 3> material_min{
+            (std::numeric_limits<float>::max)(),
+            (std::numeric_limits<float>::max)(),
+            (std::numeric_limits<float>::max)()};
+        std::array<float, 3> material_max{
+            -(std::numeric_limits<float>::max)(),
+            -(std::numeric_limits<float>::max)(),
+            -(std::numeric_limits<float>::max)()};
+        std::array<float, 2> uv_min{
+            (std::numeric_limits<float>::max)(),
+            (std::numeric_limits<float>::max)()};
+        std::array<float, 2> uv_max{
+            -(std::numeric_limits<float>::max)(),
+            -(std::numeric_limits<float>::max)()};
+        for (std::size_t face = material.first_face;
+             face < material.end_face; ++face) {
+            for (const auto corner_index : chunk.faces[face]) {
+                const auto& corner = chunk.corners[corner_index];
+                for (std::size_t axis = 0U; axis < 3U; ++axis) {
+                    material_min[axis] = (std::min)(material_min[axis],
+                        corner.position[axis]);
+                    material_max[axis] = (std::max)(material_max[axis],
+                        corner.position[axis]);
+                }
+                for (std::size_t axis = 0U; axis < 2U; ++axis) {
+                    uv_min[axis] = (std::min)(uv_min[axis], corner.uv[axis]);
+                    uv_max[axis] = (std::max)(uv_max[axis], corner.uv[axis]);
+                }
+            }
+        }
+        std::cout << "material\t"
+                  << (material.texture_name.empty() ? "<empty>" : material.texture_name)
+                  << '\t' << material.first_corner << ':' << material.end_corner
+                  << '\t' << material.first_face << ':' << material.end_face
+                  << "\txyz " << material_min[0] << ':' << material_max[0]
+                  << ',' << material_min[1] << ':' << material_max[1]
+                  << ',' << material_min[2] << ':' << material_max[2]
+                  << "\tuv " << uv_min[0] << ':' << uv_max[0]
+                  << ',' << uv_min[1] << ':' << uv_max[1] << '\n';
+    }
+    for (const auto& node : graphics->scene_nodes) {
+        if (!node.parsed_chunk_index || *node.parsed_chunk_index != chunk_index)
+            continue;
+        std::cout << "scene_node\t0x" << std::hex << node.source_offset
+                  << std::dec << "\ttype " << node.type << "\tmode "
+                  << node.facing_mode << "\tlinks 0x" << std::hex
+                  << node.link_plus_4_offset << "/0x" << node.link_plus_8_offset
+                  << std::dec << '\n';
     }
     return 0;
 }
@@ -669,7 +761,8 @@ int inspect_stamp_image(const std::filesystem::path& path,
 }
 
 int inspect_texture(const std::filesystem::path& path,
-                    const std::string_view resource_name)
+                    const std::string_view resource_name,
+                    const std::optional<std::filesystem::path>& export_path = {})
 {
     const auto bundle = viper::ResourceBundle::open(path);
     const auto* entry = bundle.find(
@@ -686,6 +779,45 @@ int inspect_texture(const std::filesystem::path& path,
     std::size_t transparent_pixels = 0U;
     for (std::size_t pixel = 0U; pixel < texture->rgba.size() / 4U; ++pixel) {
         if (texture->rgba[pixel * 4U + 3U] == 0U) ++transparent_pixels;
+    }
+    if (export_path) {
+        std::ofstream output(*export_path, std::ios::binary | std::ios::trunc);
+        if (!output) throw std::runtime_error("could not create texture preview: " +
+            export_path->string());
+        const std::uint32_t row_bytes = texture->width * 3U;
+        const std::uint32_t padded_row_bytes = (row_bytes + 3U) & ~3U;
+        const std::uint32_t pixel_bytes = padded_row_bytes * texture->height;
+        std::array<std::uint8_t, 54> header{};
+        const auto put_u16 = [&header](const std::size_t offset,
+            const std::uint16_t value) {
+            header[offset] = static_cast<std::uint8_t>(value & 0xffU);
+            header[offset + 1U] = static_cast<std::uint8_t>(value >> 8U);
+        };
+        const auto put_u32 = [&header](const std::size_t offset,
+            const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte)
+                header[offset + byte] = static_cast<std::uint8_t>(value >> (byte * 8U));
+        };
+        header[0] = 'B'; header[1] = 'M';
+        put_u32(2U, 54U + pixel_bytes); put_u32(10U, 54U);
+        put_u32(14U, 40U); put_u32(18U, texture->width);
+        put_u32(22U, texture->height); put_u16(26U, 1U);
+        put_u16(28U, 24U); put_u32(34U, pixel_bytes);
+        output.write(reinterpret_cast<const char*>(header.data()), header.size());
+        std::vector<std::uint8_t> row(padded_row_bytes, 0U);
+        for (std::uint32_t y = texture->height; y-- > 0U;) {
+            for (std::uint32_t x = 0U; x < texture->width; ++x) {
+                const auto source = (static_cast<std::size_t>(y) * texture->width + x) * 4U;
+                const auto destination = static_cast<std::size_t>(x) * 3U;
+                row[destination] = texture->rgba[source + 2U];
+                row[destination + 1U] = texture->rgba[source + 1U];
+                row[destination + 2U] = texture->rgba[source];
+            }
+            output.write(reinterpret_cast<const char*>(row.data()), row.size());
+        }
+        if (!output) throw std::runtime_error("could not finish texture preview: " +
+            export_path->string());
+        std::cout << "preview_bmp\t" << export_path->string() << '\n';
     }
     std::cout << "bundle\t" << path.string() << '\n'
               << "resource\t" << entry->name << '\n'
@@ -747,11 +879,13 @@ int main(int argc, char** argv)
         std::optional<std::string> stamp_resource_name;
         std::optional<std::string> stamp_image_resource_name;
         std::optional<std::string> texture_resource_name;
+        std::optional<std::filesystem::path> texture_export_path;
         std::optional<std::string> font_resource_name;
         std::optional<std::string> text_table_resource_name;
         std::optional<std::string> car_stem;
         std::optional<std::string> model_resource_name;
         std::optional<std::string> grf_resource_name;
+        std::optional<std::size_t> grf_chunk_index;
         std::optional<std::string> wobble_graf_resource_name;
         std::optional<std::array<float, 6>> grf_view_camera;
         float grf_view_detail_level = 1.0F;
@@ -835,6 +969,15 @@ int main(int argc, char** argv)
                 texture_resource_name = argv[++i];
                 continue;
             }
+            if (argument == "--export-texture") {
+                if (i + 3 >= argc)
+                    throw std::invalid_argument(
+                        "--export-texture requires a bundle, resource, and BMP output path");
+                resource_bundle_path = argv[++i];
+                texture_resource_name = argv[++i];
+                texture_export_path = argv[++i];
+                continue;
+            }
             if (argument == "--inspect-font") {
                 if (i + 2 >= argc) {
                     throw std::invalid_argument(
@@ -878,6 +1021,20 @@ int main(int argc, char** argv)
                 }
                 resource_bundle_path = argv[++i];
                 grf_resource_name = argv[++i];
+                continue;
+            }
+            if (argument == "--inspect-grf-chunk") {
+                if (i + 3 >= argc)
+                    throw std::invalid_argument(
+                        "--inspect-grf-chunk requires a bundle, resource, and chunk index");
+                resource_bundle_path = argv[++i];
+                grf_resource_name = argv[++i];
+                char* end = nullptr;
+                const auto parsed = std::strtoull(argv[++i], &end, 10);
+                if (end == argv[i] || *end != '\0' ||
+                    parsed > (std::numeric_limits<std::size_t>::max)())
+                    throw std::invalid_argument("GRAF chunk index must be a nonnegative integer");
+                grf_chunk_index = static_cast<std::size_t>(parsed);
                 continue;
             }
             if (argument == "--inspect-wobble-models") {
@@ -991,7 +1148,7 @@ int main(int argc, char** argv)
             }
             if (texture_resource_name) {
                 return inspect_texture(*resource_bundle_path,
-                                       *texture_resource_name);
+                    *texture_resource_name, texture_export_path);
             }
             if (font_resource_name) {
                 return inspect_font(*resource_bundle_path, *font_resource_name);
@@ -1007,6 +1164,9 @@ int main(int argc, char** argv)
                 return inspect_model(*resource_bundle_path, *model_resource_name);
             }
             if (grf_resource_name) {
+                if (grf_chunk_index)
+                    return inspect_track_graphics_chunk(*resource_bundle_path,
+                        *grf_resource_name, *grf_chunk_index);
                 if (grf_view_camera) {
                     return inspect_track_graphics_view(*resource_bundle_path,
                         *grf_resource_name,

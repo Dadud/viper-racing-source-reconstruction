@@ -206,6 +206,7 @@ struct Options {
     bool diagnostics_only{};
     bool route_motion_prototype{};
     std::optional<unsigned> smoke_frames;
+    std::optional<std::array<unsigned, 2>> window_size;
     std::optional<std::filesystem::path> capture_frame;
     std::optional<std::filesystem::path> record_trace;
     std::optional<std::filesystem::path> record_physics_tick_trace;
@@ -229,8 +230,9 @@ struct TraceInputFrame {
 void usage(std::ostream& out)
 {
     out << "Viper Racing reconstruction runtime\n"
-        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--capture-frame PATH] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--route-motion-prototype] [--load-replay PATH] [--software] [--help]\n"
+        << "Usage: viper_game [--data-dir PATH] [--config-dir PATH] [--track NAME] [--car NAME] [--window-size WIDTH HEIGHT] [--host PORT | --join HOST PORT] [--network-slot N] [-grid] [--validate-assets] [--smoke-frames N] [--capture-frame PATH] [--smoke-audio] [--record-trace PATH] [--play-trace PATH] [--diagnostics-only] [--route-motion-prototype] [--load-replay PATH] [--software] [--help]\n"
         << "  --capture-frame PATH saves the first rendered scene as a 24-bit BMP; requires --track and --car and exits after that frame unless --smoke-frames is set.\n"
+        << "  --window-size WIDTH HEIGHT selects the client-area size; useful for matching a reference capture.\n"
         << "  --host PORT waits for one reconstructed client; --join HOST PORT connects and exchanges route-race snapshots.\n"
         << "  --network-slot N selects a zero-based local player grid slot for multiplayer.\n"
         << "  --load-replay PATH validates the v6 container and fixed engine-record header, then retains it; frame payload remains opaque.\n"
@@ -402,6 +404,27 @@ Options parse_options(const int argc, wchar_t** argv)
             if (!valid || frames == 0)
                 throw std::runtime_error("--smoke-frames requires a positive integer");
             options.smoke_frames = frames;
+        } else if (arg == L"--window-size") {
+            if (i + 2 >= argc)
+                throw std::runtime_error("--window-size requires width and height");
+            std::array<unsigned, 2> size{};
+            for (auto& value : size) {
+                const std::wstring_view text(argv[++i]);
+                bool valid = !text.empty();
+                for (const wchar_t ch : text) {
+                    if (ch < L'0' || ch > L'9' ||
+                        value > (std::numeric_limits<unsigned>::max() -
+                            static_cast<unsigned>(ch - L'0')) / 10U) {
+                        valid = false;
+                        break;
+                    }
+                    value = value * 10U + static_cast<unsigned>(ch - L'0');
+                }
+                if (!valid || value < 320U || value > 4096U)
+                    throw std::runtime_error(
+                        "--window-size dimensions must be integers from 320 to 4096");
+            }
+            options.window_size = size;
         } else if (arg == L"--capture-frame") {
             if (++i >= argc) throw std::runtime_error("--capture-frame requires an output path");
             options.capture_frame = std::filesystem::path(argv[i]);
@@ -1432,8 +1455,8 @@ public:
             const auto vehicle_forward = normalize(
                 {vehicle[6], vehicle[7], vehicle[8]});
             const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
-            const float chase_distance = 16.0F / zoom;
-            const float chase_height = 6.0F / zoom;
+            const float chase_distance = 9.6F / zoom;
+            const float chase_height = 4.8F / zoom;
             std::array<float, 3> target{
                 focus_x + vehicle_forward[0] * 5.0F,
                 vehicle[10] + 1.0F + vehicle_forward[1] * 5.0F +
@@ -6296,6 +6319,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
 
 int run_window(bool software, std::optional<unsigned> smoke_frames,
                std::optional<std::filesystem::path> capture_frame_path,
+               const std::optional<std::array<unsigned, 2>>& window_size,
                const bool smoke_audio,
                const bool diagnostics_only,
                const bool route_motion_enabled,
@@ -6430,8 +6454,23 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
     if (MultiByteToWideChar(CP_UTF8, 0, title_utf8.c_str(), -1,
             title.data(), title_length) <= 0) return 1;
     title.pop_back();
+    constexpr DWORD window_style = WS_OVERLAPPEDWINDOW;
+    int window_width = 1280;
+    int window_height = 800;
+    if (window_size) {
+        RECT window_rectangle{0, 0,
+            static_cast<LONG>((*window_size)[0]),
+            static_cast<LONG>((*window_size)[1])};
+        if (!AdjustWindowRect(&window_rectangle, window_style, FALSE)) {
+            std::cerr << "Could not calculate the runtime window dimensions.\n";
+            return 1;
+        }
+        window_width = window_rectangle.right - window_rectangle.left;
+        window_height = window_rectangle.bottom - window_rectangle.top;
+    }
     HWND hwnd = CreateWindowExW(0, class_name, title.c_str(),
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
+        window_style, CW_USEDEFAULT, CW_USEDEFAULT,
+        window_width, window_height,
         nullptr, nullptr, instance, &state);
     if (!hwnd) { std::cerr << "Could not create the runtime window.\n"; return 1; }
     state.window = hwnd;
@@ -8592,6 +8631,7 @@ int run_selected_race(const Options& options, const std::string_view track,
         std::cout << "Reconstructed clients agreed on race setup; replicating route-race state.\n";
     }
     return run_window(options.software, options.smoke_frames, options.capture_frame,
+        options.window_size,
         options.audio_smoke,
         options.diagnostics_only || !options.route_motion_prototype,
         options.route_motion_prototype && !options.diagnostics_only,
