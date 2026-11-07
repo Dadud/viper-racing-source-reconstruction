@@ -20,8 +20,10 @@ tree's raw-link roles, type-2 distance gates, type-1 sphere culling, and type-4
 dispatch. The renderer now applies the recovered visibility/LOD gates per
 frame and submits the selected ordinary and facing groups in pass categories.
 Modes 1, 2, and configured modes 4-7 use reconstructed camera/facing behavior,
-but the mode-4 WARP capture still differs visibly from the original scene.
-Native camera-global transitions, mode-4 live transforms, materials, and scene
+and the normal spline-placement view now keeps the asphalt and lane markings
+visible after correcting the culling-axis sign separately from projection. The
+arena and side geometry still differ visibly from the original. Native
+camera-global transitions, mode-4 live transforms, materials, and scene
 alignment remain open. Modes 1 and 2 use reconstructed native bases. Keep full 3D scene parity
 as the first visual acceptance gate, ahead of screenshot or driving acceptance.
 See [`native_graf_draw_tree.md`](native_graf_draw_tree.md).

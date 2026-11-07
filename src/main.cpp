@@ -27,6 +27,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -52,6 +53,7 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-grf-chunk BUNDLE_PATH RESOURCE_NAME CHUNK_INDEX\n"
            << "       viper_reconstruction --inspect-wobble-models TRACK_BUNDLE GRAF_RESOURCE\n"
            << "       viper_reconstruction --inspect-grf-view BUNDLE_PATH RESOURCE_NAME X Y Z FX FY FZ [DETAIL_LEVEL]\n"
+           << "       add --grf-view-material-details to report selected track-material coverage and key chunk bounds\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-text-table BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-terrain BUNDLE_PATH\n"
@@ -445,7 +447,8 @@ int inspect_track_graphics_view(const std::filesystem::path& path,
                                 const std::string_view resource_name,
                                 const std::array<float, 3>& camera_position,
                                 const std::array<float, 3>& camera_forward,
-                                const float detail_level)
+                                const float detail_level,
+                                const bool report_material_details)
 {
     const auto bundle = viper::ResourceBundle::open(path);
     const auto* entry = bundle.find(resource_name,
@@ -473,6 +476,72 @@ int inspect_track_graphics_view(const std::filesystem::path& path,
               << "facing_mode_1_nodes\t" << selection.facing_mode_1_node_offsets.size() << '\n'
               << "facing_mode_2_nodes\t" << selection.facing_mode_2_node_offsets.size() << '\n'
               << "registered_mode_4_nodes\t" << selection.registered_mode_4_node_offsets.size() << '\n';
+    if (report_material_details) {
+        std::unordered_set<std::uint32_t> selected_offsets;
+        const auto add_selected = [&selected_offsets](
+            const auto& offsets) {
+            selected_offsets.insert(offsets.begin(), offsets.end());
+        };
+        add_selected(selection.ordinary_node_offsets);
+        add_selected(selection.facing_mode_1_node_offsets);
+        add_selected(selection.facing_mode_2_node_offsets);
+        add_selected(selection.registered_mode_4_node_offsets);
+        std::unordered_map<std::string, std::array<std::size_t, 2>> material_coverage;
+        for (const auto& node : graphics->scene_nodes) {
+            if (!node.parsed_chunk_index ||
+                *node.parsed_chunk_index >= graphics->chunks.size()) continue;
+            const bool selected = selected_offsets.contains(node.source_offset);
+            const auto& chunk = graphics->chunks[*node.parsed_chunk_index];
+            for (const auto& material : chunk.materials) {
+                auto& counts = material_coverage[material.texture_name];
+                ++counts[1];
+                if (selected) ++counts[0];
+                if (material.texture_name == "asph.tex" ||
+                    material.texture_name == "grs.tex" ||
+                    material.texture_name == "check.tex" ||
+                    material.texture_name == "strpy.tex") {
+                    std::cout << "material_instance\t" << material.texture_name
+                              << '\t' << (selected ? "selected" : "culled")
+                              << "\tnode 0x" << std::hex << node.source_offset
+                              << std::dec << "\tchunk " << *node.parsed_chunk_index
+                              << "\tcorners " << material.first_corner << ':'
+                              << material.end_corner << "\tbounds xyz ";
+                    std::array<float, 3> minimum{
+                        std::numeric_limits<float>::max(),
+                        std::numeric_limits<float>::max(),
+                        std::numeric_limits<float>::max()};
+                    std::array<float, 3> maximum{
+                        std::numeric_limits<float>::lowest(),
+                        std::numeric_limits<float>::lowest(),
+                        std::numeric_limits<float>::lowest()};
+                    for (std::uint32_t corner = material.first_corner;
+                         corner < material.end_corner; ++corner) {
+                        for (std::size_t axis = 0; axis < minimum.size(); ++axis) {
+                            minimum[axis] = std::min(minimum[axis],
+                                chunk.corners[corner].position[axis]);
+                            maximum[axis] = std::max(maximum[axis],
+                                chunk.corners[corner].position[axis]);
+                        }
+                    }
+                    std::cout << minimum[0] << ':' << maximum[0] << ','
+                              << minimum[1] << ':' << maximum[1] << ','
+                              << minimum[2] << ':' << maximum[2] << '\n';
+                }
+            }
+        }
+        std::vector<std::string> material_names;
+        material_names.reserve(material_coverage.size());
+        for (const auto& [name, counts] : material_coverage) {
+            (void)counts;
+            material_names.push_back(name);
+        }
+        std::sort(material_names.begin(), material_names.end());
+        for (const auto& name : material_names) {
+            const auto& counts = material_coverage.at(name);
+            std::cout << "material_nodes\t" << name << '\t'
+                      << counts[0] << '/' << counts[1] << '\n';
+        }
+    }
     return selection.traversal_complete ? 0 : 2;
 }
 
@@ -905,6 +974,7 @@ int main(int argc, char** argv)
         std::optional<std::string> wobble_graf_resource_name;
         std::optional<std::array<float, 6>> grf_view_camera;
         float grf_view_detail_level = 1.0F;
+        bool grf_view_material_details{};
         bool inspect_track_terrain = false;
         std::optional<std::array<float, 3>> terrain_sample_position;
 
@@ -1082,6 +1152,10 @@ int main(int argc, char** argv)
                         "detail level");
                 continue;
             }
+            if (argument == "--grf-view-material-details") {
+                grf_view_material_details = true;
+                continue;
+            }
             if (argument == "--inspect-terrain") {
                 if (i + 1 >= argc) {
                     throw std::invalid_argument(
@@ -1189,7 +1263,8 @@ int main(int argc, char** argv)
                         {(*grf_view_camera)[0], (*grf_view_camera)[1],
                             (*grf_view_camera)[2]},
                         {(*grf_view_camera)[3], (*grf_view_camera)[4],
-                            (*grf_view_camera)[5]}, grf_view_detail_level);
+                            (*grf_view_camera)[5]}, grf_view_detail_level,
+                        grf_view_material_details);
                 }
                 return inspect_track_graphics(*resource_bundle_path,
                     *grf_resource_name);

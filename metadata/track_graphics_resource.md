@@ -118,16 +118,20 @@ have not been integrated.
 ## Limits and next evidence
 
 The parser inventories linked nodes and maps active geometry to chunks. The
-renderer now applies the recovered type-1 axial visibility check and type-2
-distance intervals, plus type-4 mode pass distance bounds, using the
-reconstructed camera position/forward and native default settings. Camera pose
-parity, mode-4 live instance transforms/animation, lighting, and
+renderer applies the recovered type-1 axial visibility check and type-2
+distance intervals, plus type-4 mode pass distance bounds. It now uses the
+negated D3D projection-forward vector for native type-1 selection; a normal
+spline-placement capture showed this restores the asphalt and lane markings
+without changing projection. The underlying native matrix sign mapping still
+needs confirmation against a matched original view. Camera pose parity,
+mode-4 live instance transforms/animation, lighting, and
 transparent material ordering remain open. Mode 1 assumes the reconstructed chase camera
 has no roll; both basis orientations need visual comparison against the native
 renderer. The new
 read-only `--inspect-grf-view BUNDLE RESOURCE X Y Z FX FY FZ [DETAIL_LEVEL]`
-command reports selected node counts without launching the game. Supply world
-coordinates and a normalized world-forward vector.
+command reports selected node counts without launching the game; append
+`--grf-view-material-details` to report material coverage and relevant chunk
+bounds. Supply world coordinates and a normalized view vector.
 
 [`native_graf_draw_tree.md`](native_graf_draw_tree.md) records the recovered
 dispatcher, raw-link semantics, LOD interval formula, settings path, and native

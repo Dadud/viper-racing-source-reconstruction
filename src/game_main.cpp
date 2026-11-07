@@ -1550,11 +1550,48 @@ public:
             camera_forward[2], near_plane};
         camera_constants_.position_far = {camera_position[0],
             camera_position[1], camera_position[2], native_far_distance};
+        if (capture_frame_path && !render_probe_reported_) {
+            render_probe_reported_ = true;
+            std::cout << "Render projection probe: camera ("
+                      << camera_position[0] << ',' << camera_position[1] << ','
+                      << camera_position[2] << ") forward ("
+                      << camera_forward[0] << ',' << camera_forward[1] << ','
+                      << camera_forward[2] << ")\n";
+            const float projection_aspect = static_cast<float>(width_) /
+                static_cast<float>(height_);
+            for (std::size_t index = 0; index < car_poses_.size(); ++index) {
+                const auto& pose = car_poses_[index];
+                const std::array<float, 3> point{
+                    pose[9], pose[10] + 1.0F, pose[11]};
+                std::array<float, 3> relative{};
+                for (std::size_t axis = 0; axis < relative.size(); ++axis)
+                    relative[axis] = point[axis] - camera_position[axis];
+                const auto project = [&relative](const auto& axis) {
+                    return relative[0] * axis[0] + relative[1] * axis[1] +
+                        relative[2] * axis[2];
+                };
+                const float depth = project(camera_forward);
+                const float x = depth > 0.0F
+                    ? (0.5F + 0.5F * project(camera_right) *
+                        focal_scale / projection_aspect / depth) * static_cast<float>(width_)
+                    : -1.0F;
+                const float y = depth > 0.0F
+                    ? (0.5F - 0.5F * project(camera_up) *
+                        focal_scale / depth) * static_cast<float>(height_)
+                    : -1.0F;
+                std::cout << "  car " << index << (index == player_car_index_
+                    ? " player" : " opponent") << " world (" << pose[9] << ','
+                    << pose[10] << ',' << pose[11] << ") depth " << depth
+                    << " pixel (" << x << ',' << y << ")\n";
+            }
+        }
         std::optional<viper::TrackGraphicsNodeSelection> selected_track_nodes;
         if (track_graphics_ != nullptr && track_graphics_->scene_graph_complete &&
             track_graphics_->scene_graph_geometry_matched) {
             const viper::TrackGraphicsCamera scene_camera{
-                camera_position, camera_forward, native_far_distance, 4.0F,
+                camera_position,
+                {-camera_forward[0], -camera_forward[1], -camera_forward[2]},
+                native_far_distance, 4.0F,
                 lod_scale_squared_};
             auto selection = viper::select_track_graphics_nodes(
                 *track_graphics_, scene_camera);
@@ -2747,6 +2784,7 @@ private:
     UINT width_{};
     UINT height_{};
     UINT vsync_interval_{1U};
+    bool render_probe_reported_{};
     CameraConstants camera_constants_{};
 };
 

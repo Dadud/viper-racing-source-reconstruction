@@ -96,11 +96,17 @@ Type 1 records use a center at `+0x10..+0x18` and radius at `+0x1c`. A zero
 flag at `+0x0c` bypasses the sphere gate and traverses `+0x08` directly;
 otherwise the walker calls `0x00448DB0` with the center and radius before
 traversing that branch. The helper projects center-minus-camera onto the
-native forward vector at `[0x00509B48..0x00509B50]` and accepts it when
+view vector at `[0x00509B48..0x00509B50]` and accepts it when
 `-radius <= depth < [0x00509B1C] + radius`. This is an axial near/far sphere
-test; it does not test horizontal or vertical frustum planes. The renderer now
-applies this predicate each frame using its chase-camera position/forward and
-the recovered 1000-unit axial limit; camera pose parity remains unverified.
+test; it does not test horizontal or vertical frustum planes. In the
+reconstruction, the mode-4 projection vector and native visibility vector
+have opposite signs. A capture with the normal spline-based grid pose showed
+the cars and arena but no roadway when the projection vector was passed to the
+selector. Passing its negation restored asphalt and lane markings while
+leaving the D3D projection unchanged. The renderer now keeps distinct axes for
+projection and scene selection; the mapping from the native `+0x18` vector in
+`0x00448940` to the modeled race-camera matrix remains to be proven from a
+matched native capture.
 
 Camera setup at `0x00448940` copies camera position from its input matrix at
 `+0x24` to `[0x00509B58..0x00509B60]` and its forward vector at `+0x18` to
@@ -109,9 +115,11 @@ transform from the input basis and position. The routine is called with a
 stack-built matrix from `0x00410500` and with global matrix `0x0053A480` from
 `0x0045BD20`. The latter matrix is initialized to identity in the containing
 camera/scene setup path before those calls. This identifies the native camera
-state consumed by type-1 and type-2 selection, but does not yet map the
-reconstruction's race chase camera to either native call path or establish the
-matrix conventions used during an ordinary race.
+state consumed by type-1 and type-2 selection. A read-only
+`--inspect-grf-view ... --grf-view-material-details` mode reports material
+coverage and bounds for selected scene nodes, allowing camera/cull mismatch to
+be diagnosed without launching the game. Ordinary-race matrix conventions and
+exact camera parity remain open.
 
 The race-scene projection is now sourced independently of the camera pose.
 Initializer `0x0045FAE0` stores bit pattern `0x3F9C61AA` in the scene FOV
