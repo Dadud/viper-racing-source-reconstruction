@@ -203,11 +203,17 @@ serialization cursor at visual `+0x34`. The renderer computes
 record in the shared buffer, so the writer and reader address the same
 12-DWORD record layout. This closes the buffer-alias question.
 
-The remaining exactness gap is ring selection and timing: simulation uses
-`[0x4D4888]`, while render snapshot selection uses `[0x4D4DE0]`. Both select
-through the manager table at `0x56AFB4`, but their per-frame relationship has
-not been recovered. Before connecting this to the reconstruction, trace those
-index producers and identify which adjacent state snapshots the native renderer
-uses. The reconstruction also still needs runtime WOBL task state and a
-mode-4 draw path; static GRAF registration alone does not animate or draw these
-instances.
+The two selector producers use the same shared-memory key. Simulation calls
+`0x4C59B0` with `0x4D494C` (`"shm_PhysicsShmem"`); that routine registers a
+manager entry in the table at `0x56AFB8` and returns its one-based slot.
+Render setup calls `0x4C5A00` with `0x4D4E88`, the same string, and that routine
+searches the same table case-insensitively and returns a one-based slot. Both
+accessors then use the one-based selector against `0x56AFB4`, which is the
+same table shifted by one DWORD. The listing has one direct fixed-name
+registration call and one direct fixed-name lookup. This makes the state-ring
+manager join consistent; proving the exact runtime index still requires
+confirming there is no earlier dynamically named duplicate and tracing which
+adjacent snapshots the display consumes.
+
+The reconstruction still needs runtime WOBL task state and a mode-4 draw path;
+static GRAF registration alone does not animate or draw these instances.
