@@ -232,8 +232,12 @@ Opponent behavior still depends on the explicitly named
 `--route-motion-prototype` path, which advances `OpponentMotion` using route
 fractions and synthetic speed. With that prototype disabled, opponent body
 position and velocity are not evolved by the live runtime; the constructed
-ACAR bodies and wheels remain at constructor state. These poses, prototype
-speeds, and stale constructor snapshots must not be converted into timer rows.
+ACAR bodies and wheels remain at constructor state. The normal renderer now
+reads each retained ACAR body's 3x3 basis and world position instead of
+assuming the separate graphics pose remains authoritative. This is a pose
+ownership correction only: it does not advance the ACAR task or make the
+opponents move. These poses, prototype speeds, and stale constructor snapshots
+must not be converted into timer rows.
 The session also does not create the ACAR manager pointer registry. The native
 setup walks registered object pointers and leaves unregistered ordinal rows
 zero-filled, so the player body alone cannot stand in for all descriptor

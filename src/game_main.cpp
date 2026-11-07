@@ -2781,6 +2781,29 @@ struct AcarBodyRuntimeState {
     std::array<viper::TireTrigonometricTerms, 4> tire_trigonometric_terms{};
 };
 
+std::optional<viper::BodyRenderTransform> make_ncar_body_render_transform(
+    const viper::NcarBodyRuntimeObjectState& body) noexcept
+{
+    viper::BodyRenderTransform transform{};
+    for (std::size_t lane = 0U; lane < 9U; ++lane) {
+        const auto bits = viper::read_ncar_body_object_u32(
+            body, 0x38U + static_cast<std::uint32_t>(lane * 4U));
+        if (!bits) return std::nullopt;
+        const float value = std::bit_cast<float>(*bits);
+        if (!std::isfinite(value)) return std::nullopt;
+        transform[lane] = value;
+    }
+    for (std::size_t lane = 0U; lane < 3U; ++lane) {
+        const auto bits = viper::read_ncar_body_object_u32(
+            body, 0x5cU + static_cast<std::uint32_t>(lane * 4U));
+        if (!bits) return std::nullopt;
+        const float value = std::bit_cast<float>(*bits);
+        if (!std::isfinite(value)) return std::nullopt;
+        transform[9U + lane] = value;
+    }
+    return transform;
+}
+
 struct WindowState;
 void refresh_keyboard_controls(WindowState& state);
 
@@ -5257,6 +5280,21 @@ struct WindowState {
         }
         if (lap_completed) refresh_title(true);
         if (update_graphics) {
+            if (!route_motion_enabled) {
+                // In the physical path the ACAR scene pose is derived from
+                // its retained native body object. This keeps all three body
+                // axes and world position on the same owner as the player;
+                // route-prototype poses remain isolated to their explicit
+                // demo path.
+                for (const auto& ai_body : ai_acar_body_states) {
+                    const auto car = ai_body.stream_binding.configured_car_index;
+                    if (car >= opponent_simulated_poses.size() ||
+                        car == player_car_index) continue;
+                    const auto transform = make_ncar_body_render_transform(
+                        ai_body.body_object);
+                    if (transform) opponent_simulated_poses[car] = *transform;
+                }
+            }
             for (std::size_t car = 0; car < graphics.car_count(); ++car) {
                 pose_buffer[car] = graphics.car_transform(car);
             }
