@@ -52,6 +52,7 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-grf BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-grf-chunk BUNDLE_PATH RESOURCE_NAME CHUNK_INDEX\n"
            << "       viper_reconstruction --inspect-wobble-models TRACK_BUNDLE GRAF_RESOURCE\n"
+           << "       viper_reconstruction --inspect-car-grid-poses TRACK_BUNDLE\n"
            << "       viper_reconstruction --inspect-grf-view BUNDLE_PATH RESOURCE_NAME X Y Z FX FY FZ [DETAIL_LEVEL]\n"
            << "       add --grf-view-material-details to report selected track-material coverage and key chunk bounds\n"
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
@@ -625,6 +626,118 @@ int inspect_wobble_model_bindings(const std::filesystem::path& path,
     return 0;
 }
 
+int inspect_car_grid_poses(const std::filesystem::path& path)
+{
+    constexpr std::uint32_t ideal_line_type = 0x494c494eU;
+    const auto bundle = viper::ResourceBundle::open(path);
+    const auto* object_entry = bundle.find("track.obt",
+        viper::TrackObjectTextTable::bats_resource_type_code);
+    const auto* line_entry = bundle.find("track.ild", ideal_line_type);
+    if (object_entry == nullptr || line_entry == nullptr)
+        throw std::runtime_error("track.obt or track.ild is missing");
+    const auto object_table = viper::parse_track_object_text_table(
+        bundle.payload(*object_entry));
+    const auto line_payload = viper::parse_ideal_line_resource(
+        line_entry->attributes, bundle.payload(*line_entry));
+    if (!object_table || !line_payload)
+        throw std::runtime_error("track.obt or track.ild is malformed");
+    const auto line = viper::normalize_ideal_line_resource(*line_payload, 0U);
+    if (!line) throw std::runtime_error("track.ild could not be normalized");
+    const auto nodes = viper::make_track_spline_index_nodes(*line);
+    if (nodes.empty()) throw std::runtime_error("track.ild has no spline nodes");
+
+    std::cout << "bundle\t" << path.string() << '\n'
+              << "row\tordinal\tspawn_x\tspawn_z\tsegment\tfraction\t"
+                 "segment_key\tsegment_x\tsegment_z\tnext_x\tnext_z\t"
+                 "centerline_distance\tprojected_key\tpose_x\tpose_z\t"
+                 "pose_delta\tyaw_radians\n";
+    std::size_t ordinal = 0U;
+    std::size_t failed = 0U;
+    for (std::size_t row = 1U; row < object_table->line_count; ++row) {
+        const auto text = viper::track_object_text_line(*object_table, row);
+        if (!text) continue;
+        const auto directive = viper::classify_track_directive(*text);
+        if (directive.kind != viper::TrackDirectiveKind::object ||
+            !directive.object_line.starts_with("obj car ")) continue;
+        float spawn_x{}, spawn_z{};
+        if (sscanf_s(directive.object_line.data(), "obj car %f, %f",
+                &spawn_x, &spawn_z) != 2) {
+            ++failed;
+            continue;
+        }
+        std::optional<std::size_t> nearest_segment;
+        float nearest_fraction{};
+        float nearest_distance_squared = std::numeric_limits<float>::max();
+        for (std::size_t segment_index = 0U; segment_index < nodes.size();
+             ++segment_index) {
+            const auto& start = nodes[segment_index];
+            if (start.next_index >= nodes.size()) continue;
+            const auto& end = nodes[start.next_index];
+            const auto dx = end.position_x - start.position_x;
+            const auto dz = end.position_z - start.position_z;
+            const auto length_squared = dx * dx + dz * dz;
+            if (!(length_squared > 1.0e-8F)) continue;
+            const auto fraction = std::clamp(
+                ((spawn_x - start.position_x) * dx +
+                    (spawn_z - start.position_z) * dz) / length_squared,
+                0.0F, 1.0F);
+            const auto error_x = spawn_x - (start.position_x + dx * fraction);
+            const auto error_z = spawn_z - (start.position_z + dz * fraction);
+            const auto distance_squared = error_x * error_x + error_z * error_z;
+            if (distance_squared < nearest_distance_squared) {
+                nearest_segment = segment_index;
+                nearest_fraction = fraction;
+                nearest_distance_squared = distance_squared;
+            }
+        }
+        if (!nearest_segment || *nearest_segment >= nodes.size()) {
+            std::cout << row << '\t' << ordinal << '\t' << spawn_x << '\t'
+                      << spawn_z << "\tprojection_failed\n";
+            ++ordinal;
+            ++failed;
+            continue;
+        }
+        const auto segment_index = *nearest_segment;
+        const auto& segment = nodes[segment_index];
+        if (segment.next_index >= nodes.size()) {
+            ++ordinal;
+            ++failed;
+            continue;
+        }
+        const auto& next = nodes[segment.next_index];
+        const auto key = segment.segment_key +
+            nearest_fraction * segment.segment_duration;
+        const auto base_key = key + static_cast<float>(ordinal) * 15.0F + 28.0F;
+        const viper::CarSplineTrackPlacementObservation placement{
+            true, 0U, nodes, base_key, static_cast<std::int32_t>(ordinal), 0.0F};
+        const auto pose = viper::plan_car_spline_track_placement(placement);
+        if (!pose.pose_plan.helper_succeeded) {
+            std::cout << row << '\t' << ordinal << '\t' << spawn_x << '\t'
+                      << spawn_z << "\tpose_failed\n";
+            ++ordinal;
+            ++failed;
+            continue;
+        }
+        const auto& transform = pose.pose_plan.transform;
+        const auto dx = transform[9] - spawn_x;
+        const auto dz = transform[11] - spawn_z;
+        const auto yaw = std::atan2(transform[6], transform[8]);
+        std::cout << row << '\t' << ordinal << '\t' << spawn_x << '\t'
+                  << spawn_z << '\t' << segment_index << '\t'
+                  << nearest_fraction << '\t' << segment.segment_key << '\t'
+                  << segment.position_x << '\t' << segment.position_z << '\t'
+                  << next.position_x << '\t' << next.position_z << '\t'
+                  << std::sqrt(nearest_distance_squared) << '\t'
+                  << key << '\t'
+                  << transform[9] << '\t' << transform[11] << '\t'
+                  << std::sqrt(dx * dx + dz * dz) << '\t' << yaw << '\n';
+        ++ordinal;
+    }
+    std::cout << "car_rows\t" << ordinal << '\n'
+              << "failed_rows\t" << failed << '\n';
+    return failed == 0U && ordinal != 0U ? 0 : 2;
+}
+
 float parse_finite_float(const std::string_view text, const std::string_view label)
 {
     std::size_t parsed = 0U;
@@ -972,6 +1085,7 @@ int main(int argc, char** argv)
         std::optional<std::string> grf_resource_name;
         std::optional<std::size_t> grf_chunk_index;
         std::optional<std::string> wobble_graf_resource_name;
+        bool inspect_car_grid_poses_requested = false;
         std::optional<std::array<float, 6>> grf_view_camera;
         float grf_view_detail_level = 1.0F;
         bool grf_view_material_details{};
@@ -1132,6 +1246,14 @@ int main(int argc, char** argv)
                 wobble_graf_resource_name = argv[++i];
                 continue;
             }
+            if (argument == "--inspect-car-grid-poses") {
+                if (i + 1 >= argc)
+                    throw std::invalid_argument(
+                        "--inspect-car-grid-poses requires a track bundle path");
+                resource_bundle_path = argv[++i];
+                inspect_car_grid_poses_requested = true;
+                continue;
+            }
             if (argument == "--inspect-grf-view") {
                 if (i + 8 >= argc) {
                     throw std::invalid_argument(
@@ -1218,6 +1340,7 @@ int main(int argc, char** argv)
                 static_cast<unsigned>(model_resource_name.has_value()) +
                 static_cast<unsigned>(grf_resource_name.has_value()) +
                 static_cast<unsigned>(wobble_graf_resource_name.has_value()) +
+                static_cast<unsigned>(inspect_car_grid_poses_requested) +
                 static_cast<unsigned>(inspect_track_terrain);
             if (inspection_count > 1U) {
                 throw std::invalid_argument(
@@ -1272,6 +1395,9 @@ int main(int argc, char** argv)
             if (wobble_graf_resource_name) {
                 return inspect_wobble_model_bindings(*resource_bundle_path,
                     *wobble_graf_resource_name);
+            }
+            if (inspect_car_grid_poses_requested) {
+                return inspect_car_grid_poses(*resource_bundle_path);
             }
             if (inspect_track_terrain) {
                 return inspect_terrain(*resource_bundle_path,

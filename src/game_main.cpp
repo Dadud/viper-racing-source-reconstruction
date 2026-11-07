@@ -1296,8 +1296,41 @@ public:
             const auto spawns = car_spawns(track_objects);
             if (spawns.empty()) throw std::runtime_error("track.obt has no usable obj car start position");
             const auto spline_nodes = viper::make_track_spline_index_nodes(ideal_line);
-            const float placement_base_key = spline_nodes.empty() ? 0.0F :
-                spline_nodes.back().segment_key + spline_nodes.back().segment_duration;
+            const auto placement_base_key_for_spawn =
+                [&spline_nodes](const float spawn_x, const float spawn_z,
+                                const std::size_t ordinal)
+                    -> std::optional<float> {
+                    if (spline_nodes.empty()) return std::nullopt;
+                    auto nearest_distance_squared =
+                        std::numeric_limits<float>::max();
+                    std::optional<float> nearest_key;
+                    for (const auto& segment : spline_nodes) {
+                        if (segment.next_index >= spline_nodes.size()) continue;
+                        const auto& next = spline_nodes[segment.next_index];
+                        const auto dx = next.position_x - segment.position_x;
+                        const auto dz = next.position_z - segment.position_z;
+                        const auto length_squared = dx * dx + dz * dz;
+                        if (!(length_squared > 1.0e-8F)) continue;
+                        const auto fraction = std::clamp(
+                            ((spawn_x - segment.position_x) * dx +
+                                (spawn_z - segment.position_z) * dz) /
+                                length_squared, 0.0F, 1.0F);
+                        const auto error_x = spawn_x -
+                            (segment.position_x + dx * fraction);
+                        const auto error_z = spawn_z -
+                            (segment.position_z + dz * fraction);
+                        const auto distance_squared =
+                            error_x * error_x + error_z * error_z;
+                        if (distance_squared < nearest_distance_squared) {
+                            nearest_distance_squared = distance_squared;
+                            nearest_key = segment.segment_key +
+                                fraction * segment.segment_duration;
+                        }
+                    }
+                    if (!nearest_key) return std::nullopt;
+                    return *nearest_key + static_cast<float>(ordinal) * 15.0F +
+                        28.0F;
+                };
             viper::TrackBasisTransform track_basis{};
             track_basis.basis = {1.0F, 0.0F, 0.0F,
                 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F};
@@ -1324,10 +1357,14 @@ public:
                     observation.track_basis = track_basis;
                     observation.terrain_height = terrain_height;
                     if (!force_default_placement && !spline_nodes.empty()) {
-                        observation.spline_placement =
-                            viper::CarSplineTrackPlacementObservation{
-                                true, 0U, spline_nodes, placement_base_key,
-                                static_cast<std::int32_t>(index), terrain_height};
+                        const auto base_key = placement_base_key_for_spawn(
+                            spawn[0], spawn[1], index);
+                        if (base_key) {
+                            observation.spline_placement =
+                                viper::CarSplineTrackPlacementObservation{
+                                    true, 0U, spline_nodes, *base_key,
+                                    static_cast<std::int32_t>(index), terrain_height};
+                        }
                     }
                     return viper::plan_car_track_line(observation);
                 };
