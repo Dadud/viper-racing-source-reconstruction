@@ -721,6 +721,16 @@ the prior contact point. This captures the caller's branch and stores, not
 the query helper's terrain lookup or the global reset hook. The call to
 `0x443F00` is a direct call to an observed empty routine and has no recovered
 state effect (`ev_f8618067a91dd813de20b3cb89e18bd09a63aac451ea4e8d976525435816f29e`).
+
+Before the terrain query, `0x442530` also compares the parent argument's
+DWORD at `+0x48` against zero and skips the contact branch on signed `JLE`
+(`0x442C36..0x442C69`). In the live PCAR object this aliases basis element
+`+0x48`, `body_basis[4]`; the runtime now enables the terrain query only when
+`std::bit_cast<std::int32_t>(body_basis[4]) > 0`. This preserves the native
+signed-bit behavior for inverted, zero, or unusual matrices instead of forcing
+the contact query on. Other earlier per-wheel gates and their side effects
+remain separate from this confirmed parent-body condition.
+
 The live player's wheel-object byte storage now receives the modeled feature
 word at `+0x19C` and active byte at `+0x168` after each contact update. The
 three contact-point floats at `+0x130..+0x138` are copied only when the modeled

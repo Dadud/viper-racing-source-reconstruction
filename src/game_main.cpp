@@ -3796,7 +3796,8 @@ struct WindowState {
             const auto wheel_object_offset = static_cast<std::uint32_t>(
                 0x554U + 0x1a4U * static_cast<std::uint32_t>(wheel));
             // Reproduce only the source-backed 0x442530 entry prefix. The
-            // native global distance/damage gate is still unresolved.
+            // contact query branch also requires parent body +0x48 > 0 using
+            // the native signed-DWORD comparison (jle skips the query).
             if (!viper::advance_ncar_wheel_update_prefix_in_object(
                     player_runtime_state.wheel_objects[wheel],
                     wheel_object_offset)) {
@@ -3873,17 +3874,21 @@ struct WindowState {
             // full basis. Its result feeds the reconstructed suspension,
             // collision, tire-response, and body-integration stages below.
             viper::WheelContactObservation observation{};
-            observation.body_query_enabled = true;
+            observation.body_query_enabled =
+                std::bit_cast<std::int32_t>(body_basis[4]) > 0;
             observation.reset_feature_hook_active = false;
             observation.contact_projection_origin = *wheel_world_point;
             observation.contact_direction = body_up;
             observation.wheel_depth_limit_0x44 = core->value_0x44;
-            const auto query = viper::sample_terrain_surface(
-                viper::make_terrain_surface_query_input(
-                    *terrain,
-                    {wheel_world_point->x, wheel_world_point->y,
-                     wheel_world_point->z},
-                    true));
+            viper::TerrainSurfaceQueryResult query{};
+            if (observation.body_query_enabled) {
+                query = viper::sample_terrain_surface(
+                    viper::make_terrain_surface_query_input(
+                        *terrain,
+                        {wheel_world_point->x, wheel_world_point->y,
+                         wheel_world_point->z},
+                        true));
+            }
             player_wheel_terrain_queries_succeeded[wheel] = query.query_succeeded;
             observation.query_succeeded = query.query_succeeded;
             if (query.query_succeeded) {

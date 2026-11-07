@@ -1149,19 +1149,19 @@ cannot validate acceleration. Trace-derived causes are recorded in
 reconstruction only, not grounds for tuning constants.
 
 Next, close the native contact-state path before changing force values:
-recover the global distance/damage gate and full call ordering around
-`0x442530`, then compare the reconstructed transform, direction and signed
-depth producers against the exact local disassembly. `0x443F00` is already
-documented as an empty routine in this build; do not treat it as an unknown
-contact callback. Use existing offline traces and focused diagnostics; do not
-launch the game repeatedly. Keep negative signed depth inactive unless new
-source evidence changes that predicate. Once ordinary placement maintains
-contact for a full controlled interval, use one bounded original comparison
-only if a materially different launch strategy can produce aligned
-PCAR/wheel samples. The capture must distinguish input delivery, contact
-transitions, wheel `+0xE4`, tire response and body force. The existing
-`pcar_source_field_watch_mock` checks probe control flow only and is not
-original-client evidence.
+compare the reconstructed transform, direction and signed-depth producers
+against the exact local disassembly, then map the remaining earlier per-wheel
+distance/damage guards and full shared-integrator call ordering around
+`0x442530`. The signed parent-body `+0x48` query gate is now implemented;
+`0x443F00` is an empty routine in this build, not an unknown contact callback.
+Use existing offline traces and focused diagnostics; do not launch the game
+repeatedly. Keep negative signed depth inactive unless new source evidence
+changes that predicate. Once ordinary placement maintains contact for a full
+controlled interval, use one bounded original comparison only if a materially
+different launch strategy can produce aligned PCAR/wheel samples. The capture
+must distinguish input delivery, contact transitions, wheel `+0xE4`, tire
+response and body force. The existing `pcar_source_field_watch_mock` checks
+probe control flow only and is not original-client evidence.
 
 The existing `tools/run_original_pcar_capture.py` enforces the official ISO
 engine hash, writes JSONL externally and terminates only process IDs it
