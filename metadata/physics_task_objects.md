@@ -230,7 +230,9 @@ raw words at `+0x08..+0x14`, lookup key at `+0x18`, and type word at `+0x1C`
 in `PhysicsWoblTaskRuntimeState`. The raw words are kept as DWORDs because
 their semantics are not assigned. This closes input retention only: the
 materializer does not yet supply a resource table to the constructor planner,
-create a WOBL task state, run its callback, or update render snapshots.
+create a WOBL task state, run its callback, or update render snapshots. The
+race renderer consumes the retained resource IDs to select registered mode-4
+GRAF nodes, but still uses static inferred transforms.
 
 `plan_physics_gcar_task_constructor` now covers the GCAR constructor's large
 sample buffer and the bounded tail of its source initialization. It records

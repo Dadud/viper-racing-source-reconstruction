@@ -59,10 +59,14 @@ native node gates per frame and submits selected type-3/type-4 nodes in ordinary
 mode-1, and mode-2 pass order, including native 300-unit facing cutoffs and
 the mode-2 0.1-unit singularity guard. The ordinary tree pass still only
 registers type-4 mode 4; a separate renderer pass now draws meshes referenced
-by track `obj wobble` rows at their GRAF center with identity basis. This
-startup placement is an inference; live physics snapshot matrices and wobble
-motion are not wired. Type-4 basis transforms apply for modes 1 and 2. Valid
-mode-4 IDs map to their first active graph node. See
+by track `obj wobble` rows at their GRAF center with identity basis. In an
+active race, the validated physics task stream's WOBL resource IDs now drive
+which registered mode-4 nodes that pass submits, in task order; before stream
+materialization it falls back to the track-text IDs. This joins task identity
+to rendered model selection, but the startup placement remains an inference:
+live physics snapshot matrices and wobble motion are not wired. Type-4 basis
+transforms apply for modes 1 and 2. Valid mode-4 IDs map to their first active
+graph node. See
 [`native_graf_draw_tree.md`](native_graf_draw_tree.md) for the function-level
 evidence and remaining implementation sequence.
 

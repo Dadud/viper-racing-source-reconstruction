@@ -153,4 +153,11 @@ parse_track_graphics_resource(std::uint32_t resource_version,
     const TrackGraphicsResourcePayload& resource,
     const TrackGraphicsCamera& camera);
 
+// Selects the registered mode-4 mesh instance nodes named by the validated
+// WOBL runtime task IDs, preserving task order and omitting unresolved IDs.
+[[nodiscard]] std::vector<std::uint32_t> select_track_wobl_node_offsets(
+    const TrackGraphicsResourcePayload& resource,
+    const TrackGraphicsNodeSelection& selection,
+    std::span<const std::uint32_t> wobl_resource_ids);
+
 } // namespace viper

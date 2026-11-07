@@ -111,6 +111,14 @@ void test_mode_four_initial_pose()
     check(selected.registered_mode_4_transforms[0].node_offset == 0U &&
             selected.registered_mode_4_transforms[0].basis_and_position == expected,
         "mode-4 initial pose must use identity basis and source model center");
+    constexpr std::array<std::uint32_t, 3> task_ids{17U, 999U, 17U};
+    check(select_track_wobl_node_offsets(resource, selected, task_ids) ==
+            std::vector<std::uint32_t>{0U, 0U},
+        "validated WOBL task IDs must select their registered model in task order");
+    const TrackGraphicsNodeSelection culled{};
+    check(select_track_wobl_node_offsets(resource, culled,
+            std::span<const std::uint32_t>(task_ids.data(), 1U)).empty(),
+        "WOBL runtime selection must preserve the current scene-graph visibility result");
 }
 
 std::array<viper::SceneRenderRowRecord, 2> make_source()

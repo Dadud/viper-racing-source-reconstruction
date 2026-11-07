@@ -12,6 +12,14 @@ materialization. `physics_task_stream_regression` passed, and the Release
 physics state, resolve its resource entry, run the callback, or connect live
 transform snapshots to rendering; the mode-4 GRAF placement remains static.
 
+Race rendering now takes mode-4 model IDs from that validated task runtime and
+resolves them through the first-entry GRAF facing registry, retaining task
+order and the frame's scene-graph visibility selection. A renderer regression
+covers successful, unresolved, duplicate, and culled IDs; the focused test
+passed and the Release game target rebuilt. Pre-race rendering keeps the
+track-text fallback. This wires task identity to model submission only; runtime
+matrices and wobble motion remain disconnected.
+
 The historical 2026-10-24 AI-sidecar inventory below missed indexed resources:
 all eight supplied track bundles contain `default.ili` and `rdefault.ili`, and
 `drivers.res` contains 524 `.ilg` lines and 695 `.dnt` notes. See [AI note

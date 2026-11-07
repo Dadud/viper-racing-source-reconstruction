@@ -219,9 +219,11 @@ confirming there is no earlier dynamically named duplicate and tracing which
 adjacent snapshots the display consumes.
 
 The renderer has a static mode-4 draw path for WOBL IDs found in `track.obt`;
-its initial identity-basis/GRAF-center placement remains an inference. The
-ordered task runtime now retains each validated WOBL record's four leading raw
-words, resource ID, and type word. It still does not resolve those records to
-the native WOBL resource table, instantiate task state, run `0x436F70`, or feed
-the shared snapshot matrix to the renderer, so this change does not add wobble
-motion or establish transform parity.
+its initial identity-basis/GRAF-center placement remains an inference. During a
+race session, validated task-runtime WOBL resource IDs now select the
+registered mode-4 nodes in record order, subject to the current scene-graph
+visibility selection. Before task-stream materialization, the renderer retains
+the track-text fallback. The runtime still does not resolve records to native
+WOBL resource matrices, instantiate task state, run `0x436F70`, or feed the
+shared snapshot matrix to the renderer, so this connection adds no wobble motion
+or transform parity.

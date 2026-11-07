@@ -1365,6 +1365,8 @@ public:
                 const float camera_zoom,
                 const float camera_response_0xea8,
                 const bool native_camera_follow,
+                const std::optional<std::span<const std::uint32_t>>
+                    runtime_wobl_resource_ids,
                 const std::optional<std::filesystem::path>& capture_frame_path)
     {
         if (!target_ || !depth_target_ || !context_ || !swap_chain_ ||
@@ -1558,12 +1560,18 @@ public:
                 draw_node_groups(selected_track_nodes->facing_mode_2_node_offsets,
                     &selected_track_nodes->facing_mode_2_transforms);
                 std::vector<std::uint32_t> selected_wobble_nodes;
-                selected_wobble_nodes.reserve(
-                    selected_track_nodes->registered_mode_4_node_offsets.size());
-                for (const auto node_offset :
-                     selected_track_nodes->registered_mode_4_node_offsets) {
-                    if (wobble_scene_node_offsets_.contains(node_offset))
-                        selected_wobble_nodes.push_back(node_offset);
+                if (runtime_wobl_resource_ids.has_value() && track_graphics_ != nullptr) {
+                    selected_wobble_nodes = viper::select_track_wobl_node_offsets(
+                        *track_graphics_, *selected_track_nodes,
+                        *runtime_wobl_resource_ids);
+                } else {
+                    selected_wobble_nodes.reserve(
+                        selected_track_nodes->registered_mode_4_node_offsets.size());
+                    for (const auto node_offset :
+                         selected_track_nodes->registered_mode_4_node_offsets) {
+                        if (wobble_scene_node_offsets_.contains(node_offset))
+                            selected_wobble_nodes.push_back(node_offset);
+                    }
                 }
                 draw_node_groups(selected_wobble_nodes,
                     &selected_track_nodes->registered_mode_4_transforms);
@@ -3068,6 +3076,7 @@ struct WindowState {
     std::optional<viper::PhysicsTaskRecordStreamRead> full_task_record_readback;
     std::vector<viper::PhysicsTaskObjectInventoryEntry> physics_task_object_inventory;
     std::optional<viper::PhysicsTaskRuntimeCollection> physics_task_runtime_collection;
+    std::vector<std::uint32_t> physics_task_wobl_resource_ids;
     // Decoded replay data is retained for the lifetime of the race session.
     // Its packet payload is intentionally opaque until native field semantics
     // are recovered; this does not claim to drive playback.
@@ -6501,6 +6510,15 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 if (stream_ok)
                     state.physics_task_runtime_collection =
                         std::move(runtime_collection);
+                if (stream_ok) {
+                    state.physics_task_wobl_resource_ids.clear();
+                    for (const auto& entry :
+                         state.physics_task_runtime_collection->entries) {
+                        if (entry.wobl.has_value())
+                            state.physics_task_wobl_resource_ids.push_back(
+                                entry.wobl->resource_id_0x18);
+                    }
+                }
             }
             if (stream_ok) {
                 stream_failure_stage = "bind configured cars to ordered stream";
@@ -7052,6 +7070,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.full_task_record_readback.reset();
             state.physics_task_object_inventory.clear();
             state.physics_task_runtime_collection.reset();
+            state.physics_task_wobl_resource_ids.clear();
             state.inactive_stat_task_states.clear();
             state.configured_car_stream_bindings.clear();
             state.ai_acar_curve_sources.clear();
@@ -8220,6 +8239,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     camera_focus[0], camera_focus[1], state.camera_pan_clip,
                     state.camera_zoom, camera_response_0xea8,
                     state.camera_follow_player,
+                    state.physics_task_runtime_collection.has_value()
+                        ? std::optional<std::span<const std::uint32_t>>{
+                            std::span<const std::uint32_t>(
+                                state.physics_task_wobl_resource_ids)}
+                        : std::nullopt,
                     capture_frame_path)) {
                 std::cerr << "Direct3D frame rendering or presentation failed.\n";
                 DestroyWindow(hwnd);

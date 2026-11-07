@@ -674,4 +674,26 @@ TrackGraphicsNodeSelection select_track_graphics_nodes(
     return result;
 }
 
+std::vector<std::uint32_t> select_track_wobl_node_offsets(
+    const TrackGraphicsResourcePayload& resource,
+    const TrackGraphicsNodeSelection& selection,
+    const std::span<const std::uint32_t> wobl_resource_ids)
+{
+    std::vector<std::uint32_t> result;
+    result.reserve(wobl_resource_ids.size());
+    for (const auto resource_id : wobl_resource_ids) {
+        if (resource_id >= resource.facing_registry_node_offsets.size()) continue;
+        const auto node_offset = lookup_registered_facing_node(
+            resource, static_cast<std::int32_t>(resource_id));
+        if (!node_offset || std::find(
+                selection.registered_mode_4_node_offsets.begin(),
+                selection.registered_mode_4_node_offsets.end(), *node_offset) ==
+                selection.registered_mode_4_node_offsets.end()) {
+            continue;
+        }
+        result.push_back(*node_offset);
+    }
+    return result;
+}
+
 } // namespace viper
