@@ -1862,3 +1862,30 @@ the first target instruction and its vtable data reference are
 The registrar bodies are `0x43CA00`
 `ev_86206c193a2ee0b15855fe49958b44f8478ff027ac1ab72fa6daf037161ab819` and
 `0x43C950` `ev_3c2fcc04e3969be87660adc7c9c740282ccc2a76f9479a60ba26f4e338493a49`.
+
+## ACAR manager start transition at `0x43CDB0`
+
+Static listing analysis resolves the direct activation gate that changes
+registered car body `+0x4FC` from its registration value zero to active value
+two. The manager update first calls `0x426E50`; a true result returns without
+processing. Otherwise it obtains a mode/state value from `0x40A160`, samples
+the update time through `0x425790`, and checks manager byte `+0x7D9`. When that
+byte is set, the manager compares its threshold at `+0x7CC` against the sampled
+time. The x87 condition reaches the activation path once the threshold is no
+longer greater than the sampled time (unordered comparisons also pass this
+condition). A nonzero value from `0x40A160` bypasses the body-mode writes.
+
+For state zero, the manager calls its event helper, invokes `0x40A170(1)`, and,
+when manager entrant count `+0x30` is positive, walks the registered body
+pointers at stride `0x74`. For each body it copies the sampled time into two
+manager-row fields and writes dword `2` at body `+0x4FC` (`0x43CF5A`). This is
+the native producer for the ACAR task's active branch gate at `0x42AB20`; it is
+not evidence that constructing an opponent should set that value immediately.
+
+The manager's timer arming, entrant eligibility, alternate `+0x7D8` path,
+global mode helpers, and event side effects are not yet modeled as a complete
+runtime state machine. The reconstruction therefore retains the sourced
+constructor value zero and does not synthesize this transition from a local
+tick count. The next integration step must first own the corresponding manager
+timer and global race-state inputs, then dispatch the ACAR callbacks in their
+native order; setting only `+0x4FC = 2` would skip their state producers.
