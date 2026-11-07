@@ -50,7 +50,7 @@ for supported TEX payload variants. Extracted livery/material inventory and
 bundle hashes are recorded in
 [`metadata/texture_resource_inventory.md`](metadata/texture_resource_inventory.md).
 Use `--inspect-grf-chunk BUNDLE track.grf INDEX` to inspect one mesh's spatial
-bounds, UV range, material ranges, and scene-node binding, or
+bounds, UV range, packed-color range, material ranges, and scene-node binding, or
 `--export-texture BUNDLE RESOURCE OUTPUT.bmp` to create a decoded texture preview.
 Pass `--window-size 640 480` with a bounded capture to match the original game's
 reference resolution.

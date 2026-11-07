@@ -19,7 +19,8 @@ the corner positions/UVs/baked color, and resolves textures in the track
 bundle, then `race.res`, then `common.res`. BPP remains the physics query
 source; it is used for display only when no GRF draw groups are available.
 `--inspect-grf-chunk BUNDLE track.grf INDEX` reports one mesh's world bounds,
-per-material bounds and UV ranges, and linked scene node. `--export-texture BUNDLE
+per-material bounds, UV ranges, packed BGRA byte ranges (byte order only; native
+channel interpretation remains unverified), and linked scene node. `--export-texture BUNDLE
 RESOURCE OUTPUT.bmp` writes a decoded base-level BMP for visual inspection
 without starting the game.
 

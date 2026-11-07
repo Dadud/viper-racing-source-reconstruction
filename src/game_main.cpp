@@ -2131,13 +2131,13 @@ private:
         render_target_blend.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
         if (FAILED(device_->CreateBlendState(&blend_desc,
                 &car_alpha_blend_state_))) return false;
-        // File evidence associates 0 with unique decals and 1 with tiling.
-        // Value 2 is rare; mirror is a convention-based hypothesis until a
-        // native state-setter/capture confirms it.
+        // The native material-state path branches only on texture byte +0x17:
+        // zero selects D3D address mode CLAMP; every nonzero value selects
+        // WRAP. In particular, the observed value 2 is not mirror mode.
         constexpr std::array<D3D11_TEXTURE_ADDRESS_MODE, 3> address_modes{
             D3D11_TEXTURE_ADDRESS_CLAMP,
             D3D11_TEXTURE_ADDRESS_WRAP,
-            D3D11_TEXTURE_ADDRESS_MIRROR};
+            D3D11_TEXTURE_ADDRESS_WRAP};
         for (std::size_t wrap = 0; wrap < address_modes.size(); ++wrap) {
             D3D11_SAMPLER_DESC sampler_desc{};
             sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;

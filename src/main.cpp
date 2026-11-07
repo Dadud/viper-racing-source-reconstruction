@@ -387,6 +387,8 @@ int inspect_track_graphics_chunk(const std::filesystem::path& path,
         std::array<float, 2> uv_max{
             -(std::numeric_limits<float>::max)(),
             -(std::numeric_limits<float>::max)()};
+        std::array<std::uint8_t, 4> color_min{255U, 255U, 255U, 255U};
+        std::array<std::uint8_t, 4> color_max{};
         for (std::size_t face = material.first_face;
              face < material.end_face; ++face) {
             for (const auto corner_index : chunk.faces[face]) {
@@ -401,6 +403,12 @@ int inspect_track_graphics_chunk(const std::filesystem::path& path,
                     uv_min[axis] = (std::min)(uv_min[axis], corner.uv[axis]);
                     uv_max[axis] = (std::max)(uv_max[axis], corner.uv[axis]);
                 }
+                for (std::size_t channel = 0U; channel < 4U; ++channel) {
+                    const auto value = static_cast<std::uint8_t>(
+                        corner.packed_color >> (channel * 8U));
+                    color_min[channel] = (std::min)(color_min[channel], value);
+                    color_max[channel] = (std::max)(color_max[channel], value);
+                }
             }
         }
         std::cout << "material\t"
@@ -411,7 +419,15 @@ int inspect_track_graphics_chunk(const std::filesystem::path& path,
                   << ',' << material_min[1] << ':' << material_max[1]
                   << ',' << material_min[2] << ':' << material_max[2]
                   << "\tuv " << uv_min[0] << ':' << uv_max[0]
-                  << ',' << uv_min[1] << ':' << uv_max[1] << '\n';
+                  << ',' << uv_min[1] << ':' << uv_max[1]
+                  << "\tpacked_bgra " << static_cast<unsigned>(color_min[0])
+                  << ':' << static_cast<unsigned>(color_max[0]) << ','
+                  << static_cast<unsigned>(color_min[1]) << ':'
+                  << static_cast<unsigned>(color_max[1]) << ','
+                  << static_cast<unsigned>(color_min[2]) << ':'
+                  << static_cast<unsigned>(color_max[2]) << ','
+                  << static_cast<unsigned>(color_min[3]) << ':'
+                  << static_cast<unsigned>(color_max[3]) << '\n';
     }
     for (const auto& node : graphics->scene_nodes) {
         if (!node.parsed_chunk_index || *node.parsed_chunk_index != chunk_index)

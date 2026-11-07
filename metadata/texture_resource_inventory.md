@@ -50,11 +50,12 @@ car bundle first, then `race.res`. The pinned [external format
 reference](https://github.com/HerbFargus/viper-racing-modding/blob/e8435ddce817eb37502d1dd1080b64ee27f44515/docs/reference/file-formats.md)
 associates wrap `1` with tileable surfaces and wrap `0` with unique decals;
 wrap `2` appears on one colorkeyed texture. The native parser copies this byte to
-texture-object offset `+0x17` at `0x4598E4`, but the inspected creation routine
-`0x459ED0` does not consume that field. The renderer maps `0` to clamp, `1` to
-wrap, and `2` to mirror; the first two are evidence-informed and the mirror
-interpretation is a convention-based hypothesis. Transparent group sorting
-remains unresolved.
+texture-object offset `+0x17` at `0x4598E4`. Render-state updater `0x457AF0`
+compares the byte and selects address mode 3 (D3D clamp) when it is zero and
+address mode 1 (D3D wrap) for any nonzero value. Thus value `2` also wraps; it is
+not mirror mode. The reconstruction now maps every nonzero value to wrap. This
+establishes address mode, not every texture-stage/material operation or visual
+pixel parity. Transparent group sorting remains unresolved.
 
 The Viper car bundle additionally contains `viperd.tex` (flags `2`),
 `Viperd1.tex` through `Viperd4.tex` (flags `0`), and `Viperw.tex` (flags `3`).
