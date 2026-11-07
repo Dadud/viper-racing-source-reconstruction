@@ -1822,61 +1822,109 @@ private:
                 {x1, y1, 0.0F, color[0], color[1], color[2]},
                 {x0, y1, 0.0F, color[0], color[1], color[2]}});
         };
-        constexpr float panel_x = 18.0F;
-        constexpr float panel_y = 18.0F;
-        constexpr float scale = 2.0F;
-        constexpr float advance = 18.0F;
-        constexpr float line_height = 22.0F;
-        std::size_t line_count = 1U;
-        std::size_t longest_line = 0U;
-        std::size_t current_line = 0U;
-        for (const char character : text) {
-            if (character == '\n') {
-                longest_line = (std::max)(longest_line, current_line);
-                current_line = 0U;
-                ++line_count;
-            } else {
-                ++current_line;
-            }
-        }
-        longest_line = (std::max)(longest_line, current_line);
-        const float panel_width = (std::max)(290.0F,
-            16.0F + static_cast<float>(longest_line) * advance);
-        const float panel_height = (std::max)(108.0F,
-            12.0F + static_cast<float>(line_count) * line_height);
-        append_rectangle(panel_x, panel_y, panel_x + panel_width,
-            panel_y + panel_height,
-            {0.035F, 0.060F, 0.080F});
-        float x = panel_x + 8.0F;
-        float y = panel_y + 6.0F;
-        for (const auto raw_character : text) {
-            if (raw_character == '\n') {
-                x = panel_x + 8.0F;
-                y += line_height;
-                continue;
-            }
-            const auto character = static_cast<unsigned char>(raw_character);
-            if (character < 0x20U || character >= 0x80U) continue;
-            const auto& glyph = viper::detail::scene_font_8x8[
-                static_cast<std::size_t>(character - 0x20U)];
-            for (std::size_t row = 0; row < glyph.size(); ++row) {
-                const auto row_bits = glyph[row];
-                for (std::size_t column = 0; column < 8U;) {
-                    if ((row_bits & (std::uint8_t{1} << column)) == 0U) {
-                        ++column;
-                        continue;
+        const float sx = static_cast<float>(width_) / 640.0F;
+        const float sy = static_cast<float>(height_) / 480.0F;
+        const auto draw_text = [&](std::string_view value, float x, float y,
+            float pixel_x, float pixel_y, float advance,
+            const std::array<float, 3>& color) {
+            for (const auto raw_character : value) {
+                const auto character = static_cast<unsigned char>(raw_character);
+                if (character < 0x20U || character >= 0x80U) {
+                    x += advance;
+                    continue;
+                }
+                const auto& glyph = viper::detail::scene_font_8x8[
+                    static_cast<std::size_t>(character - 0x20U)];
+                for (std::size_t row = 0; row < glyph.size(); ++row) {
+                    const auto row_bits = glyph[row];
+                    for (std::size_t column = 0; column < 8U;) {
+                        if ((row_bits & (std::uint8_t{1} << column)) == 0U) {
+                            ++column;
+                            continue;
+                        }
+                        const auto run_start = column;
+                        while (column < 8U &&
+                            (row_bits & (std::uint8_t{1} << column)) != 0U) ++column;
+                        append_rectangle(x + static_cast<float>(run_start) * pixel_x,
+                            y + static_cast<float>(row) * pixel_y,
+                            x + static_cast<float>(column) * pixel_x,
+                            y + static_cast<float>(row + 1U) * pixel_y, color);
                     }
-                    const auto run_start = column;
-                    while (column < 8U &&
-                        (row_bits & (std::uint8_t{1} << column)) != 0U) ++column;
-                    append_rectangle(x + static_cast<float>(run_start) * scale,
-                        y + static_cast<float>(row) * scale,
-                        x + static_cast<float>(column) * scale,
-                        y + static_cast<float>(row + 1U) * scale,
-                        {0.94F, 0.96F, 0.98F});
+                }
+                x += advance;
+            }
+        };
+
+        // The original race HUD is a three-part silver instrument cluster.
+        // Keep the layout anchored to the captured 640x480 frame while scaling
+        // independently for the reconstruction's selected output resolution.
+        const float hud_height = 64.0F * sy;
+        append_rectangle(0.0F, 0.0F, static_cast<float>(width_), hud_height,
+            {0.68F, 0.72F, 0.75F});
+        append_rectangle(4.0F * sx, 4.0F * sy, 636.0F * sx, 60.0F * sy,
+            {0.12F, 0.15F, 0.18F});
+        const std::array<std::array<float, 2>, 3> panels{{
+            {8.0F, 188.0F}, {204.0F, 438.0F}, {454.0F, 632.0F}}};
+        for (const auto& panel : panels) {
+            append_rectangle(panel[0] * sx, 8.0F * sy, panel[1] * sx,
+                54.0F * sy, {0.035F, 0.045F, 0.060F});
+        }
+        // Small checker inserts reproduce the distinctive racing-dashboard trim.
+        for (std::size_t row = 0; row < 3U; ++row) {
+            for (std::size_t column = 0; column < 11U; ++column) {
+                if (((row + column) & 1U) == 0U) {
+                    const float x = (12.0F + static_cast<float>(column) * 15.0F) * sx;
+                    const float y = (12.0F + static_cast<float>(row) * 13.0F) * sy;
+                    append_rectangle(x, y, x + 7.0F * sx, y + 7.0F * sy,
+                        {0.22F, 0.24F, 0.27F});
                 }
             }
-            x += advance;
+        }
+
+        std::string lap = "LAP 1 / 1";
+        std::string position = "POSITION 1 / 1";
+        std::string time = "TIME 0:00.00";
+        std::string speed = "SPEED 0 KM/H";
+        for (std::size_t start = 0; start < text.size();) {
+            const auto end = text.find('\n', start);
+            const auto line = text.substr(start, end == std::string_view::npos
+                ? text.size() - start : end - start);
+            if (line.starts_with("LAP ")) lap.assign(line);
+            else if (line.starts_with("POSITION ")) position.assign(line);
+            else if (line.starts_with("TIME ")) time.assign(line);
+            else if (line.starts_with("SPEED ")) speed.assign(line);
+            if (end == std::string_view::npos) break;
+            start = end + 1U;
+        }
+        const auto compact_value = [](const std::string& line,
+            const std::string_view prefix) {
+            const auto offset = line.find(prefix);
+            return offset == std::string::npos
+                ? line : line.substr(offset + prefix.size());
+        };
+        const auto lap_value = compact_value(lap, "LAP ");
+        const auto position_value = compact_value(position, "POSITION ");
+        const auto time_value = compact_value(time, "TIME ");
+        const auto speed_value = compact_value(speed, "SPEED ");
+        const auto speed_number = speed_value.substr(0,
+            speed_value.find(' '));
+        const auto speed_mph = std::to_string(static_cast<int>(std::lround(
+            static_cast<float>(std::stoi(speed_number)) * 0.621371F)));
+        const auto yellow = std::array<float, 3>{1.0F, 0.86F, 0.16F};
+        const auto white = std::array<float, 3>{0.96F, 0.97F, 0.98F};
+        draw_text("LAP " + lap_value, 265.0F * sx, 10.0F * sy,
+            1.0F * sx, 1.0F * sy, 7.0F * sx, yellow);
+        draw_text("POSITION " + position_value, 347.0F * sx, 10.0F * sy,
+            1.0F * sx, 1.0F * sy, 7.0F * sx, yellow);
+        draw_text("LAP TIME " + time_value, 245.0F * sx, 29.0F * sy,
+            1.45F * sx, 1.45F * sy, 10.0F * sx, white);
+        draw_text("PLAYER", 514.0F * sx, 13.0F * sy,
+            1.0F * sx, 1.0F * sy, 7.0F * sx, white);
+        draw_text(speed_mph + " MPH", 539.0F * sx, 35.0F * sy,
+            1.25F * sx, 1.25F * sy, 8.5F * sx, yellow);
+        if (text.find("PAUSED") != std::string_view::npos) {
+            draw_text("PAUSED", 280.0F * sx, 74.0F * sy,
+                2.0F * sx, 2.0F * sy, 14.0F * sx, yellow);
         }
         constexpr std::size_t max_vertices = 65536U;
         if (vertices.size() > max_vertices) return false;
