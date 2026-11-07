@@ -1432,8 +1432,8 @@ public:
             const auto vehicle_forward = normalize(
                 {vehicle[6], vehicle[7], vehicle[8]});
             const float zoom = std::clamp(camera_zoom, 0.35F, 4.5F);
-            const float chase_distance = 20.0F / zoom;
-            const float chase_height = 5.5F / zoom;
+            const float chase_distance = 30.0F / zoom;
+            const float chase_height = 8.0F / zoom;
             std::array<float, 3> target{
                 focus_x + vehicle_forward[0] * 5.0F,
                 vehicle[10] + 1.0F + vehicle_forward[1] * 5.0F +
@@ -3141,7 +3141,10 @@ struct WindowState {
     bool route_motion_enabled{};
     bool paused{};
     bool return_to_frontend{};
-    bool camera_follow_player{true};
+    // Start in the visible exterior chase view. The recovered mode-0 camera
+    // uses the cockpit.tab attachment point and can place the development
+    // renderer inside opaque car geometry; F3 still switches to that camera.
+    bool camera_follow_player{false};
     std::array<float, 2> camera_anchor_world{};
     std::array<float, 2> camera_pan_clip{};
     float camera_zoom{1.6F};

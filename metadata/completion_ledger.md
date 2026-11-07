@@ -20,6 +20,16 @@ passed and the Release game target rebuilt. Pre-race rendering keeps the
 track-text fallback. This wires task identity to model submission only; runtime
 matrices and wobble motion remain disconnected.
 
+The first requested WARP screenshot used the native mode-0 camera at its
+cockpit attachment point and showed a mostly black frame. Startup now uses the
+existing exterior chase view, with a wider and higher offset; F3 still switches
+to the recovered mode-0 view. A second bounded, silent 3-frame capture on
+Bemidji with forced grid placement shows the full player car, opponents, road,
+and buildings. The result is materially more legible, but parity is still poor:
+a large black wedge, crude track textures, and lighting/material differences
+remain visible. The capture is kept outside the source repository at
+`../captures/viper-bemidji-chase-wide.bmp`; no game process remains running.
+
 The historical 2026-10-24 AI-sidecar inventory below missed indexed resources:
 all eight supplied track bundles contain `default.ili` and `rdefault.ili`, and
 `drivers.res` contains 524 `.ilg` lines and 695 `.dnt` notes. See [AI note
