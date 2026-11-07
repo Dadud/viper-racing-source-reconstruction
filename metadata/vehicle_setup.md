@@ -690,8 +690,19 @@ caller copies those three fields to its local vector at `0x4429F1..0x442A0C`
 and uses them in the plane-normal dot product at `0x442C71..0x442C8B`. The live
 reconstruction reads the corresponding `body_basis[3..5]` values. The saved
 trace's contact-gate rejections therefore do not justify flipping this vector;
-the next comparison target is the selected terrain plane/normal and the wheel
-query point at `+0xC8`.
+the original-runtime comparison target remains the selected terrain
+plane/normal and the wheel query point at `+0xC8`.
+
+The target-free `viper_reconstruction --inspect-terrain BUNDLE --terrain-sample
+X Y Z` diagnostic reads those fields from the supplied track resource. At the
+saved Bemidji sample `(219.782318, 0.407693505, -35.3858795)`, it selected plane
+10394, returned point `(219.782318, 0.306743562, -35.3858795)` and normal
+`(0, 0.999994218, -0.00340401428)`, matching the recorded trace. The point is
+about `0.10095` below the wheel query origin; projected onto the native +Y
+direction, that is negative depth, so native `0x442530` leaves contact
+inactive on this sample. This confirms the asset-backed reconstruction agrees
+with its saved query result at that coordinate; it does not independently
+validate the original runtime output.
 
 The direct contact branch is modeled by `update_wheel_contact`. Each wheel
 update first clears feature `+0x19C`; when the body query gate is enabled, the

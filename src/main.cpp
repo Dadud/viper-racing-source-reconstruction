@@ -52,6 +52,7 @@ void print_usage(std::ostream& output)
            << "       viper_reconstruction --inspect-font BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-text-table BUNDLE_PATH RESOURCE_NAME\n"
            << "       viper_reconstruction --inspect-terrain BUNDLE_PATH\n"
+           << "       viper_reconstruction --inspect-terrain BUNDLE_PATH --terrain-sample X Y Z\n"
            << "       viper_reconstruction --inspect-language LNG_PATH [KEY]\n"
            << "       viper_reconstruction --help | --version\n\n"
            << "Asset files stay outside this source repository. Set VIPER_DATA_DIR\n"
@@ -456,7 +457,8 @@ float parse_finite_float(const std::string_view text, const std::string_view lab
     return value;
 }
 
-int inspect_terrain(const std::filesystem::path& path)
+int inspect_terrain(const std::filesystem::path& path,
+                    const std::optional<std::array<float, 3>>& sample_position)
 {
     const auto bundle = viper::ResourceBundle::open(path);
     const auto terrain = viper::parse_track_terrain_resource(bundle);
@@ -469,6 +471,26 @@ int inspect_terrain(const std::filesystem::path& path)
               << "planes\t" << terrain->planes.size() << '\n'
               << "partition_nodes\t" << terrain->partition_nodes.size() << '\n'
               << "root_node_index\t" << terrain->root_node_index << '\n';
+    if (sample_position) {
+        const auto sample = viper::sample_terrain_resource(
+            *terrain, *sample_position, true);
+        std::cout << "sample_x\t" << (*sample_position)[0] << '\n'
+                  << "sample_y\t" << (*sample_position)[1] << '\n'
+                  << "sample_z\t" << (*sample_position)[2] << '\n'
+                  << "query_succeeded\t" << sample.query_succeeded << '\n'
+                  << "selected_plane_index\t" << sample.selected_plane_index << '\n'
+                  << "quantized_lookup_x\t" << sample.quantized_lookup_position[0] << '\n'
+                  << "quantized_lookup_z\t" << sample.quantized_lookup_position[2] << '\n';
+        if (sample.query_succeeded) {
+            std::cout << "terrain_point_x\t" << sample.sampled_position[0] << '\n'
+                      << "terrain_point_y\t" << sample.sampled_position[1] << '\n'
+                      << "terrain_point_z\t" << sample.sampled_position[2] << '\n'
+                      << "plane_normal_x\t" << sample.plane_normal[0] << '\n'
+                      << "plane_normal_y\t" << sample.plane_normal[1] << '\n'
+                      << "plane_normal_z\t" << sample.plane_normal[2] << '\n'
+                      << "surface_value_0x34\t" << sample.surface_value_0x34 << '\n';
+        }
+    }
     return 0;
 }
 
@@ -734,6 +756,7 @@ int main(int argc, char** argv)
         std::optional<std::array<float, 6>> grf_view_camera;
         float grf_view_detail_level = 1.0F;
         bool inspect_track_terrain = false;
+        std::optional<std::array<float, 3>> terrain_sample_position;
 
         for (int i = 1; i < argc; ++i) {
             const std::string_view argument(argv[i]);
@@ -895,6 +918,17 @@ int main(int argc, char** argv)
                 inspect_track_terrain = true;
                 continue;
             }
+            if (argument == "--terrain-sample") {
+                if (i + 3 >= argc) {
+                    throw std::invalid_argument(
+                        "--terrain-sample requires X, Y, and Z coordinates");
+                }
+                terrain_sample_position = std::array<float, 3>{
+                    parse_finite_float(argv[++i], "terrain sample X"),
+                    parse_finite_float(argv[++i], "terrain sample Y"),
+                    parse_finite_float(argv[++i], "terrain sample Z")};
+                continue;
+            }
             if (argument == "--data-dir") {
                 if (i + 1 >= argc) {
                     throw std::invalid_argument("--data-dir requires a path");
@@ -905,6 +939,10 @@ int main(int argc, char** argv)
             throw std::invalid_argument("unknown option: " + std::string(argument));
         }
 
+        if (terrain_sample_position && !inspect_track_terrain) {
+            throw std::invalid_argument(
+                "--terrain-sample requires --inspect-terrain BUNDLE_PATH");
+        }
         if (list_assets && resource_bundle_path) {
             throw std::invalid_argument("--list-assets and --list-resources are separate actions");
         }
@@ -985,7 +1023,12 @@ int main(int argc, char** argv)
                     *wobble_graf_resource_name);
             }
             if (inspect_track_terrain) {
-                return inspect_terrain(*resource_bundle_path);
+                return inspect_terrain(*resource_bundle_path,
+                    terrain_sample_position);
+            }
+            if (terrain_sample_position) {
+                throw std::invalid_argument(
+                    "--terrain-sample requires --inspect-terrain");
             }
             return inspect_resource_bundle(*resource_bundle_path);
         }
