@@ -225,6 +225,13 @@ the link and trailing object writes do not. Evidence: `0x436ED0`,
 resource lookup `0x420970`,
 `ev_1bb2651b902d18f7d9e14701002e84f4ff795cdcc7c2b339e4c053022f73db7b`.
 
+The ordered runtime materializer now retains the validated WOBL record's four
+raw words at `+0x08..+0x14`, lookup key at `+0x18`, and type word at `+0x1C`
+in `PhysicsWoblTaskRuntimeState`. The raw words are kept as DWORDs because
+their semantics are not assigned. This closes input retention only: the
+materializer does not yet supply a resource table to the constructor planner,
+create a WOBL task state, run its callback, or update render snapshots.
+
 `plan_physics_gcar_task_constructor` now covers the GCAR constructor's large
 sample buffer and the bounded tail of its source initialization. It records
 the base-car field copies at `+0xEC8` and `+0xECC`, singleton assignment at

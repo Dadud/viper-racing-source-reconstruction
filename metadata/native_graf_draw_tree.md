@@ -218,5 +218,10 @@ manager join consistent; proving the exact runtime index still requires
 confirming there is no earlier dynamically named duplicate and tracing which
 adjacent snapshots the display consumes.
 
-The reconstruction still needs runtime WOBL task state and a mode-4 draw path;
-static GRAF registration alone does not animate or draw these instances.
+The renderer has a static mode-4 draw path for WOBL IDs found in `track.obt`;
+its initial identity-basis/GRAF-center placement remains an inference. The
+ordered task runtime now retains each validated WOBL record's four leading raw
+words, resource ID, and type word. It still does not resolve those records to
+the native WOBL resource table, instantiate task state, run `0x436F70`, or feed
+the shared snapshot matrix to the renderer, so this change does not add wobble
+motion or establish transform parity.

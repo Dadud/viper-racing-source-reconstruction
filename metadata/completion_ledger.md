@@ -1,5 +1,17 @@
 # Playable reconstruction completion ledger
 
+## 2026-11-06 update
+
+The validated physics task runtime now retains WOBL constructor inputs as a
+typed entry: all four raw DWORDs at record `+0x08..+0x14`, the model/resource
+lookup key at `+0x18`, and the type word at `+0x1C`. Raw bit patterns are kept
+because the first four field meanings remain unassigned. The stream regression
+covers mixed CHKP/STAT/WOBL/OBST ordering and verifies those bytes survive
+materialization. `physics_task_stream_regression` passed, and the Release
+`viper_game` target built successfully. This does not yet instantiate WOBL
+physics state, resolve its resource entry, run the callback, or connect live
+transform snapshots to rendering; the mode-4 GRAF placement remains static.
+
 The historical 2026-10-24 AI-sidecar inventory below missed indexed resources:
 all eight supplied track bundles contain `default.ili` and `rdefault.ili`, and
 `drivers.res` contains 524 `.ilg` lines and 695 `.dnt` notes. See [AI note

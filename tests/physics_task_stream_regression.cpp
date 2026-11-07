@@ -865,8 +865,22 @@ int main()
             write_checkpoint_word(0x08U + field * 4U,
                 std::bit_cast<std::uint32_t>(checkpoint_endpoints[field]));
         auto unsupported_active_record = make_physics_record(0x4f425354U, 0x38U);
-        const std::array<viper::PhysicsTaskRecordInput, 3> runtime_records{{
-            {checkpoint_record}, {stat_record}, {unsupported_active_record}}};
+        auto wobl_record = make_physics_record(0x574f424cU, 0x20U);
+        const auto write_wobl_word = [&wobl_record](
+            const std::size_t offset, const std::uint32_t value) {
+            for (std::size_t byte = 0U; byte < 4U; ++byte) {
+                wobl_record[offset + byte] = static_cast<std::byte>(
+                    (value >> (byte * 8U)) & 0xffU);
+            }
+        };
+        constexpr std::array<std::uint32_t, 6> wobl_words{
+            0x3f800000U, 0xc0200000U, 0x41200000U, 0x00000001U,
+            0x0000012cU, 1U};
+        for (std::size_t word = 0U; word < wobl_words.size(); ++word)
+            write_wobl_word(0x08U + word * sizeof(std::uint32_t), wobl_words[word]);
+        const std::array<viper::PhysicsTaskRecordInput, 4> runtime_records{{
+            {checkpoint_record}, {stat_record}, {wobl_record},
+            {unsupported_active_record}}};
         const auto runtime_serialized = viper::serialize_physics_task_records(
             runtime_records, 0x40U);
         const auto runtime_decoded = viper::read_physics_task_record_stream(
@@ -879,7 +893,7 @@ int main()
                     viper::PhysicsTaskRecordStreamReadStatus::complete &&
                     runtime_tasks.status ==
                     viper::PhysicsTaskRuntimeCollectionStatus::complete &&
-                    runtime_tasks.entries.size() == 3U,
+                    runtime_tasks.entries.size() == 4U,
                 "semantic task runtime did not retain the complete ordered stream");
         require(runtime_tasks.entries[0].record_tag == 0x43484b50U &&
                     runtime_tasks.entries[0].stream_record_index == 0U &&
@@ -902,16 +916,26 @@ int main()
                     runtime_tasks.entries[1].stat.has_value() &&
                     runtime_tasks.entries[1].stat->serialized_stream_cursor ==
                         runtime_decoded.records[1].cursor_offset &&
-                    runtime_tasks.entries[2].record_tag == 0x4f425354U &&
+                    runtime_tasks.entries[2].record_tag == 0x574f424cU &&
                     runtime_tasks.entries[2].status ==
+                        viper::PhysicsTaskRuntimeEntryStatus::wobl_record_retained &&
+                    runtime_tasks.entries[2].callback_behavior_unavailable &&
+                    runtime_tasks.entries[2].wobl.has_value() &&
+                    runtime_tasks.entries[2].wobl->raw_words_0x08_to_0x14 ==
+                        std::array<std::uint32_t, 4>{
+                            0x3f800000U, 0xc0200000U, 0x41200000U, 0x00000001U} &&
+                    runtime_tasks.entries[2].wobl->resource_id_0x18 == 0x12cU &&
+                    runtime_tasks.entries[2].wobl->type_0x1c == 1U &&
+                    runtime_tasks.entries[3].record_tag == 0x4f425354U &&
+                    runtime_tasks.entries[3].status ==
                         viper::PhysicsTaskRuntimeEntryStatus::
                             obstacle_cached_pose_retained &&
-                    runtime_tasks.entries[2].callback_behavior_unavailable &&
-                    runtime_tasks.entries[2].obstacle.has_value() &&
-                    runtime_tasks.entries[2].obstacle->geometry_records.empty() &&
-                    !runtime_tasks.entries[2].checkpoint.has_value() &&
-                    !runtime_tasks.entries[2].stat.has_value(),
-                "semantic task runtime did not preserve OBST pose and unavailable callback status");
+                    runtime_tasks.entries[3].callback_behavior_unavailable &&
+                    runtime_tasks.entries[3].obstacle.has_value() &&
+                    runtime_tasks.entries[3].obstacle->geometry_records.empty() &&
+                    !runtime_tasks.entries[3].checkpoint.has_value() &&
+                    !runtime_tasks.entries[3].stat.has_value(),
+                "semantic task runtime did not preserve WOBL constructor inputs and OBST pose");
 
         // Synthetic fixture for the captured factory order: seven ACAR cars,
         // the player PCAR, then three CHKP objects. This verifies serialized

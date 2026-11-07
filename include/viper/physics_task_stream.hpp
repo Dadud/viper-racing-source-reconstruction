@@ -225,7 +225,17 @@ enum class PhysicsTaskRuntimeEntryStatus : std::uint8_t {
     unsupported_stat_variant,
     obstacle_cached_pose_retained,
     obstacle_shape_geometry_retained,
+    wobl_record_retained,
     active_callback_unavailable,
+};
+
+// Raw validated WOBL constructor input. The four leading values and type word
+// retain their serialized bit patterns because their field semantics are not
+// all established; resource_id is the observed lookup key at record +0x18.
+struct PhysicsWoblTaskRuntimeState {
+    std::array<std::uint32_t, 4> raw_words_0x08_to_0x14{};
+    std::uint32_t resource_id_0x18{};
+    std::uint32_t type_0x1c{};
 };
 
 struct PhysicsObstacleTaskRuntimeState {
@@ -264,6 +274,7 @@ struct PhysicsTaskRuntimeEntry {
     std::optional<PhysicsCheckpointTaskRuntimeState> checkpoint;
     std::optional<PhysicsStatTaskRuntimeState> stat;
     std::optional<PhysicsObstacleTaskRuntimeState> obstacle;
+    std::optional<PhysicsWoblTaskRuntimeState> wobl;
 };
 
 enum class PhysicsTaskRuntimeCollectionStatus : std::uint8_t {

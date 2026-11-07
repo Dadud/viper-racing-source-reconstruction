@@ -6931,6 +6931,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
         std::size_t retained_inactive_stat_count = 0U;
         std::size_t retained_obstacle_pose_count = 0U;
         std::size_t retained_obstacle_geometry_count = 0U;
+        std::size_t retained_wobl_record_count = 0U;
         std::size_t unsupported_stat_variant_count = 0U;
         std::size_t unavailable_active_callback_count = 0U;
         if (stream_ok && state.physics_task_runtime_collection.has_value()) {
@@ -6968,6 +6969,13 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                     }
                     ++retained_obstacle_pose_count;
                     ++retained_obstacle_geometry_count;
+                    break;
+                case viper::PhysicsTaskRuntimeEntryStatus::wobl_record_retained:
+                    if (!entry.wobl.has_value()) {
+                        stream_ok = false;
+                        break;
+                    }
+                    ++retained_wobl_record_count;
                     break;
                 case viper::PhysicsTaskRuntimeEntryStatus::active_callback_unavailable:
                     break;
@@ -7011,7 +7019,9 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                       << retained_obstacle_pose_count
                       << " OBST cached poses (including "
                       << retained_obstacle_geometry_count
-                      << " with selector-2 geometry); "
+                      << " with selector-2 geometry), "
+                      << retained_wobl_record_count
+                      << " WOBL constructor records; "
                       << unsupported_stat_variant_count
                       << " unsupported STAT variants and "
                       << unavailable_active_callback_count

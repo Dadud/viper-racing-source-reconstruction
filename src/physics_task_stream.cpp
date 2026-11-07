@@ -459,10 +459,28 @@ PhysicsTaskRuntimeCollection materialize_physics_task_runtime_collection(
                     obstacle_cached_pose_retained;
             }
             entry.obstacle = std::move(obstacle);
+        } else if (record.record_tag == 0x574f424cU) { // WOBL constructor record
+            if (record_bytes.size() < 0x20U) {
+                collection.entries.clear();
+                collection.status =
+                    PhysicsTaskRuntimeCollectionStatus::entry_materialization_failed;
+                collection.failed_record_index = index;
+                return collection;
+            }
+            PhysicsWoblTaskRuntimeState wobl{};
+            for (std::size_t word = 0U; word < wobl.raw_words_0x08_to_0x14.size();
+                 ++word) {
+                wobl.raw_words_0x08_to_0x14[word] = read_record_u32(
+                    0x08U + word * sizeof(std::uint32_t));
+            }
+            wobl.resource_id_0x18 = read_record_u32(0x18U);
+            wobl.type_0x1c = read_record_u32(0x1cU);
+            entry.status = PhysicsTaskRuntimeEntryStatus::wobl_record_retained;
+            entry.wobl = wobl;
         } else {
             // Preserve order and identity while refusing to invent active
-            // callback state for PCAR/ACAR, truncated OBST, WOBL, and other
-            // known classes.
+            // callback state for PCAR/ACAR, truncated OBST, and other known
+            // classes.
             entry.status = PhysicsTaskRuntimeEntryStatus::active_callback_unavailable;
         }
         collection.entries.push_back(std::move(entry));
