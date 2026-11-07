@@ -635,6 +635,19 @@ SHA-256 digests are
 `145EC4E50E9B90063E68F3A383320E38F6F796CFC663498C8D2735BBAEA74CF6`,
 respectively.
 
+The follow-up trace had 192 rows with 677 fields each. Terrain queries
+succeeded on all 192 ticks for all four wheels; the contact gate passed on
+157/158/157/158 ticks, but end-of-tick contact-active remained true on only
+45/52/49/53 ticks, with suspension reset flags on 147/140/143/139 ticks. This
+places the loss of persistent contact after successful surface queries, in the
+contact/suspension state path. The body begins at y `0.915`, reaches about
+`0.709`, then rebounds above `1.5` before falling below zero by the final
+sample. That oscillation and intermittent support make the current grounded
+drive trace unsuitable for acceleration acceptance. The next physics audit
+should compare contact-state transitions and suspension reset conditions
+against the same ordinary-placement interval in the original before changing
+the model.
+
 As an independent semantic reference, the public
 [Viper Racing source port](https://github.com/HerbFargus/viper-racing-port/tree/b72d263)
 at commit `b72d263` has source for Engine, Clutch, Transmission, Differential,
