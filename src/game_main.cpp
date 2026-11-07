@@ -6463,6 +6463,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 stream_failure_stage = "retain bound ACAR constructor state";
                 state.ai_acar_curve_sources.clear();
                 state.ai_acar_body_states.clear();
+                state.session_ordinal_pair_rows.clear();
+                state.session_ordinal_pair_rows_ready = false;
                 for (const auto& binding : state.configured_car_stream_bindings) {
                     if (binding.record_tag != 0x41434152U) continue;
                     if (binding.record_bytes_offset > stream.bytes.size() ||
@@ -6992,6 +6994,8 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
             state.configured_car_stream_bindings.clear();
             state.ai_acar_curve_sources.clear();
             state.ai_acar_body_states.clear();
+            state.session_ordinal_pair_rows.clear();
+            state.session_ordinal_pair_rows_ready = false;
             state.player_pcar_task_binding.reset();
             std::cout << "; full stream serialization validation failed";
         }
