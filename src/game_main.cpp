@@ -2862,6 +2862,7 @@ struct PlayerPhysicsTickContext {
     std::array<std::optional<viper::WheelSpinPreprojectionResult>, 4>
         wheel_spin_preprojection_results{};
     std::array<std::optional<float>, 4> wheel_angle_0xac_after_tick{};
+    std::array<std::optional<std::uint8_t>, 4> wheel_contact_query_gate_passed{};
     std::array<std::optional<std::uint8_t>, 4> wheel_contact_gate_passed_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_depth_after_tick{};
     std::array<std::optional<float>, 4> wheel_contact_clamped_depth_after_tick{};
@@ -3876,6 +3877,8 @@ struct WindowState {
             viper::WheelContactObservation observation{};
             observation.body_query_enabled =
                 std::bit_cast<std::int32_t>(body_basis[4]) > 0;
+            tick.wheel_contact_query_gate_passed[wheel] =
+                static_cast<std::uint8_t>(observation.body_query_enabled ? 1U : 0U);
             observation.reset_feature_hook_active = false;
             observation.contact_projection_origin = *wheel_world_point;
             observation.contact_direction = body_up;
@@ -6954,6 +6957,7 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                 << ",wheel" << wheel << "_spin_response_0x90"
                 << ",wheel" << wheel << "_spin_blend_0x28"
                 << ",wheel" << wheel << "_angle_0xac"
+                << ",wheel" << wheel << "_contact_query_gate_passed"
                 << ",wheel" << wheel << "_contact_gate_passed"
                 << ",wheel" << wheel << "_projected_depth"
                 << ",wheel" << wheel << "_clamped_contact_depth"
@@ -7460,6 +7464,11 @@ int run_window(bool software, std::optional<unsigned> smoke_frames,
                         physics_tick_trace << ',';
                         if (tick.wheel_angle_0xac_after_tick[wheel])
                             physics_tick_trace << *tick.wheel_angle_0xac_after_tick[wheel];
+                        physics_tick_trace << ',';
+                        if (tick.wheel_contact_query_gate_passed[wheel]) {
+                            physics_tick_trace << static_cast<unsigned>(
+                                *tick.wheel_contact_query_gate_passed[wheel]);
+                        }
                         physics_tick_trace << ',';
                         if (tick.wheel_contact_gate_passed_after_tick[wheel]) {
                             physics_tick_trace << static_cast<unsigned>(

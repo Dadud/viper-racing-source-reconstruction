@@ -672,3 +672,8 @@ not establish whether those orientations match the original at the same ticks.
 The reusable offline summarizer is
 `tools/analyze_wheel_suspension_trace.ps1`. These counts are diagnostic
 evidence only, not a physics-parity result.
+
+The fixed-step CSV now records `wheelN_contact_query_gate_passed` separately
+from `wheelN_contact_query_succeeded` and `wheelN_contact_gate_passed`. This
+distinguishes a native parent-body `+0x48` skip from a terrain lookup miss and
+from the later normal/feature gate on the next existing bounded trace.
