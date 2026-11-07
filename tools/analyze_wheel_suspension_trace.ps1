@@ -15,6 +15,13 @@ foreach ($wheel in 0..3) {
     $required = @(
         "${prefix}suspension_reset_contact",
         "${prefix}contact_gate_passed",
+        "${prefix}contact_query_succeeded",
+        "${prefix}contact_direction_x",
+        "${prefix}contact_direction_y",
+        "${prefix}contact_direction_z",
+        "${prefix}query_contact_normal_x",
+        "${prefix}query_contact_normal_y",
+        "${prefix}query_contact_normal_z",
         "${prefix}projected_depth",
         "${prefix}surface_adjusted_response_0x178"
     )
@@ -26,7 +33,9 @@ foreach ($wheel in 0..3) {
 
     $totals = [ordered]@{
         reset = 0
-        contact_gate_not_passed = 0
+        contact_query_not_succeeded = 0
+        normal_alignment_rejected = 0
+        other_contact_gate_rejection = 0
         negative_projected_depth = 0
         negative_response_with_valid_contact = 0
         unclassified_or_inconsistent = 0
@@ -36,7 +45,30 @@ foreach ($wheel in 0..3) {
         $totals.reset++
 
         if ($row."${prefix}contact_gate_passed" -ne '1') {
-            $totals.contact_gate_not_passed++
+            if ($row."${prefix}contact_query_succeeded" -ne '1') {
+                $totals.contact_query_not_succeeded++
+                continue
+            }
+            $direction = @(
+                [double]$row."${prefix}contact_direction_x",
+                [double]$row."${prefix}contact_direction_y",
+                [double]$row."${prefix}contact_direction_z"
+            )
+            $normal = @(
+                [double]$row."${prefix}query_contact_normal_x",
+                [double]$row."${prefix}query_contact_normal_y",
+                [double]$row."${prefix}query_contact_normal_z"
+            )
+            $alignment = 0.0
+            for ($axis = 0; $axis -lt 3; $axis++) {
+                $alignment += $direction[$axis] * $normal[$axis]
+            }
+            if ($alignment -le 0.1) {
+                $totals.normal_alignment_rejected++
+            }
+            else {
+                $totals.other_contact_gate_rejection++
+            }
             continue
         }
 

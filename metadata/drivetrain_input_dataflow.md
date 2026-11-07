@@ -664,7 +664,11 @@ inactive). Across wheels 0–3, reset counts were 147/140/143/139. Of those,
 gate but had negative projected depth; and 9/8/29/31 had nonnegative projected
 depth with negative adjusted response. The categories partition each wheel's
 reset ticks in this capture. Most observed resets therefore came from negative
-projected depth, with a smaller response-sign contribution. This local trace
-does not establish which input first diverged from the original. The reusable
-offline summarizer is `tools/analyze_wheel_suspension_trace.ps1`. These counts
-are diagnostic evidence only, not a physics-parity result.
+projected depth, with a smaller response-sign contribution. Every terrain
+query succeeded in this capture, and each failed contact gate had a
+contact-direction/terrain-normal dot product at or below the native `0.1`
+threshold: 35/34/35/34 rejection ticks for wheels 0–3. This local trace does
+not establish whether those orientations match the original at the same ticks.
+The reusable offline summarizer is
+`tools/analyze_wheel_suspension_trace.ps1`. These counts are diagnostic
+evidence only, not a physics-parity result.
